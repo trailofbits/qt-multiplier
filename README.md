@@ -34,7 +34,22 @@ cmake \
   -DCMAKE_PREFIX_PATH="/usr/local/opt;${WORKSPACE_DIR}/install"
   -S . -B ~/build/qt-multiplier
   
-cmake --build ~/build/qt-multiplier
+cmake --build ${WORKSPACE_DIR}/build/qt-multiplier
 
 ```
 
+## Run QT Multiplier
+
+Within `${WORKSPACE_DIR}/build/qt-multiplier` there should be a file called `Multipier.app`. Open this file to launch the GUI.
+
+On macOS this can be done via `open ${WORKSPACE_DIR}/build/qt-multiplier/Multipier.app`
+
+## Example Workflow
+
+- Select "Launch new indexer" from the "File" menu
+
+- Create os select a directory (e.g. /tmp/ws)
+
+- Use the default options for host and port. Wait from approximately 3 seconds
+
+- Select "Import Build" from the "File" menu and choose compile_commands.json of interest. Wait again. Larger files will require longer wait time.
