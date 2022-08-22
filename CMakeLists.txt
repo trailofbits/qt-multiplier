@@ -31,6 +31,8 @@ find_package(${MX_QT} COMPONENTS ${MX_QT_COMPONENTS} REQUIRED)
 
 find_package(multiplier CONFIG REQUIRED)
 
+find_package(sqlite-multiplier CONFIG REQUIRED)
+
 set(exe_name "mx-gui")
 add_executable("${exe_name}"
 
@@ -93,6 +95,7 @@ target_link_libraries("${exe_name}" PRIVATE
   multiplier::mx-api
   ${MX_QT}::Core
   ${MX_QT}::Widgets
+  sqlite-multiplier::mxsqlitebridge
 )
 
 if(MX_QT_VERSION GREATER "5")
@@ -127,8 +130,6 @@ else()
   message(STATUS "Found Remarks library: ${lib_remarks_path}")
 endif()
 get_filename_component(lib_remarks_name "${lib_remarks_path}" NAME)
-
-get_target_property(mx_sqlite_bridge_path multiplier::mxsqlitebridge IMPORTED_LOCATION)
 
 if(PLATFORM_MACOS)
   find_program(install_name_tool install_name_tool)
@@ -170,7 +171,7 @@ if(PLATFORM_MACOS)
       "$<TARGET_FILE:mx-gui>"
       "$<TARGET_FILE:multiplier::mx-index>"
       "$<TARGET_FILE:multiplier::mx-import>"
-      "$<TARGET_FILE:multiplier::mxsqlitebridge>"
+      "$<TARGET_FILE:sqlite-multiplier::mxsqlitebridge>"
       "${lib_lto_path}"
       "${lib_remarks_path}"
       "${plist_path}"
@@ -186,7 +187,7 @@ if(PLATFORM_MACOS)
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:mx-gui>" "${output_bundle_path}/Contents/MacOS/Multiplier"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-index>" "${output_bundle_path}/Contents/bin/mx-index"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-import>" "${output_bundle_path}/Contents/bin/mx-import"
-    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mxsqlitebridge>" "${output_bundle_path}/Contents/lib/mxsqlitebridge.a"
+    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:sqlite-multiplier::mxsqlitebridge>" "${output_bundle_path}/Contents/lib/mxsqlitebridge.a"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_lto_path}" "${output_bundle_path}/Contents/lib/${lib_lto_name}"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_remarks_path}" "${output_bundle_path}/Contents/lib/${lib_remarks_name}"
     COMMAND "${install_name_tool}" -change "@rpath/${lib_lto_name}" "@loader_path/../lib/${lib_lto_name}" "${output_bundle_path}/Contents/bin/mx-index"
