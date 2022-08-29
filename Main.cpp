@@ -22,6 +22,8 @@
 #include <multiplier/Index.h>
 #include <system_error>
 #include <tuple>
+#include <variant>
+
 
 #include "CodeView.h"
 #include "Configuration.h"
@@ -233,6 +235,7 @@ int main(int argc, char *argv[]) {
   qRegisterMetaType<mx::gui::UserLocations>("UserLocations");
   qRegisterMetaType<mx::RawEntityId>("RawEntityId");
   qRegisterMetaType<mx::EntityId>("EntityId");
+  qRegisterMetaType<std::optional<mx::VariantEntity>>("std::optional<VariantEntity>");
   qRegisterMetaType<mx::FilePathList>("FilePathList");
   qRegisterMetaType<mx::Token>("Token");
   qRegisterMetaType<mx::TokenRange>("TokenRange");

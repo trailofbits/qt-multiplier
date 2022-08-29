@@ -26,10 +26,12 @@
 
 #include <cassert>
 #include <iostream>
+#include <sstream>
 #include <multiplier/Index.h>
 #include <multiplier/Re2.h>
 #include <multiplier/Weggli.h>
 #include <string>
+#include <variant>
 
 #include "CodeSearchResults.h"
 #include "CodeTheme.h"
@@ -120,6 +122,12 @@ struct OmniBoxView::PrivateData {
   std::unordered_map<QTreeWidgetItem *, std::pair<RawEntityId, NamedDecl>>
       item_to_entity;
 
+  QWidget *entity_box{nullptr};
+  QGridLayout *entity_layout{nullptr};
+  QLineEdit *entity_input{nullptr};
+  QPushButton *entity_button{nullptr};
+  QWidget *entity_results{nullptr};
+
   QWidget *regex_box{nullptr};
   QGridLayout *regex_layout{nullptr};
   QLineEdit *regex_input{nullptr};
@@ -142,6 +150,7 @@ struct OmniBoxView::PrivateData {
   unsigned symbol_counter{0};
   unsigned regex_counter{0};
   unsigned weggli_counter{0};
+  unsigned entity_counter{0};
 
   std::unordered_map<RawEntityId, std::filesystem::path> file_id_to_path;
 
@@ -236,6 +245,49 @@ void OmniBoxView::InitializeWidgets(void) {
 
   connect(d->symbol_button, &QPushButton::pressed,
           this, &OmniBoxView::RunSymbolSearch);
+
+  // ---------------------------------------------------------------------------
+  // Entity name search
+  d->entity_box = new QWidget;
+  d->entity_layout = new QGridLayout;
+  d->entity_input = new QLineEdit;
+  d->entity_button = new QPushButton(tr("Query"));
+
+
+  button_font.setPointSize(input_font.pointSize());
+
+  d->entity_input->setFont(input_font);
+  d->entity_input->setFocus();
+  d->entity_button->setFont(button_font);
+  d->entity_button->setDisabled(true);
+
+
+  /*QFormLayout *column_layouts[2] = {new QFormLayout, new QFormLayout};
+
+  columns_widget = new QWidget;
+  columns_layout = new QHBoxLayout;
+  columns_widget->setLayout(columns_layout);
+  columns_layout->addLayout(column_layouts[0]);
+  columns_layout->addLayout(column_layouts[1]);*/
+
+  d->entity_box->setLayout(d->entity_layout);
+  d->entity_layout->addWidget(d->entity_button, 0, 0, 1, 1, Qt::AlignTop);
+  d->entity_layout->addWidget(d->entity_input, 0, 1, 1, 1, Qt::AlignTop);
+  //d->symbol_layout->addWidget(columns_widget, 1, 0, 1, 2, Qt::AlignTop);
+  d->entity_layout->setRowStretch(0, 0);
+  d->entity_layout->setRowStretch(1, 0);
+  d->entity_layout->setRowStretch(2, 1);
+
+  d->content->addTab(d->entity_box, tr("Go to Entity Id"));
+
+  connect(d->entity_input, &QLineEdit::textChanged,
+          this, &OmniBoxView::SetEntityIdQueryString);
+
+  connect(d->entity_input, &QLineEdit::returnPressed,
+          this, &OmniBoxView::RunEntityIdSearch);
+
+  connect(d->entity_button, &QPushButton::pressed,
+          this, &OmniBoxView::RunEntityIdSearch);
 
   // ---------------------------------------------------------------------------
   // Regex search
@@ -367,6 +419,11 @@ void OmniBoxView::Clear(void) {
   d->symbol_input->setText(QString());
   d->symbol_counter++;
   ClearSymbolResults();
+
+  d->entity_button->setDisabled(true);
+  d->entity_input->setText(QString());
+  d->entity_counter++;
+  ClearEntityResults();
 }
 
 void OmniBoxView::ClearSymbolResults(void) {
@@ -405,6 +462,16 @@ void OmniBoxView::ClearWeggliResults(void) {
   }
 }
 
+void OmniBoxView::ClearEntityResults(void) {
+  if (d->entity_results) {
+    d->entity_layout->removeWidget(d->entity_results);
+    d->entity_results->disconnect();
+    d->entity_results->deleteLater();
+    d->entity_results = nullptr;
+    update();
+  }
+}
+
 void OmniBoxView::OpenWeggliSearch(void) {
   d->content->setCurrentWidget(d->weggli_box);
   d->weggli_input->setFocus();
@@ -415,9 +482,14 @@ void OmniBoxView::OpenRegexSearch(void) {
   d->regex_input->setFocus();
 }
 
-void OmniBoxView::OpenEntitySearch(void) {
+void OmniBoxView::OpenSymbolQuerySearch(void) {
   d->content->setCurrentWidget(d->symbol_box);
   d->symbol_input->setFocus();
+}
+
+void OmniBoxView::OpenEntitySearch(void) {
+  d->content->setCurrentWidget(d->entity_box);
+  d->entity_input->setFocus();
 }
 
 void OmniBoxView::Focus(void) {
@@ -480,7 +552,6 @@ void OmniBoxView::RunSymbolSearch(void) {
 
   d->symbol_counter++;
   ClearSymbolResults();
-  d->symbol_results =
 
   d->symbol_results = new QTreeWidget;
   d->symbol_results->setColumnCount(kNumColumns);
@@ -672,6 +743,87 @@ void OmniBoxView::OnFoundSymbols(NamedDeclList symbols, DeclCategory category,
     FillRow(decl_child, decl);
     d->category_results[c]->addChild(decl_child);
   }
+}
+
+void OmniBoxView::SetEntityIdQueryString(const QString &text) {
+  if (text.isEmpty()) {
+	  d->entity_button->setDisabled(true);
+  } else {
+  	if (text.toULong()) {
+  		d->entity_button->setDisabled(false);
+  	} else {
+  	  d->entity_button->setDisabled(true);
+  	}
+  }
+  ClearEntityResults();
+
+}
+
+void OmniBoxView::RunEntityIdSearch(void) {
+
+	RawEntityId entity_id;
+
+	std::istringstream iss(d->entity_input->text().toStdString().c_str());
+  iss >> entity_id;
+
+	d->entity_counter++;
+
+  ClearEntityResults();
+  d->entity_results = new QLabel(tr("Loading entity"));
+  d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
+                             Qt::AlignmentFlag::AlignHCenter |
+                             Qt::AlignmentFlag::AlignVCenter);
+
+  entity_id = 13835058267480395895u;
+
+	auto runnable = new EntitySearchThread(
+			d->multiplier.Index(), d->multiplier.FileLocationCache(),
+			entity_id, d->entity_counter);
+	runnable->setAutoDelete(true);
+
+	connect(runnable, &EntitySearchThread::FoundEntity,
+			this, &OmniBoxView::OnFoundEntity);
+
+	QThreadPool::globalInstance()->start(runnable);
+
+}
+
+void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> entity, unsigned counter) {
+
+  ClearEntityResults();
+
+	if (d->entity_counter != counter) {
+    return;
+  }
+
+  ClearEntityResults();
+
+  const CodeTheme &theme = d->multiplier.CodeTheme();
+  theme.BeginTokens();
+
+  auto model = new CodeSearchResultsModel(d->multiplier);
+  auto table = new CodeSearchResultsView(model);
+
+  connect(table, &CodeSearchResultsView::TokenPressEvent,
+          &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+
+  if (std::holds_alternative<mx::NotAnEntity>(*entity)) {
+    d->entity_results = new QLabel(tr("No matches"));
+    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
+                               Qt::AlignmentFlag::AlignHCenter |
+                               Qt::AlignmentFlag::AlignVCenter);
+  } else if (!d->entity_results) {
+    //d->entity_results = table;
+    d->entity_results = new QLabel(tr("Found entity"));
+    //d->regex_to_dock_button->setEnabled(true);
+    //d->entity_to_tab_button->setEnabled(true);
+    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
+  }
+
+  theme.EndTokens();
+
+  update();
+
 }
 
 void OmniBoxView::BuildRegex(const QString &text) {
@@ -938,6 +1090,36 @@ void SymbolSearchThread::run(void) {
   }
 
   emit FoundSymbols(std::move(decls), d->category, d->counter);
+}
+
+struct EntitySearchThread::PrivateData {
+	const Index index;
+  const FileLocationCache &file_cache;
+  const RawEntityId raw_id;
+  const unsigned counter;
+
+	inline PrivateData(const Index &index_, const FileLocationCache &cache_,
+                     const RawEntityId raw_id_, unsigned counter_)
+      : index(index_),
+        file_cache(cache_),
+				raw_id(raw_id_),
+        counter(counter_) {}
+
+};
+
+EntitySearchThread::~EntitySearchThread(void) {}
+
+EntitySearchThread::EntitySearchThread(
+		const Index &index_, const FileLocationCache &cache_,
+    const RawEntityId raw_id_, unsigned counter_)
+		: d(std::make_unique<PrivateData>(
+				index_, cache_, raw_id_, counter_)) {}
+
+
+void EntitySearchThread::run(void) {
+	emit FoundEntity(
+			d->index.entity(d->raw_id),
+			d->counter);
 }
 
 struct RegexQueryThread::PrivateData {

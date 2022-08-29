@@ -39,6 +39,7 @@ class OmniBoxView final : public QWidget {
   void ClearSymbolResults(void);
   void ClearRegexResults(void);
   void ClearWeggliResults(void);
+  void ClearEntityResults(void);
 
   void FillRow(QTreeWidgetItem *item, const NamedDecl &decl) const;
 
@@ -49,6 +50,7 @@ class OmniBoxView final : public QWidget {
   void Clear(void);
   void OpenWeggliSearch(void);
   void OpenRegexSearch(void);
+  void OpenSymbolQuerySearch(void);
   void OpenEntitySearch(void);
 
   void Disconnected(void);
@@ -65,6 +67,10 @@ class OmniBoxView final : public QWidget {
   void OnFoundSymbols(NamedDeclList symbols, DeclCategory category,
                       unsigned counter);
   void OnSymbolItemClicked(QTreeWidgetItem *item, int column);
+
+  void SetEntityIdQueryString(const QString &text);
+  void RunEntityIdSearch(void);
+  void OnFoundEntity(std::optional<VariantEntity> entity, unsigned counter);
 
   void BuildRegex(const QString &text);
   void RunRegex(void);
@@ -106,6 +112,27 @@ class SymbolSearchThread final : public QObject, public QRunnable {
   void FoundSymbols(NamedDeclList symbols, DeclCategory category,
                     unsigned counter);
 };
+
+// Downloads the entity search results in the background.
+class EntitySearchThread final : public QObject, public QRunnable {
+  Q_OBJECT
+
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
+
+  void run(void) Q_DECL_FINAL;
+
+ public:
+  virtual ~EntitySearchThread(void);
+
+  explicit EntitySearchThread(
+      const Index &index_, const FileLocationCache &cache_,
+			const RawEntityId raw_id_, unsigned counter_);
+
+ signals:
+  void FoundEntity(std::optional<VariantEntity> entity, unsigned counter);
+};
+
 
 // Downloads the regex search results in the background.
 class RegexQueryThread final : public QObject, public QRunnable {

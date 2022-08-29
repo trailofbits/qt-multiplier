@@ -60,6 +60,7 @@ class CodeBrowserView final : public QWidget {
   void OpenWeggliSearch(void);
   void OpenRegexSearch(void);
   void OpenEntitySearch(void);
+  void OpenSymbolQuerySearch(void);
 
  public slots:
   void OnDownloadedFileList(FilePathList files);

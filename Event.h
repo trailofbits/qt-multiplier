@@ -215,6 +215,7 @@ enum class Action : int {
   kGoBackLinearHistory,
 
   kOpenEntitySearch,
+	kOpenSymbolQuerySearch,
   kOpenRegexSearch,
   kOpenWeggliSearch,
 };
