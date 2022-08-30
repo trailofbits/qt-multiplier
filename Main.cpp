@@ -4,6 +4,9 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
+// This needs to be included before any Qt stuff because of AUTOMOC/UIC macros
+#include <Python.h>
+
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
@@ -27,6 +30,7 @@
 #include "Configuration.h"
 #include "Multiplier.h"
 #include "ReferenceBrowserView.h"
+#include "PythonOutputAdapter.h"
 
 int main(int argc, char *argv[]) {
   QApplication application(argc, argv);
@@ -40,6 +44,24 @@ int main(int argc, char *argv[]) {
   parser.addOption(host_option);
   parser.addOption(port_option);
   parser.process(application);
+
+  Py_Initialize();
+
+  std::unique_ptr<int, void(*)(int*)> python_release(new int, [](int* x) {
+    Py_FinalizeEx();
+  });
+
+  mx::gui::PythonOutputAdapter::InitPythonType();
+  mx::gui::PythonOutputAdapter::StdOut = new mx::gui::PythonOutputAdapter();
+  mx::gui::PythonOutputAdapter::StdErr = new mx::gui::PythonOutputAdapter();
+
+  auto stdout_obj = mx::gui::PythonOutputAdapter::StdOut->GetInstance();
+  auto stderr_obj = mx::gui::PythonOutputAdapter::StdErr->GetInstance();
+
+  PyObject *sys = PyImport_ImportModule("sys");
+  PyObject_SetAttrString(sys, "stdout", stdout_obj);
+  PyObject_SetAttrString(sys, "stderr", stderr_obj);
+  Py_DECREF(sys);
 
   QSplashScreen splash_screen(QPixmap(":/Icons/appicon"));
   splash_screen.show();

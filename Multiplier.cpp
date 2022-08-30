@@ -42,6 +42,7 @@
 #include "HistoryBrowserView.h"
 #include "IndexMonitorThread.h"
 #include "OmniBoxView.h"
+#include "PythonPromptView.h"
 #include "OpenConnectionDialog.h"
 #include "ReferenceBrowserView.h"
 
@@ -101,6 +102,9 @@ struct Multiplier::PrivateData final {
 
   class HistoryBrowserView *history_browser_view{nullptr};
   QDockWidget *history_browser_dock{nullptr};
+
+  PythonPromptView *python_prompt_view{nullptr};
+  QDockWidget *python_prompt_dock{nullptr};
 
   Qt::KeyboardModifiers modifiers;
   Qt::Key key{Qt::Key_unknown};
@@ -360,12 +364,17 @@ void Multiplier::InitializeWidgets(void) {
   d->history_browser_dock = new QDockWidget(d->history_browser_view->windowTitle());
   d->history_browser_dock->setWidget(d->history_browser_view);
 
+  d->python_prompt_view = new PythonPromptView(this);
+  d->python_prompt_dock = new QDockWidget(d->python_prompt_view->windowTitle());
+  d->python_prompt_dock->setWidget(d->python_prompt_view);
+
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::East);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
   addDockWidget(Qt::LeftDockWidgetArea, d->file_browser_dock);
   addDockWidget(Qt::LeftDockWidgetArea, d->history_browser_dock);
   addDockWidget(Qt::LeftDockWidgetArea, d->reference_browser_dock);
+  addDockWidget(Qt::BottomDockWidgetArea, d->python_prompt_dock);
   tabifyDockWidget(d->file_browser_dock, d->history_browser_dock);
   tabifyDockWidget(d->history_browser_dock, d->reference_browser_dock);
 
