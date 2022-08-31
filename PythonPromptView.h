@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <multiplier/Index.h>
+
 #include <QWidget>
 
 #include <memory>
@@ -13,6 +15,8 @@
 namespace mx {
 
 namespace gui {
+
+class Multiplier;
 
 class PythonPromptView final : public QWidget {
   Q_OBJECT
@@ -26,8 +30,13 @@ class PythonPromptView final : public QWidget {
   void OnStdOut(const QString& str);
   void OnStdErr(const QString& str);
 
+ public slots:
+  void Connected();
+  void Disconnected();
+  void CurrentFile(mx::RawEntityId id);
+
  public:
-  PythonPromptView(QWidget *parent=nullptr);
+  PythonPromptView(Multiplier& multiplier);
   virtual ~PythonPromptView(void);
 };
 

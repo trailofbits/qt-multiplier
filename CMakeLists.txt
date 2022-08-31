@@ -33,6 +33,7 @@ find_package(multiplier CONFIG REQUIRED)
 
 find_package(sqlite-multiplier CONFIG REQUIRED)
 find_package(Python3 3.7 MODULE REQUIRED COMPONENTS Development)
+find_package(py-multiplier CONFIG REQUIRED)
 
 set(exe_name "mx-gui")
 add_executable("${exe_name}"
@@ -104,6 +105,7 @@ target_link_libraries("${exe_name}" PRIVATE
   ${MX_QT}::Widgets
   sqlite-multiplier::mxsqlitebridge
   Python3::Python
+  py-multiplier::py-multiplier
 )
 
 if(MX_QT_VERSION GREATER "5")

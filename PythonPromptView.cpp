@@ -4,6 +4,7 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 #include <Python.h>
+#include <py-multiplier/api.h>
 #include "PythonOutputAdapter.h"
 
 #include <QApplication>
@@ -13,11 +14,15 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 
+#include "Multiplier.h"
+
 #include "PythonPromptView.h"
 
 namespace mx::gui {
 
 struct PythonPromptView::PrivateData {
+  Multiplier& multiplier;
+
   QLineEdit* input_box;
   QTextEdit* output_box;
   QLabel* prompt_label;
@@ -25,13 +30,15 @@ struct PythonPromptView::PrivateData {
   QStringList buffer;
   PyObject* compile;
 
+  PrivateData(Multiplier& multiplier) : multiplier(multiplier) {}
+
   ~PrivateData() {
     Py_DECREF(compile);
   }
 };
 
-PythonPromptView::PythonPromptView(QWidget *parent)
-    : QWidget(parent), d{std::make_unique<PrivateData>()} {
+PythonPromptView::PythonPromptView(Multiplier& multiplier)
+    : QWidget(&multiplier), d{std::make_unique<PrivateData>(multiplier)} {
   InitializeWidgets();
 }
 
@@ -135,6 +142,24 @@ void PythonPromptView::OnStdErr(const QString& str) {
   d->output_box->setTextColor(Qt::red);
   d->output_box->setFontItalic(false);
   d->output_box->insertPlainText(str);
+}
+
+void PythonPromptView::Connected() {
+  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  auto index_obj = ::mx::py::CreateObject(::mx::Index{d->multiplier.EntityProvider()});
+  PyDict_SetItemString(dict, "index", index_obj);
+}
+
+void PythonPromptView::Disconnected() {
+  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  PyDict_DelItemString(dict, "index");
+}
+
+void PythonPromptView::CurrentFile(mx::RawEntityId id) {
+  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  auto index = reinterpret_cast<mx::py::IndexWrapper*>(PyDict_GetItemString(dict, "index"));
+  auto file = mx::py::CreateObject(index->index.entity(id));
+  PyDict_SetItemString(dict, "current_file", file);
 }
 
 }  // namespace mx::gui

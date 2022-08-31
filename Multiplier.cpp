@@ -5,6 +5,8 @@
   This source code is licensed in accordance with the terms specified in
   the LICENSE file found in the root directory of this source tree.
 */
+#include <Python.h>
+#include <py-multiplier/api.h>
 
 #include "Multiplier.h"
 
@@ -118,6 +120,7 @@ struct Multiplier::PrivateData final {
   // The last user-caused event, excluding physical events.
   uint64_t last_event{0u};
 
+  mx::EntityProvider::Ptr ep;
   mx::Index index;
   mx::FileLocationCache line_cache;
 
@@ -146,6 +149,11 @@ Multiplier::~Multiplier(void) {}
 // Return the current connected index.
 const ::mx::Index &Multiplier::Index(void) const {
   return d->index;
+}
+
+// Return the current connected entity provider.
+const ::mx::EntityProvider::Ptr &Multiplier::EntityProvider(void) const {
+  return d->ep;
 }
 
 // Return the current code theme.
@@ -364,7 +372,7 @@ void Multiplier::InitializeWidgets(void) {
   d->history_browser_dock = new QDockWidget(d->history_browser_view->windowTitle());
   d->history_browser_dock->setWidget(d->history_browser_view);
 
-  d->python_prompt_view = new PythonPromptView(this);
+  d->python_prompt_view = new PythonPromptView(*this);
   d->python_prompt_dock = new QDockWidget(d->python_prompt_view->windowTitle());
   d->python_prompt_dock->setWidget(d->python_prompt_view);
 
@@ -400,6 +408,12 @@ void Multiplier::InitializeWidgets(void) {
 
   connect(d->history_browser_view, &HistoryBrowserView::TokenPressEvent,
           this, &Multiplier::ActOnTokenPressEvent);
+
+  connect(this, &Multiplier::IndexReady,
+          d->python_prompt_view, &PythonPromptView::Connected);
+
+  connect(d->code_browser_view, &CodeBrowserView::CurrentFile,
+          d->python_prompt_view, &PythonPromptView::CurrentFile);
 }
 
 void Multiplier::InitializeMenus(void) {
@@ -493,6 +507,7 @@ void Multiplier::UpdateWidgets(void) {
       d->file_browser_dock->hide();
       d->history_browser_dock->hide();
       d->reference_browser_dock->hide();
+      d->python_prompt_dock->hide();
       d->code_browser_view->Disconnected();
       break;
 
@@ -500,6 +515,7 @@ void Multiplier::UpdateWidgets(void) {
       d->file_browser_dock->show();
       d->history_browser_dock->show();
       d->reference_browser_dock->show();
+      d->python_prompt_dock->show();
       d->code_browser_view->Connected();
       break;
 
@@ -507,6 +523,7 @@ void Multiplier::UpdateWidgets(void) {
       d->file_browser_dock->hide();
       d->history_browser_dock->hide();
       d->reference_browser_dock->hide();
+      d->python_prompt_dock->hide();
       d->code_browser_view->Disconnected();
       break;
   }
@@ -590,17 +607,19 @@ void Multiplier::OnSourceFileDoubleClicked(
 }
 
 void Multiplier::OnLaunchedIndexerReady(void) {
-  d->monitor = new IndexMonitorThread(
-      EntityProvider::in_memory_cache(
-          EntityProvider::from_remote(
-              d->indexer_host.toStdString(),
-              d->indexer_port.toStdString()),
-          10u * 60u  /* 10 minutes */));
+  d->ep = EntityProvider::in_memory_cache(
+              EntityProvider::from_remote(
+                d->indexer_host.toStdString(),
+                d->indexer_port.toStdString()),
+              10u * 60u  /* 10 minutes */);
+  d->monitor = new IndexMonitorThread(d->ep);
 
   connect(d->monitor, &IndexMonitorThread::VersionNumberChanged,
           this, &Multiplier::OnVersionNumberChanged);
 
   d->monitor->Start();
+
+  emit IndexReady();
 }
 
 void Multiplier::OnVersionNumberChanged(::mx::Index index_) {
