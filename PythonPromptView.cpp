@@ -6,6 +6,7 @@
 #include <Python.h>
 #include <py-multiplier/api.h>
 #include "PythonOutputAdapter.h"
+#include <structmember.h>
 
 #include <QApplication>
 #include <QHBoxLayout>
@@ -30,6 +31,8 @@ struct PythonPromptView::PrivateData {
   QStringList buffer;
   PyObject* compile;
 
+  mx::RawEntityId current_file{};
+
   PrivateData(Multiplier& multiplier) : multiplier(multiplier) {}
 
   ~PrivateData() {
@@ -37,8 +40,88 @@ struct PythonPromptView::PrivateData {
   }
 };
 
+struct PythonPromptView::Wrapper final {
+  PyObject_HEAD
+  PythonPromptView* view;
+
+  Multiplier& Multiplier() {
+    return view->d->multiplier;
+  }
+
+  static PyObject* get_index(PyObject* self, void*) {
+    auto me = reinterpret_cast<Wrapper*>(self);
+    auto &ep = me->Multiplier().EntityProvider();
+    return mx::py::CreateObject(mx::Index{ep});
+  }
+
+  static PyObject* get_current_file(PyObject* self, void*) {
+    auto me = reinterpret_cast<Wrapper*>(self);
+    auto &index = me->Multiplier().Index();
+    return mx::py::CreateObject(index.entity(me->view->d->current_file));
+  }
+
+  static PyGetSetDef *GetGetSetDefs() {
+    static PyGetSetDef props[] = {
+      {"index", get_index, nullptr, "The index to which Multiplier is connected", nullptr},
+      {"current_file", get_current_file, nullptr, "The file that's currently selected", nullptr},
+      {}};
+
+    return props;
+  }
+
+  static PyMemberDef *GetMemberDefs() {
+    static PyMemberDef members[] = {{}};
+
+    return members;
+  }
+
+  static PyObject* open_entity(PyObject* self, PyObject* arg) {
+    auto me = reinterpret_cast<Wrapper*>(self);
+
+    if(PyLong_Check(arg)) {
+        auto id = PyLong_AsSize_t(arg);
+        auto entity = me->Multiplier().Index().entity(id);
+        return Py_NewRef(me->view->Open(entity) ? Py_True : Py_False);
+    }
+
+    if(!PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetFileType()))) {
+      PyErr_BadArgument();
+      return nullptr;
+    }
+
+    auto wrapper = reinterpret_cast<py::EntityWrapper<mx::File>*>(arg);
+    me->view->Open(wrapper->entity);
+    Py_RETURN_TRUE;
+  }
+
+  static PyMethodDef *GetMethodDefs() {
+    static PyMethodDef methods[] = {
+      {"open", open_entity, METH_O, "Opens an entity in the GUI"},
+      {}};
+
+    return methods;
+  }
+
+  static PyTypeObject* GetTypeObject() {
+    static PyTypeObject type = {
+      PyVarObject_HEAD_INIT(NULL, 0)
+      .tp_name = "_multiplier.GUI",
+      .tp_doc = "Allows programmatic interaction with the Multiplier GUI",
+      .tp_basicsize = sizeof(Wrapper),
+      .tp_itemsize = 0,
+      .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+      .tp_members = GetMemberDefs(),
+      .tp_methods = GetMethodDefs(),
+      .tp_getset = GetGetSetDefs()
+    };
+
+    return &type;
+  }
+};
+
 PythonPromptView::PythonPromptView(Multiplier& multiplier)
     : QWidget(&multiplier), d{std::make_unique<PrivateData>(multiplier)} {
+  PyType_Ready(Wrapper::GetTypeObject());
   InitializeWidgets();
 }
 
@@ -76,6 +159,11 @@ void PythonPromptView::InitializeWidgets(void) {
   connect(d->input_box, &QLineEdit::returnPressed, this, &PythonPromptView::OnPromptEnter);
   connect(PythonOutputAdapter::StdOut, &PythonOutputAdapter::OnWrite, this, &PythonPromptView::OnStdOut);
   connect(PythonOutputAdapter::StdErr, &PythonOutputAdapter::OnWrite, this, &PythonPromptView::OnStdErr);
+
+  auto env = PyModule_GetDict(PyImport_AddModule("__main__"));
+  auto gui_obj = PyObject_NEW(Wrapper, Wrapper::GetTypeObject());
+  gui_obj->view = this;
+  PyDict_SetItemString(env, "gui", reinterpret_cast<PyObject*>(gui_obj));
 
   auto codeop = PyImport_ImportModule("codeop");
   d->compile = PyObject_GetAttrString(codeop, "compile_command");
@@ -144,22 +232,23 @@ void PythonPromptView::OnStdErr(const QString& str) {
   d->output_box->insertPlainText(str);
 }
 
-void PythonPromptView::Connected() {
-  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
-  auto index_obj = ::mx::py::CreateObject(::mx::Index{d->multiplier.EntityProvider()});
-  PyDict_SetItemString(dict, "index", index_obj);
-}
-
-void PythonPromptView::Disconnected() {
-  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
-  PyDict_DelItemString(dict, "index");
-}
-
 void PythonPromptView::CurrentFile(mx::RawEntityId id) {
-  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
-  auto index = reinterpret_cast<mx::py::IndexWrapper*>(PyDict_GetItemString(dict, "index"));
-  auto file = mx::py::CreateObject(index->index.entity(id));
-  PyDict_SetItemString(dict, "current_file", file);
+  d->current_file = id;
+}
+
+bool PythonPromptView::Open(const mx::VariantEntity& entity) {
+  if(std::holds_alternative<mx::File>(entity)) {
+    auto& file = std::get<mx::File>(entity);
+    auto paths = d->multiplier.Index().file_paths();
+    for(auto [path, id] : paths) {
+      if(id == file.id()) {
+        emit SourceFileOpened(path, id);
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 }  // namespace mx::gui

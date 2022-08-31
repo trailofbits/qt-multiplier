@@ -409,11 +409,11 @@ void Multiplier::InitializeWidgets(void) {
   connect(d->history_browser_view, &HistoryBrowserView::TokenPressEvent,
           this, &Multiplier::ActOnTokenPressEvent);
 
-  connect(this, &Multiplier::IndexReady,
-          d->python_prompt_view, &PythonPromptView::Connected);
-
   connect(d->code_browser_view, &CodeBrowserView::CurrentFile,
           d->python_prompt_view, &PythonPromptView::CurrentFile);
+
+  connect(d->python_prompt_view, &PythonPromptView::SourceFileOpened,
+          this, &Multiplier::OnSourceFileDoubleClicked);
 }
 
 void Multiplier::InitializeMenus(void) {

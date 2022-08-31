@@ -21,8 +21,13 @@ class Multiplier;
 class PythonPromptView final : public QWidget {
   Q_OBJECT
 
+  struct Wrapper;
+  friend Wrapper;
+
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
+
+  bool Open(const mx::VariantEntity& entity);
 
   void InitializeWidgets(void);
  private slots:
@@ -31,9 +36,10 @@ class PythonPromptView final : public QWidget {
   void OnStdErr(const QString& str);
 
  public slots:
-  void Connected();
-  void Disconnected();
   void CurrentFile(mx::RawEntityId id);
+
+ signals:
+  void SourceFileOpened(std::filesystem::path path, mx::RawEntityId file_id);
 
  public:
   PythonPromptView(Multiplier& multiplier);
