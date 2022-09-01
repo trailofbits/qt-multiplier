@@ -1049,8 +1049,19 @@ void Multiplier::ActOnTokenPressEvent(EventSource source, EventLocations locs) {
   }
 }
 
-void Multiplier::SetPythonGlobal(const QString& name, mx::RawEntityId id) {
-  d->python_prompt_view->SetGlobal(name, id);
+void Multiplier::SetSingleEntityGlobal(const QString& name, mx::RawEntityId id) {
+  auto entity = d->index.entity(id);
+  d->python_prompt_view->SetGlobal(name, py::CreateObject(std::move(entity)));
+  d->python_prompt_view->OnLineEntered(name);
+}
+
+void Multiplier::SetMultipleEntitiesGlobal(const QString& name, const std::vector<mx::RawEntityId>& ids) {
+  auto list = PyList_New(ids.size());
+  for(size_t i = 0; i < ids.size(); ++i) {
+    auto entity = d->index.entity(ids[i]);
+    PyList_SetItem(list, i, py::CreateObject(std::move(entity)));
+  }
+  d->python_prompt_view->SetGlobal(name, list);
   d->python_prompt_view->OnLineEntered(name);
 }
 

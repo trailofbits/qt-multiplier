@@ -99,7 +99,9 @@ class Multiplier final : public QMainWindow {
 
  public slots:
   void ActOnTokenPressEvent(EventSource source, EventLocations locs);
-  void SetPythonGlobal(const QString& name, mx::RawEntityId id);
+  void SetSingleEntityGlobal(const QString& name, mx::RawEntityId id);
+  void SetMultipleEntitiesGlobal(const QString& name,
+                                 const std::vector<mx::RawEntityId>& ids);
 
  signals:
   void IndexReady(void);

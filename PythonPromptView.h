@@ -12,6 +12,8 @@
 
 #include <memory>
 
+typedef struct _object PyObject;
+
 namespace mx {
 
 namespace gui {
@@ -38,7 +40,7 @@ class PythonPromptView final : public QWidget {
  public slots:
   void CurrentFile(mx::RawEntityId id);
   void OnLineEntered(const QString& s);
-  void SetGlobal(const QString& name, mx::RawEntityId id);
+  void SetGlobal(const QString& name, PyObject* id);
 
  signals:
   void SourceFileOpened(std::filesystem::path path, mx::RawEntityId file_id);

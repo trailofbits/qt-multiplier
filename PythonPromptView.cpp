@@ -320,10 +320,8 @@ bool PythonPromptView::Open(const mx::VariantEntity& entity) {
   return false;
 }
 
-void PythonPromptView::SetGlobal(const QString& name, mx::RawEntityId id) {
-  auto entity = d->multiplier.Index().entity(id);
+void PythonPromptView::SetGlobal(const QString& name, PyObject* obj) {
   auto mod = PyImport_AddModule("__main__");
-  auto obj = py::CreateObject(std::move(entity));
   PyObject_SetAttrString(mod, name.toUtf8().data(), obj);
 }
 

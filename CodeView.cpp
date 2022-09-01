@@ -826,16 +826,75 @@ void CodeView::mousePressEvent(QMouseEvent *event) {
 void CodeView::ShowContextMenu(const QPoint& point) {
   if (auto pos = TokenIndexForPosition(point)) {
     auto [index, block] = pos.value();
-    auto id = d->code->file_token_ids[index];
-    auto contextMenu = this->createStandardContextMenu();
 
-    QAction useToken("Use token in console", this);
-    connect(&useToken, &QAction::triggered, [&](bool checked) {
-      QString name = "token_" + QString::number(id, 16);
-      emit SetPythonGlobal(name, id);
-    });
+    assert((index + 1u) < d->code->tok_decl_ids_begin.size());
+    auto locs_begin_index = d->code->tok_decl_ids_begin[index];
+    auto locs_end_index = d->code->tok_decl_ids_begin[index + 1u];
+    auto file_tok_id = d->code->file_token_ids[index];
+    assert(file_tok_id != kInvalidEntityId);
+    assert(std::holds_alternative<FileTokenId>(EntityId(file_tok_id).Unpack()));
+
+    auto contextMenu = this->createStandardContextMenu();
     contextMenu->addSeparator();
-    contextMenu->addAction(&useToken);
+
+    auto useFileToken = new QAction("Use file token in console", this);
+    connect(useFileToken, &QAction::triggered, [&](bool checked) {
+      QString name = "file_token_" + QString::number(file_tok_id, 16);
+      emit SetSingleEntityGlobal(name, file_tok_id);
+    });
+    contextMenu->addAction(useFileToken);
+
+    if (auto num_locs = locs_end_index - locs_begin_index) {
+      if (num_locs == 1u) {
+        auto [frag_tok_id_, decl_id_] = d->code->tok_decl_ids[locs_begin_index];
+        assert(frag_tok_id_ != kInvalidEntityId);
+
+        auto frag_tok_id = frag_tok_id_;
+        auto decl_id = decl_id_;
+
+        auto useFragToken = new QAction("Use fragment token in console", this);
+        connect(useFragToken, &QAction::triggered, [&](bool checked) {
+          QString name = "frag_token_" + QString::number(frag_tok_id, 16);
+          emit SetSingleEntityGlobal(name, frag_tok_id);
+        });
+        contextMenu->addAction(useFragToken);
+
+        if(decl_id != kInvalidEntityId) {
+          auto useDecl = new QAction("Use declaration in console", this);
+          connect(useDecl, &QAction::triggered, [&](bool checked) {
+            QString name = "decl_" + QString::number(decl_id, 16);
+            emit SetSingleEntityGlobal(name, decl_id);
+          });
+          contextMenu->addAction(useDecl);
+        }
+  
+      } else {
+        std::vector<mx::RawEntityId> frag_ids(num_locs);
+        std::vector<mx::RawEntityId> decls;
+        for (auto i = locs_begin_index; i < locs_end_index; ++i) {
+          auto [frag_tok_id, decl_id] = d->code->tok_decl_ids[i];
+          assert(frag_tok_id != kInvalidEntityId);
+          frag_ids[i - locs_begin_index] = frag_tok_id;
+          decls.push_back(decl_id);
+        }
+
+        auto useFragTokens = new QAction("Use fragment tokens in console", this);
+        connect(useFragTokens, &QAction::triggered, [&, frag_ids](bool checked) {
+          QString name = "frag_tokens";
+          emit SetMultipleEntitiesGlobal(name, frag_ids);
+        });
+        contextMenu->addAction(useFragTokens);
+
+        if(!decls.empty()) {
+          auto useDecls = new QAction("Use declarations in console", this);
+          connect(useDecls, &QAction::triggered, [&, decls](bool checked) {
+            QString name = "decls";
+            emit SetMultipleEntitiesGlobal(name, decls);
+          });
+          contextMenu->addAction(useDecls);
+        }
+      }
+    }
 
     contextMenu->exec(mapToGlobal(point));
   }

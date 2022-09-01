@@ -91,7 +91,9 @@ class CodeView final : public QPlainTextEdit {
  signals:
   void DataChanged(void);
   void TokenPressEvent(EventLocations loc_ids);
-  void SetPythonGlobal(const QString& name, mx::RawEntityId entity);
+  void SetSingleEntityGlobal(const QString& name, mx::RawEntityId id);
+  void SetMultipleEntitiesGlobal(const QString& name,
+                                 const std::vector<mx::RawEntityId>& ids);
 };
 
 // Renders line numbers for the code view.
