@@ -247,28 +247,27 @@ void PythonPromptView::CurrentFile(mx::RawEntityId id) {
 }
 
 bool PythonPromptView::Open(const mx::VariantEntity& entity) {
-  auto GetFilePath = [&](const std::optional<mx::File>& file, std::filesystem::path& out_path) {
+  auto GetFilePath = [&](const std::optional<mx::File>& file) ->
+                         std::optional<std::filesystem::path> {
     if(!file) {
-      return false;
+      return {};
     }
 
     auto paths = d->multiplier.Index().file_paths();
     for(auto [path, id] : paths) {
       if(id == file->id()) {
-        out_path = path;
-        return true;
+        return path;
       }
     }
-    return false;
+    return {};
   };
 
   mx::Token token;
   if(std::holds_alternative<mx::File>(entity)) {
     std::filesystem::path path;
     auto& file{std::get<mx::File>(entity)};
-    bool found = GetFilePath(file, path);
-    if(found) {
-      emit SourceFileOpened(path, file.id());
+    if(auto path = GetFilePath(file)) {
+      emit SourceFileOpened(*path, file.id());
       return true;
     }
   } else if(std::holds_alternative<mx::Token>(entity)) {
@@ -284,11 +283,8 @@ bool PythonPromptView::Open(const mx::VariantEntity& entity) {
   }
 
   auto file = mx::File::containing(token);
-
-  std::filesystem::path path;
-  bool found = GetFilePath(file, path);
-  if(found) {
-    emit TokenOpened(path, file->id(), token.id());
+  if(auto path = GetFilePath(file)) {
+    emit TokenOpened(*path, file->id(), token.id());
     return true;
   }
 
