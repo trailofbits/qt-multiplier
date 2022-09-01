@@ -104,9 +104,21 @@ struct PythonPromptView::Wrapper final {
     return Py_NewRef(me->view->Open(entity) ? Py_True : Py_False);
   }
 
+  static PyObject* print_html(PyObject* self, PyObject* args) {
+    auto me = reinterpret_cast<Wrapper*>(self);
+    const char* str;
+    if(!PyArg_ParseTuple(args, "s", &str)) {
+      return nullptr;
+    }
+    me->view->d->output_box->moveCursor(QTextCursor::End);
+    me->view->d->output_box->insertHtml(str);
+    Py_RETURN_NONE;
+  }
+
   static PyMethodDef *GetMethodDefs() {
     static PyMethodDef methods[] = {
       {"open_entity", open_entity, METH_O, "Opens an entity in the GUI"},
+      {"print_html", print_html, METH_VARARGS, "Prints HTML to the console"},
       {}};
 
     return methods;
