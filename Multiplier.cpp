@@ -1049,4 +1049,9 @@ void Multiplier::ActOnTokenPressEvent(EventSource source, EventLocations locs) {
   }
 }
 
+void Multiplier::SetPythonGlobal(const QString& name, mx::RawEntityId id) {
+  d->python_prompt_view->SetGlobal(name, id);
+  d->python_prompt_view->OnLineEntered(name);
+}
+
 }  // namespace mx::gui

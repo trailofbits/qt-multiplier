@@ -80,6 +80,7 @@ class CodeBrowserView final : public QWidget {
 
  signals:
   void CurrentFile(RawEntityId file_id);
+  void SetPythonGlobal(const QString& name, mx::RawEntityId id);
 };
 
 // Thread that goes and downloads and structures the relevant code in the

@@ -86,10 +86,12 @@ class CodeView final : public QPlainTextEdit {
   void OnRenderCode(void *code, uint64_t counter);
   void UpdateLineNumberAreaWidth(void);
   void UpdateLineNumberArea(const QRect &rect, int dy);
+  void ShowContextMenu(const QPoint& point);
 
  signals:
   void DataChanged(void);
   void TokenPressEvent(EventLocations loc_ids);
+  void SetPythonGlobal(const QString& name, mx::RawEntityId entity);
 };
 
 // Renders line numbers for the code view.

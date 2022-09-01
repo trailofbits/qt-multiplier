@@ -182,7 +182,7 @@ void PythonPromptView::InitializeWidgets(void) {
   d->output_box->insertPlainText(welcome_string);
 }
 
-void PythonPromptView::OnPromptEnter() {
+void PythonPromptView::OnLineEntered(const QString& s) {
   auto group = QPalette::Disabled;
   auto role = QPalette::Text;
 
@@ -190,18 +190,16 @@ void PythonPromptView::OnPromptEnter() {
   d->output_box->moveCursor(QTextCursor::End);
 
   auto prompt = d->prompt_label->text();
-  auto input = d->input_box->text();
 
   d->output_box->setTextColor(palette.color(group, role));
   d->output_box->setFontItalic(true);
-  d->output_box->insertPlainText(prompt + " " + input + "\n");
-  d->input_box->clear();
+  d->output_box->insertPlainText(prompt + " " + s + "\n");
 
-  d->buffer << input;
+  d->buffer << s;
 
-  auto data = d->buffer.join('\n').toUtf8();
+  auto utf8 = d->buffer.join('\n').toUtf8();
 
-  auto args = Py_BuildValue("sss", data.data(), "<input>", "single");
+  auto args = Py_BuildValue("sss", utf8.data(), "<input>", "single");
   auto compiled = PyObject_Call(d->compile, args, nullptr);
   Py_DECREF(args);
 
@@ -222,6 +220,12 @@ void PythonPromptView::OnPromptEnter() {
 
   d->buffer.clear();
   d->prompt_label->setText(">>>");
+}
+
+void PythonPromptView::OnPromptEnter() {
+  auto input = d->input_box->text();
+  d->input_box->clear();
+  OnLineEntered(input);
 }
 
 void PythonPromptView::OnStdOut(const QString& str) {
@@ -289,6 +293,13 @@ bool PythonPromptView::Open(const mx::VariantEntity& entity) {
   }
 
   return false;
+}
+
+void PythonPromptView::SetGlobal(const QString& name, mx::RawEntityId id) {
+  auto entity = d->multiplier.Index().entity(id);
+  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  auto obj = py::CreateObject(std::move(entity));
+  PyDict_SetItemString(dict, name.toUtf8().data(), obj);
 }
 
 }  // namespace mx::gui

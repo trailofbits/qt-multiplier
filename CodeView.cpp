@@ -11,6 +11,7 @@
 #include <QColor>
 #include <QFont>
 #include <QFontMetrics>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
@@ -597,6 +598,7 @@ void CodeView::InitializeWidgets(void) {
   setReadOnly(true);
   setOverwriteMode(false);
   setTextInteractionFlags(Qt::TextSelectableByMouse);
+  setContextMenuPolicy(Qt::CustomContextMenu);
   viewport()->setCursor(Qt::ArrowCursor);
   setFont(d->theme.Font());
 
@@ -621,6 +623,9 @@ void CodeView::InitializeWidgets(void) {
 
   connect(this, &CodeView::cursorPositionChanged,
           this, &CodeView::OnHighlightLine);
+  
+  connect(this, &CodeView::customContextMenuRequested,
+          this, &CodeView::ShowContextMenu);
 
   update();
 }
@@ -816,6 +821,24 @@ void CodeView::mousePressEvent(QMouseEvent *event) {
     d->last_block = -1;
   }
   this->QPlainTextEdit::mousePressEvent(event);
+}
+
+void CodeView::ShowContextMenu(const QPoint& point) {
+  if (auto pos = TokenIndexForPosition(point)) {
+    auto [index, block] = pos.value();
+    auto id = d->code->file_token_ids[index];
+    auto contextMenu = this->createStandardContextMenu();
+
+    QAction useToken("Use token in console", this);
+    connect(&useToken, &QAction::triggered, [&](bool checked) {
+      QString name = "token_" + QString::number(id, 16);
+      emit SetPythonGlobal(name, id);
+    });
+    contextMenu->addSeparator();
+    contextMenu->addAction(&useToken);
+
+    contextMenu->exec(mapToGlobal(point));
+  }
 }
 
 void CodeView::resizeEvent(QResizeEvent *event) {
