@@ -62,8 +62,10 @@ struct PythonPromptView::Wrapper final {
 
   static PyGetSetDef *GetGetSetDefs() {
     static PyGetSetDef props[] = {
-      {"index", get_index, nullptr, "The index to which Multiplier is connected", nullptr},
-      {"current_file", get_current_file, nullptr, "The file that's currently selected", nullptr},
+      {"index", get_index, nullptr,
+       "The index to which Multiplier is connected", nullptr},
+      {"current_file", get_current_file, nullptr,
+       "The file that's currently selected", nullptr},
       {}};
 
     return props;
@@ -84,20 +86,25 @@ struct PythonPromptView::Wrapper final {
       entity = me->Multiplier().Index().entity(id);
     }
 
-    if(PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetFileType()))) {
+    if(PyObject_IsInstance(arg,
+         reinterpret_cast<PyObject*>(py::GetFileType()))) {
       auto wrapper = reinterpret_cast<py::EntityWrapper<mx::File>*>(arg);
       entity = wrapper->entity;
-    } else if(PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetTokenType()))) {
+    } else if(PyObject_IsInstance(arg,
+                reinterpret_cast<PyObject*>(py::GetTokenType()))) {
       auto wrapper = reinterpret_cast<py::EntityWrapper<mx::Token>*>(arg);
       entity = wrapper->entity;
-    } else if(PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetDeclType()))) {
+    } else if(PyObject_IsInstance(arg,
+                reinterpret_cast<PyObject*>(py::GetDeclType()))) {
       auto wrapper = reinterpret_cast<py::EntityWrapper<mx::Decl>*>(arg);
       entity = wrapper->entity;
-    } else if(PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetAttrType()))) {
+    } else if(PyObject_IsInstance(arg,
+                reinterpret_cast<PyObject*>(py::GetAttrType()))) {
       auto wrapper = reinterpret_cast<py::EntityWrapper<mx::Attr>*>(arg);
       entity = wrapper->entity;
     } else {
-        PyErr_SetString(PyExc_TypeError, "Can only open entities of type File, Token, Decl or Attr");
+        PyErr_SetString(PyExc_TypeError,
+          "Can only open entities of type File, Token, Decl or Attr");
         return nullptr;
     }
 
@@ -178,9 +185,14 @@ void PythonPromptView::InitializeWidgets(void) {
 
   setWindowTitle("Python Console");
 
-  connect(d->input_box, &QLineEdit::returnPressed, this, &PythonPromptView::OnPromptEnter);
-  connect(PythonOutputAdapter::StdOut, &PythonOutputAdapter::OnWrite, this, &PythonPromptView::OnStdOut);
-  connect(PythonOutputAdapter::StdErr, &PythonOutputAdapter::OnWrite, this, &PythonPromptView::OnStdErr);
+  connect(d->input_box, &QLineEdit::returnPressed,
+    this, &PythonPromptView::OnPromptEnter);
+
+  connect(PythonOutputAdapter::StdOut, &PythonOutputAdapter::OnWrite,
+    this, &PythonPromptView::OnStdOut);
+
+  connect(PythonOutputAdapter::StdErr, &PythonOutputAdapter::OnWrite,
+    this, &PythonPromptView::OnStdErr);
 
   auto env = PyModule_GetDict(PyImport_AddModule("__main__"));
   auto gui_obj = PyObject_NEW(Wrapper, Wrapper::GetTypeObject());
@@ -190,7 +202,8 @@ void PythonPromptView::InitializeWidgets(void) {
   auto codeop = PyImport_ImportModule("codeop");
   d->compile = PyObject_GetAttrString(codeop, "compile_command");
 
-  QString welcome_string = QString("Python ") + Py_GetVersion() + " on " + Py_GetPlatform() + "\n";
+  QString welcome_string =
+    QString("Python %1 on %2\n").arg(Py_GetVersion(), Py_GetPlatform());
   d->output_box->insertPlainText(welcome_string);
 }
 
