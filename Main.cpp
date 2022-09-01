@@ -77,8 +77,8 @@ int main(int argc, char *argv[]) {
 
   Py_Initialize();
 
-  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
-  PyDict_SetItemString(dict, "multiplier", mx::py::PyInit__multiplier());
+  auto mod = PyImport_AddModule("__main__");
+  PyObject_SetAttrString(mod, "multiplier", mx::py::PyInit__multiplier());
 
   std::unique_ptr<int, void(*)(int*)> python_release(new int, [](int* x) {
     Py_FinalizeEx();

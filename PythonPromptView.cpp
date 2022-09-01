@@ -194,10 +194,10 @@ void PythonPromptView::InitializeWidgets(void) {
   connect(PythonOutputAdapter::StdErr, &PythonOutputAdapter::OnWrite,
     this, &PythonPromptView::OnStdErr);
 
-  auto env = PyModule_GetDict(PyImport_AddModule("__main__"));
+  auto mod = PyImport_AddModule("__main__");
   auto gui_obj = PyObject_NEW(Wrapper, Wrapper::GetTypeObject());
   gui_obj->view = this;
-  PyDict_SetItemString(env, "gui", reinterpret_cast<PyObject*>(gui_obj));
+  PyObject_SetAttrString(mod, "gui", reinterpret_cast<PyObject*>(gui_obj));
 
   auto codeop = PyImport_ImportModule("codeop");
   d->compile = PyObject_GetAttrString(codeop, "compile_command");
@@ -322,9 +322,9 @@ bool PythonPromptView::Open(const mx::VariantEntity& entity) {
 
 void PythonPromptView::SetGlobal(const QString& name, mx::RawEntityId id) {
   auto entity = d->multiplier.Index().entity(id);
-  auto dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  auto mod = PyImport_AddModule("__main__");
   auto obj = py::CreateObject(std::move(entity));
-  PyDict_SetItemString(dict, name.toUtf8().data(), obj);
+  PyObject_SetAttrString(mod, name.toUtf8().data(), obj);
 }
 
 }  // namespace mx::gui
