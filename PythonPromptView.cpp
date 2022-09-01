@@ -77,26 +77,36 @@ struct PythonPromptView::Wrapper final {
 
   static PyObject* open_entity(PyObject* self, PyObject* arg) {
     auto me = reinterpret_cast<Wrapper*>(self);
+    mx::VariantEntity entity{mx::NotAnEntity{}};
 
     if(PyLong_Check(arg)) {
-        auto id = PyLong_AsSize_t(arg);
-        auto entity = me->Multiplier().Index().entity(id);
-        return Py_NewRef(me->view->Open(entity) ? Py_True : Py_False);
+      auto id = PyLong_AsSize_t(arg);
+      entity = me->Multiplier().Index().entity(id);
     }
 
-    if(!PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetFileType()))) {
-      PyErr_BadArgument();
-      return nullptr;
+    if(PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetFileType()))) {
+      auto wrapper = reinterpret_cast<py::EntityWrapper<mx::File>*>(arg);
+      entity = wrapper->entity;
+    } else if(PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetTokenType()))) {
+      auto wrapper = reinterpret_cast<py::EntityWrapper<mx::Token>*>(arg);
+      entity = wrapper->entity;
+    } else if(PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetDeclType()))) {
+      auto wrapper = reinterpret_cast<py::EntityWrapper<mx::Decl>*>(arg);
+      entity = wrapper->entity;
+    } else if(PyObject_IsInstance(arg, reinterpret_cast<PyObject*>(py::GetAttrType()))) {
+      auto wrapper = reinterpret_cast<py::EntityWrapper<mx::Attr>*>(arg);
+      entity = wrapper->entity;
+    } else {
+        PyErr_SetString(PyExc_TypeError, "Can only open entities of type File, Token, Decl or Attr");
+        return nullptr;
     }
 
-    auto wrapper = reinterpret_cast<py::EntityWrapper<mx::File>*>(arg);
-    me->view->Open(wrapper->entity);
-    Py_RETURN_TRUE;
+    return Py_NewRef(me->view->Open(entity) ? Py_True : Py_False);
   }
 
   static PyMethodDef *GetMethodDefs() {
     static PyMethodDef methods[] = {
-      {"open", open_entity, METH_O, "Opens an entity in the GUI"},
+      {"open_entity", open_entity, METH_O, "Opens an entity in the GUI"},
       {}};
 
     return methods;
@@ -237,15 +247,49 @@ void PythonPromptView::CurrentFile(mx::RawEntityId id) {
 }
 
 bool PythonPromptView::Open(const mx::VariantEntity& entity) {
-  if(std::holds_alternative<mx::File>(entity)) {
-    auto& file = std::get<mx::File>(entity);
+  auto GetFilePath = [&](const std::optional<mx::File>& file, std::filesystem::path& out_path) {
+    if(!file) {
+      return false;
+    }
+
     auto paths = d->multiplier.Index().file_paths();
     for(auto [path, id] : paths) {
-      if(id == file.id()) {
-        emit SourceFileOpened(path, id);
+      if(id == file->id()) {
+        out_path = path;
         return true;
       }
     }
+    return false;
+  };
+
+  mx::Token token;
+  if(std::holds_alternative<mx::File>(entity)) {
+    std::filesystem::path path;
+    auto& file{std::get<mx::File>(entity)};
+    bool found = GetFilePath(file, path);
+    if(found) {
+      emit SourceFileOpened(path, file.id());
+      return true;
+    }
+  } else if(std::holds_alternative<mx::Token>(entity)) {
+    token = std::get<mx::Token>(entity);
+  } else if(std::holds_alternative<mx::Decl>(entity)) {
+    auto& decl = std::get<mx::Decl>(entity);
+    token = decl.token();
+  } else if(std::holds_alternative<mx::Attr>(entity)) {
+    auto& attr = std::get<mx::Attr>(entity);
+    token = attr.token();
+  } else {
+    return false;
+  }
+
+  auto file = mx::File::containing(token);
+
+  std::filesystem::path path;
+  bool found = GetFilePath(file, path);
+  if(found) {
+    emit TokenOpened(path, file->id(), token.id());
+    return true;
   }
 
   return false;

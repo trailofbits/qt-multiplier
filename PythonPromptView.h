@@ -40,6 +40,8 @@ class PythonPromptView final : public QWidget {
 
  signals:
   void SourceFileOpened(std::filesystem::path path, mx::RawEntityId file_id);
+  void TokenOpened(std::filesystem::path path, mx::RawEntityId file_id,
+                   mx::RawEntityId token_id);
 
  public:
   PythonPromptView(Multiplier& multiplier);

@@ -63,6 +63,8 @@ class CodeBrowserView final : public QWidget {
 
  public slots:
   void OnDownloadedFileList(FilePathList files);
+  void OnScrollToToken(const std::filesystem::path& path,
+                       mx::RawEntityId file_id, mx::RawEntityId token_id);
 
  private slots:
   void OnCloseFileViewTab(int index);

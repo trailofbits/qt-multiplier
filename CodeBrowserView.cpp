@@ -222,6 +222,12 @@ void CodeBrowserView::ScrollToTokenInFile(
   }
 }
 
+void CodeBrowserView::OnScrollToToken(const std::filesystem::path& path,
+                                      mx::RawEntityId file_id,
+                                      mx::RawEntityId token_id) {
+  ScrollToTokenInFile(file_id, token_id, d->counter);
+}
+
 void CodeBrowserView::Clear(void) {
   d->file_id_to_view.clear();
   d->view_to_file_id.clear();

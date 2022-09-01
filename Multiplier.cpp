@@ -414,6 +414,9 @@ void Multiplier::InitializeWidgets(void) {
 
   connect(d->python_prompt_view, &PythonPromptView::SourceFileOpened,
           this, &Multiplier::OnSourceFileDoubleClicked);
+
+  connect(d->python_prompt_view, &PythonPromptView::TokenOpened,
+          d->code_browser_view, &CodeBrowserView::OnScrollToToken);
 }
 
 void Multiplier::InitializeMenus(void) {
