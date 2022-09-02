@@ -13,8 +13,10 @@
 #include <QWidget>
 
 #include <memory>
+#include <multiplier/File.h>
 
 #include "Event.h"
+
 
 namespace mx {
 class RegexQueryMatch;
@@ -56,6 +58,7 @@ class CodeSearchResultsModel final : public QAbstractTableModel {
 
   void AddHeader(const RegexQueryMatch &match);
   void AddHeader(const WeggliQueryMatch &match);
+  void AddHeader(const Fragment &frag, const File &file);
 
  public:
   friend class CodeSearchResultsItemDelegate;
@@ -69,6 +72,7 @@ class CodeSearchResultsModel final : public QAbstractTableModel {
 
   void AddResult(const RegexQueryMatch &match);
   void AddResult(const WeggliQueryMatch &match);
+  void AddResult(const Fragment &frag, const File &file);
 
   int columnCount(const QModelIndex &parent) const Q_DECL_FINAL;
   int rowCount(const QModelIndex &parent) const Q_DECL_FINAL;

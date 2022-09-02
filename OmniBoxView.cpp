@@ -27,6 +27,7 @@
 #include <cassert>
 #include <iostream>
 #include <sstream>
+#include <multiplier/AST.h>
 #include <multiplier/Index.h>
 #include <multiplier/Re2.h>
 #include <multiplier/Weggli.h>
@@ -774,8 +775,6 @@ void OmniBoxView::RunEntityIdSearch(void) {
                              Qt::AlignmentFlag::AlignHCenter |
                              Qt::AlignmentFlag::AlignVCenter);
 
-  entity_id = 13835058267480395895u;
-
 	auto runnable = new EntitySearchThread(
 			d->multiplier.Index(), d->multiplier.FileLocationCache(),
 			entity_id, d->entity_counter);
@@ -788,9 +787,7 @@ void OmniBoxView::RunEntityIdSearch(void) {
 
 }
 
-void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> entity, unsigned counter) {
-
-  ClearEntityResults();
+void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsigned counter) {
 
 	if (d->entity_counter != counter) {
     return;
@@ -801,23 +798,44 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> entity, unsigned co
   const CodeTheme &theme = d->multiplier.CodeTheme();
   theme.BeginTokens();
 
-  auto model = new CodeSearchResultsModel(d->multiplier);
-  auto table = new CodeSearchResultsView(model);
+  if (std::holds_alternative<Decl>(*maybe_entity)) {
+    auto model = new CodeSearchResultsModel(d->multiplier);
+    auto table = new CodeSearchResultsView(model);;
+    d->entity_results = table;
+		d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
+    auto entity = std::get<Decl>(*maybe_entity);
+    model->AddResult(Fragment::containing(entity), File::containing(entity));
 
-  connect(table, &CodeSearchResultsView::TokenPressEvent,
-          &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+    connect(table, &CodeSearchResultsView::TokenPressEvent,
+            &d->multiplier, &Multiplier::ActOnTokenPressEvent);
 
-  if (std::holds_alternative<mx::NotAnEntity>(*entity)) {
+  } else if (std::holds_alternative<Stmt>(*maybe_entity)) {
+    auto model = new CodeSearchResultsModel(d->multiplier);
+    auto table = new CodeSearchResultsView(model);;
+    d->entity_results = table;
+    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
+    auto entity = std::get<Stmt>(*maybe_entity);
+    model->AddResult(Fragment::containing(entity), File::containing(entity));
+
+    connect(table, &CodeSearchResultsView::TokenPressEvent,
+            &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+
+  } else if (std::holds_alternative<Token>(*maybe_entity)) {
+    auto model = new CodeSearchResultsModel(d->multiplier);
+    auto table = new CodeSearchResultsView(model);;
+    d->entity_results = table;
+    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
+    auto entity = std::get<Token>(*maybe_entity);
+    //model->AddResult(Fragment::containing(entity), File::containing(entity));
+
+    connect(table, &CodeSearchResultsView::TokenPressEvent,
+            &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+
+  } else {
     d->entity_results = new QLabel(tr("No matches"));
     d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
                                Qt::AlignmentFlag::AlignHCenter |
                                Qt::AlignmentFlag::AlignVCenter);
-  } else if (!d->entity_results) {
-    //d->entity_results = table;
-    d->entity_results = new QLabel(tr("Found entity"));
-    //d->regex_to_dock_button->setEnabled(true);
-    //d->entity_to_tab_button->setEnabled(true);
-    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
   }
 
   theme.EndTokens();
@@ -870,19 +888,19 @@ void OmniBoxView::OnFoundFragmentsWithRegex(RegexQueryResultIterator *list_,
   }
 
   ClearRegexResults();
-
   const CodeTheme &theme = d->multiplier.CodeTheme();
   theme.BeginTokens();
-
-  auto model = new CodeSearchResultsModel(d->multiplier);
-  auto table = new CodeSearchResultsView(model);
-
-  connect(table, &CodeSearchResultsView::TokenPressEvent,
-          &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+  CodeSearchResultsModel * model;
 
   for (auto j = 1; *list != IteratorEnd{}; ++*list, ++j) {
     const RegexQueryMatch &match = **list;
     if (!d->regex_results) {
+    	model = new CodeSearchResultsModel(d->multiplier);
+    	auto table = new CodeSearchResultsView(model);
+
+    	connect(table, &CodeSearchResultsView::TokenPressEvent,
+              &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+
       d->regex_results = table;
       d->regex_to_dock_button->setEnabled(true);
       d->regex_to_tab_button->setEnabled(true);

@@ -47,7 +47,8 @@ namespace mx::gui {
 enum class ModelMode {
   kNoData,
   kRegex,
-  kWeggli
+  kWeggli,
+  kEntityId
 };
 
 struct RowData {
@@ -71,6 +72,9 @@ struct RowData {
   explicit RowData(CodeSearchResultsModelImpl &d,
                    const WeggliQueryMatch &, unsigned file_index_,
                    unsigned frag_index_);
+
+  explicit RowData(CodeSearchResultsModelImpl &d, const Fragment &match,
+                   unsigned file_index_, unsigned frag_index_);
 
   std::pair<unsigned, unsigned> Tokens(CodeSearchResultsModelImpl &d);
 };
@@ -356,6 +360,57 @@ RowData::RowData(CodeSearchResultsModelImpl &d,
       token_sub_range.second = capture_sub_range.second;
     }
   }
+}
+
+RowData::RowData(CodeSearchResultsModelImpl &d,
+								 const Fragment &match,
+                 unsigned file_index_, unsigned frag_index_)
+    : file_index(file_index_),
+      frag_index(frag_index_) {
+  VariantId first_vid = EntityId(match.file_tokens().front().id()).Unpack();
+  VariantId last_vid = EntityId(match.file_tokens().back().id()).Unpack();
+
+  assert(std::holds_alternative<FileTokenId>(first_vid));
+  assert(std::holds_alternative<FileTokenId>(last_vid));
+
+  file_tokens_begin = std::get<FileTokenId>(first_vid).offset;
+  file_tokens_end = std::get<FileTokenId>(last_vid).offset + 1u;
+
+  const char *begin_utf8 = match.file_tokens().data().data();
+
+	auto &capture_sub_range = d.capture_sub_ranges.emplace_back(0, 0);
+	auto &token_sub_range = d.token_sub_ranges.emplace_back(0, 0);
+	auto &captured_data = d.captured_data.emplace_back();
+
+	captured_data = match.file_tokens().data();
+
+	const ptrdiff_t len_utf8 = captured_data.data() - begin_utf8;
+	assert(0 <= len_utf8);
+
+	capture_sub_range.first =
+			QString::fromUtf8(begin_utf8, static_cast<int>(len_utf8)).size();
+
+	capture_sub_range.second =
+			QString::fromUtf8(captured_data.data(),
+												static_cast<int>(captured_data.size())).size();
+
+	if (auto captured_tokens = match.file_tokens()) {
+		const std::string_view tok_data = captured_tokens.data();
+		const ptrdiff_t tok_len_utf8 = tok_data.data() - begin_utf8;
+
+		token_sub_range.first =
+				QString::fromUtf8(begin_utf8, static_cast<int>(tok_len_utf8)).size();
+
+		token_sub_range.second =
+				QString::fromUtf8(tok_data.data(),
+													static_cast<int>(tok_data.size())).size();
+
+	} else if (!captured_data.empty()) {
+		assert(false);
+		token_sub_range.first = capture_sub_range.first;
+		token_sub_range.second = capture_sub_range.second;
+	}
+
 }
 
 CodeSearchResultsItemDelegate::~CodeSearchResultsItemDelegate(void) {}
@@ -776,6 +831,19 @@ void CodeSearchResultsModel::AddHeader(const WeggliQueryMatch &match) {
   endInsertColumns();
 }
 
+void CodeSearchResultsModel::AddHeader(const Fragment &frag, const File &file) {
+
+	beginInsertColumns(QModelIndex(), 0u, 0u);
+  d->num_columns = 1u;
+  d->headers.push_back(tr("Match"));  // The whole match.
+  insertColumns(0u, d->num_columns);
+
+  emit headerDataChanged(Qt::Orientation::Vertical, 0u, d->num_columns - 1u);
+	endInsertColumns();
+
+}
+
+
 void CodeSearchResultsModel::AddResult(const RegexQueryMatch &match) {
   if (d->mode == ModelMode::kNoData) {
     d->mode = ModelMode::kRegex;
@@ -859,6 +927,51 @@ void CodeSearchResultsModel::AddResult(const WeggliQueryMatch &match) {
 
   emit AddedRows();
 }
+
+void CodeSearchResultsModel::AddResult(const Fragment &frag, const File &file) {
+
+  if (d->mode == ModelMode::kNoData) {
+    d->mode = ModelMode::kEntityId;
+    AddHeader(frag, file);
+
+  } else if (d->mode != ModelMode::kEntityId) {
+    return;
+  }
+
+
+  beginInsertRows(QModelIndex(), d->num_rows, d->num_rows);
+
+  unsigned file_index;
+  unsigned frag_index;
+
+  if (auto file_index_it = d->file_indexes.find(file.id());
+      file_index_it != d->file_indexes.end()) {
+    file_index = file_index_it->second;
+  } else {
+    file_index = static_cast<unsigned>(d->files.size());
+    d->file_indexes.emplace(file.id(), file_index);
+    d->files.emplace_back(std::move(file));
+  }
+
+  if (auto frag_index_it = d->fragment_indexes.find(frag.id());
+      frag_index_it != d->fragment_indexes.end()) {
+    frag_index = frag_index_it->second;
+  } else {
+    frag_index = static_cast<unsigned>(d->fragments.size());
+    d->fragment_indexes.emplace(frag.id(), frag_index);
+    d->fragments.emplace_back(std::move(frag));
+  }
+
+  d->rows.emplace_back(*d, frag, file_index, frag_index);
+  ++d->num_rows;
+
+  endInsertRows();
+
+
+  emit AddedRows();
+
+}
+
 
 SortableCodeSearchResultsModel::~SortableCodeSearchResultsModel(void) {}
 
