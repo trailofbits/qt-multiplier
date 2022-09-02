@@ -311,9 +311,17 @@ bool PythonPromptView::Open(const mx::VariantEntity& entity) {
     return false;
   }
 
+  auto file_token = token.file_token();
+  if(!file_token) {
+    file_token = token.nearest_file_token();
+    if(!file_token) {
+      return false;
+    }
+  }
+
   auto file = mx::File::containing(token);
   if(auto path = GetFilePath(file)) {
-    emit TokenOpened(*path, file->id(), token.id());
+    emit TokenOpened(*path, file->id(), file_token->id());
     return true;
   }
 
