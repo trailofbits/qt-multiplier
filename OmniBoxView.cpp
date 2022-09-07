@@ -1101,32 +1101,27 @@ void SymbolSearchThread::run(void) {
 }
 
 struct EntitySearchThread::PrivateData {
-	const Index index;
+  const Index index;
   const FileLocationCache &file_cache;
   const RawEntityId raw_id;
   const unsigned counter;
 
-	inline PrivateData(const Index &index_, const FileLocationCache &cache_,
+  inline PrivateData(const Index &index_,
+                     const FileLocationCache &cache_,
                      const RawEntityId raw_id_, unsigned counter_)
-      : index(index_),
-        file_cache(cache_),
-        raw_id(raw_id_),
-        counter(counter_) {}
+      : index(index_), file_cache(cache_), raw_id(raw_id_), counter(counter_) {}
 };
 
 EntitySearchThread::~EntitySearchThread(void) {}
 
-EntitySearchThread::EntitySearchThread(
-    const Index &index_, const FileLocationCache &cache_,
-    const RawEntityId raw_id_, unsigned counter_)
-    : d(std::make_unique<PrivateData>(
-        index_, cache_, raw_id_, counter_)) {}
-
+EntitySearchThread::EntitySearchThread(const Index &index_,
+                                       const FileLocationCache &cache_,
+                                       const RawEntityId raw_id_,
+                                       unsigned counter_)
+    : d(std::make_unique < PrivateData > (index_, cache_, raw_id_, counter_)) {}
 
 void EntitySearchThread::run(void) {
-  emit FoundEntity(
-      d->index.entity(d->raw_id),
-      d->counter);
+  emit FoundEntity(d->index.entity(d->raw_id), d->counter);
 }
 
 struct RegexQueryThread::PrivateData {
