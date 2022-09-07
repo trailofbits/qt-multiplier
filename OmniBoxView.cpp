@@ -248,7 +248,7 @@ void OmniBoxView::InitializeWidgets(void) {
           this, &OmniBoxView::RunSymbolSearch);
 
   // ---------------------------------------------------------------------------
-  // Entity name search
+  // Entity ID search
   d->entity_box = new QWidget;
   d->entity_layout = new QGridLayout;
   d->entity_input = new QLineEdit;
@@ -262,19 +262,9 @@ void OmniBoxView::InitializeWidgets(void) {
   d->entity_button->setFont(button_font);
   d->entity_button->setDisabled(true);
 
-
-  /*QFormLayout *column_layouts[2] = {new QFormLayout, new QFormLayout};
-
-  columns_widget = new QWidget;
-  columns_layout = new QHBoxLayout;
-  columns_widget->setLayout(columns_layout);
-  columns_layout->addLayout(column_layouts[0]);
-  columns_layout->addLayout(column_layouts[1]);*/
-
   d->entity_box->setLayout(d->entity_layout);
   d->entity_layout->addWidget(d->entity_button, 0, 0, 1, 1, Qt::AlignTop);
   d->entity_layout->addWidget(d->entity_input, 0, 1, 1, 1, Qt::AlignTop);
-  //d->symbol_layout->addWidget(columns_widget, 1, 0, 1, 2, Qt::AlignTop);
   d->entity_layout->setRowStretch(0, 0);
   d->entity_layout->setRowStretch(1, 0);
   d->entity_layout->setRowStretch(2, 1);
@@ -761,13 +751,13 @@ void OmniBoxView::SetEntityIdQueryString(const QString &text) {
 }
 
 void OmniBoxView::RunEntityIdSearch(void) {
+  RawEntityId entity_id;
 
-	RawEntityId entity_id;
+  std::istringstream iss(d->entity_input->text().toStdString().c_str());
 
-	std::istringstream iss(d->entity_input->text().toStdString().c_str());
   iss >> entity_id;
 
-	d->entity_counter++;
+  d->entity_counter++;
 
   ClearEntityResults();
   d->entity_results = new QLabel(tr("Loading entity"));
@@ -775,21 +765,21 @@ void OmniBoxView::RunEntityIdSearch(void) {
                              Qt::AlignmentFlag::AlignHCenter |
                              Qt::AlignmentFlag::AlignVCenter);
 
-	auto runnable = new EntitySearchThread(
-			d->multiplier.Index(), d->multiplier.FileLocationCache(),
-			entity_id, d->entity_counter);
-	runnable->setAutoDelete(true);
+  auto runnable = new EntitySearchThread(
+      d->multiplier.Index(), d->multiplier.FileLocationCache(),
+      entity_id, d->entity_counter);
+  runnable->setAutoDelete(true);
 
-	connect(runnable, &EntitySearchThread::FoundEntity,
-			this, &OmniBoxView::OnFoundEntity);
+  connect(runnable, &EntitySearchThread::FoundEntity,
+      this, &OmniBoxView::OnFoundEntity);
 
-	QThreadPool::globalInstance()->start(runnable);
+  QThreadPool::globalInstance()->start(runnable);
 
 }
 
 void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsigned counter) {
 
-	if (d->entity_counter != counter) {
+  if (d->entity_counter != counter) {
     return;
   }
 
@@ -895,10 +885,10 @@ void OmniBoxView::OnFoundFragmentsWithRegex(RegexQueryResultIterator *list_,
   for (auto j = 1; *list != IteratorEnd{}; ++*list, ++j) {
     const RegexQueryMatch &match = **list;
     if (!d->regex_results) {
-    	model = new CodeSearchResultsModel(d->multiplier);
-    	auto table = new CodeSearchResultsView(model);
+      model = new CodeSearchResultsModel(d->multiplier);
+      auto table = new CodeSearchResultsView(model);
 
-    	connect(table, &CodeSearchResultsView::TokenPressEvent,
+      connect(table, &CodeSearchResultsView::TokenPressEvent,
               &d->multiplier, &Multiplier::ActOnTokenPressEvent);
 
       d->regex_results = table;
@@ -1120,24 +1110,23 @@ struct EntitySearchThread::PrivateData {
                      const RawEntityId raw_id_, unsigned counter_)
       : index(index_),
         file_cache(cache_),
-				raw_id(raw_id_),
+        raw_id(raw_id_),
         counter(counter_) {}
-
 };
 
 EntitySearchThread::~EntitySearchThread(void) {}
 
 EntitySearchThread::EntitySearchThread(
-		const Index &index_, const FileLocationCache &cache_,
+    const Index &index_, const FileLocationCache &cache_,
     const RawEntityId raw_id_, unsigned counter_)
-		: d(std::make_unique<PrivateData>(
-				index_, cache_, raw_id_, counter_)) {}
+    : d(std::make_unique<PrivateData>(
+        index_, cache_, raw_id_, counter_)) {}
 
 
 void EntitySearchThread::run(void) {
-	emit FoundEntity(
-			d->index.entity(d->raw_id),
-			d->counter);
+  emit FoundEntity(
+      d->index.entity(d->raw_id),
+      d->counter);
 }
 
 struct RegexQueryThread::PrivateData {
