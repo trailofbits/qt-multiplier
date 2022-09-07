@@ -83,6 +83,9 @@ add_executable("${exe_name}"
   OpenConnectionDialog.cpp
   OpenConnectionDialog.h
 
+  PythonCompletionModel.cpp
+  PythonCompletionModel.h
+
   PythonOutputAdapter.cpp
   PythonOutputAdapter.h
 

@@ -9,6 +9,7 @@
 #include <structmember.h>
 
 #include <QApplication>
+#include <QCompleter>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -18,6 +19,7 @@
 #include "Multiplier.h"
 
 #include "PythonPromptView.h"
+#include "PythonCompletionModel.h"
 
 namespace mx::gui {
 
@@ -33,7 +35,11 @@ struct PythonPromptView::PrivateData {
 
   mx::RawEntityId current_file{};
 
-  PrivateData(Multiplier& multiplier) : multiplier(multiplier) {}
+  PythonCompletionModel completion_model;
+  QCompleter* completer;
+
+  PrivateData(PythonPromptView* parent, Multiplier& multiplier)
+    : multiplier(multiplier), completion_model(parent) { }
 
   ~PrivateData() {
     Py_DECREF(compile);
@@ -149,7 +155,7 @@ struct PythonPromptView::Wrapper final {
 };
 
 PythonPromptView::PythonPromptView(Multiplier& multiplier)
-    : QWidget(&multiplier), d{std::make_unique<PrivateData>(multiplier)} {
+    : QWidget(&multiplier), d{std::make_unique<PrivateData>(this, multiplier)} {
   PyType_Ready(Wrapper::GetTypeObject());
   InitializeWidgets();
 }
@@ -181,6 +187,12 @@ void PythonPromptView::InitializeWidgets(void) {
   input_layout->addWidget(d->prompt_label);
   input_layout->addWidget(d->input_box, /*stretch=*/1);
 
+  d->completer = new QCompleter(&d->completion_model, this);
+  d->completer->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
+  d->completer->setCompletionRole(Qt::DisplayRole);
+  d->completer->setModelSorting(QCompleter::UnsortedModel);
+  d->input_box->setCompleter(d->completer);
+
   vlayout->addWidget(input_area);
 
   setWindowTitle("Python Console");
@@ -193,6 +205,9 @@ void PythonPromptView::InitializeWidgets(void) {
 
   connect(PythonOutputAdapter::StdErr, &PythonOutputAdapter::OnWrite,
     this, &PythonPromptView::OnStdErr);
+
+  connect(d->input_box, &QLineEdit::textEdited,
+    &d->completion_model, &PythonCompletionModel::setPrefix);
 
   auto mod = PyImport_AddModule("__main__");
   auto gui_obj = PyObject_NEW(Wrapper, Wrapper::GetTypeObject());
