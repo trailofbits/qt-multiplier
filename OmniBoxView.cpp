@@ -465,6 +465,10 @@ void OmniBoxView::ClearEntityResults(void) {
     d->entity_results->disconnect();
     d->entity_results->deleteLater();
     d->entity_results = nullptr;
+    if (d->entity_result_code_view) {
+      d->entity_result_code_view->Clear();
+      d->entity_result_code_view->hide();
+    }
     update();
   }
 }
@@ -798,19 +802,31 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     d->entity_results = new QWidget;
     d->entity_results_layout = new QVBoxLayout;
     d->entity_results->setLayout(d->entity_results_layout);
-		d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
-		d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
+    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
+    d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
     d->entity_results_layout->addWidget(d->entity_result_splitter);
     d->entity_result_code_view = new CodeView(theme, d->multiplier.FileLocationCache());
     d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
     d->entity_result_splitter->addWidget(d->entity_result_code_view);
-    //auto entity = std::get<Decl>(*maybe_entity);
+    auto entity = std::get<Decl>(*maybe_entity);
     //model->AddResult(Fragment::containing(entity), File::containing(entity));
 
     //connect(table, &CodeSearchResultsView::TokenPressEvent,
     //        &d->multiplier, &Multiplier::ActOnTokenPressEvent);
-    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
-            this, &Multiplier::ActOnTokenPressEvent);
+
+
+    auto frag = Fragment::containing(entity);
+    auto file = File::containing(entity);
+    unsigned frag_index;
+
+    d->entity_result_code_view->show();
+    //theme.HighlightFileTokenRange(frag.file_tokens());
+
+    d->entity_result_code_view->SetFragment(Index::containing(frag), frag.id());
+    d->entity_result_code_view->ScrollToFileToken(frag.file_tokens());
+
+//    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+//            this, &Multiplier::ActOnTokenPressEvent);
 
 
   } else if (std::holds_alternative<Stmt>(*maybe_entity)) {
@@ -822,11 +838,22 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     d->entity_result_code_view = new CodeView(theme, d->multiplier.FileLocationCache());
     d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
     d->entity_result_splitter->addWidget(d->entity_result_code_view);
-    //auto entity = std::get<Stmt>(*maybe_entity);
+    auto entity = std::get<Stmt>(*maybe_entity);
     //model->AddResult(Fragment::containing(entity), File::containing(entity));
 
-    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
-            this, &Multiplier::ActOnTokenPressEvent);
+    auto frag = Fragment::containing(entity);
+    auto file = File::containing(entity);
+    unsigned frag_index;
+
+    d->entity_result_code_view->show();
+    //theme.HighlightFileTokenRange(frag.file_tokens());
+
+    d->entity_result_code_view->SetFragment(Index::containing(frag), frag.id());
+    d->entity_result_code_view->ScrollToFileToken(frag.file_tokens());
+
+
+//    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+//            this, &Multiplier::ActOnTokenPressEvent);
 
   } else if (std::holds_alternative<Token>(*maybe_entity)) {
     d->entity_results = new QWidget;
@@ -837,21 +864,36 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
     d->entity_result_splitter->addWidget(d->entity_result_code_view);
     //d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
-    //auto entity = std::get<Token>(*maybe_entity);
+    auto entity = std::get<Token>(*maybe_entity);
     //model->AddResult(Fragment::containing(entity), File::containing(entity));
 
-    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
-            this, &Multiplier::ActOnTokenPressEvent);
+    auto frag = Fragment::containing(entity);
+    auto file = File::containing(entity);
+    unsigned frag_index;
+
+    d->entity_result_code_view->show();
+    //theme.HighlightFileTokenRange(frag.file_tokens());
+
+    d->entity_result_code_view->SetFragment(Index::containing(*frag), frag->id());
+    d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
+
+
+//    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+//            this, &Multiplier::ActOnTokenPressEvent);
 
   } else {
     d->entity_results = new QLabel(tr("No matches"));
     d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
                                Qt::AlignmentFlag::AlignHCenter |
                                Qt::AlignmentFlag::AlignVCenter);
+    theme.EndTokens();
+    update();
+    return;
   }
 
-  theme.EndTokens();
 
+
+  theme.EndTokens();
   update();
 
 }
