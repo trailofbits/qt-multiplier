@@ -131,6 +131,7 @@ struct OmniBoxView::PrivateData {
   QLineEdit *entity_input{nullptr};
   QPushButton *entity_button{nullptr};
   QWidget *entity_results{nullptr};
+  HighlightRangeTheme *entity_result_theme{nullptr};
   QVBoxLayout *entity_results_layout{nullptr};
   QSplitter *entity_result_splitter{nullptr};
 
@@ -795,105 +796,66 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
 
   ClearEntityResults();
 
-  const CodeTheme &theme = d->multiplier.CodeTheme();
-  theme.BeginTokens();
+  d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
+  d->entity_result_theme->BeginTokens();
+
+  std::optional<Fragment> frag;
+  std::optional<File> file;
 
   if (std::holds_alternative<Decl>(*maybe_entity)) {
-    d->entity_results = new QWidget;
-    d->entity_results_layout = new QVBoxLayout;
-    d->entity_results->setLayout(d->entity_results_layout);
-    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
-    d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
-    d->entity_results_layout->addWidget(d->entity_result_splitter);
-    d->entity_result_code_view = new CodeView(theme, d->multiplier.FileLocationCache());
-    d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
-    d->entity_result_splitter->addWidget(d->entity_result_code_view);
     auto entity = std::get<Decl>(*maybe_entity);
-    //model->AddResult(Fragment::containing(entity), File::containing(entity));
-
-    //connect(table, &CodeSearchResultsView::TokenPressEvent,
-    //        &d->multiplier, &Multiplier::ActOnTokenPressEvent);
-
-
-    auto frag = Fragment::containing(entity);
-    auto file = File::containing(entity);
-    unsigned frag_index;
-
-    d->entity_result_code_view->show();
-    //theme.HighlightFileTokenRange(frag.file_tokens());
-
-    d->entity_result_code_view->SetFragment(Index::containing(frag), frag.id());
-    d->entity_result_code_view->ScrollToFileToken(frag.file_tokens());
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(entity));
 
 //    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
 //            this, &Multiplier::ActOnTokenPressEvent);
 
 
   } else if (std::holds_alternative<Stmt>(*maybe_entity)) {
-    d->entity_results = new QWidget;
-    d->entity_results_layout = new QVBoxLayout;
-    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
-    d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
-    d->entity_results_layout->addWidget(d->entity_result_splitter);
-    d->entity_result_code_view = new CodeView(theme, d->multiplier.FileLocationCache());
-    d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
-    d->entity_result_splitter->addWidget(d->entity_result_code_view);
     auto entity = std::get<Stmt>(*maybe_entity);
-    //model->AddResult(Fragment::containing(entity), File::containing(entity));
-
-    auto frag = Fragment::containing(entity);
-    auto file = File::containing(entity);
-    unsigned frag_index;
-
-    d->entity_result_code_view->show();
-    //theme.HighlightFileTokenRange(frag.file_tokens());
-
-    d->entity_result_code_view->SetFragment(Index::containing(frag), frag.id());
-    d->entity_result_code_view->ScrollToFileToken(frag.file_tokens());
-
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(entity));
 
 //    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
 //            this, &Multiplier::ActOnTokenPressEvent);
 
   } else if (std::holds_alternative<Token>(*maybe_entity)) {
-    d->entity_results = new QWidget;
-    d->entity_results_layout = new QVBoxLayout;
-    d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
-    d->entity_results_layout->addWidget(d->entity_result_splitter);
-    d->entity_result_code_view = new CodeView(theme, d->multiplier.FileLocationCache());
-    d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
-    d->entity_result_splitter->addWidget(d->entity_result_code_view);
-    //d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
     auto entity = std::get<Token>(*maybe_entity);
-    //model->AddResult(Fragment::containing(entity), File::containing(entity));
-
-    auto frag = Fragment::containing(entity);
-    auto file = File::containing(entity);
-    unsigned frag_index;
-
-    d->entity_result_code_view->show();
-    //theme.HighlightFileTokenRange(frag.file_tokens());
-
-    d->entity_result_code_view->SetFragment(Index::containing(*frag), frag->id());
-    d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
-
-
-//    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
-//            this, &Multiplier::ActOnTokenPressEvent);
+    frag.emplace(Fragment::containing(entity).value());
+    file.emplace(File::containing(entity).value());
 
   } else {
     d->entity_results = new QLabel(tr("No matches"));
     d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
                                Qt::AlignmentFlag::AlignHCenter |
                                Qt::AlignmentFlag::AlignVCenter);
-    theme.EndTokens();
+    d->entity_result_theme->EndTokens();
     update();
     return;
   }
 
+  d->entity_results = new QWidget;
+  d->entity_results_layout = new QVBoxLayout;
+  d->entity_results->setLayout(d->entity_results_layout);
+  d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
+  d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
+  // TODO(ss): Add header
+  d->entity_results_layout->addWidget(d->entity_result_splitter);
+  d->entity_result_code_view = new CodeView(*d->entity_result_theme,
+      d->multiplier.FileLocationCache());
+  d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
+  d->entity_result_splitter->addWidget(d->entity_result_code_view);
+  d->entity_result_code_view->show();
+  d->entity_result_code_view->SetFile(*file);
+  d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
+  // TODO(ss): Adjust code view wiget size - viewport()
 
 
-  theme.EndTokens();
+  connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+          this, &Multiplier::ActOnTokenPressEvent);
+
+
+  d->entity_result_theme->EndTokens();
   update();
 
 }
