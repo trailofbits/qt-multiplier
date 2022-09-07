@@ -17,6 +17,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSplitter>
 #include <QString>
 #include <QTableWidget>
 #include <QTabWidget>
@@ -36,6 +37,7 @@
 
 #include "CodeSearchResults.h"
 #include "CodeTheme.h"
+#include "CodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 #include "TitleNamePrompt.h"
@@ -125,9 +127,13 @@ struct OmniBoxView::PrivateData {
 
   QWidget *entity_box{nullptr};
   QGridLayout *entity_layout{nullptr};
+  CodeView *entity_result_code_view{nullptr};
   QLineEdit *entity_input{nullptr};
   QPushButton *entity_button{nullptr};
   QWidget *entity_results{nullptr};
+  QVBoxLayout *entity_results_layout{nullptr};
+  QSplitter *entity_result_splitter{nullptr};
+
 
   QWidget *regex_box{nullptr};
   QGridLayout *regex_layout{nullptr};
@@ -789,37 +795,53 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   theme.BeginTokens();
 
   if (std::holds_alternative<Decl>(*maybe_entity)) {
-    auto model = new CodeSearchResultsModel(d->multiplier);
-    auto table = new CodeSearchResultsView(model);;
-    d->entity_results = table;
+    d->entity_results = new QWidget;
+    d->entity_results_layout = new QVBoxLayout;
+    d->entity_results->setLayout(d->entity_results_layout);
 		d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
-    auto entity = std::get<Decl>(*maybe_entity);
-    model->AddResult(Fragment::containing(entity), File::containing(entity));
-
-    connect(table, &CodeSearchResultsView::TokenPressEvent,
-            &d->multiplier, &Multiplier::ActOnTokenPressEvent);
-
-  } else if (std::holds_alternative<Stmt>(*maybe_entity)) {
-    auto model = new CodeSearchResultsModel(d->multiplier);
-    auto table = new CodeSearchResultsView(model);;
-    d->entity_results = table;
-    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
-    auto entity = std::get<Stmt>(*maybe_entity);
-    model->AddResult(Fragment::containing(entity), File::containing(entity));
-
-    connect(table, &CodeSearchResultsView::TokenPressEvent,
-            &d->multiplier, &Multiplier::ActOnTokenPressEvent);
-
-  } else if (std::holds_alternative<Token>(*maybe_entity)) {
-    auto model = new CodeSearchResultsModel(d->multiplier);
-    auto table = new CodeSearchResultsView(model);;
-    d->entity_results = table;
-    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
-    auto entity = std::get<Token>(*maybe_entity);
+		d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
+    d->entity_results_layout->addWidget(d->entity_result_splitter);
+    d->entity_result_code_view = new CodeView(theme, d->multiplier.FileLocationCache());
+    d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
+    d->entity_result_splitter->addWidget(d->entity_result_code_view);
+    //auto entity = std::get<Decl>(*maybe_entity);
     //model->AddResult(Fragment::containing(entity), File::containing(entity));
 
-    connect(table, &CodeSearchResultsView::TokenPressEvent,
-            &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+    //connect(table, &CodeSearchResultsView::TokenPressEvent,
+    //        &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+            this, &Multiplier::ActOnTokenPressEvent);
+
+
+  } else if (std::holds_alternative<Stmt>(*maybe_entity)) {
+    d->entity_results = new QWidget;
+    d->entity_results_layout = new QVBoxLayout;
+    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
+    d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
+    d->entity_results_layout->addWidget(d->entity_result_splitter);
+    d->entity_result_code_view = new CodeView(theme, d->multiplier.FileLocationCache());
+    d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
+    d->entity_result_splitter->addWidget(d->entity_result_code_view);
+    //auto entity = std::get<Stmt>(*maybe_entity);
+    //model->AddResult(Fragment::containing(entity), File::containing(entity));
+
+    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+            this, &Multiplier::ActOnTokenPressEvent);
+
+  } else if (std::holds_alternative<Token>(*maybe_entity)) {
+    d->entity_results = new QWidget;
+    d->entity_results_layout = new QVBoxLayout;
+    d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
+    d->entity_results_layout->addWidget(d->entity_result_splitter);
+    d->entity_result_code_view = new CodeView(theme, d->multiplier.FileLocationCache());
+    d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
+    d->entity_result_splitter->addWidget(d->entity_result_code_view);
+    //d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
+    //auto entity = std::get<Token>(*maybe_entity);
+    //model->AddResult(Fragment::containing(entity), File::containing(entity));
+
+    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+            this, &Multiplier::ActOnTokenPressEvent);
 
   } else {
     d->entity_results = new QLabel(tr("No matches"));
@@ -1109,7 +1131,10 @@ struct EntitySearchThread::PrivateData {
   inline PrivateData(const Index &index_,
                      const FileLocationCache &cache_,
                      const RawEntityId raw_id_, unsigned counter_)
-      : index(index_), file_cache(cache_), raw_id(raw_id_), counter(counter_) {}
+      : index(index_),
+        file_cache(cache_),
+        raw_id(raw_id_),
+        counter(counter_) {}
 };
 
 EntitySearchThread::~EntitySearchThread(void) {}
