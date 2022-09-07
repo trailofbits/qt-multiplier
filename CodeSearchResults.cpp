@@ -378,38 +378,37 @@ RowData::RowData(CodeSearchResultsModelImpl &d,
 
   const char *begin_utf8 = match.file_tokens().data().data();
 
-	auto &capture_sub_range = d.capture_sub_ranges.emplace_back(0, 0);
-	auto &token_sub_range = d.token_sub_ranges.emplace_back(0, 0);
-	auto &captured_data = d.captured_data.emplace_back();
+  auto &capture_sub_range = d.capture_sub_ranges.emplace_back(0, 0);
+  auto &token_sub_range = d.token_sub_ranges.emplace_back(0, 0);
+  auto &captured_data = d.captured_data.emplace_back();
 
-	captured_data = match.file_tokens().data();
+  captured_data = match.file_tokens().data();
 
-	const ptrdiff_t len_utf8 = captured_data.data() - begin_utf8;
-	assert(0 <= len_utf8);
+  const ptrdiff_t len_utf8 = captured_data.data() - begin_utf8;
+  assert(0 <= len_utf8);
 
-	capture_sub_range.first =
-			QString::fromUtf8(begin_utf8, static_cast<int>(len_utf8)).size();
+  capture_sub_range.first =
+  		QString::fromUtf8(begin_utf8, static_cast<int>(len_utf8)).size();
 
-	capture_sub_range.second =
-			QString::fromUtf8(captured_data.data(),
-												static_cast<int>(captured_data.size())).size();
+  capture_sub_range.second =
+  		QString::fromUtf8(captured_data.data(),
+  				static_cast<int>(captured_data.size())).size();
 
-	if (auto captured_tokens = match.file_tokens()) {
-		const std::string_view tok_data = captured_tokens.data();
-		const ptrdiff_t tok_len_utf8 = tok_data.data() - begin_utf8;
+  if (auto captured_tokens = match.file_tokens()) {
+  	const std::string_view tok_data = captured_tokens.data();
+    const ptrdiff_t tok_len_utf8 = tok_data.data() - begin_utf8;
 
-		token_sub_range.first =
-				QString::fromUtf8(begin_utf8, static_cast<int>(tok_len_utf8)).size();
+    token_sub_range.first =
+    		QString::fromUtf8(begin_utf8, static_cast<int>(tok_len_utf8)).size();
 
-		token_sub_range.second =
-				QString::fromUtf8(tok_data.data(),
-													static_cast<int>(tok_data.size())).size();
+    token_sub_range.second =
+    		QString::fromUtf8(tok_data.data(),
+    				static_cast<int>(tok_data.size())).size();
 
-	} else if (!captured_data.empty()) {
-		assert(false);
-		token_sub_range.first = capture_sub_range.first;
-		token_sub_range.second = capture_sub_range.second;
-	}
+  } else if (!captured_data.empty()) {
+    token_sub_range.first = capture_sub_range.first;
+    token_sub_range.second = capture_sub_range.second;
+  }
 
 }
 

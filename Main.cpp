@@ -211,8 +211,15 @@ int main(int argc, char *argv[]) {
   });
 
   config.actions.emplace_back(mx::gui::EventAction{
-    .description = "G should open the entity search.",
+    .description = "G should open the entity search by name.",
     .match_key = Qt::Key_G,
+    .match_sources = ~mx::gui::EventSources(),
+    .do_action = mx::gui::Action::kOpenSymbolQuerySearch,
+  });
+
+  config.actions.emplace_back(mx::gui::EventAction{
+    .description = "I should open the entity search by ID.",
+    .match_key = Qt::Key_I,
     .match_sources = ~mx::gui::EventSources(),
     .do_action = mx::gui::Action::kOpenEntitySearch,
   });
