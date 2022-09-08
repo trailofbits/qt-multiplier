@@ -8,6 +8,7 @@
 #include "PythonOutputAdapter.h"
 #include <structmember.h>
 
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QCompleter>
 #include <QHBoxLayout>
@@ -197,7 +198,7 @@ void PythonPromptView::InitializeWidgets(void) {
 
   setWindowTitle("Python Console");
 
-  connect(d->input_box, &QLineEdit::returnPressed,
+  connect(d->input_box, &QLineEdit::editingFinished,
     this, &PythonPromptView::OnPromptEnter);
 
   connect(PythonOutputAdapter::StdOut, &PythonOutputAdapter::OnWrite,
@@ -223,6 +224,11 @@ void PythonPromptView::InitializeWidgets(void) {
 }
 
 void PythonPromptView::OnLineEntered(const QString& s) {
+  auto completer_view{d->input_box->completer()->popup()};
+  if(completer_view->isVisible()) {
+    return;
+  }
+
   auto group = QPalette::Disabled;
   auto role = QPalette::Text;
 
