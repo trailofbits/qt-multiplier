@@ -24,6 +24,7 @@
 #include <QThreadPool>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+#include <QSizePolicy>
 
 #include <cassert>
 #include <iostream>
@@ -132,7 +133,6 @@ struct OmniBoxView::PrivateData {
   QPushButton *entity_button{nullptr};
   QWidget *entity_results{nullptr};
   HighlightRangeTheme *entity_result_theme{nullptr};
-  QVBoxLayout *entity_results_layout{nullptr};
   QSplitter *entity_result_splitter{nullptr};
 
 
@@ -835,12 +835,9 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   }
 
   d->entity_results = new QWidget;
-  d->entity_results_layout = new QVBoxLayout;
-  d->entity_results->setLayout(d->entity_results_layout);
-  d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4);
   d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
-  // TODO(ss): Add header
-  d->entity_results_layout->addWidget(d->entity_result_splitter);
+  d->entity_layout->addWidget(d->entity_result_splitter, 1, 0,
+      d->entity_layout->rowCount() - 1, 4);
   d->entity_result_code_view = new CodeView(*d->entity_result_theme,
       d->multiplier.FileLocationCache());
   d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
@@ -848,11 +845,9 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   d->entity_result_code_view->show();
   d->entity_result_code_view->SetFile(*file);
   d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
-  // TODO(ss): Adjust code view wiget size - viewport()
 
-
-  connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
-          this, &Multiplier::ActOnTokenPressEvent);
+//  connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+//          this, &Multiplier::ActOnTokenPressEvent);
 
 
   d->entity_result_theme->EndTokens();
