@@ -42,6 +42,9 @@ class PythonPromptView final : public QWidget {
   void OnLineEntered(const QString& s);
   void SetGlobal(const QString& name, PyObject* id);
 
+ protected:
+  bool eventFilter(QObject* source, QEvent* event) override;
+
  signals:
   void SourceFileOpened(std::filesystem::path path, mx::RawEntityId file_id);
   void TokenOpened(std::filesystem::path path, mx::RawEntityId file_id,

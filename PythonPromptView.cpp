@@ -12,6 +12,7 @@
 #include <QApplication>
 #include <QCompleter>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QVBoxLayout>
@@ -38,6 +39,35 @@ struct PythonPromptView::PrivateData {
 
   PythonCompletionModel completion_model;
   QCompleter* completer;
+
+  bool InputBoxFilter(QEvent* event) {
+    if(event->type() != QEvent::KeyPress) {
+      return false;
+    }
+
+    auto key_event = static_cast<QKeyEvent*>(event);
+    if(key_event->key() != Qt::Key_Tab) {
+      return false;
+    }
+
+    completion_model.enableSuggestions();
+    auto completer{input_box->completer()};
+    completer->complete();
+    return true;
+  }
+
+  bool CompleterFilter(QEvent* event) {
+    if(event->type() != QEvent::KeyPress) {
+      return false;
+    }
+
+    auto key_event = static_cast<QKeyEvent*>(event);
+    if(key_event->key() != Qt::Key_Tab) {
+      return false;
+    }
+
+    return true;
+  }
 
   PrivateData(PythonPromptView* parent, Multiplier& multiplier)
     : multiplier(multiplier), completion_model(parent) { }
@@ -198,7 +228,7 @@ void PythonPromptView::InitializeWidgets(void) {
 
   setWindowTitle("Python Console");
 
-  connect(d->input_box, &QLineEdit::editingFinished,
+  connect(d->input_box, &QLineEdit::returnPressed,
     this, &PythonPromptView::OnPromptEnter);
 
   connect(PythonOutputAdapter::StdOut, &PythonOutputAdapter::OnWrite,
@@ -209,6 +239,9 @@ void PythonPromptView::InitializeWidgets(void) {
 
   connect(d->input_box, &QLineEdit::textEdited,
     &d->completion_model, &PythonCompletionModel::setPrefix);
+
+  d->input_box->installEventFilter(this);
+  d->input_box->completer()->popup()->installEventFilter(this);
 
   auto mod = PyImport_AddModule("__main__");
   auto gui_obj = PyObject_NEW(Wrapper, Wrapper::GetTypeObject());
@@ -352,6 +385,18 @@ bool PythonPromptView::Open(const mx::VariantEntity& entity) {
 void PythonPromptView::SetGlobal(const QString& name, PyObject* obj) {
   auto mod = PyImport_AddModule("__main__");
   PyObject_SetAttrString(mod, name.toUtf8().data(), obj);
+}
+
+bool PythonPromptView::eventFilter(QObject* sender, QEvent* event) {
+  if(sender == d->input_box) {
+    return d->InputBoxFilter(event);
+  }
+
+  if(sender == d->input_box->completer()->popup()) {
+    return d->CompleterFilter(event);
+  }
+
+  return false;
 }
 
 }  // namespace mx::gui

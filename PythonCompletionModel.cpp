@@ -11,6 +11,7 @@ namespace mx::gui {
 
 struct PythonCompletionModel::PrivateData {
   PyObject *completer_obj;
+  QStringList suggestions;
 
   PyObject *complete(const char* str, int state) {
     return PyObject_CallMethod(completer_obj, "complete", "si", str, state);
@@ -32,19 +33,23 @@ PythonCompletionModel::~PythonCompletionModel() = default;
 
 void PythonCompletionModel::setPrefix(const QString& text) {
   auto utf8 = text.toUtf8();
-  QStringList list;
+  d->suggestions.clear();
+  setStringList(d->suggestions);
   
   int i = 0;
   auto suggestion{d->complete(utf8.data(), i++)};
   while(suggestion != Py_None) {
     auto sugg_str = PyUnicode_AsUTF8(suggestion);
-    list.push_back(sugg_str);
+    d->suggestions.push_back(sugg_str);
 
     Py_DECREF(suggestion);
     suggestion = d->complete(utf8.data(), i++);
   }
   Py_DECREF(suggestion);
-  setStringList(list);
+}
+
+void PythonCompletionModel::enableSuggestions() {
+  setStringList(d->suggestions);
 }
 
 } // namespace mx::gui

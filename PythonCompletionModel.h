@@ -26,6 +26,7 @@ class PythonCompletionModel final : public QStringListModel {
  public:
   PythonCompletionModel(QObject *parent = nullptr);
   virtual ~PythonCompletionModel(void);
+  void enableSuggestions();
 };
 
 }  // namespace gui
