@@ -133,8 +133,6 @@ struct OmniBoxView::PrivateData {
   QPushButton *entity_button{nullptr};
   QWidget *entity_results{nullptr};
   HighlightRangeTheme *entity_result_theme{nullptr};
-  QSplitter *entity_result_splitter{nullptr};
-
 
   QWidget *regex_box{nullptr};
   QGridLayout *regex_layout{nullptr};
@@ -466,12 +464,18 @@ void OmniBoxView::ClearEntityResults(void) {
     d->entity_results->disconnect();
     d->entity_results->deleteLater();
     d->entity_results = nullptr;
-    if (d->entity_result_code_view) {
-      d->entity_result_code_view->Clear();
-      d->entity_result_code_view->hide();
-    }
     update();
   }
+  if (d->entity_result_code_view) {
+    d->entity_layout->removeWidget(d->entity_result_code_view);
+    d->entity_result_code_view->Clear();
+    d->entity_result_code_view->hide();
+    d->entity_result_code_view->disconnect();
+    d->entity_result_code_view->deleteLater();
+    d->entity_result_code_view = nullptr;
+    update();
+  }
+
 }
 
 void OmniBoxView::OpenWeggliSearch(void) {
@@ -802,10 +806,17 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   std::optional<Fragment> frag;
   std::optional<File> file;
 
+  // TODO(ss):
+  // - restrict the code view to just showing the containing fragment if it's something
+  // in a fragment, as oposed to a file id
+  // - then support click in there, just passing through the various signals then wiring
+  // them up to the current config to open up what is clicked
+
   if (std::holds_alternative<Decl>(*maybe_entity)) {
     auto entity = std::get<Decl>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
+    // TODO(ss): highlight token for the decl
 
 //    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
 //            this, &Multiplier::ActOnTokenPressEvent);
@@ -834,14 +845,11 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     return;
   }
 
-  d->entity_results = new QWidget;
-  d->entity_result_splitter = new QSplitter(Qt::Orientation::Horizontal);
-  d->entity_layout->addWidget(d->entity_result_splitter, 1, 0,
-      d->entity_layout->rowCount() - 1, 4);
   d->entity_result_code_view = new CodeView(*d->entity_result_theme,
       d->multiplier.FileLocationCache());
+  d->entity_layout->addWidget(d->entity_result_code_view, 1, 0,
+      d->entity_layout->rowCount() - 1, d->entity_layout->columnCount());
   d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
-  d->entity_result_splitter->addWidget(d->entity_result_code_view);
   d->entity_result_code_view->show();
   d->entity_result_code_view->SetFile(*file);
   d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
