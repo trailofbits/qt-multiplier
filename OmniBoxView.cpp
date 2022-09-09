@@ -801,39 +801,54 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
 
   std::optional<Fragment> frag;
   std::optional<File> file;
+  std::optional<TokenRange> highlightTok;
+
 
   if (std::holds_alternative<Decl>(*maybe_entity)) {
     auto entity = std::get<Decl>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
+    highlightTok.emplace(entity.tokens());
 
   } else if (std::holds_alternative<Stmt>(*maybe_entity)) {
     auto entity = std::get<Stmt>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
+    highlightTok.emplace(entity.tokens());
 
   } else if (std::holds_alternative<Token>(*maybe_entity)) {
     auto entity = std::get<Token>(*maybe_entity);
     frag.emplace(Fragment::containing(entity).value());
     file.emplace(File::containing(entity).value());
+    highlightTok.emplace(entity);
 
   } else if (std::holds_alternative<Fragment>(*maybe_entity)) {
     auto entity = std::get<Fragment>(*maybe_entity);
     frag.emplace(entity);
     file.emplace(File::containing(entity));
+    highlightTok.emplace(entity.file_tokens());
 
   } else if (std::holds_alternative<Type>(*maybe_entity)) {
     auto entity = std::get<Type>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
+    // TODO: highlight type token?
 
   } else if (std::holds_alternative<Attr>(*maybe_entity)) {
     auto entity = std::get<Attr>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
+    highlightTok.emplace(entity.tokens());
 
   } else if (std::holds_alternative<TokenSubstitution>(*maybe_entity)) {
     auto entity = std::get<TokenSubstitution>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
+    //highlightTok.emplace(entity.tokens()); TODO: highlight before and after tok?
+
+  } else if (std::holds_alternative<Designator>(*maybe_entity)) {
+    // TODO
+
+  } else if (std::holds_alternative<File>(*maybe_entity)) {
+    // TODO: just open the file
 
   } else {
     d->entity_results = new QLabel(tr("No matches"));
@@ -845,7 +860,7 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   }
 
   d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
-  d->entity_result_theme->BeginTokens();
+  d->multiplier.CodeTheme().BeginTokens();
 
   d->entity_result_code_view = new CodeView(*d->entity_result_theme,
       d->multiplier.FileLocationCache());
@@ -853,6 +868,10 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
       d->entity_layout->rowCount() - 1, d->entity_layout->columnCount());
   d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
   d->entity_result_code_view->show();
+
+  if (highlightTok) {
+    d->entity_result_theme->HighlightFileTokenRange(*highlightTok);
+  }
 
   // if in a fragment only show fragment and click into file
   // if fragment show file
@@ -864,24 +883,13 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
 
   }
 
+  d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
+
   // Event to reference view of a file at selected token (cmd + click)
   connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
       this, &OmniBoxView::OnEntityTokenPressEvent);
 
-  // TODO(ss):
-  // - restrict the code view to just showing the containing fragment if it's something
-  // in a fragment, as oposed to a file id
-  // - then support click in there, just passing through the various signals then wiring
-  // them up to the current config to open up what is clicked
-
-  if (std::holds_alternative<Token>(*maybe_entity)) {
-    auto entity = std::get<Token>(*maybe_entity);
-    d->entity_result_theme->HighlightFileTokenRange(entity);
-  }
-
-  d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
-
-  d->entity_result_theme->EndTokens();
+  d->multiplier.CodeTheme().EndTokens();
   update();
 
 }
