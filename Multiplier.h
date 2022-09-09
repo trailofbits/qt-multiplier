@@ -98,6 +98,7 @@ class Multiplier final : public QMainWindow {
 
  public slots:
   void ActOnTokenPressEvent(EventSource source, EventLocations locs);
+
 };
 
 }  // namespace gui

@@ -793,57 +793,59 @@ void OmniBoxView::RunEntityIdSearch(void) {
 }
 
 void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsigned counter) {
-
   if (d->entity_counter != counter) {
     return;
   }
 
   ClearEntityResults();
 
-  d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
-  d->entity_result_theme->BeginTokens();
-
   std::optional<Fragment> frag;
   std::optional<File> file;
-
-  // TODO(ss):
-  // - restrict the code view to just showing the containing fragment if it's something
-  // in a fragment, as oposed to a file id
-  // - then support click in there, just passing through the various signals then wiring
-  // them up to the current config to open up what is clicked
 
   if (std::holds_alternative<Decl>(*maybe_entity)) {
     auto entity = std::get<Decl>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
-    // TODO(ss): highlight token for the decl
-
-//    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
-//            this, &Multiplier::ActOnTokenPressEvent);
-
 
   } else if (std::holds_alternative<Stmt>(*maybe_entity)) {
     auto entity = std::get<Stmt>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
 
-//    connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
-//            this, &Multiplier::ActOnTokenPressEvent);
-
   } else if (std::holds_alternative<Token>(*maybe_entity)) {
     auto entity = std::get<Token>(*maybe_entity);
     frag.emplace(Fragment::containing(entity).value());
     file.emplace(File::containing(entity).value());
+
+  } else if (std::holds_alternative<Fragment>(*maybe_entity)) {
+    auto entity = std::get<Fragment>(*maybe_entity);
+    frag.emplace(entity);
+    file.emplace(File::containing(entity));
+
+  } else if (std::holds_alternative<Type>(*maybe_entity)) {
+    auto entity = std::get<Type>(*maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(entity));
+
+  } else if (std::holds_alternative<Attr>(*maybe_entity)) {
+    auto entity = std::get<Attr>(*maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+
+  } else if (std::holds_alternative<TokenSubstitution>(*maybe_entity)) {
+    auto entity = std::get<TokenSubstitution>(*maybe_entity);
+    frag.emplace(Fragment::containing(entity));
 
   } else {
     d->entity_results = new QLabel(tr("No matches"));
     d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
                                Qt::AlignmentFlag::AlignHCenter |
                                Qt::AlignmentFlag::AlignVCenter);
-    d->entity_result_theme->EndTokens();
     update();
     return;
   }
+
+  d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
+  d->entity_result_theme->BeginTokens();
 
   d->entity_result_code_view = new CodeView(*d->entity_result_theme,
       d->multiplier.FileLocationCache());
@@ -851,16 +853,48 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
       d->entity_layout->rowCount() - 1, d->entity_layout->columnCount());
   d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
   d->entity_result_code_view->show();
-  d->entity_result_code_view->SetFile(*file);
+
+  // if in a fragment only show fragment and click into file
+  // if fragment show file
+  if (std::holds_alternative<Fragment>(*maybe_entity)) {
+    d->entity_result_code_view->SetFile(*file);
+
+  } else {
+    d->entity_result_code_view->SetFragment(*frag);
+
+  }
+
+  // Event to open a file at selected token
+  connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+      this, &OmniBoxView::OnEntityTokenPressEvent);
+
+  // TODO(ss):
+  // - restrict the code view to just showing the containing fragment if it's something
+  // in a fragment, as oposed to a file id
+  // - then support click in there, just passing through the various signals then wiring
+  // them up to the current config to open up what is clicked
+
+  if (std::holds_alternative<Token>(*maybe_entity)) {
+    auto entity = std::get<Token>(*maybe_entity);
+    d->entity_result_theme->HighlightFileTokenRange(entity);
+  }
+
   d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
-
-//  connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
-//          this, &Multiplier::ActOnTokenPressEvent);
-
 
   d->entity_result_theme->EndTokens();
   update();
 
+}
+
+void OmniBoxView::OnEntityTokenPressEvent(EventLocations locs) {
+  for (EventLocation loc : locs) {
+    emit TokenPressEvent(EventSource::kEntityIDSearchResultSource, loc);
+    if (loc.UnpackDeclarationId()) {
+      loc.SetFragmentTokenId(kInvalidEntityId);
+      loc.SetFileTokenId(kInvalidEntityId);
+      emit TokenPressEvent(EventSource::kEntityIDSearchResultDest, loc);
+    }
+  }
 }
 
 void OmniBoxView::BuildRegex(const QString &text) {

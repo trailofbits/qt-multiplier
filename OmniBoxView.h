@@ -86,6 +86,8 @@ class OmniBoxView final : public QWidget {
   void OnOpenWeggliResultsInTab(void);
   void OnOpenWeggliResultsInDock(void);
 
+  void OnEntityTokenPressEvent(EventLocations locs);
+
  signals:
   void OpenTab(QString title, QWidget *widget);
   void OpenDock(QString title, QWidget *widget);
