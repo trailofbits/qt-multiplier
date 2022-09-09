@@ -285,6 +285,8 @@ void OmniBoxView::InitializeWidgets(void) {
   connect(d->entity_button, &QPushButton::pressed,
           this, &OmniBoxView::RunEntityIdSearch);
 
+  // TODO connect open file on enity search
+
   // ---------------------------------------------------------------------------
   // Regex search
   d->regex_box = new QWidget;
@@ -844,11 +846,13 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     frag.emplace(Fragment::containing(entity));
     //highlightTok.emplace(entity.tokens()); TODO: highlight before and after tok?
 
-  } else if (std::holds_alternative<Designator>(*maybe_entity)) {
-    // TODO
+  //} else if (std::holds_alternative<Designator>(*maybe_entity)) {
+    // TODO(ss)
 
-  } else if (std::holds_alternative<File>(*maybe_entity)) {
-    // TODO: just open the file
+  //} else if (std::holds_alternative<File>(*maybe_entity)) {
+    // TODO(ss): Open a file - need to modify file browser to share file to RawID list - maybe
+    // auto entity = std::get<File>(*maybe_entity);
+    // emit EntityIdIsFile(entity., entity.id());
 
   } else {
     d->entity_results = new QLabel(tr("No matches"));
