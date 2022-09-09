@@ -864,7 +864,7 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
 
   }
 
-  // Event to open a file at selected token
+  // Event to reference view of a file at selected token (cmd + click)
   connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
       this, &OmniBoxView::OnEntityTokenPressEvent);
 
