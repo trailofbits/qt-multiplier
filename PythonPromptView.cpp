@@ -40,12 +40,54 @@ struct PythonPromptView::PrivateData {
   PythonCompletionModel completion_model;
   QCompleter* completer;
 
+  QStringList history;
+  typename QStringList::const_iterator current_history_position;
+  QString original_input; // This is the input that was in the LineEdit before the user started navigating the history
+
+  void InputBoxArrowUp() {
+    if(current_history_position == history.begin()) {
+      return; // Already at the top
+    }
+    if(current_history_position == history.end()) {
+      // Starting history scroll, need to save current input
+      original_input = input_box->text();
+    }
+    --current_history_position;
+    input_box->setText(*current_history_position);
+  }
+
+  void InputBoxArrowDown() {
+    if(current_history_position == history.end()) {
+      // Already at the bottom
+      return;
+    }
+
+    ++current_history_position;
+    if(current_history_position == history.end()) {
+      // Reached the bottom, restore original input
+      input_box->setText(original_input);
+      return;
+    }
+
+    input_box->setText(*current_history_position);
+  }
+
   bool InputBoxFilter(QEvent* event) {
     if(event->type() != QEvent::KeyPress) {
       return false;
     }
 
     auto key_event = static_cast<QKeyEvent*>(event);
+    if(key_event->key() == Qt::Key_Up) {
+      InputBoxArrowUp();
+      return true;
+    }
+
+    if(key_event->key() == Qt::Key_Down) {
+      InputBoxArrowDown();
+      return true;
+    }
+
     if(key_event->key() != Qt::Key_Tab) {
       return false;
     }
@@ -254,6 +296,8 @@ void PythonPromptView::InitializeWidgets(void) {
   QString welcome_string =
     QString("Python %1 on %2\n").arg(Py_GetVersion(), Py_GetPlatform());
   d->output_box->insertPlainText(welcome_string);
+
+  d->current_history_position = d->history.end();
 }
 
 void PythonPromptView::OnLineEntered(const QString& s) {
@@ -273,6 +317,9 @@ void PythonPromptView::OnLineEntered(const QString& s) {
   d->output_box->setTextColor(palette.color(group, role));
   d->output_box->setFontItalic(true);
   d->output_box->insertPlainText(prompt + " " + s + "\n");
+
+  d->history.push_back(s);
+  d->current_history_position = d->history.end();
 
   d->buffer << s;
 
