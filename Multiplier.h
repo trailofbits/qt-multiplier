@@ -43,6 +43,7 @@ class Multiplier final : public QMainWindow {
 
   // Return the current connected index.
   const ::mx::Index &Index(void) const;
+  const ::mx::EntityProvider::Ptr &EntityProvider() const;
 
   // Return the current code theme.
   const ::mx::gui::CodeTheme &CodeTheme(void) const;
@@ -98,6 +99,12 @@ class Multiplier final : public QMainWindow {
 
  public slots:
   void ActOnTokenPressEvent(EventSource source, EventLocations locs);
+  void SetSingleEntityGlobal(const QString& name, mx::RawEntityId id);
+  void SetMultipleEntitiesGlobal(const QString& name,
+                                 const std::vector<mx::RawEntityId>& ids);
+
+ signals:
+  void IndexReady(void);
 };
 
 }  // namespace gui

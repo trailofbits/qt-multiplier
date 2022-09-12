@@ -32,6 +32,8 @@ find_package(${MX_QT} COMPONENTS ${MX_QT_COMPONENTS} REQUIRED)
 find_package(multiplier CONFIG REQUIRED)
 
 find_package(sqlite-multiplier CONFIG REQUIRED)
+find_package(Python3 3.7 MODULE REQUIRED COMPONENTS Development)
+find_package(py-multiplier CONFIG REQUIRED)
 
 set(exe_name "mx-gui")
 add_executable("${exe_name}"
@@ -81,6 +83,15 @@ add_executable("${exe_name}"
   OpenConnectionDialog.cpp
   OpenConnectionDialog.h
 
+  PythonCompletionModel.cpp
+  PythonCompletionModel.h
+
+  PythonOutputAdapter.cpp
+  PythonOutputAdapter.h
+
+  PythonPromptView.cpp
+  PythonPromptView.h
+
   ReferenceBrowserView.cpp
   ReferenceBrowserView.h
   
@@ -96,6 +107,8 @@ target_link_libraries("${exe_name}" PRIVATE
   ${MX_QT}::Core
   ${MX_QT}::Widgets
   sqlite-multiplier::mxsqlitebridge
+  Python3::Python
+  py-multiplier::py-multiplier
 )
 
 if(MX_QT_VERSION GREATER "5")
@@ -109,6 +122,10 @@ set_target_properties("${exe_name}"
     AUTOMOC TRUE
     AUTOUIC TRUE
     AUTORCC TRUE
+)
+
+target_compile_definitions("${exe_name}" PRIVATE
+  PY_SSIZE_T_CLEAN
 )
 
 # Find libLTO.so or libLTO.dylib. LLVM relies on these, and LLVM is used in
