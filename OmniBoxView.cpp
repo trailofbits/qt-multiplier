@@ -133,6 +133,7 @@ struct OmniBoxView::PrivateData {
   QPushButton *entity_button{nullptr};
   QWidget *entity_results{nullptr};
   HighlightRangeTheme *entity_result_theme{nullptr};
+  HighlightTokenSubstitution *entity_result_tok_sub_theme{nullptr};
 
   QWidget *regex_box{nullptr};
   QGridLayout *regex_layout{nullptr};
@@ -475,6 +476,8 @@ void OmniBoxView::ClearEntityResults(void) {
     d->entity_result_code_view->disconnect();
     d->entity_result_code_view->deleteLater();
     d->entity_result_code_view = nullptr;
+    d->entity_result_theme = nullptr;
+    d->entity_result_tok_sub_theme = nullptr;
     update();
   }
 
@@ -803,7 +806,7 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
 
   std::optional<Fragment> frag;
   std::optional<File> file;
-  std::optional<TokenRange> highlightTok;
+  std::optional<std::variant<TokenRange, TokenSubstitution>> highlightTok;
 
 
   if (std::holds_alternative<Decl>(*maybe_entity)) {
@@ -844,7 +847,12 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   } else if (std::holds_alternative<TokenSubstitution>(*maybe_entity)) {
     auto entity = std::get<TokenSubstitution>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
-    //highlightTok.emplace(entity.tokens()); TODO: highlight before and after tok?
+    // Highlight all original filetokens - HighlightFileTokenRanges
+
+    highlightTok.emplace(entity);
+    d->entity_result_tok_sub_theme = new HighlightTokenSubstitution(d->multiplier.CodeTheme());
+    d->entity_result_code_view = new CodeView(*d->entity_result_tok_sub_theme,
+        d->multiplier.FileLocationCache());
 
   //} else if (std::holds_alternative<Designator>(*maybe_entity)) {
     // TODO(ss)
@@ -863,18 +871,24 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     return;
   }
 
-  d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
+  if (!d->entity_result_tok_sub_theme) {
+    d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
+    d->entity_result_code_view = new CodeView(*d->entity_result_theme,
+        d->multiplier.FileLocationCache());
+  }
   d->multiplier.CodeTheme().BeginTokens();
 
-  d->entity_result_code_view = new CodeView(*d->entity_result_theme,
-      d->multiplier.FileLocationCache());
   d->entity_layout->addWidget(d->entity_result_code_view, 1, 0,
       d->entity_layout->rowCount() - 1, d->entity_layout->columnCount());
   d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
   d->entity_result_code_view->show();
 
-  if (highlightTok) {
-    d->entity_result_theme->HighlightFileTokenRange(*highlightTok);
+  if (d->entity_result_theme) {
+    d->entity_result_theme->HighlightFileTokenRange(
+        std::get<TokenRange>(*highlightTok));
+  } else {
+    d->entity_result_tok_sub_theme->HighlightFileTokenSubList(
+        std::get<TokenSubstitution>(*highlightTok));
   }
 
   // if in a fragment only show fragment and click into file

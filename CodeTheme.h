@@ -19,6 +19,7 @@ class Decl;
 class Index;
 class Token;
 class TokenRange;
+class TokenSubstitution;
 namespace gui {
 
 enum class TokenCategory : unsigned char {
@@ -194,6 +195,37 @@ class HighlightRangeTheme final : public ProxyCodeTheme {
 
   // Set the entity to be highlighted.
   void HighlightFileTokenRange(const TokenRange &range_);
+
+  void BeginTokens(void) const override;
+  void EndTokens(void) const override;
+
+  // Background color for a specific token.
+  const QBrush &TokenBackgroundColor(
+      const Token &tok, const std::vector<Decl> &related_decls,
+      TokenCategory kind) const override;
+
+  // Foreground color for a specific token.
+  const QBrush &TokenForegroundColor(
+      const Token &tok, const std::vector<Decl> &related_decls,
+      TokenCategory kind) const override;
+};
+
+// Wraps around a theme to let us highlight a range of tokens.
+class HighlightTokenSubstitution final : public ProxyCodeTheme {
+ private:
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
+  void UnparsedTokens(TokenSubstitution &tok_sub);
+
+ public:
+
+  virtual ~HighlightTokenSubstitution(void);
+
+  HighlightTokenSubstitution(const CodeTheme &next_);
+
+  // Set the entity to be highlighted.
+  void HighlightFileTokenSubList(const TokenSubstitution &tok_sub_list_);
+  void BuildUnparsedTokens();
 
   void BeginTokens(void) const override;
   void EndTokens(void) const override;
