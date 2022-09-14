@@ -461,6 +461,7 @@ void HighlightTokenSubstitution::BeginTokens(void) const {
   d->lock.lock();
   d->inverted_colors.clear();
   d->token_sub.reset();
+  d->unparsed_tokens.clear();
 }
 
 void HighlightTokenSubstitution::EndTokens(void) const {

@@ -5,6 +5,8 @@
   This source code is licensed in accordance with the terms specified in
   the LICENSE file found in the root directory of this source tree.
 */
+#include <Python.h>
+#include <py-multiplier/api.h>
 
 #include "Multiplier.h"
 
@@ -42,6 +44,7 @@
 #include "HistoryBrowserView.h"
 #include "IndexMonitorThread.h"
 #include "OmniBoxView.h"
+#include "PythonPromptView.h"
 #include "OpenConnectionDialog.h"
 #include "ReferenceBrowserView.h"
 
@@ -102,6 +105,9 @@ struct Multiplier::PrivateData final {
   class HistoryBrowserView *history_browser_view{nullptr};
   QDockWidget *history_browser_dock{nullptr};
 
+  PythonPromptView *python_prompt_view{nullptr};
+  QDockWidget *python_prompt_dock{nullptr};
+
   Qt::KeyboardModifiers modifiers;
   Qt::Key key{Qt::Key_unknown};
   Qt::MouseButtons buttons;
@@ -114,6 +120,7 @@ struct Multiplier::PrivateData final {
   // The last user-caused event, excluding physical events.
   uint64_t last_event{0u};
 
+  mx::EntityProvider::Ptr ep;
   mx::Index index;
   mx::FileLocationCache line_cache;
 
@@ -142,6 +149,11 @@ Multiplier::~Multiplier(void) {}
 // Return the current connected index.
 const ::mx::Index &Multiplier::Index(void) const {
   return d->index;
+}
+
+// Return the current connected entity provider.
+const ::mx::EntityProvider::Ptr &Multiplier::EntityProvider(void) const {
+  return d->ep;
 }
 
 // Return the current code theme.
@@ -360,12 +372,17 @@ void Multiplier::InitializeWidgets(void) {
   d->history_browser_dock = new QDockWidget(d->history_browser_view->windowTitle());
   d->history_browser_dock->setWidget(d->history_browser_view);
 
+  d->python_prompt_view = new PythonPromptView(*this);
+  d->python_prompt_dock = new QDockWidget(d->python_prompt_view->windowTitle());
+  d->python_prompt_dock->setWidget(d->python_prompt_view);
+
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::East);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
   addDockWidget(Qt::LeftDockWidgetArea, d->file_browser_dock);
   addDockWidget(Qt::LeftDockWidgetArea, d->history_browser_dock);
   addDockWidget(Qt::LeftDockWidgetArea, d->reference_browser_dock);
+  addDockWidget(Qt::BottomDockWidgetArea, d->python_prompt_dock);
   tabifyDockWidget(d->file_browser_dock, d->history_browser_dock);
   tabifyDockWidget(d->history_browser_dock, d->reference_browser_dock);
 
@@ -391,6 +408,15 @@ void Multiplier::InitializeWidgets(void) {
 
   connect(d->history_browser_view, &HistoryBrowserView::TokenPressEvent,
           this, &Multiplier::ActOnTokenPressEvent);
+
+  connect(d->code_browser_view, &CodeBrowserView::CurrentFile,
+          d->python_prompt_view, &PythonPromptView::CurrentFile);
+
+  connect(d->python_prompt_view, &PythonPromptView::SourceFileOpened,
+          this, &Multiplier::OnSourceFileDoubleClicked);
+
+  connect(d->python_prompt_view, &PythonPromptView::TokenOpened,
+          d->code_browser_view, &CodeBrowserView::OnScrollToToken);
 }
 
 void Multiplier::InitializeMenus(void) {
@@ -484,6 +510,7 @@ void Multiplier::UpdateWidgets(void) {
       d->file_browser_dock->hide();
       d->history_browser_dock->hide();
       d->reference_browser_dock->hide();
+      d->python_prompt_dock->hide();
       d->code_browser_view->Disconnected();
       break;
 
@@ -491,6 +518,7 @@ void Multiplier::UpdateWidgets(void) {
       d->file_browser_dock->show();
       d->history_browser_dock->show();
       d->reference_browser_dock->show();
+      d->python_prompt_dock->show();
       d->code_browser_view->Connected();
       break;
 
@@ -498,6 +526,7 @@ void Multiplier::UpdateWidgets(void) {
       d->file_browser_dock->hide();
       d->history_browser_dock->hide();
       d->reference_browser_dock->hide();
+      d->python_prompt_dock->hide();
       d->code_browser_view->Disconnected();
       break;
   }
@@ -583,17 +612,19 @@ void Multiplier::OnSourceFileDoubleClicked(
 }
 
 void Multiplier::OnLaunchedIndexerReady(void) {
-  d->monitor = new IndexMonitorThread(
-      EntityProvider::in_memory_cache(
-          EntityProvider::from_remote(
-              d->indexer_host.toStdString(),
-              d->indexer_port.toStdString()),
-          10u * 60u  /* 10 minutes */));
+  d->ep = EntityProvider::in_memory_cache(
+              EntityProvider::from_remote(
+                d->indexer_host.toStdString(),
+                d->indexer_port.toStdString()),
+              10u * 60u  /* 10 minutes */);
+  d->monitor = new IndexMonitorThread(d->ep);
 
   connect(d->monitor, &IndexMonitorThread::VersionNumberChanged,
           this, &Multiplier::OnVersionNumberChanged);
 
   d->monitor->Start();
+
+  emit IndexReady();
 }
 
 void Multiplier::OnVersionNumberChanged(::mx::Index index_) {
@@ -1023,6 +1054,22 @@ void Multiplier::ActOnTokenPressEvent(EventSource source, EventLocations locs) {
   for (const EventAction &ea : d->config.immediate_actions) {
     DoActions(source, ea);
   }
+}
+
+void Multiplier::SetSingleEntityGlobal(const QString& name, mx::RawEntityId id) {
+  auto entity = d->index.entity(id);
+  d->python_prompt_view->SetGlobal(name, py::CreateObject(std::move(entity)));
+  d->python_prompt_view->OnLineEntered(name);
+}
+
+void Multiplier::SetMultipleEntitiesGlobal(const QString& name, const std::vector<mx::RawEntityId>& ids) {
+  auto list = PyList_New(ids.size());
+  for(size_t i = 0; i < ids.size(); ++i) {
+    auto entity = d->index.entity(ids[i]);
+    PyList_SetItem(list, i, py::CreateObject(std::move(entity)));
+  }
+  d->python_prompt_view->SetGlobal(name, list);
+  d->python_prompt_view->OnLineEntered(name);
 }
 
 }  // namespace mx::gui

@@ -92,6 +92,7 @@ class OmniBoxView final : public QWidget {
   void OpenTab(QString title, QWidget *widget);
   void OpenDock(QString title, QWidget *widget);
   void TokenPressEvent(EventSource source, EventLocations loc_ids);
+  void EntityIdIsFile(std::filesystem::path, RawEntityId file_id);
 };
 
 // Downloads the symbol search results in the background.

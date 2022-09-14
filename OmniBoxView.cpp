@@ -286,7 +286,8 @@ void OmniBoxView::InitializeWidgets(void) {
   connect(d->entity_button, &QPushButton::pressed,
           this, &OmniBoxView::RunEntityIdSearch);
 
-  // TODO connect open file on enity search
+  connect(this, &OmniBoxView::EntityIdIsFile,
+          &d->multiplier, &Multiplier::OnSourceFileDoubleClicked);
 
   // ---------------------------------------------------------------------------
   // Regex search
@@ -842,25 +843,41 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   } else if (std::holds_alternative<Attr>(*maybe_entity)) {
     auto entity = std::get<Attr>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(*frag));
     highlightTok.emplace(entity.tokens());
 
   } else if (std::holds_alternative<TokenSubstitution>(*maybe_entity)) {
+    //TODO(ss): test this
     auto entity = std::get<TokenSubstitution>(*maybe_entity);
     frag.emplace(Fragment::containing(entity));
-    // Highlight all original filetokens - HighlightFileTokenRanges
-
+    file.emplace(File::containing(*frag));
     highlightTok.emplace(entity);
     d->entity_result_tok_sub_theme = new HighlightTokenSubstitution(d->multiplier.CodeTheme());
     d->entity_result_code_view = new CodeView(*d->entity_result_tok_sub_theme,
         d->multiplier.FileLocationCache());
 
-  //} else if (std::holds_alternative<Designator>(*maybe_entity)) {
-    // TODO(ss)
+  } else if (std::holds_alternative<Designator>(*maybe_entity)) {
+    // TODO(ss): test this
+    auto entity = std::get<Designator>(*maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(*frag));
+    highlightTok.emplace(entity.tokens());
 
-  //} else if (std::holds_alternative<File>(*maybe_entity)) {
-    // TODO(ss): Open a file - need to modify file browser to share file to RawID list - maybe
-    // auto entity = std::get<File>(*maybe_entity);
-    // emit EntityIdIsFile(entity., entity.id());
+  } else if (std::holds_alternative<File>(*maybe_entity)) {
+    // TODO(ss): test this
+    auto entity = std::get<File>(*maybe_entity);
+
+    if (!d->file_id_to_path.contains(entity.id())) {
+      d->entity_results = new QLabel(tr("Filepath for ID not found"));
+      d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
+                                 Qt::AlignmentFlag::AlignHCenter |
+                                 Qt::AlignmentFlag::AlignVCenter);
+      update();
+      return;
+
+    }
+
+    emit EntityIdIsFile(d->file_id_to_path[entity.id()], entity.id());
 
   } else {
     d->entity_results = new QLabel(tr("No matches"));
@@ -883,10 +900,10 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
   d->entity_result_code_view->show();
 
-  if (d->entity_result_theme) {
+  if (d->entity_result_theme && highlightTok) {
     d->entity_result_theme->HighlightFileTokenRange(
         std::get<TokenRange>(*highlightTok));
-  } else {
+  } else if (highlightTok){
     d->entity_result_tok_sub_theme->HighlightFileTokenSubList(
         std::get<TokenSubstitution>(*highlightTok));
   }
