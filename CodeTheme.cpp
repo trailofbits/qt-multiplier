@@ -410,7 +410,6 @@ const QBrush &HighlightRangeTheme::TokenForegroundColor(
   return brush;
 }
 
-// TODO(ss): HighlightTokenSubstitutionList
 struct HighlightTokenSubstitution::PrivateData {
   std::mutex lock;
   std::optional<TokenSubstitution> token_sub;
