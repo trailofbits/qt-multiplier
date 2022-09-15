@@ -13,6 +13,8 @@ Install [Multiplier](https://github.com/trailofbits/multiplier) and it's depende
 
 Install [SQlite Multiplier](https://github.com/trailofbits/sqlite-multiplier) and it's dependencies to `WORKSPACE_DIR`.
 
+Install [Python bindings for Multiplier](https://github.com/trailofbits/py-multiplier) and it's dependencies to `WORKSPACE_DIR`.
+
 Install QT5
 
 ```shell
