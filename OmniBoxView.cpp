@@ -898,6 +898,13 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     d->entity_result_code_view = new CodeView(*d->entity_result_theme,
         d->multiplier.FileLocationCache());
   }
+
+  connect(d->entity_result_code_view, &CodeView::SetSingleEntityGlobal,
+          &d->multiplier, &Multiplier::SetSingleEntityGlobal);
+
+  connect(d->entity_result_code_view, &CodeView::SetMultipleEntitiesGlobal,
+          &d->multiplier, &Multiplier::SetMultipleEntitiesGlobal);
+
   d->multiplier.CodeTheme().BeginTokens();
 
   d->entity_layout->addWidget(d->entity_result_code_view, 1, 0,
