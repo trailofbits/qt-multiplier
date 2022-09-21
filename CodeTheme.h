@@ -18,6 +18,7 @@ namespace mx {
 class Decl;
 class Index;
 class Token;
+class Type;
 class TokenRange;
 class TokenSubstitution;
 namespace gui {
@@ -195,6 +196,8 @@ class HighlightRangeTheme final : public ProxyCodeTheme {
 
   // Set the entity to be highlighted.
   void HighlightFileTokenRange(const TokenRange &range_);
+  void HighlightTypeInFileTokenRange(const TokenRange &range_,
+                                      Type &type);
 
   void BeginTokens(void) const override;
   void EndTokens(void) const override;
@@ -210,8 +213,8 @@ class HighlightRangeTheme final : public ProxyCodeTheme {
       TokenCategory kind) const override;
 };
 
-// Wraps around a theme to let us highlight a range of tokens.
-class HighlightTokenSubstitution final : public ProxyCodeTheme {
+// Wraps around a theme to let us highlight a TokenSubstitution of tokens.
+class HighlightTokenSubstitutionTheme final : public ProxyCodeTheme {
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
@@ -219,9 +222,9 @@ class HighlightTokenSubstitution final : public ProxyCodeTheme {
 
  public:
 
-  virtual ~HighlightTokenSubstitution(void);
+  virtual ~HighlightTokenSubstitutionTheme(void);
 
-  HighlightTokenSubstitution(const CodeTheme &next_);
+  HighlightTokenSubstitutionTheme(const CodeTheme &next_);
 
   // Set the entity to be highlighted.
   void HighlightFileTokenSubList(const TokenSubstitution &tok_sub_list_);

@@ -343,6 +343,7 @@ TokenFormat ProxyCodeTheme::Format(
 struct HighlightRangeTheme::PrivateData {
   std::mutex lock;
   TokenRange tokens;
+  std::optional<Type> type;
   std::unordered_map<const QBrush *, QBrush> inverted_colors;
   const QColor background;
   const QColor inverted_foreground;
@@ -362,12 +363,22 @@ HighlightRangeTheme::~HighlightRangeTheme(void) {}
 void HighlightRangeTheme::HighlightFileTokenRange(const TokenRange &range) {
   std::unique_lock<std::mutex> locker(d->lock);
   d->tokens = range;
+  d->type.reset();
+}
+
+// Set the range and type to be highlighted.
+void HighlightRangeTheme::HighlightTypeInFileTokenRange(const TokenRange &range,
+                                                       Type &type) {
+  std::unique_lock<std::mutex> locker(d->lock);
+  d->tokens = range;
+  d->type.emplace(type);
 }
 
 void HighlightRangeTheme::BeginTokens(void) const {
   this->ProxyCodeTheme::BeginTokens();
   d->lock.lock();
   d->inverted_colors.clear();
+  d->type.reset();
   d->tokens = d->tokens.file_tokens();
 }
 
@@ -383,6 +394,16 @@ const QBrush &HighlightRangeTheme::TokenBackgroundColor(
 
   const QBrush &brush = this->ProxyCodeTheme::TokenBackgroundColor(
       tok, related_decls, kind);
+
+  if (d->type && d->tokens.index_of(tok)) {
+    if (auto type = mx::TokenContext::of(tok)->as_type()) {
+      if (type->id().Pack() == d->type->id().Pack()) {
+        QBrush brush_inv(d->background, brush.style());
+        return d->inverted_colors.emplace(&brush, brush_inv).first->second;
+      }
+    }
+    return brush;
+  }
 
   // If it's one of the tokens in our range, then invert its background color.
   if (d->tokens.index_of(tok)) {
@@ -400,6 +421,16 @@ const QBrush &HighlightRangeTheme::TokenForegroundColor(
   const QBrush &brush = this->ProxyCodeTheme::TokenForegroundColor(
       tok, related_decls, kind);
 
+  if (d->type && d->tokens.index_of(tok)) {
+    if (auto type = mx::TokenContext::of(tok)->as_type()) {
+      if (type->id().Pack() == d->type->id().Pack()) {
+         QBrush brush_inv(d->background, brush.style());
+        return d->inverted_colors.emplace(&brush, brush_inv).first->second;
+      }
+    }
+    return brush;
+  }
+
   // If it's one of the tokens in our range, then invert its background color.
   if (d->tokens.index_of(tok)) {
     if (brush.color().isValid()) {
@@ -410,7 +441,7 @@ const QBrush &HighlightRangeTheme::TokenForegroundColor(
   return brush;
 }
 
-struct HighlightTokenSubstitution::PrivateData {
+struct HighlightTokenSubstitutionTheme::PrivateData {
   std::mutex lock;
   std::optional<TokenSubstitution> token_sub;
   std::unordered_map<uint64_t, Token> unparsed_tokens;
@@ -423,13 +454,13 @@ struct HighlightTokenSubstitution::PrivateData {
         inverted_foreground(InvertColor(bg_color)) {}
 };
 
-HighlightTokenSubstitution::HighlightTokenSubstitution(const CodeTheme &next_)
+HighlightTokenSubstitutionTheme::HighlightTokenSubstitutionTheme(const CodeTheme &next_)
     : ProxyCodeTheme(next_),
       d(new PrivateData(next_.SelectedLineBackgroundColor())) {}
 
-HighlightTokenSubstitution::~HighlightTokenSubstitution(void) {}
+HighlightTokenSubstitutionTheme::~HighlightTokenSubstitutionTheme(void) {}
 
-void HighlightTokenSubstitution::UnparsedTokens(TokenSubstitution &tok_sub) {
+void HighlightTokenSubstitutionTheme::UnparsedTokens(TokenSubstitution &tok_sub) {
   for (auto node : tok_sub.before()) {
       if (std::holds_alternative<mx::Token>(node)) {
         auto tok = std::get<Token>(node);
@@ -441,21 +472,21 @@ void HighlightTokenSubstitution::UnparsedTokens(TokenSubstitution &tok_sub) {
   }
 }
 
-void HighlightTokenSubstitution::BuildUnparsedTokens() {
+void HighlightTokenSubstitutionTheme::BuildUnparsedTokens() {
   if (d->token_sub) {
     UnparsedTokens(*d->token_sub);
   }
 }
 
 // Set the entity to be highlighted.
-void HighlightTokenSubstitution::HighlightFileTokenSubList(const TokenSubstitution &tok_sub_) {
+void HighlightTokenSubstitutionTheme::HighlightFileTokenSubList(const TokenSubstitution &tok_sub_) {
   std::unique_lock<std::mutex> locker(d->lock);
   d->token_sub.emplace(tok_sub_);
   BuildUnparsedTokens();
 
 }
 
-void HighlightTokenSubstitution::BeginTokens(void) const {
+void HighlightTokenSubstitutionTheme::BeginTokens(void) const {
   this->ProxyCodeTheme::BeginTokens();
   d->lock.lock();
   d->inverted_colors.clear();
@@ -463,13 +494,13 @@ void HighlightTokenSubstitution::BeginTokens(void) const {
   d->unparsed_tokens.clear();
 }
 
-void HighlightTokenSubstitution::EndTokens(void) const {
+void HighlightTokenSubstitutionTheme::EndTokens(void) const {
   d->lock.unlock();
   this->ProxyCodeTheme::EndTokens();
 }
 
 // Background color for a specific token.
-const QBrush &HighlightTokenSubstitution::TokenBackgroundColor(
+const QBrush &HighlightTokenSubstitutionTheme::TokenBackgroundColor(
     const Token &tok, const std::vector<Decl> &related_decls,
     TokenCategory kind) const {
 
@@ -486,7 +517,7 @@ const QBrush &HighlightTokenSubstitution::TokenBackgroundColor(
 }
 
 // Foreground color for a specific token.
-const QBrush &HighlightTokenSubstitution::TokenForegroundColor(
+const QBrush &HighlightTokenSubstitutionTheme::TokenForegroundColor(
     const Token &tok, const std::vector<Decl> &related_decls,
     TokenCategory kind) const {
   const QBrush &brush = this->ProxyCodeTheme::TokenForegroundColor(
