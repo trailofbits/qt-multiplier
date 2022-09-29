@@ -477,8 +477,14 @@ void OmniBoxView::ClearEntityResults(void) {
     d->entity_result_code_view->disconnect();
     d->entity_result_code_view->deleteLater();
     d->entity_result_code_view = nullptr;
-    d->entity_result_theme = nullptr;
-    d->entity_result_tok_sub_theme = nullptr;
+    if (d->entity_result_theme) {
+      delete d->entity_result_theme;
+      d->entity_result_theme = nullptr;
+    }
+    if (d->entity_result_tok_sub_theme) {
+      delete d->entity_result_tok_sub_theme;
+      d->entity_result_tok_sub_theme = nullptr;
+    }
     update();
   }
 
