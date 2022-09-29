@@ -304,7 +304,7 @@ int main(int argc, char *argv[]) {
   qRegisterMetaType<mx::gui::UserLocations>("UserLocations");
   qRegisterMetaType<mx::RawEntityId>("RawEntityId");
   qRegisterMetaType<mx::EntityId>("EntityId");
-  qRegisterMetaType<std::optional<mx::VariantEntity>>("std::optional<VariantEntity>");
+  qRegisterMetaType<mx::VariantEntity>("VariantEntity");
   qRegisterMetaType<mx::FilePathList>("FilePathList");
   qRegisterMetaType<mx::Token>("Token");
   qRegisterMetaType<mx::TokenRange>("TokenRange");

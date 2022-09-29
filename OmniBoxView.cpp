@@ -798,7 +798,7 @@ void OmniBoxView::RunEntityIdSearch(void) {
 
 }
 
-void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsigned counter) {
+void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
   if (d->entity_counter != counter) {
     return;
   }
@@ -810,20 +810,20 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   std::optional<std::variant<TokenRange, TokenSubstitution>> highlightTok;
 
 
-  if (std::holds_alternative<Decl>(*maybe_entity)) {
-    auto entity = std::get<Decl>(*maybe_entity);
+  if (std::holds_alternative<Decl>(maybe_entity)) {
+    auto entity = std::get<Decl>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
     highlightTok.emplace(entity.tokens());
 
-  } else if (std::holds_alternative<Stmt>(*maybe_entity)) {
-    auto entity = std::get<Stmt>(*maybe_entity);
+  } else if (std::holds_alternative<Stmt>(maybe_entity)) {
+    auto entity = std::get<Stmt>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
     highlightTok.emplace(entity.tokens());
 
-  } else if (std::holds_alternative<Token>(*maybe_entity)) {
-    auto entity = std::get<Token>(*maybe_entity);
+  } else if (std::holds_alternative<Token>(maybe_entity)) {
+    auto entity = std::get<Token>(maybe_entity);
     if (Fragment::containing(entity)) {
       frag.emplace(Fragment::containing(entity).value());
     }
@@ -832,26 +832,26 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     }
     highlightTok.emplace(entity);
 
-  } else if (std::holds_alternative<Fragment>(*maybe_entity)) {
-    auto entity = std::get<Fragment>(*maybe_entity);
+  } else if (std::holds_alternative<Fragment>(maybe_entity)) {
+    auto entity = std::get<Fragment>(maybe_entity);
     frag.emplace(entity);
     file.emplace(File::containing(entity));
     highlightTok.emplace(entity.file_tokens());
 
-  } else if (std::holds_alternative<Type>(*maybe_entity)) {
-    auto entity = std::get<Type>(*maybe_entity);
+  } else if (std::holds_alternative<Type>(maybe_entity)) {
+    auto entity = std::get<Type>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
     highlightTok.emplace(frag->file_tokens());
 
-  } else if (std::holds_alternative<Attr>(*maybe_entity)) {
-    auto entity = std::get<Attr>(*maybe_entity);
+  } else if (std::holds_alternative<Attr>(maybe_entity)) {
+    auto entity = std::get<Attr>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(*frag));
     highlightTok.emplace(entity.tokens());
 
-  } else if (std::holds_alternative<TokenSubstitution>(*maybe_entity)) {
-    auto entity = std::get<TokenSubstitution>(*maybe_entity);
+  } else if (std::holds_alternative<TokenSubstitution>(maybe_entity)) {
+    auto entity = std::get<TokenSubstitution>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
     highlightTok.emplace(entity);
@@ -859,14 +859,14 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
     d->entity_result_code_view = new CodeView(*d->entity_result_tok_sub_theme,
         d->multiplier.FileLocationCache());
 
-  } else if (std::holds_alternative<Designator>(*maybe_entity)) {
-    auto entity = std::get<Designator>(*maybe_entity);
+  } else if (std::holds_alternative<Designator>(maybe_entity)) {
+    auto entity = std::get<Designator>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
     highlightTok.emplace(entity.tokens());
 
-  } else if (std::holds_alternative<File>(*maybe_entity)) {
-    auto entity = std::get<File>(*maybe_entity);
+  } else if (std::holds_alternative<File>(maybe_entity)) {
+    auto entity = std::get<File>(maybe_entity);
 
     if (!d->file_id_to_path.contains(entity.id())) {
       d->entity_results = new QLabel(tr("Filepath for ID not found"));
@@ -913,8 +913,8 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
 
   if (d->entity_result_theme && highlightTok) {
     auto tok = std::get<TokenRange>(*highlightTok);
-    if (std::holds_alternative<Type>(*maybe_entity)) {
-      d->entity_result_theme->HighlightTypeInFileTokenRange(tok, std::get<Type>(*maybe_entity));
+    if (std::holds_alternative<Type>(maybe_entity)) {
+      d->entity_result_theme->HighlightTypeInFileTokenRange(tok, std::get<Type>(maybe_entity));
 
     } else {
       d->entity_result_theme->HighlightFileTokenRange(tok);
@@ -929,7 +929,7 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
 
   // if in a fragment only show fragment and click into file
   // if fragment show file
-  if ((std::holds_alternative<Fragment>(*maybe_entity) || !frag) && file) {
+  if ((std::holds_alternative<Fragment>(maybe_entity) || !frag) && file) {
     d->entity_result_code_view->SetFile(*file);
 
   } else {
@@ -940,7 +940,7 @@ void OmniBoxView::OnFoundEntity(std::optional<VariantEntity> maybe_entity, unsig
   if (frag) {
     d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
   } else {
-   auto entity = std::get<Token>(*maybe_entity);
+   auto entity = std::get<Token>(maybe_entity);
    assert (entity);
    d->entity_result_code_view->ScrollToFileToken(entity);
 

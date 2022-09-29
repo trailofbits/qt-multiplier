@@ -70,7 +70,7 @@ class OmniBoxView final : public QWidget {
 
   void SetEntityIdQueryString(const QString &text);
   void RunEntityIdSearch(void);
-  void OnFoundEntity(std::optional<VariantEntity> entity, unsigned counter);
+  void OnFoundEntity(VariantEntity entity, unsigned counter);
 
   void BuildRegex(const QString &text);
   void RunRegex(void);
@@ -133,7 +133,7 @@ class EntitySearchThread final : public QObject, public QRunnable {
 			const RawEntityId raw_id_, unsigned counter_);
 
  signals:
-  void FoundEntity(std::optional<VariantEntity> entity, unsigned counter);
+  void FoundEntity(VariantEntity entity, unsigned counter);
 };
 
 
