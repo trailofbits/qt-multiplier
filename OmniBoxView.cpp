@@ -814,7 +814,11 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
     auto entity = std::get<Decl>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
-    highlight_tok.emplace(entity.tokens());
+    if (auto tok = DeclFileToken(entity)) {
+      highlight_tok.emplace(*tok);
+    } else {
+      highlight_tok.emplace(entity.tokens());
+    }
 
   } else if (std::holds_alternative<Stmt>(maybe_entity)) {
     auto entity = std::get<Stmt>(maybe_entity);
