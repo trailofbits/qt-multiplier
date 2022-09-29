@@ -807,20 +807,20 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
 
   std::optional<Fragment> frag;
   std::optional<File> file;
-  std::optional<std::variant<TokenRange, TokenSubstitution>> highlightTok;
+  std::optional<std::variant<TokenRange, TokenSubstitution>> highlight_tok;
 
 
   if (std::holds_alternative<Decl>(maybe_entity)) {
     auto entity = std::get<Decl>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
-    highlightTok.emplace(entity.tokens());
+    highlight_tok.emplace(entity.tokens());
 
   } else if (std::holds_alternative<Stmt>(maybe_entity)) {
     auto entity = std::get<Stmt>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
-    highlightTok.emplace(entity.tokens());
+    highlight_tok.emplace(entity.tokens());
 
   } else if (std::holds_alternative<Token>(maybe_entity)) {
     auto entity = std::get<Token>(maybe_entity);
@@ -830,31 +830,31 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
     if (File::containing(entity)) {
       file.emplace(File::containing(entity).value());
     }
-    highlightTok.emplace(entity);
+    highlight_tok.emplace(entity);
 
   } else if (std::holds_alternative<Fragment>(maybe_entity)) {
     auto entity = std::get<Fragment>(maybe_entity);
     frag.emplace(entity);
     file.emplace(File::containing(entity));
-    highlightTok.emplace(entity.file_tokens());
+    highlight_tok.emplace(entity.file_tokens());
 
   } else if (std::holds_alternative<Type>(maybe_entity)) {
     auto entity = std::get<Type>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
-    highlightTok.emplace(frag->file_tokens());
+    highlight_tok.emplace(frag->file_tokens());
 
   } else if (std::holds_alternative<Attr>(maybe_entity)) {
     auto entity = std::get<Attr>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(*frag));
-    highlightTok.emplace(entity.tokens());
+    highlight_tok.emplace(entity.tokens());
 
   } else if (std::holds_alternative<TokenSubstitution>(maybe_entity)) {
     auto entity = std::get<TokenSubstitution>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
-    highlightTok.emplace(entity);
+    highlight_tok.emplace(entity);
     d->entity_result_tok_sub_theme = new HighlightTokenSubstitutionTheme(d->multiplier.CodeTheme());
     d->entity_result_code_view = new CodeView(*d->entity_result_tok_sub_theme,
         d->multiplier.FileLocationCache());
@@ -863,7 +863,7 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
     auto entity = std::get<Designator>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
-    highlightTok.emplace(entity.tokens());
+    highlight_tok.emplace(entity.tokens());
 
   } else if (std::holds_alternative<File>(maybe_entity)) {
     auto entity = std::get<File>(maybe_entity);
@@ -911,8 +911,8 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
   d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
   d->entity_result_code_view->show();
 
-  if (d->entity_result_theme && highlightTok) {
-    auto tok = std::get<TokenRange>(*highlightTok);
+  if (d->entity_result_theme && highlight_tok) {
+    auto tok = std::get<TokenRange>(*highlight_tok);
     if (std::holds_alternative<Type>(maybe_entity)) {
       d->entity_result_theme->HighlightTypeInFileTokenRange(tok, std::get<Type>(maybe_entity));
 
@@ -921,9 +921,9 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
 
     }
 
-  } else if (d->entity_result_tok_sub_theme && highlightTok){
+  } else if (d->entity_result_tok_sub_theme && highlight_tok) {
     d->entity_result_tok_sub_theme->HighlightFileTokenSubList(
-        std::get<TokenSubstitution>(*highlightTok));
+        std::get<TokenSubstitution>(*highlight_tok));
 
   }
 
