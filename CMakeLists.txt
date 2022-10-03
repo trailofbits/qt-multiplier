@@ -179,6 +179,9 @@ if(PLATFORM_MACOS)
       MACOSX_PACKAGE_LOCATION "Contents"
   )
   set(output_bundle_path "${CMAKE_CURRENT_BINARY_DIR}/Multiplier.app")
+
+  get_target_property(multiplier_include_dir "multiplier::mx-common" INTERFACE_INCLUDE_DIRECTORIES)
+  set(multiplier_library_path ${multiplier_DIR})
   
   add_custom_command(
     OUTPUT
@@ -201,12 +204,18 @@ if(PLATFORM_MACOS)
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_bundle_path}/Contents/bin"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_bundle_path}/Contents/lib"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_bundle_path}/Contents/PlugIns"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_bundle_path}/Contents/include"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:mx-gui>" "${output_bundle_path}/Contents/MacOS/Multiplier"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-index>" "${output_bundle_path}/Contents/bin/mx-index"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-import>" "${output_bundle_path}/Contents/bin/mx-import"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:sqlite-multiplier::mxsqlitebridge>" "${output_bundle_path}/Contents/lib/mxsqlitebridge.a"
+    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-api>" "${output_bundle_path}/Contents/lib/mx-api.a"
+    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-util>" "${output_bundle_path}/Contents/lib/mx-util.a"
+    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-common>" "${output_bundle_path}/Contents/lib/mx-common.a"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_lto_path}" "${output_bundle_path}/Contents/lib/${lib_lto_name}"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_remarks_path}" "${output_bundle_path}/Contents/lib/${lib_remarks_name}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${multiplier_include_dir}/multiplier" "${output_bundle_path}/Contents/include/multiplier"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${multiplier_library_path}" "${output_bundle_path}/Contents/lib/cmake/multiplier"
     COMMAND "${install_name_tool}" -change "@rpath/${lib_lto_name}" "@loader_path/../lib/${lib_lto_name}" "${output_bundle_path}/Contents/bin/mx-index"
     COMMAND "${install_name_tool}" -change "@rpath/${lib_lto_name}" "@loader_path/../lib/${lib_lto_name}" "${output_bundle_path}/Contents/bin/mx-import"
     COMMAND "${install_name_tool}" -change "@rpath/${lib_remarks_name}" "@loader_path/../lib/${lib_remarks_name}" "${output_bundle_path}/Contents/bin/mx-index"
