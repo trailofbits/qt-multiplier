@@ -14,6 +14,7 @@ include("cmake/vcpkg_helper.cmake")
 project(qt-multiplier CXX)
 
 include("cmake/system.cmake")
+include("cmake/utils.cmake")
 
 if(PLATFORM_MACOS)
   include("cmake/macdeployqt.cmake")
@@ -34,6 +35,12 @@ find_package(multiplier CONFIG REQUIRED)
 find_package(sqlite-multiplier CONFIG REQUIRED)
 find_package(Python3 3.7 MODULE REQUIRED COMPONENTS Development)
 find_package(py-multiplier CONFIG REQUIRED)
+
+if(PLATFORM_MACOS)
+  set(CMAKE_INSTALL_RPATH "@executable_path/../${CMAKE_INSTALL_LIBDIR}")
+elseif(PLATFORM_LINUX)
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+endif()
 
 set(exe_name "mx-gui")
 add_executable("${exe_name}"
@@ -209,9 +216,6 @@ if(PLATFORM_MACOS)
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-index>" "${output_bundle_path}/Contents/bin/mx-index"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-import>" "${output_bundle_path}/Contents/bin/mx-import"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:sqlite-multiplier::mxsqlitebridge>" "${output_bundle_path}/Contents/lib/mxsqlitebridge.a"
-    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-api>" "${output_bundle_path}/Contents/lib/mx-api.a"
-    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-util>" "${output_bundle_path}/Contents/lib/mx-util.a"
-    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-common>" "${output_bundle_path}/Contents/lib/mx-common.a"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_lto_path}" "${output_bundle_path}/Contents/lib/${lib_lto_name}"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_remarks_path}" "${output_bundle_path}/Contents/lib/${lib_remarks_name}"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${multiplier_include_dir}/multiplier" "${output_bundle_path}/Contents/include/multiplier"
@@ -230,6 +234,7 @@ if(PLATFORM_MACOS)
   
   qt_deploy_target("mx-gui-bundle" "${output_bundle_path}")
 
+  mx_deploy_targets("mx-gui-bundle" "${output_bundle_path}")
 endif(PLATFORM_MACOS)
 
 if(MX_ENABLE_INSTALL)
@@ -238,8 +243,8 @@ if(MX_ENABLE_INSTALL)
       "${exe_name}"
     DESTINATION
       "${CMAKE_INSTALL_BINDIR}")
-  
-  
+
+
   if(PLATFORM_MACOS)
     install(
       DIRECTORY
