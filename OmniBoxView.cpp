@@ -760,16 +760,13 @@ void OmniBoxView::OnFoundSymbols(NamedDeclList symbols, DeclCategory category,
 
 void OmniBoxView::SetEntityIdQueryString(const QString &text) {
   if (text.isEmpty()) {
-	  d->entity_button->setDisabled(true);
+    d->entity_button->setDisabled(true);
+  } else if (text.toULong()) {
+    d->entity_button->setDisabled(false);
   } else {
-  	if (text.toULong()) {
-  		d->entity_button->setDisabled(false);
-  	} else {
-  	  d->entity_button->setDisabled(true);
-  	}
+    d->entity_button->setDisabled(true);
   }
   ClearEntityResults();
-
 }
 
 void OmniBoxView::RunEntityIdSearch(void) {
@@ -919,27 +916,26 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
 
     } else {
       d->entity_result_theme->HighlightFileTokenRange(tok);
-
     }
   }
 
-  // if in a fragment only show fragment and click into file
-  // if fragment show file
+  // If the entity to show is a file or fragment, then show the whole file,
+  // so that the 'context' is the file, but the location is the fragment within
+  // the file. Otherwise, the context is a fragment, and the location is something
+  // inside of the fragment. 
   if ((std::holds_alternative<Fragment>(maybe_entity) || !frag) && file) {
     d->entity_result_code_view->SetFile(*file);
 
   } else {
     d->entity_result_code_view->SetFragment(*frag);
-
   }
-
-  if (frag) {
+  
+  if (highlight_tok) {
+    d->entity_result_code_view->ScrollToFileToken(*highlight_tok);
+  } else if (frag) {
     d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
-  } else {
-   auto entity = std::get<Token>(maybe_entity);
-   assert (entity);
-   d->entity_result_code_view->ScrollToFileToken(entity);
-
+  } else if (auto entity = std::get<Token>(maybe_entity)) {
+    d->entity_result_code_view->ScrollToFileToken(entity);
   }
 
   // Event to reference view of a file at selected token (cmd + click)
