@@ -47,7 +47,7 @@ namespace mx::gui {
 enum class ModelMode {
   kNoData,
   kRegex,
-  kWeggli
+  kWeggli,
 };
 
 struct RowData {

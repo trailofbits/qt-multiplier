@@ -565,6 +565,8 @@ void Multiplier::ClearLastLocations(void) {
   std::ignore = d->last_locations[EventSource::kCodeSearchResultPreviewClickSource];
   std::ignore = d->last_locations[EventSource::kCodeSearchResultPreviewClickDest];
   std::ignore = d->last_locations[EventSource::kEntitySearchResult];
+  std::ignore = d->last_locations[EventSource::kEntityIDSearchResultSource];
+  std::ignore = d->last_locations[EventSource::kEntityIDSearchResultDest];
 }
 
 void Multiplier::OnMoveReferenceBrowser(Qt::DockWidgetArea area) {
@@ -1004,6 +1006,11 @@ bool Multiplier::DoActions(EventSource source, const EventAction &ea) {
     case Action::kOpenEntitySearch:
       ea.last_triggered = d->last_event;
       d->code_browser_view->OpenEntitySearch();
+      return true;
+
+    case Action::kOpenSymbolQuerySearch:
+      ea.last_triggered = d->last_event;
+      d->code_browser_view->OpenSymbolQuerySearch();
       return true;
 
     case Action::kOpenWeggliSearch:

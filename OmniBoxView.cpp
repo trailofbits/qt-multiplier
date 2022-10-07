@@ -17,22 +17,28 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSplitter>
 #include <QString>
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QThreadPool>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+#include <QSizePolicy>
 
 #include <cassert>
 #include <iostream>
+#include <sstream>
+#include <multiplier/AST.h>
 #include <multiplier/Index.h>
 #include <multiplier/Re2.h>
 #include <multiplier/Weggli.h>
 #include <string>
+#include <variant>
 
 #include "CodeSearchResults.h"
 #include "CodeTheme.h"
+#include "CodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 #include "TitleNamePrompt.h"
@@ -120,6 +126,14 @@ struct OmniBoxView::PrivateData {
   std::unordered_map<QTreeWidgetItem *, std::pair<RawEntityId, NamedDecl>>
       item_to_entity;
 
+  QWidget *entity_box{nullptr};
+  QGridLayout *entity_layout{nullptr};
+  CodeView *entity_result_code_view{nullptr};
+  QLineEdit *entity_input{nullptr};
+  QPushButton *entity_button{nullptr};
+  QWidget *entity_results{nullptr};
+  HighlightRangeTheme *entity_result_theme{nullptr};
+
   QWidget *regex_box{nullptr};
   QGridLayout *regex_layout{nullptr};
   QLineEdit *regex_input{nullptr};
@@ -142,6 +156,7 @@ struct OmniBoxView::PrivateData {
   unsigned symbol_counter{0};
   unsigned regex_counter{0};
   unsigned weggli_counter{0};
+  unsigned entity_counter{0};
 
   std::unordered_map<RawEntityId, std::filesystem::path> file_id_to_path;
 
@@ -236,6 +251,42 @@ void OmniBoxView::InitializeWidgets(void) {
 
   connect(d->symbol_button, &QPushButton::pressed,
           this, &OmniBoxView::RunSymbolSearch);
+
+  // ---------------------------------------------------------------------------
+  // Entity ID search
+  d->entity_box = new QWidget;
+  d->entity_layout = new QGridLayout;
+  d->entity_input = new QLineEdit;
+  d->entity_button = new QPushButton(tr("Query"));
+
+
+  button_font.setPointSize(input_font.pointSize());
+
+  d->entity_input->setFont(input_font);
+  d->entity_input->setFocus();
+  d->entity_button->setFont(button_font);
+  d->entity_button->setDisabled(true);
+
+  d->entity_box->setLayout(d->entity_layout);
+  d->entity_layout->addWidget(d->entity_button, 0, 0, 1, 1, Qt::AlignTop);
+  d->entity_layout->addWidget(d->entity_input, 0, 1, 1, 1, Qt::AlignTop);
+  d->entity_layout->setRowStretch(0, 0);
+  d->entity_layout->setRowStretch(1, 0);
+  d->entity_layout->setRowStretch(2, 1);
+
+  d->content->addTab(d->entity_box, tr("Go to Entity Id"));
+
+  connect(d->entity_input, &QLineEdit::textChanged,
+          this, &OmniBoxView::SetEntityIdQueryString);
+
+  connect(d->entity_input, &QLineEdit::returnPressed,
+          this, &OmniBoxView::RunEntityIdSearch);
+
+  connect(d->entity_button, &QPushButton::pressed,
+          this, &OmniBoxView::RunEntityIdSearch);
+
+  connect(this, &OmniBoxView::EntityIdIsFile,
+          &d->multiplier, &Multiplier::OnSourceFileDoubleClicked);
 
   // ---------------------------------------------------------------------------
   // Regex search
@@ -367,6 +418,11 @@ void OmniBoxView::Clear(void) {
   d->symbol_input->setText(QString());
   d->symbol_counter++;
   ClearSymbolResults();
+
+  d->entity_button->setDisabled(true);
+  d->entity_input->setText(QString());
+  d->entity_counter++;
+  ClearEntityResults();
 }
 
 void OmniBoxView::ClearSymbolResults(void) {
@@ -405,6 +461,30 @@ void OmniBoxView::ClearWeggliResults(void) {
   }
 }
 
+void OmniBoxView::ClearEntityResults(void) {
+  if (d->entity_results) {
+    d->entity_layout->removeWidget(d->entity_results);
+    d->entity_results->disconnect();
+    d->entity_results->deleteLater();
+    d->entity_results = nullptr;
+    update();
+  }
+  if (d->entity_result_code_view) {
+    d->entity_layout->removeWidget(d->entity_result_code_view);
+    d->entity_result_code_view->Clear();
+    d->entity_result_code_view->hide();
+    d->entity_result_code_view->disconnect();
+    d->entity_result_code_view->deleteLater();
+    d->entity_result_code_view = nullptr;
+    if (d->entity_result_theme) {
+      delete d->entity_result_theme;
+      d->entity_result_theme = nullptr;
+    }
+    update();
+  }
+
+}
+
 void OmniBoxView::OpenWeggliSearch(void) {
   d->content->setCurrentWidget(d->weggli_box);
   d->weggli_input->setFocus();
@@ -415,9 +495,14 @@ void OmniBoxView::OpenRegexSearch(void) {
   d->regex_input->setFocus();
 }
 
-void OmniBoxView::OpenEntitySearch(void) {
+void OmniBoxView::OpenSymbolQuerySearch(void) {
   d->content->setCurrentWidget(d->symbol_box);
   d->symbol_input->setFocus();
+}
+
+void OmniBoxView::OpenEntitySearch(void) {
+  d->content->setCurrentWidget(d->entity_box);
+  d->entity_input->setFocus();
 }
 
 void OmniBoxView::Focus(void) {
@@ -480,7 +565,6 @@ void OmniBoxView::RunSymbolSearch(void) {
 
   d->symbol_counter++;
   ClearSymbolResults();
-  d->symbol_results =
 
   d->symbol_results = new QTreeWidget;
   d->symbol_results->setColumnCount(kNumColumns);
@@ -674,6 +758,206 @@ void OmniBoxView::OnFoundSymbols(NamedDeclList symbols, DeclCategory category,
   }
 }
 
+void OmniBoxView::SetEntityIdQueryString(const QString &text) {
+  if (text.isEmpty()) {
+    d->entity_button->setDisabled(true);
+  } else if (text.toULong()) {
+    d->entity_button->setDisabled(false);
+  } else {
+    d->entity_button->setDisabled(true);
+  }
+  ClearEntityResults();
+}
+
+void OmniBoxView::RunEntityIdSearch(void) {
+  RawEntityId entity_id;
+
+  std::istringstream iss(d->entity_input->text().toStdString().c_str());
+
+  iss >> entity_id;
+
+  d->entity_counter++;
+
+  ClearEntityResults();
+  d->entity_results = new QLabel(tr("Loading entity"));
+  d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
+                             Qt::AlignmentFlag::AlignHCenter |
+                             Qt::AlignmentFlag::AlignVCenter);
+
+  auto runnable = new EntitySearchThread(
+      d->multiplier.Index(), d->multiplier.FileLocationCache(),
+      entity_id, d->entity_counter);
+  runnable->setAutoDelete(true);
+
+  connect(runnable, &EntitySearchThread::FoundEntity,
+      this, &OmniBoxView::OnFoundEntity);
+
+  QThreadPool::globalInstance()->start(runnable);
+
+}
+
+void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
+  if (d->entity_counter != counter) {
+    return;
+  }
+
+  ClearEntityResults();
+
+  std::optional<Fragment> frag;
+  std::optional<File> file;
+  std::optional<std::variant<TokenRange, TokenSubstitution>> highlight_tok;
+
+
+  if (std::holds_alternative<Decl>(maybe_entity)) {
+    auto entity = std::get<Decl>(maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(entity));
+    if (auto tok = DeclFileToken(entity)) {
+      highlight_tok.emplace(*tok);
+    } else {
+      highlight_tok.emplace(entity.tokens());
+    }
+
+  } else if (std::holds_alternative<Stmt>(maybe_entity)) {
+    auto entity = std::get<Stmt>(maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(entity));
+    highlight_tok.emplace(entity.tokens());
+
+  } else if (std::holds_alternative<Token>(maybe_entity)) {
+    auto entity = std::get<Token>(maybe_entity);
+    if (Fragment::containing(entity)) {
+      frag.emplace(Fragment::containing(entity).value());
+    }
+    if (File::containing(entity)) {
+      file.emplace(File::containing(entity).value());
+    }
+    highlight_tok.emplace(entity);
+
+  } else if (std::holds_alternative<Fragment>(maybe_entity)) {
+    auto entity = std::get<Fragment>(maybe_entity);
+    frag.emplace(entity);
+    file.emplace(File::containing(entity));
+    highlight_tok.emplace(entity.file_tokens());
+
+  } else if (std::holds_alternative<Type>(maybe_entity)) {
+    auto entity = std::get<Type>(maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(entity));
+    highlight_tok.emplace(frag->file_tokens());
+
+  } else if (std::holds_alternative<Attr>(maybe_entity)) {
+    auto entity = std::get<Attr>(maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(*frag));
+    highlight_tok.emplace(entity.tokens());
+
+  } else if (std::holds_alternative<TokenSubstitution>(maybe_entity)) {
+    auto entity = std::get<TokenSubstitution>(maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(entity));
+
+  } else if (std::holds_alternative<Designator>(maybe_entity)) {
+    auto entity = std::get<Designator>(maybe_entity);
+    frag.emplace(Fragment::containing(entity));
+    file.emplace(File::containing(entity));
+    highlight_tok.emplace(entity.tokens());
+
+  } else if (std::holds_alternative<File>(maybe_entity)) {
+    auto entity = std::get<File>(maybe_entity);
+
+    if (!d->file_id_to_path.contains(entity.id())) {
+      d->entity_results = new QLabel(tr("Filepath for ID not found"));
+      d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
+                                 Qt::AlignmentFlag::AlignHCenter |
+                                 Qt::AlignmentFlag::AlignVCenter);
+      update();
+      return;
+
+    }
+
+    emit EntityIdIsFile(d->file_id_to_path[entity.id()], entity.id());
+    return;
+
+  }
+
+  if (!frag && !file) {
+    d->entity_results = new QLabel(tr("No matches"));
+    d->entity_layout->addWidget(d->entity_results, 1, 0, 1, 4,
+                               Qt::AlignmentFlag::AlignHCenter |
+                               Qt::AlignmentFlag::AlignVCenter);
+    update();
+    return;
+  }
+
+  if (highlight_tok) {
+    d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
+    d->entity_result_code_view = new CodeView(*d->entity_result_theme,
+        d->multiplier.FileLocationCache());
+  }
+
+  connect(d->entity_result_code_view, &CodeView::SetSingleEntityGlobal,
+          &d->multiplier, &Multiplier::SetSingleEntityGlobal);
+
+  connect(d->entity_result_code_view, &CodeView::SetMultipleEntitiesGlobal,
+          &d->multiplier, &Multiplier::SetMultipleEntitiesGlobal);
+
+  d->multiplier.CodeTheme().BeginTokens();
+
+  d->entity_layout->addWidget(d->entity_result_code_view, 1, 0,
+      d->entity_layout->rowCount() - 1, d->entity_layout->columnCount());
+  d->entity_result_code_view->viewport()->installEventFilter(&(d->multiplier));
+  d->entity_result_code_view->show();
+
+  if (d->entity_result_theme && highlight_tok) {
+    auto tok = std::get<TokenRange>(*highlight_tok);
+    if (std::holds_alternative<Type>(maybe_entity)) {
+      d->entity_result_theme->HighlightTypeInFileTokenRange(tok, std::get<Type>(maybe_entity));
+
+    } else {
+      d->entity_result_theme->HighlightFileTokenRange(tok);
+    }
+  }
+
+  // If the entity to show is a file or fragment, then show the whole file,
+  // so that the 'context' is the file, but the location is the fragment within
+  // the file. Otherwise, the context is a fragment, and the location is something
+  // inside of the fragment. 
+  if ((std::holds_alternative<Fragment>(maybe_entity) || !frag) && file) {
+    d->entity_result_code_view->SetFile(*file);
+
+  } else {
+    d->entity_result_code_view->SetFragment(*frag);
+  }
+  
+  if (highlight_tok && std::holds_alternative<mx::TokenRange>(*highlight_tok)) {
+    d->entity_result_code_view->ScrollToFileToken(std::get<mx::TokenRange>(*highlight_tok));
+  } else if (frag) {
+    d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
+  } else if (auto entity = std::get<Token>(maybe_entity)) {
+    d->entity_result_code_view->ScrollToFileToken(entity);
+  }
+
+  // Event to reference view of a file at selected token (cmd + click)
+  connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+      this, &OmniBoxView::OnEntityTokenPressEvent);
+
+  d->multiplier.CodeTheme().EndTokens();
+  update();
+
+}
+
+void OmniBoxView::OnEntityTokenPressEvent(EventLocations locs) {
+  for (EventLocation loc : locs) {
+    emit TokenPressEvent(EventSource::kEntityIDSearchResultSource, loc);
+    if (loc.UnpackDeclarationId()) {
+      loc.SetFragmentTokenId(kInvalidEntityId);
+      loc.SetFileTokenId(kInvalidEntityId);
+      emit TokenPressEvent(EventSource::kEntityIDSearchResultDest, loc);
+    }
+  }
+}
+
 void OmniBoxView::BuildRegex(const QString &text) {
   if (text.isEmpty()) {
     d->regex_query = RegexQuery();
@@ -718,19 +1002,19 @@ void OmniBoxView::OnFoundFragmentsWithRegex(RegexQueryResultIterator *list_,
   }
 
   ClearRegexResults();
-
   const CodeTheme &theme = d->multiplier.CodeTheme();
   theme.BeginTokens();
-
-  auto model = new CodeSearchResultsModel(d->multiplier);
-  auto table = new CodeSearchResultsView(model);
-
-  connect(table, &CodeSearchResultsView::TokenPressEvent,
-          &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+  CodeSearchResultsModel * model;
 
   for (auto j = 1; *list != IteratorEnd{}; ++*list, ++j) {
     const RegexQueryMatch &match = **list;
     if (!d->regex_results) {
+      model = new CodeSearchResultsModel(d->multiplier);
+      auto table = new CodeSearchResultsView(model);
+
+      connect(table, &CodeSearchResultsView::TokenPressEvent,
+              &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+
       d->regex_results = table;
       d->regex_to_dock_button->setEnabled(true);
       d->regex_to_tab_button->setEnabled(true);
@@ -938,6 +1222,33 @@ void SymbolSearchThread::run(void) {
   }
 
   emit FoundSymbols(std::move(decls), d->category, d->counter);
+}
+
+struct EntitySearchThread::PrivateData {
+  const Index index;
+  const FileLocationCache &file_cache;
+  const RawEntityId raw_id;
+  const unsigned counter;
+
+  inline PrivateData(const Index &index_,
+                     const FileLocationCache &cache_,
+                     const RawEntityId raw_id_, unsigned counter_)
+      : index(index_),
+        file_cache(cache_),
+        raw_id(raw_id_),
+        counter(counter_) {}
+};
+
+EntitySearchThread::~EntitySearchThread(void) {}
+
+EntitySearchThread::EntitySearchThread(const Index &index_,
+                                       const FileLocationCache &cache_,
+                                       const RawEntityId raw_id_,
+                                       unsigned counter_)
+    : d(std::make_unique < PrivateData > (index_, cache_, raw_id_, counter_)) {}
+
+void EntitySearchThread::run(void) {
+  emit FoundEntity(d->index.entity(d->raw_id), d->counter);
 }
 
 struct RegexQueryThread::PrivateData {

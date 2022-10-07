@@ -18,7 +18,9 @@ namespace mx {
 class Decl;
 class Index;
 class Token;
+class Type;
 class TokenRange;
+class TokenSubstitution;
 namespace gui {
 
 enum class TokenCategory : unsigned char {
@@ -194,6 +196,8 @@ class HighlightRangeTheme final : public ProxyCodeTheme {
 
   // Set the entity to be highlighted.
   void HighlightFileTokenRange(const TokenRange &range_);
+  void HighlightTypeInFileTokenRange(const TokenRange &range_,
+                                      Type &type);
 
   void BeginTokens(void) const override;
   void EndTokens(void) const override;

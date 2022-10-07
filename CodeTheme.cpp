@@ -343,6 +343,7 @@ TokenFormat ProxyCodeTheme::Format(
 struct HighlightRangeTheme::PrivateData {
   std::mutex lock;
   TokenRange tokens;
+  std::optional<Type> type;
   std::unordered_map<const QBrush *, QBrush> inverted_colors;
   const QColor background;
   const QColor inverted_foreground;
@@ -362,12 +363,22 @@ HighlightRangeTheme::~HighlightRangeTheme(void) {}
 void HighlightRangeTheme::HighlightFileTokenRange(const TokenRange &range) {
   std::unique_lock<std::mutex> locker(d->lock);
   d->tokens = range;
+  d->type.reset();
+}
+
+// Set the range and type to be highlighted.
+void HighlightRangeTheme::HighlightTypeInFileTokenRange(const TokenRange &range,
+                                                       Type &type) {
+  std::unique_lock<std::mutex> locker(d->lock);
+  d->tokens = range;
+  d->type.emplace(type);
 }
 
 void HighlightRangeTheme::BeginTokens(void) const {
   this->ProxyCodeTheme::BeginTokens();
   d->lock.lock();
   d->inverted_colors.clear();
+  d->type.reset();
   d->tokens = d->tokens.file_tokens();
 }
 
@@ -384,6 +395,16 @@ const QBrush &HighlightRangeTheme::TokenBackgroundColor(
   const QBrush &brush = this->ProxyCodeTheme::TokenBackgroundColor(
       tok, related_decls, kind);
 
+  if (d->type && d->tokens.index_of(tok)) {
+    if (auto type = mx::TokenContext::of(tok)->as_type()) {
+      if (type->id().Pack() == d->type->id().Pack()) {
+        QBrush brush_inv(d->background, brush.style());
+        return d->inverted_colors.emplace(&brush, brush_inv).first->second;
+      }
+    }
+    return brush;
+  }
+
   // If it's one of the tokens in our range, then invert its background color.
   if (d->tokens.index_of(tok)) {
     QBrush brush_inv(d->background, brush.style());
@@ -399,6 +420,16 @@ const QBrush &HighlightRangeTheme::TokenForegroundColor(
     TokenCategory kind) const {
   const QBrush &brush = this->ProxyCodeTheme::TokenForegroundColor(
       tok, related_decls, kind);
+
+  if (d->type && d->tokens.index_of(tok)) {
+    if (auto type = mx::TokenContext::of(tok)->as_type()) {
+      if (type->id().Pack() == d->type->id().Pack()) {
+         QBrush brush_inv(d->background, brush.style());
+        return d->inverted_colors.emplace(&brush, brush_inv).first->second;
+      }
+    }
+    return brush;
+  }
 
   // If it's one of the tokens in our range, then invert its background color.
   if (d->tokens.index_of(tok)) {

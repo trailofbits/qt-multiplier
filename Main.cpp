@@ -27,6 +27,8 @@
 #include <multiplier/Index.h>
 #include <system_error>
 #include <tuple>
+#include <variant>
+
 
 #include "CodeView.h"
 #include "Configuration.h"
@@ -200,7 +202,8 @@ int main(int argc, char *argv[]) {
   config.actions.emplace_back(mx::gui::EventAction{
     .description = "The code browser should show a double clicked entity result",
     .match_click = mx::gui::MouseClickKind::kLeftDoubleClick,
-    .match_sources = {mx::gui::EventSource::kEntitySearchResult},
+    .match_sources = {mx::gui::EventSource::kEntitySearchResult,
+                      mx::gui::EventSource::kEntityIDSearchResultSource},
     .do_action = mx::gui::Action::kOpenCodeBrowser,
   });
 
@@ -270,8 +273,15 @@ int main(int argc, char *argv[]) {
   });
 
   config.actions.emplace_back(mx::gui::EventAction{
-    .description = "G should open the entity search.",
+    .description = "G should open the entity search by name.",
     .match_key = Qt::Key_G,
+    .match_sources = ~mx::gui::EventSources(),
+    .do_action = mx::gui::Action::kOpenSymbolQuerySearch,
+  });
+
+  config.actions.emplace_back(mx::gui::EventAction{
+    .description = "I should open the entity search by ID.",
+    .match_key = Qt::Key_I,
     .match_sources = ~mx::gui::EventSources(),
     .do_action = mx::gui::Action::kOpenEntitySearch,
   });
@@ -294,6 +304,7 @@ int main(int argc, char *argv[]) {
   qRegisterMetaType<mx::gui::UserLocations>("UserLocations");
   qRegisterMetaType<mx::RawEntityId>("RawEntityId");
   qRegisterMetaType<mx::EntityId>("EntityId");
+  qRegisterMetaType<mx::VariantEntity>("VariantEntity");
   qRegisterMetaType<mx::FilePathList>("FilePathList");
   qRegisterMetaType<mx::Token>("Token");
   qRegisterMetaType<mx::TokenRange>("TokenRange");

@@ -189,6 +189,10 @@ enum class EventSource : int {
 
   // When we click on an entity name from the entity symbol search.
   kEntitySearchResult                  = 1 << 10,
+
+  // When we click on an entity id from the entity symbol search.
+  kEntityIDSearchResultSource          = 1 << 11,
+  kEntityIDSearchResultDest            = 1 << 12,
 };
 
 Q_DECLARE_FLAGS(EventSources, EventSource)
@@ -215,6 +219,7 @@ enum class Action : int {
   kGoBackLinearHistory,
 
   kOpenEntitySearch,
+  kOpenSymbolQuerySearch,
   kOpenRegexSearch,
   kOpenWeggliSearch,
 };

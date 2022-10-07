@@ -283,6 +283,12 @@ void CodeBrowserView::OpenEntitySearch(void) {
   d->omnibox->OpenEntitySearch();
 }
 
+void CodeBrowserView::OpenSymbolQuerySearch(void) {
+  d->content->setCurrentWidget(d->omnibox);
+  d->omnibox->raise();
+  d->omnibox->OpenSymbolQuerySearch();
+}
+
 // Open a file in a tab.
 //
 // NOTE(pag): This does not set the file to be the active widget.
