@@ -213,36 +213,5 @@ class HighlightRangeTheme final : public ProxyCodeTheme {
       TokenCategory kind) const override;
 };
 
-// Wraps around a theme to let us highlight a TokenSubstitution of tokens.
-class HighlightTokenSubstitutionTheme final : public ProxyCodeTheme {
- private:
-  struct PrivateData;
-  std::unique_ptr<PrivateData> d;
-  void UnparsedTokens(TokenSubstitution &tok_sub);
-
- public:
-
-  virtual ~HighlightTokenSubstitutionTheme(void);
-
-  HighlightTokenSubstitutionTheme(const CodeTheme &next_);
-
-  // Set the entity to be highlighted.
-  void HighlightFileTokenSubList(const TokenSubstitution &tok_sub_list_);
-  void BuildUnparsedTokens();
-
-  void BeginTokens(void) const override;
-  void EndTokens(void) const override;
-
-  // Background color for a specific token.
-  const QBrush &TokenBackgroundColor(
-      const Token &tok, const std::vector<Decl> &related_decls,
-      TokenCategory kind) const override;
-
-  // Foreground color for a specific token.
-  const QBrush &TokenForegroundColor(
-      const Token &tok, const std::vector<Decl> &related_decls,
-      TokenCategory kind) const override;
-};
-
 }  // namespace gui
 }  // namespace mx

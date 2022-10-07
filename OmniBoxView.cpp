@@ -133,7 +133,6 @@ struct OmniBoxView::PrivateData {
   QPushButton *entity_button{nullptr};
   QWidget *entity_results{nullptr};
   HighlightRangeTheme *entity_result_theme{nullptr};
-  HighlightTokenSubstitutionTheme *entity_result_tok_sub_theme{nullptr};
 
   QWidget *regex_box{nullptr};
   QGridLayout *regex_layout{nullptr};
@@ -480,10 +479,6 @@ void OmniBoxView::ClearEntityResults(void) {
     if (d->entity_result_theme) {
       delete d->entity_result_theme;
       d->entity_result_theme = nullptr;
-    }
-    if (d->entity_result_tok_sub_theme) {
-      delete d->entity_result_tok_sub_theme;
-      d->entity_result_tok_sub_theme = nullptr;
     }
     update();
   }
@@ -864,10 +859,6 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
     auto entity = std::get<TokenSubstitution>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
-    highlight_tok.emplace(entity);
-    d->entity_result_tok_sub_theme = new HighlightTokenSubstitutionTheme(d->multiplier.CodeTheme());
-    d->entity_result_code_view = new CodeView(*d->entity_result_tok_sub_theme,
-        d->multiplier.FileLocationCache());
 
   } else if (std::holds_alternative<Designator>(maybe_entity)) {
     auto entity = std::get<Designator>(maybe_entity);
@@ -902,7 +893,7 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
     return;
   }
 
-  if (!d->entity_result_tok_sub_theme) {
+  if (highlight_tok) {
     d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
     d->entity_result_code_view = new CodeView(*d->entity_result_theme,
         d->multiplier.FileLocationCache());
@@ -930,11 +921,6 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
       d->entity_result_theme->HighlightFileTokenRange(tok);
 
     }
-
-  } else if (d->entity_result_tok_sub_theme && highlight_tok) {
-    d->entity_result_tok_sub_theme->HighlightFileTokenSubList(
-        std::get<TokenSubstitution>(*highlight_tok));
-
   }
 
   // if in a fragment only show fragment and click into file
