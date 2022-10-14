@@ -986,6 +986,12 @@ void CodeSearchResultsView::InitializeWidgets(void) {
 
     connect(d->code, &CodeView::TokenPressEvent,
             this, &CodeSearchResultsView::ActOnTokenPressEvent);
+
+    connect(d->code, &CodeView::SetSingleEntityGlobal,
+            &d->model_data->multiplier, &Multiplier::SetSingleEntityGlobal);
+
+    connect(d->code, &CodeView::SetMultipleEntitiesGlobal,
+            &d->model_data->multiplier, &Multiplier::SetMultipleEntitiesGlobal);
   }
 
   connect(d->model.get(), &CodeSearchResultsModel::AddedRows,
