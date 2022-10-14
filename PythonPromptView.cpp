@@ -7,6 +7,7 @@
 #include <py-multiplier/api.h>
 #include "PythonOutputAdapter.h"
 #include <structmember.h>
+#include <multiplier/AST.h>
 
 #include <QAbstractItemView>
 #include <QApplication>

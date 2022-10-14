@@ -28,6 +28,7 @@
 #include <cmath>
 #include <iostream>
 #include <map>
+#include <multiplier/AST.h>
 #include <multiplier/Index.h>
 #include <optional>
 #include <unordered_map>
