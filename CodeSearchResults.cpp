@@ -752,7 +752,6 @@ void CodeSearchResultsModel::AddHeader(const RegexQueryMatch &match) {
     }
   }
 
-  emit headerDataChanged(Qt::Orientation::Vertical, 0, d->num_columns - 1);
   endInsertColumns();
 }
 
@@ -772,7 +771,6 @@ void CodeSearchResultsModel::AddHeader(const WeggliQueryMatch &match) {
   }
   insertColumns(0, d->num_columns);
 
-  emit headerDataChanged(Qt::Orientation::Vertical, 0, d->num_columns - 1);
   endInsertColumns();
 }
 
