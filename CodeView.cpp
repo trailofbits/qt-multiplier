@@ -930,6 +930,38 @@ void CodeView::ShowContextMenu(const QPoint& point) {
           });
           contextMenu->addAction(useDecls);
         }
+
+        std::vector<RawEntityId> type_ids;
+        std::vector<RawEntityId> stmt_ids;
+        for(auto frag_tok_id : frag_ids) {
+          auto frag_tok = std::get<Token>(d->index.entity(frag_tok_id));
+          for(auto type : Type::containing(frag_tok)) {
+            type_ids.push_back(type.id().Pack());
+          }
+          for(auto stmt : Stmt::containing(frag_tok)) {
+            stmt_ids.push_back(stmt.id().Pack());
+          }
+        }
+
+        {
+          auto useTypes = new QAction("Use types in console", this);
+          useTypes->setEnabled(!type_ids.empty());
+          connect(useTypes, &QAction::triggered, [&, type_ids](bool checked) {
+            QString name = "types";
+            emit SetMultipleEntitiesGlobal(name, type_ids);
+          });
+          contextMenu->addAction(useTypes);
+        }
+
+        {
+          auto useStmts = new QAction("Use statements in console", this);
+          useStmts->setEnabled(!stmt_ids.empty());
+          connect(useStmts, &QAction::triggered, [&, stmt_ids](bool checked) {
+            QString name = "stmts";
+            emit SetMultipleEntitiesGlobal(name, stmt_ids);
+          });
+          contextMenu->addAction(useStmts);
+        }
       }
     }
 
