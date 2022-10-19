@@ -76,9 +76,12 @@ struct CodeView::PrivateData {
 
   CodeViewLineNumberArea *line_area{nullptr};
 
-  inline PrivateData(const CodeTheme &theme_, const FileLocationCache &locs_)
+  const Index index;
+
+  inline PrivateData(const CodeTheme &theme_, const FileLocationCache &locs_, Index index_)
       : theme(theme_),
-        locs(locs_) {}
+        locs(locs_),
+        index(index_) {}
 };
 
 struct DownloadCodeThread::PrivateData {
@@ -434,10 +437,10 @@ void DownloadCodeThread::run(void) {
 
 CodeView::~CodeView(void) {}
 
-CodeView::CodeView(const CodeTheme &theme_, const FileLocationCache &locs_,
+CodeView::CodeView(const CodeTheme &theme_, const FileLocationCache &locs_, Index index_,
                    QWidget *parent)
     : QPlainTextEdit(parent),
-      d(std::make_unique<PrivateData>(theme_, locs_)) {
+      d(std::make_unique<PrivateData>(theme_, locs_, index_)) {
   InitializeWidgets();
 }
 
@@ -860,13 +863,45 @@ void CodeView::ShowContextMenu(const QPoint& point) {
         });
         contextMenu->addAction(useFragToken);
 
-        if(decl_id != kInvalidEntityId) {
+        {
           auto useDecl = new QAction("Use declaration in console", this);
+          useDecl->setEnabled(decl_id != kInvalidEntityId);
           connect(useDecl, &QAction::triggered, [&](bool checked) {
             QString name = "decl_" + QString::number(decl_id, 16);
             emit SetSingleEntityGlobal(name, decl_id);
           });
           contextMenu->addAction(useDecl);
+        }
+        
+        auto frag_tok = std::get<Token>(d->index.entity(frag_tok_id));
+        {
+          std::vector<RawEntityId> type_ids;
+          for(auto type : Type::containing(frag_tok)) {
+            type_ids.push_back(type.id().Pack());
+          }
+
+          auto useTypes = new QAction("Use types in console", this);
+          useTypes->setEnabled(!type_ids.empty());
+          connect(useTypes, &QAction::triggered, [&, type_ids](bool checked) {
+            QString name = "types";
+            emit SetMultipleEntitiesGlobal(name, type_ids);
+          });
+          contextMenu->addAction(useTypes);
+        }
+        
+        {
+          std::vector<RawEntityId> stmt_ids;
+          for(auto stmt : Stmt::containing(frag_tok)) {
+            stmt_ids.push_back(stmt.id().Pack());
+          }
+
+          auto useStmts = new QAction("Use statements in console", this);
+          useStmts->setEnabled(!stmt_ids.empty());
+          connect(useStmts, &QAction::triggered, [&, stmt_ids](bool checked) {
+            QString name = "stmts";
+            emit SetMultipleEntitiesGlobal(name, stmt_ids);
+          });
+          contextMenu->addAction(useStmts);
         }
   
       } else {
@@ -886,8 +921,9 @@ void CodeView::ShowContextMenu(const QPoint& point) {
         });
         contextMenu->addAction(useFragTokens);
 
-        if(!decls.empty()) {
+        {
           auto useDecls = new QAction("Use declarations in console", this);
+          useDecls->setEnabled(!decls.empty());
           connect(useDecls, &QAction::triggered, [&, decls](bool checked) {
             QString name = "decls";
             emit SetMultipleEntitiesGlobal(name, decls);

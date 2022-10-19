@@ -363,7 +363,10 @@ void ReferenceBrowserView::InitializeWidgets(void) {
 
   // Create and connect the code preview.
   if (config.code_preview.visible) {
-    d->code = new CodeView(d->theme, d->multiplier.FileLocationCache());
+    d->code = new CodeView(
+        d->theme,
+        d->multiplier.FileLocationCache(),
+        d->multiplier.Index());
     d->code->viewport()->installEventFilter(&(d->multiplier));
     d->splitter->addWidget(d->code);
 

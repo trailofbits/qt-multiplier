@@ -46,7 +46,7 @@ class CodeView final : public QPlainTextEdit {
 
  public:
   virtual ~CodeView(void);
-  CodeView(const CodeTheme &theme_, const FileLocationCache &locs_,
+  CodeView(const CodeTheme &theme_, const FileLocationCache &locs_, Index index_,
            QWidget *parent = nullptr);
 
   void ScrollToFileToken(const TokenRange &tok);

@@ -893,7 +893,7 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
   if (highlight_tok) {
     d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
     d->entity_result_code_view = new CodeView(*d->entity_result_theme,
-        d->multiplier.FileLocationCache());
+        d->multiplier.FileLocationCache(), d->multiplier.Index());
   }
 
   connect(d->entity_result_code_view, &CodeView::SetSingleEntityGlobal,
