@@ -67,6 +67,7 @@ struct MainMindowMenus final {
 
   QMenu *file_menu{nullptr};
   QAction *file_new_instance_action{nullptr};
+  QAction *file_open_db_action{nullptr};
   QAction *file_connect_action{nullptr};
   QAction *file_disconnect_action{nullptr};
   QAction *file_launch_action{nullptr};
@@ -424,6 +425,10 @@ void Multiplier::InitializeMenus(void) {
   // File menu
   //
 
+  d->menus.file_open_db_action = new QAction(tr("Open database"));
+  connect(d->menus.file_open_db_action, &QAction::triggered,
+          this, &Multiplier::OnFileOpenDatabaseAction);
+
   d->menus.file_connect_action = new QAction(tr("Connect to existing indexer"));
   connect(d->menus.file_connect_action, &QAction::triggered,
           this, &Multiplier::OnFileConnectAction);
@@ -458,6 +463,7 @@ void Multiplier::InitializeMenus(void) {
   }
 
   d->menus.file_menu->addAction(d->menus.file_connect_action);
+  d->menus.file_menu->addAction(d->menus.file_open_db_action);
 
   if (d->config.indexer_exe_path.size()) {
     d->menus.file_launch_action = new QAction(tr("Launch new indexer"));
@@ -780,32 +786,21 @@ void Multiplier::OnFileLaunchAction(void) {
     return;
   }
 
-  QString workspace_dir = QFileDialog::getExistingDirectory(
-      this, tr("Open Workspace Directory"),
-      "/tmp", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-
-  std::filesystem::path workspace_path = workspace_dir.toStdString();
-
-  // Try to create the workspace directories if they're missing.
-  std::error_code ec;
-  std::filesystem::create_directories(workspace_path, ec);
-  if (ec) {
-    (void) QMessageBox::warning(
-        this, tr("Launch Error"),
-        tr("Could not create workspace directory %1: %2")
-            .arg(workspace_dir)
-            .arg(QString::fromStdString(ec.message())),
-        QMessageBox::Ok);
+  QString file_str = QFileDialog::getSaveFileName(this, tr("Open database"));
+  if (!file_str.size()) {
     return;
   }
 
+  std::filesystem::path file_path = file_str.toStdString();
+  std::error_code ec;
+
   // Get the full path to the workspace.
-  auto full_workspace_path = std::filesystem::absolute(workspace_path, ec);
+  auto full_file_path = std::filesystem::absolute(file_path, ec);
   if (ec) {
     (void) QMessageBox::warning(
         this, tr("Launch Error"),
-        tr("Could not locate workspace directory %1: %2")
-            .arg(workspace_dir)
+        tr("Could not locate file %1: %2")
+            .arg(file_str)
             .arg(QString::fromStdString(ec.message())),
         QMessageBox::Ok);
     return;
@@ -824,8 +819,8 @@ void Multiplier::OnFileLaunchAction(void) {
   d->indexer_port = connect_settings->port;
 
   QStringList args;
-  args.push_back("--workspace_dir");
-  args.push_back(QString::fromStdString(full_workspace_path.generic_string()));
+  args.push_back("--db-path");
+  args.push_back(QString::fromStdString(full_file_path.generic_string()));
   args.push_back("--host");
   args.push_back(d->indexer_host);
   args.push_back("--port");
@@ -859,6 +854,20 @@ void Multiplier::Connect(QString host, QString port) {
   OnLaunchedIndexerReady();
 }
 
+void Multiplier::Open(std::filesystem::path db) {
+  d->connection_state = ConnectionState::kConnected;
+  UpdateUI();
+
+  d->ep = EntityProvider::from_database(db);
+  d->monitor = new IndexMonitorThread(d->ep);
+
+  connect(d->monitor, &IndexMonitorThread::VersionNumberChanged,
+          this, &Multiplier::OnVersionNumberChanged);
+
+  d->monitor->Start();
+  emit IndexReady();
+}
+
 void Multiplier::OnFileConnectAction(void) {
   auto connect_settings = OpenConnectionDialog::Run(
       tr("Connect to the Multiplier indexer"));
@@ -867,6 +876,30 @@ void Multiplier::OnFileConnectAction(void) {
   }
 
   Connect(connect_settings->host, connect_settings->port);
+}
+
+void Multiplier::OnFileOpenDatabaseAction(void) {
+  QString file_str = QFileDialog::getOpenFileName(this, tr("Open database"));
+  if (!file_str.size()) {
+    return;
+  }
+
+  std::filesystem::path file_path = file_str.toStdString();
+
+  // Get the full path to the workspace.
+  std::error_code ec;
+  auto full_file_path = std::filesystem::absolute(file_path, ec);
+  if (ec) {
+    (void) QMessageBox::warning(
+        this, tr("Read error"),
+        tr("Could not locate file %1: %2")
+            .arg(file_str)
+            .arg(QString::fromStdString(ec.message())),
+        QMessageBox::Ok);
+    return;
+  }
+
+  Open(full_file_path);
 }
 
 void Multiplier::OnFileDisconnectAction(void) {

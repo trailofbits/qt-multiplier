@@ -55,6 +55,7 @@ class Multiplier final : public QMainWindow {
   bool eventFilter(QObject *watched, QEvent *event) Q_DECL_FINAL;
 
   void Connect(QString host, QString port);
+  void Open(std::filesystem::path db_path);
 
  protected:
   void paintEvent(QPaintEvent *event) Q_DECL_FINAL;
@@ -87,6 +88,7 @@ class Multiplier final : public QMainWindow {
   void OnLaunchExited(int);
   void OnLaunchFailed(QProcess::ProcessError error);
   void OnFileNewInstanceAction(void);
+  void OnFileOpenDatabaseAction(void);
   void OnFileImportAction(void);
   void OnFileLaunchAction(void);
   void OnFileConnectAction(void);

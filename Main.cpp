@@ -73,8 +73,11 @@ int main(int argc, char *argv[]) {
   host_option.setValueName("host");
   QCommandLineOption port_option("port");
   port_option.setValueName("port");
+  QCommandLineOption db_option("db");
+  db_option.setValueName("db");
   parser.addOption(host_option);
   parser.addOption(port_option);
+  parser.addOption(db_option);
   parser.process(application);
 
   Py_Initialize();
@@ -323,8 +326,10 @@ int main(int argc, char *argv[]) {
 
   mx::gui::Multiplier main_window(config);
   main_window.show();
-
-  if (parser.isSet(host_option) && parser.isSet(port_option)) {
+  
+  if (parser.isSet(db_option)) {
+    main_window.Open(parser.value(db_option).toStdString());
+  } else if (parser.isSet(host_option) && parser.isSet(port_option)) {
     main_window.Connect(parser.value(host_option),
                         parser.value(port_option));
   }
