@@ -858,7 +858,7 @@ void Multiplier::Open(std::filesystem::path db) {
   d->connection_state = ConnectionState::kConnected;
   UpdateUI();
 
-  d->ep = EntityProvider::from_database(db);
+  d->ep = EntityProvider::in_memory_cache(EntityProvider::from_database(db));
   d->monitor = new IndexMonitorThread(d->ep);
 
   connect(d->monitor, &IndexMonitorThread::VersionNumberChanged,
