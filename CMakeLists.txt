@@ -87,9 +87,6 @@ add_executable("${exe_name}"
   OmniBoxView.cpp
   OmniBoxView.h
 
-  OpenConnectionDialog.cpp
-  OpenConnectionDialog.h
-
   PythonCompletionModel.cpp
   PythonCompletionModel.h
 

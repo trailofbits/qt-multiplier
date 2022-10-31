@@ -157,7 +157,6 @@ struct Configuration {
 
   QString gui_exe_path;
   QString indexer_exe_path;
-  QString importer_exe_path;
 
   Configuration(void);
 };
