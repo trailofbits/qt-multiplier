@@ -30,6 +30,7 @@ if(MX_QT_VERSION GREATER "5")
 endif()
 find_package(${MX_QT} COMPONENTS ${MX_QT_COMPONENTS} REQUIRED)
 
+find_package(Intl REQUIRED)
 find_package(multiplier CONFIG REQUIRED)
 
 find_package(sqlite-multiplier CONFIG REQUIRED)
