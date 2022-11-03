@@ -639,12 +639,16 @@ void Multiplier::OnFileImportIntoDatabaseAction(void) {
   arguments.push_back(bin_path.c_str());
 
   auto process = new QProcess(this);
-  connect(process, &QProcess::finished, [=](int exitCode, QProcess::ExitStatus exitStatus) {
-    Open(db_path);
+  connect(
+      process,
+      static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(
+          &QProcess::finished),
+      [=](int code, QProcess::ExitStatus status) {
+        Open(db_path);
 
-    process->disconnect();
-    process->deleteLater();
-  });
+        process->disconnect();
+        process->deleteLater();
+      });
 
   connect(process, &QProcess::errorOccurred, [=](QProcess::ProcessError error) {
     d->connection_state = ConnectionState::kNotConnected;
