@@ -628,14 +628,18 @@ void Multiplier::OnFileImportIntoDatabaseAction(void) {
   if(!bin_str.size()) {
     return;
   }
-
+  
   auto db_path = absolute(path(db_str.toStdString()));
   auto bin_path = absolute(path(bin_str.toStdString()));
 
   QStringList arguments;
-  arguments.push_back("--db-path");
+  
+  // SQLite database file.
+  arguments.push_back("--db");
   arguments.push_back(db_path.c_str());
-  arguments.push_back("--bin-path");
+  
+  // Target file (JSON compilation database, binary) to import.
+  arguments.push_back("--target");
   arguments.push_back(bin_path.c_str());
 
   auto process = new QProcess(this);
