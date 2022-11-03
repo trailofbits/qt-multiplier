@@ -88,9 +88,6 @@ add_executable("${exe_name}"
   OmniBoxView.cpp
   OmniBoxView.h
 
-  OpenConnectionDialog.cpp
-  OpenConnectionDialog.h
-
   PythonCompletionModel.cpp
   PythonCompletionModel.h
 
@@ -198,7 +195,6 @@ if(PLATFORM_MACOS)
       "${install_name_tool}"
       "$<TARGET_FILE:mx-gui>"
       "$<TARGET_FILE:multiplier::mx-index>"
-      "$<TARGET_FILE:multiplier::mx-import>"
       "$<TARGET_FILE:sqlite-multiplier::mxsqlitebridge>"
       "${lib_lto_path}"
       "${lib_remarks_path}"
@@ -215,16 +211,13 @@ if(PLATFORM_MACOS)
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_bundle_path}/Contents/include"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:mx-gui>" "${output_bundle_path}/Contents/MacOS/Multiplier"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-index>" "${output_bundle_path}/Contents/bin/mx-index"
-    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:multiplier::mx-import>" "${output_bundle_path}/Contents/bin/mx-import"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:sqlite-multiplier::mxsqlitebridge>" "${output_bundle_path}/Contents/lib/mxsqlitebridge.a"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_lto_path}" "${output_bundle_path}/Contents/lib/${lib_lto_name}"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_remarks_path}" "${output_bundle_path}/Contents/lib/${lib_remarks_name}"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${multiplier_include_dir}/multiplier" "${output_bundle_path}/Contents/include/multiplier"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${multiplier_library_path}" "${output_bundle_path}/Contents/lib/cmake/multiplier"
     COMMAND "${install_name_tool}" -change "@rpath/${lib_lto_name}" "@loader_path/../lib/${lib_lto_name}" "${output_bundle_path}/Contents/bin/mx-index"
-    COMMAND "${install_name_tool}" -change "@rpath/${lib_lto_name}" "@loader_path/../lib/${lib_lto_name}" "${output_bundle_path}/Contents/bin/mx-import"
     COMMAND "${install_name_tool}" -change "@rpath/${lib_remarks_name}" "@loader_path/../lib/${lib_remarks_name}" "${output_bundle_path}/Contents/bin/mx-index"
-    COMMAND "${install_name_tool}" -change "@rpath/${lib_remarks_name}" "@loader_path/../lib/${lib_remarks_name}" "${output_bundle_path}/Contents/bin/mx-import"
     COMMAND "${CMAKE_COMMAND}" -E copy "${plist_path}" "${output_bundle_path}/Contents/Info.plist"
     COMMAND "${CMAKE_COMMAND}" -E copy "${icon_path}" "${output_bundle_path}/Contents/Resources/Logo.ico"
   )
