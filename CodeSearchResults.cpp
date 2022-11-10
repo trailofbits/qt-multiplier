@@ -365,14 +365,15 @@ RowData::RowData(CodeSearchResultsModelImpl &d,
 }
 
 static TokenRange GetTokenRange(const VariantEntity &entity) {
+  TokenRange res;
   if(std::holds_alternative<mx::Token>(entity)) {
-    return std::get<mx::Token>(entity);
+    res = std::get<mx::Token>(entity);
   } else if(std::holds_alternative<mx::Stmt>(entity)) {
-    return std::get<mx::Stmt>(entity).tokens();
+    res = std::get<mx::Stmt>(entity).tokens();
   } else if(std::holds_alternative<mx::Decl>(entity)) {
-    return std::get<mx::Decl>(entity).tokens();
+    res = std::get<mx::Decl>(entity).tokens();
   }
-  return {};
+  return res.file_tokens();
 }
 
 RowData::RowData(CodeSearchResultsModelImpl &d,
@@ -387,8 +388,8 @@ RowData::RowData(CodeSearchResultsModelImpl &d,
   auto file = mx::File::containing(frag);
   auto tok_range = GetTokenRange(entity);
 
-  VariantId first_vid = tok_range.front().file_token()->id().Unpack();
-  VariantId last_vid = tok_range.back().file_token()->id().Unpack();
+  VariantId first_vid = tok_range.front().id().Unpack();
+  VariantId last_vid = tok_range.back().id().Unpack();
 
   assert(std::holds_alternative<FileTokenId>(first_vid));
   assert(std::holds_alternative<FileTokenId>(last_vid));
