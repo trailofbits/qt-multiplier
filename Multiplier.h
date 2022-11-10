@@ -8,6 +8,7 @@
 #include <multiplier/Index.h>
 #include <multiplier/Types.h>
 #include <multiplier/AST.h>
+#include <multiplier/Syntex.h>
 #include <QMainWindow>
 #include <QProcess>
 

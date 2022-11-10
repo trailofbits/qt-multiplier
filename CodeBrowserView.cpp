@@ -277,6 +277,12 @@ void CodeBrowserView::OpenRegexSearch(void) {
   d->omnibox->OpenRegexSearch();
 }
 
+void CodeBrowserView::OpenSyntexSearch(void) {
+  d->content->setCurrentWidget(d->omnibox);
+  d->omnibox->raise();
+  d->omnibox->OpenSyntexSearch();
+}
+
 void CodeBrowserView::OpenEntitySearch(void) {
   d->content->setCurrentWidget(d->omnibox);
   d->omnibox->raise();

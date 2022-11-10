@@ -270,6 +270,13 @@ int main(int argc, char *argv[]) {
   });
 
   config.actions.emplace_back(mx::gui::EventAction{
+    .description = "S should open the Syntex search.",
+    .match_key = Qt::Key_S,
+    .match_sources = ~mx::gui::EventSources(),
+    .do_action = mx::gui::Action::kOpenSyntexSearch,
+  });
+
+  config.actions.emplace_back(mx::gui::EventAction{
     .description = "G should open the entity search by name.",
     .match_key = Qt::Key_G,
     .match_sources = ~mx::gui::EventSources(),

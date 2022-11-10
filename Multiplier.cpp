@@ -827,6 +827,11 @@ bool Multiplier::DoActions(EventSource source, const EventAction &ea) {
       ea.last_triggered = d->last_event;
       d->code_browser_view->OpenWeggliSearch();
       return true;
+
+    case Action::kOpenSyntexSearch:
+      ea.last_triggered = d->last_event;
+      d->code_browser_view->OpenSyntexSearch();
+      return true;
   }
 
   return false;

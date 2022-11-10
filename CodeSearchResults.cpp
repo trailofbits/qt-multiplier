@@ -30,6 +30,7 @@
 #include <multiplier/Index.h>
 #include <multiplier/Re2.h>
 #include <multiplier/Weggli.h>
+#include <multiplier/Syntex.h>
 #include <variant>
 #include <vector>
 
@@ -48,6 +49,7 @@ enum class ModelMode {
   kNoData,
   kRegex,
   kWeggli,
+  kSyntex,
 };
 
 struct RowData {
@@ -70,6 +72,10 @@ struct RowData {
 
   explicit RowData(CodeSearchResultsModelImpl &d,
                    const WeggliQueryMatch &, unsigned file_index_,
+                   unsigned frag_index_);
+
+  explicit RowData(CodeSearchResultsModelImpl &d,
+                   const syntex::Match &, unsigned file_index_,
                    unsigned frag_index_);
 
   std::pair<unsigned, unsigned> Tokens(CodeSearchResultsModelImpl &d);
@@ -356,6 +362,72 @@ RowData::RowData(CodeSearchResultsModelImpl &d,
       token_sub_range.second = capture_sub_range.second;
     }
   }
+}
+
+static TokenRange GetTokenRange(const VariantEntity &entity) {
+  if(std::holds_alternative<mx::Token>(entity)) {
+    return std::get<mx::Token>(entity);
+  } else if(std::holds_alternative<mx::Stmt>(entity)) {
+    return std::get<mx::Stmt>(entity).tokens();
+  } else if(std::holds_alternative<mx::Decl>(entity)) {
+    return std::get<mx::Decl>(entity).tokens();
+  }
+  return {};
+}
+
+RowData::RowData(CodeSearchResultsModelImpl &d,
+                 const syntex::Match &match, unsigned file_index_,
+                 unsigned frag_index_)
+    : file_index(file_index_),
+      frag_index(frag_index_) {
+
+  auto &index = d.multiplier.Index();
+  auto entity = index.entity(match.Entity());
+  auto frag = *index.fragment_containing(match.Entity());
+  auto file = mx::File::containing(frag);
+  auto tok_range = GetTokenRange(entity);
+
+  VariantId first_vid = tok_range.front().file_token()->id().Unpack();
+  VariantId last_vid = tok_range.back().file_token()->id().Unpack();
+
+  assert(std::holds_alternative<FileTokenId>(first_vid));
+  assert(std::holds_alternative<FileTokenId>(last_vid));
+
+  file_tokens_begin = std::get<FileTokenId>(first_vid).offset;
+  file_tokens_end = std::get<FileTokenId>(last_vid).offset + 1u;
+
+  const char *begin_utf8 = tok_range.data().data();
+  std::vector<std::string_view> ranges;
+  ranges.push_back(tok_range.data());
+  for(auto meta : match.MetavarMatches()) {
+    ranges.push_back(GetTokenRange(index.entity(meta.Entity())).data());
+  }
+
+  for (size_t i = 0u, max_i = ranges.size(); i < max_i; ++i) {
+    auto &capture_sub_range = d.capture_sub_ranges.emplace_back(0, 0);
+    auto &token_sub_range = d.token_sub_ranges.emplace_back(0, 0);
+    auto &captured_data = d.captured_data.emplace_back();
+
+    captured_data = ranges[i];
+
+    const ptrdiff_t len_utf8 = captured_data.data() - begin_utf8;
+    assert(0 <= len_utf8);
+
+    capture_sub_range.first =
+        QString::fromUtf8(begin_utf8, static_cast<int>(len_utf8)).size();
+
+    capture_sub_range.second =
+        QString::fromUtf8(captured_data.data(),
+                          static_cast<int>(captured_data.size())).size();
+
+    token_sub_range.first =
+        QString::fromUtf8(begin_utf8, static_cast<int>(len_utf8)).size();
+
+    token_sub_range.second =
+        QString::fromUtf8(captured_data.data(),
+                          static_cast<int>(captured_data.size())).size();
+  }
+  std::cerr << std::endl;
 }
 
 CodeSearchResultsItemDelegate::~CodeSearchResultsItemDelegate(void) {}
@@ -774,6 +846,22 @@ void CodeSearchResultsModel::AddHeader(const WeggliQueryMatch &match) {
   endInsertColumns();
 }
 
+void CodeSearchResultsModel::AddHeader(const syntex::Match &match) {
+  auto num_captures = match.MetavarMatches().size();
+
+  beginInsertColumns(QModelIndex(), 0, static_cast<int>(num_captures));
+  d->num_columns = 1u;
+  d->headers.push_back(tr("Match"));
+  for (auto &var : match.MetavarMatches()) {
+    auto name = QString::fromUtf8(var.Name().data(), var.Name().size());
+    d->headers.push_back(name);
+    ++d->num_columns;
+  }
+  insertColumns(0, d->num_columns);
+
+  endInsertColumns();
+}
+
 void CodeSearchResultsModel::AddResult(const RegexQueryMatch &match) {
   if (d->mode == ModelMode::kNoData) {
     d->mode = ModelMode::kRegex;
@@ -829,6 +917,50 @@ void CodeSearchResultsModel::AddResult(const WeggliQueryMatch &match) {
 
   Fragment frag = Fragment::containing(match);
   File file = File::containing(match);
+
+  unsigned file_index;
+  unsigned frag_index;
+
+  if (auto file_index_it = d->file_indexes.find(file.id());
+      file_index_it != d->file_indexes.end()) {
+    file_index = file_index_it->second;
+  } else {
+    file_index = static_cast<unsigned>(d->files.size());
+    d->file_indexes.emplace(file.id(), file_index);
+    d->files.emplace_back(std::move(file));
+  }
+
+  if (auto frag_index_it = d->fragment_indexes.find(frag.id());
+      frag_index_it != d->fragment_indexes.end()) {
+    frag_index = frag_index_it->second;
+  } else {
+    frag_index = static_cast<unsigned>(d->fragments.size());
+    d->fragment_indexes.emplace(frag.id(), frag_index);
+    d->fragments.emplace_back(std::move(frag));
+  }
+
+  d->rows.emplace_back(*d, match, file_index, frag_index);
+  ++d->num_rows;
+  endInsertRows();
+
+  emit AddedRows();
+}
+
+void CodeSearchResultsModel::AddResult(const syntex::Match &match) {
+  if (d->mode == ModelMode::kNoData) {
+    d->mode = ModelMode::kSyntex;
+    AddHeader(match);
+
+  } else if (d->mode != ModelMode::kSyntex) {
+    return;
+  }
+
+  beginInsertRows(QModelIndex(), d->num_rows, d->num_rows);
+
+  auto &index = d->multiplier.Index();
+  auto entity = index.entity(match.Entity());
+  auto frag = *index.fragment_containing(match.Entity());
+  auto file = mx::File::containing(frag);
 
   unsigned file_index;
   unsigned frag_index;

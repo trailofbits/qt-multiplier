@@ -24,6 +24,9 @@ class RegexQuery;
 class RegexQueryResultIterator;
 class WeggliQuery;
 class WeggliQueryResultIterator;
+namespace syntex {
+class Match;
+}
 namespace gui {
 
 class Multiplier;
@@ -39,6 +42,7 @@ class OmniBoxView final : public QWidget {
   void ClearSymbolResults(void);
   void ClearRegexResults(void);
   void ClearWeggliResults(void);
+  void ClearSyntexResults(void);
   void ClearEntityResults(void);
 
   void FillRow(QTreeWidgetItem *item, const NamedDecl &decl) const;
@@ -50,6 +54,7 @@ class OmniBoxView final : public QWidget {
   void Clear(void);
   void OpenWeggliSearch(void);
   void OpenRegexSearch(void);
+  void OpenSyntexSearch(void);
   void OpenSymbolQuerySearch(void);
   void OpenEntitySearch(void);
 
@@ -85,6 +90,13 @@ class OmniBoxView final : public QWidget {
                                   unsigned counter);
   void OnOpenWeggliResultsInTab(void);
   void OnOpenWeggliResultsInDock(void);
+
+  void BuildSyntex(const QString &text);
+  void RunSyntex(void);
+  void OnFoundMatchesWithSyntex(std::vector<syntex::Match> *matches,
+                                unsigned counter);
+  void OnOpenSyntexResultsInTab(void);
+  void OnOpenSyntexResultsInDock(void);
 
   void OnEntityTokenPressEvent(EventLocations locs);
 
@@ -173,6 +185,26 @@ class WeggliQueryThread final : public QObject, public QRunnable {
 
  signals:
   void FoundFragments(WeggliQueryResultIterator *list, unsigned counter);
+};
+
+// Downloads the Syntex search results in the background.
+class SyntexQueryThread final : public QObject, public QRunnable {
+  Q_OBJECT
+
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
+
+  void run(void) Q_DECL_FINAL;
+
+ public:
+  virtual ~SyntexQueryThread(void);
+
+  explicit SyntexQueryThread(const Index &index_, const std::string &query_,
+                            unsigned counter_);
+
+ signals:
+  void FoundMatches(std::vector<syntex::Match> *matches,
+                    unsigned counter);
 };
 
 }  // namespace gui

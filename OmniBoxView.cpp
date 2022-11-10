@@ -153,9 +153,19 @@ struct OmniBoxView::PrivateData {
   QWidget *weggli_results{nullptr};
   WeggliQuery weggli_query;
 
+  QWidget *syntex_box{nullptr};
+  QGridLayout *syntex_layout{nullptr};
+  QLineEdit *syntex_input{nullptr};
+  QPushButton *syntex_button{nullptr};
+  QPushButton *syntex_to_tab_button{nullptr};
+  QPushButton *syntex_to_dock_button{nullptr};
+  QWidget *syntex_results{nullptr};
+  QString syntex_query;
+
   unsigned symbol_counter{0};
   unsigned regex_counter{0};
   unsigned weggli_counter{0};
+  unsigned syntex_counter{0};
   unsigned entity_counter{0};
 
   std::unordered_map<RawEntityId, std::filesystem::path> file_id_to_path;
@@ -393,6 +403,49 @@ void OmniBoxView::InitializeWidgets(void) {
           &d->multiplier, &Multiplier::OnOpenDock);
 
   // ---------------------------------------------------------------------------
+  // Syntex search
+  d->syntex_box = new QWidget;
+  d->syntex_layout = new QGridLayout;
+  d->syntex_input = new QLineEdit;
+  d->syntex_button = new QPushButton(tr("Query"));
+  d->syntex_to_tab_button = new QPushButton(tr("⍐ tab"));
+  d->syntex_to_dock_button = new QPushButton(tr("⍇ dock"));
+
+  d->syntex_input->setFont(input_font);
+  d->syntex_button->setFont(button_font);
+  d->syntex_to_tab_button->setFont(button_font);
+  d->syntex_to_dock_button->setFont(button_font);
+
+  d->syntex_box->setLayout(d->syntex_layout);
+  d->syntex_layout->addWidget(d->syntex_button, 0, 0, 1, 1, Qt::AlignTop);
+  d->syntex_layout->addWidget(d->syntex_to_tab_button, 0, 3, 1, 1, Qt::AlignTop);
+  d->syntex_layout->addWidget(d->syntex_to_dock_button, 0, 4, 1, 1, Qt::AlignTop);
+  d->syntex_layout->addWidget(d->syntex_input, 0, 1, 1, 1, Qt::AlignTop);
+  d->syntex_layout->setRowStretch(0, 0);
+  d->syntex_layout->setRowStretch(1, 1);
+  d->content->addTab(d->syntex_box, tr("Syntex Search"));
+  d->syntex_button->setDisabled(true);
+  d->syntex_to_dock_button->setDisabled(true);
+  d->syntex_to_tab_button->setDisabled(true);
+
+  d->syntex_layout->installEventFilter(&d->multiplier);
+
+  connect(d->syntex_input, &QLineEdit::textChanged,
+          this, &OmniBoxView::BuildSyntex);
+
+  connect(d->syntex_input, &QLineEdit::returnPressed,
+          this, &OmniBoxView::RunSyntex);
+
+  connect(d->syntex_button, &QPushButton::pressed,
+          this, &OmniBoxView::RunSyntex);
+
+  connect(d->syntex_to_dock_button, &QPushButton::pressed,
+          this, &OmniBoxView::OnOpenSyntexResultsInDock);
+
+  connect(d->syntex_to_tab_button, &QPushButton::pressed,
+          this, &OmniBoxView::OnOpenSyntexResultsInTab);
+
+  // ---------------------------------------------------------------------------
   // Generic
 
   d->content->hide();
@@ -461,6 +514,18 @@ void OmniBoxView::ClearWeggliResults(void) {
   }
 }
 
+void OmniBoxView::ClearSyntexResults(void) {
+  if (d->syntex_results) {
+    d->syntex_layout->removeWidget(d->syntex_results);
+    d->syntex_results->disconnect();
+    d->syntex_results->deleteLater();
+    d->syntex_results = nullptr;
+    d->syntex_to_dock_button->setDisabled(true);
+    d->syntex_to_tab_button->setDisabled(true);
+    update();
+  }
+}
+
 void OmniBoxView::ClearEntityResults(void) {
   if (d->entity_results) {
     d->entity_layout->removeWidget(d->entity_results);
@@ -497,6 +562,11 @@ void OmniBoxView::OpenRegexSearch(void) {
 
 void OmniBoxView::OpenSymbolQuerySearch(void) {
   d->content->setCurrentWidget(d->symbol_box);
+  d->symbol_input->setFocus();
+}
+
+void OmniBoxView::OpenSyntexSearch(void) {
+  d->content->setCurrentWidget(d->syntex_box);
   d->symbol_input->setFocus();
 }
 
@@ -1188,6 +1258,115 @@ void OmniBoxView::OnOpenWeggliResultsInDock(void) {
   update();
 }
 
+void OmniBoxView::BuildSyntex(const QString &text) {
+  if (text.isEmpty()) {
+    d->syntex_query = {};
+    d->syntex_button->setDisabled(true);
+
+  } else {
+    d->syntex_query = text;
+    d->syntex_button->setDisabled(false);
+  }
+}
+
+void OmniBoxView::RunSyntex(void) {
+  d->syntex_counter++;
+
+  ClearSyntexResults();
+  d->syntex_results = new QLabel(tr("Querying..."));
+  d->syntex_layout->addWidget(d->syntex_results, 1, 0, 1, 5,
+                              Qt::AlignmentFlag::AlignHCenter |
+                              Qt::AlignmentFlag::AlignVCenter);
+
+  auto runnable = new SyntexQueryThread(
+      d->multiplier.Index(), d->syntex_query.toStdString(), d->syntex_counter);
+  runnable->setAutoDelete(true);
+
+  connect(runnable, &SyntexQueryThread::FoundMatches,
+          this, &OmniBoxView::OnFoundMatchesWithSyntex);
+
+  QThreadPool::globalInstance()->start(runnable);
+}
+
+void OmniBoxView::OnFoundMatchesWithSyntex(std::vector<syntex::Match> *matches,
+                                           unsigned counter) {
+  if (d->syntex_counter != counter) {
+    return;
+  }
+
+  ClearSyntexResults();
+  auto matches_ptr = std::unique_ptr<std::vector<syntex::Match>>(matches);
+
+  if(matches_ptr) {
+    const CodeTheme &theme = d->multiplier.CodeTheme();
+    theme.BeginTokens();
+
+    auto model = new CodeSearchResultsModel(d->multiplier);
+    auto table = new CodeSearchResultsView(model);
+
+    connect(table, &CodeSearchResultsView::TokenPressEvent,
+            &d->multiplier, &Multiplier::ActOnTokenPressEvent);
+
+    for (auto match : *matches) {
+      if (!d->syntex_results) {
+        d->syntex_results = table;
+        d->syntex_to_dock_button->setEnabled(true);
+        d->syntex_to_tab_button->setEnabled(true);
+        d->syntex_layout->addWidget(d->syntex_results, 1, 0, 1, 5);
+      }
+      model->AddResult(match);
+    }
+
+    theme.EndTokens();
+  }
+
+  if (!d->syntex_results) {
+    d->syntex_results = new QLabel(tr("No matches"));
+    d->syntex_layout->addWidget(d->syntex_results, 1, 0, 1, 5,
+                               Qt::AlignmentFlag::AlignHCenter |
+                               Qt::AlignmentFlag::AlignVCenter);
+  }
+  update();
+}
+
+void OmniBoxView::OnOpenSyntexResultsInTab(void) {
+  if (!d->syntex_results) {
+    return;
+  }
+
+  TitleNamePrompt dialog(tr("Set tab name"), this);
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  d->syntex_layout->removeWidget(d->syntex_results);
+  d->syntex_results->setParent(nullptr);
+  emit OpenTab(dialog.NewName(), d->syntex_results);
+  d->syntex_results = nullptr;
+  d->syntex_to_dock_button->setDisabled(true);
+  d->syntex_to_tab_button->setDisabled(true);
+  update();
+}
+
+void OmniBoxView::OnOpenSyntexResultsInDock(void) {
+  if (!d->syntex_results) {
+    return;
+  }
+
+  TitleNamePrompt dialog(tr("Set dock name"), this);
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  d->syntex_layout->removeWidget(d->syntex_results);
+  d->syntex_results->setParent(nullptr);
+  emit OpenDock(dialog.NewName(), d->syntex_results);
+  d->syntex_results = nullptr;
+  d->syntex_to_dock_button->setDisabled(true);
+  d->syntex_to_tab_button->setDisabled(true);
+  update();
+}
+
 struct SymbolSearchThread::PrivateData {
   const Index index;
   const FileLocationCache &file_cache;
@@ -1299,6 +1478,33 @@ void WeggliQueryThread::run(void) {
   emit FoundFragments(
       new WeggliQueryResultIterator(d->index.query_fragments(d->query).begin()),
       d->counter);
+}
+
+struct SyntexQueryThread::PrivateData {
+  const Index index;
+  const std::string query;
+  const unsigned counter;
+
+  inline PrivateData(const Index &index_, const std::string &query_,
+                     unsigned counter_)
+      : index(index_),
+        query(query_),
+        counter(counter_) {}
+};
+
+SyntexQueryThread::~SyntexQueryThread(void) {}
+
+SyntexQueryThread::SyntexQueryThread(const Index &index_,
+                                     const std::string &query_,
+                                     unsigned counter_)
+    : d(std::make_unique<PrivateData>(index_, query_, counter_)) {}
+
+void SyntexQueryThread::run(void) {
+  auto res = d->index.query_syntex(d->query);
+  auto ptr = res.has_value() ? new std::vector<syntex::Match>(*res) : nullptr;
+  emit FoundMatches(
+    ptr,
+    d->counter);
 }
 
 }  // namespace mx::gui
