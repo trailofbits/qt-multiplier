@@ -1259,14 +1259,8 @@ void OmniBoxView::OnOpenWeggliResultsInDock(void) {
 }
 
 void OmniBoxView::BuildSyntex(const QString &text) {
-  if (text.isEmpty()) {
-    d->syntex_query = {};
-    d->syntex_button->setDisabled(true);
-
-  } else {
-    d->syntex_query = text;
-    d->syntex_button->setDisabled(false);
-  }
+  d->syntex_query = text;
+  d->syntex_button->setDisabled(text.isEmpty());
 }
 
 void OmniBoxView::RunSyntex(void) {
