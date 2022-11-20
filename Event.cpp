@@ -51,11 +51,11 @@ EventLocation::UnpackFileTokenId(void) const {
     return std::nullopt;
   }
 }
-std::optional<struct FragmentTokenId>
-EventLocation::UnpackFragmentTokenId(void) const {
+std::optional<struct ParsedTokenId>
+EventLocation::UnpackParsedTokenId(void) const {
   auto vid = EntityId(fragment_token_id).Unpack();
-  if (std::holds_alternative<struct FragmentTokenId>(vid)) {
-    return std::get<struct FragmentTokenId>(vid);
+  if (std::holds_alternative<struct ParsedTokenId>(vid)) {
+    return std::get<struct ParsedTokenId>(vid);
   } else {
     return std::nullopt;
   }
@@ -73,7 +73,7 @@ EventLocation::UnpackDeclarationId(void) const {
 
 bool EventLocation::IsSane(void) const {
   if (fragment_token_id != kInvalidEntityId) {
-    if (!UnpackFragmentTokenId().has_value()) {
+    if (!UnpackParsedTokenId().has_value()) {
       return false;
     }
   }

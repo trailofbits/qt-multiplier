@@ -394,7 +394,7 @@ void ReferenceBrowserView::ActOnTokenPressEvent(EventLocations locs) {
   for (EventLocation loc : locs) {
     emit TokenPressEvent(EventSource::kReferenceBrowserPreviewClickSource, loc);
     if (loc.UnpackDeclarationId()) {
-      loc.SetFragmentTokenId(kInvalidEntityId);
+      loc.SetParsedTokenId(kInvalidEntityId);
       loc.SetFileTokenId(kInvalidEntityId);
       emit TokenPressEvent(EventSource::kReferenceBrowserPreviewClickDest, loc);
     }
@@ -832,7 +832,7 @@ void ReferenceBrowserView::OnItemClicked(
 
   // Try to go to the specific use.
   for (const Token &tok : info.tokens) {
-    loc.SetFragmentTokenId(tok.id());
+    loc.SetParsedTokenId(tok.id());
     break;
   }
 

@@ -93,7 +93,7 @@ class CodeSearchResultsModelImpl {
   int num_columns{0};
   int num_rows{0};
 
-  std::vector<std::variant<Token, TokenSubstitution>> toks;
+  std::vector<std::variant<Token, MacroSubstitution>> toks;
 
   QVector<QString> headers;
   std::vector<RowData> rows;
@@ -175,10 +175,8 @@ std::pair<unsigned, unsigned> RowData::Tokens(CodeSearchResultsModelImpl &d) {
     for (; j < max_j; ) {
       Token frag_tok = frag_tokens[j];
       if (frag_tok.data().empty()) {
-        if (frag_tok.kind() != TokenKind::BEGIN_OF_MACRO_EXPANSION_MARKER) {
-          ++j;
-          continue;
-        }
+        ++j;
+        continue;
       }
 
       std::optional<Token> file_for_frag_tok = frag_tok.file_token();
@@ -1029,7 +1027,7 @@ void CodeSearchResultsView::ActOnTokenPressEvent(EventLocations locs) {
   for (EventLocation loc : locs) {
     emit TokenPressEvent(EventSource::kCodeSearchResultPreviewClickSource, loc);
     if (loc.UnpackDeclarationId()) {
-      loc.SetFragmentTokenId(kInvalidEntityId);
+      loc.SetParsedTokenId(kInvalidEntityId);
       loc.SetFileTokenId(kInvalidEntityId);
       emit TokenPressEvent(EventSource::kCodeSearchResultPreviewClickDest, loc);
     }
@@ -1088,7 +1086,7 @@ void CodeSearchResultsView::ClickedOnToken(unsigned row, unsigned index) {
     if (num_locs == 1u) {
       auto [frag_tok_id, decl_id] = model_data->code.tok_decl_ids[locs_begin_index];
       assert(frag_tok_id != kInvalidEntityId);
-      loc.SetFragmentTokenId(frag_tok_id);
+      loc.SetParsedTokenId(frag_tok_id);
       loc.SetReferencedDeclarationId(decl_id);
       emit TokenPressEvent(EventSource::kCodeSearchResult, loc);
 //      ShowFragmentToken(row, file_tok_id, frag_tok_id);
@@ -1098,7 +1096,7 @@ void CodeSearchResultsView::ClickedOnToken(unsigned row, unsigned index) {
       for (auto i = locs_begin_index; i < locs_end_index; ++i) {
         auto [frag_tok_id, decl_id] = model_data->code.tok_decl_ids[i];
         assert(frag_tok_id != kInvalidEntityId);
-        loc.SetFragmentTokenId(frag_tok_id);
+        loc.SetParsedTokenId(frag_tok_id);
         loc.SetReferencedDeclarationId(decl_id);
         locs[i - locs_begin_index] = loc;
       }

@@ -70,7 +70,7 @@ class EventLocation {
     is_present = !!(referenced_decl_id | fragment_token_id | file_token_id);
   }
 
-  void SetFragmentTokenId(RawEntityId ent_id) {
+  void SetParsedTokenId(RawEntityId ent_id) {
     fragment_token_id = ent_id;
     is_present = !!(referenced_decl_id | fragment_token_id | file_token_id);
   }
@@ -86,7 +86,7 @@ class EventLocation {
     return file_token_id;
   }
 
-  inline RawEntityId FragmentTokenId(void) const {
+  inline RawEntityId ParsedTokenId(void) const {
     return fragment_token_id;
   }
 
@@ -95,7 +95,7 @@ class EventLocation {
   }
 
   std::optional<struct FileTokenId> UnpackFileTokenId(void) const;
-  std::optional<struct FragmentTokenId> UnpackFragmentTokenId(void) const;
+  std::optional<struct ParsedTokenId> UnpackParsedTokenId(void) const;
   std::optional<struct DeclarationId> UnpackDeclarationId(void) const;
 };
 

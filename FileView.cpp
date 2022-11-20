@@ -76,7 +76,7 @@ void FileView::ActOnTokenPressEvent(EventLocations locs) {
   for (EventLocation loc : locs) {
     emit TokenPressEvent(EventSource::kCodeBrowserClickSource, loc);
     if (loc.UnpackDeclarationId()) {
-      loc.SetFragmentTokenId(kInvalidEntityId);
+      loc.SetParsedTokenId(kInvalidEntityId);
       loc.SetFileTokenId(kInvalidEntityId);
       emit TokenPressEvent(EventSource::kCodeBrowserClickDest, loc);
     }

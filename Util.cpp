@@ -430,8 +430,6 @@ TokenClass ClassifyToken(const Token &tok) {
     case TokenKind::OBJC_AT_IMPORT:
     case TokenKind::OBJC_AT_AVAILABLE:
       return TokenClass::kObjectiveCKeyword;
-    case TokenKind::BEGIN_OF_MACRO_EXPANSION_MARKER:
-      return TokenClass::kMacroName;
     case TokenKind::IDENTIFIER:
       return TokenClass::kIdentifier;
     default:
@@ -554,10 +552,6 @@ static std::optional<Decl> VisitType(const Type &type, const Token &token) {
 std::optional<Decl> DeclForToken(const Token &token) {
   switch (token.kind()) {
     default:
-    case TokenKind::BEGIN_OF_FILE_MARKER:
-    case TokenKind::END_OF_FILE_MARKER:
-    case TokenKind::BEGIN_OF_MACRO_EXPANSION_MARKER:
-    case TokenKind::END_OF_MACRO_EXPANSION_MARKER:
       return std::nullopt;
 
     case TokenKind::L_SQUARE:
@@ -717,12 +711,12 @@ EntityBaseOffsetPair GetFragmentOffset(RawEntityId id) {
     auto eid = std::get<TypeId>(vid);
     return {EntityId(FragmentId(eid.fragment_id)), eid.offset};
 
-  } else if (std::holds_alternative<FragmentTokenId>(vid)) {
-    auto eid = std::get<FragmentTokenId>(vid);
+  } else if (std::holds_alternative<ParsedTokenId>(vid)) {
+    auto eid = std::get<ParsedTokenId>(vid);
     return {EntityId(FragmentId(eid.fragment_id)), eid.offset};
 
-  } else if (std::holds_alternative<TokenSubstitutionId>(vid)) {
-    auto eid = std::get<TokenSubstitutionId>(vid);
+  } else if (std::holds_alternative<MacroSubstitutionId>(vid)) {
+    auto eid = std::get<MacroSubstitutionId>(vid);
     return {EntityId(FragmentId(eid.fragment_id)), eid.offset};
 
   } else {
@@ -793,8 +787,8 @@ RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
     return Fragment::containing(type).file_tokens().begin()->id();
 
   // Token substitution; walk up to the file location.
-  } else if (std::holds_alternative<TokenSubstitution>(entity)) {
-    auto sub = std::get<TokenSubstitution>(entity);
+  } else if (std::holds_alternative<MacroSubstitution>(entity)) {
+    auto sub = std::get<MacroSubstitution>(entity);
     for (;;) {
       for (auto tok_sub : sub.before()) {
         if (std::holds_alternative<Token>(tok_sub)) {
@@ -803,8 +797,8 @@ RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
             return nearest_file_loc->id();
           }
 
-        } else if (std::holds_alternative<TokenSubstitution>(tok_sub)) {
-          sub = std::get<TokenSubstitution>(tok_sub);
+        } else if (std::holds_alternative<MacroSubstitution>(tok_sub)) {
+          sub = std::get<MacroSubstitution>(tok_sub);
           goto next_sub;
         }
       }
