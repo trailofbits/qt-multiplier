@@ -931,7 +931,11 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
   }
   
   if (highlight_tok && std::holds_alternative<mx::TokenRange>(*highlight_tok)) {
-    d->entity_result_code_view->ScrollToFileToken(std::get<mx::TokenRange>(*highlight_tok));
+
+    // TODO(pag): Use macro substitutions.
+    d->entity_result_code_view->ScrollToFileToken(
+        std::get<mx::TokenRange>(*highlight_tok).file_tokens());
+
   } else if (frag) {
     d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
   } else if (auto entity = std::get<Token>(maybe_entity)) {
