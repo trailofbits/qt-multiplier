@@ -63,7 +63,7 @@ LocateEntitiesThread::LocateEntitiesThread(
     : d(new PrivateData(index_, ids_, counter_)) {}
 
 void LocateEntitiesThread::RunOnToken(Token file_tok) {
-  RawEntityId file_id = File::containing(file_tok)->id();
+  RawEntityId file_id = File::containing(file_tok)->id().Pack();
   if (std::find(d->seen_file_ids.begin(), d->seen_file_ids.end(), file_id) ==
       d->seen_file_ids.end()) {
     emit OpenEntityInFile(file_id, file_tok.id(), d->counter);

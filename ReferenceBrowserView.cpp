@@ -567,7 +567,7 @@ void ReferenceBrowserView::FillRow(
   // Show the line and column numbers.
   if (auto loc = use.nearest_location(d->multiplier.FileLocationCache())) {
     auto file = File::containing(use);
-    RawEntityId file_id = file ? file->id() : kInvalidEntityId;
+    RawEntityId file_id = file ? file->id().Pack() : kInvalidEntityId;
 
     if (auto fp_it = d->file_id_to_path.find(file_id);
         fp_it != d->file_id_to_path.end()) {

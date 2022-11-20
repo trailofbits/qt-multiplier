@@ -692,7 +692,7 @@ void OmniBoxView::FillRow(QTreeWidgetItem *item, const NamedDecl &decl) const {
 
   // Show the line and column numbers.
   auto file = File::containing(tok);
-  RawEntityId file_id = file ? file->id() : kInvalidEntityId;
+  RawEntityId file_id = file ? file->id().Pack() : kInvalidEntityId;
 
   if (auto fp_it = d->file_id_to_path.find(file_id);
       fp_it != d->file_id_to_path.end()) {
