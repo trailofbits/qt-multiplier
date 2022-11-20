@@ -20,7 +20,7 @@ class Index;
 class Token;
 class Type;
 class TokenRange;
-class TokenSubstitution;
+class MacroSubstitution;
 namespace gui {
 
 enum class TokenCategory : unsigned char {

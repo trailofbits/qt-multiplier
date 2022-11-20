@@ -84,7 +84,7 @@ void LocateEntitiesThread::run(void) {
       }
     }
 
-    entity = d->index.entity(loc.FragmentTokenId());
+    entity = d->index.entity(loc.ParsedTokenId());
     if (std::holds_alternative<Token>(entity)) {
       if (auto file_tok = std::get<Token>(entity).nearest_file_token()) {
         RunOnToken(std::move(file_tok.value()));

@@ -212,11 +212,11 @@ bool DownloadCodeThread::PrivateData::DownloadRangeTokens(void) {
     return true;
 
   // Show a range of fragment tokens.
-  } else if (std::holds_alternative<FragmentTokenId>(begin_vid) &&
-             std::holds_alternative<FragmentTokenId>(end_vid)) {
+  } else if (std::holds_alternative<ParsedTokenId>(begin_vid) &&
+             std::holds_alternative<ParsedTokenId>(end_vid)) {
 
-    FragmentTokenId begin_fid = std::get<FragmentTokenId>(begin_vid);
-    FragmentTokenId end_fid = std::get<FragmentTokenId>(end_vid);
+    ParsedTokenId begin_fid = std::get<ParsedTokenId>(begin_vid);
+    ParsedTokenId end_fid = std::get<ParsedTokenId>(end_vid);
 
     if (begin_fid.fragment_id != end_fid.fragment_id ||
         begin_fid.offset > end_fid.offset) {
@@ -303,11 +303,6 @@ void DownloadCodeThread::run(void) {
         fragment_tokens_it != d->fragment_tokens.end()) {
       for (const TokenList &parsed_toks : fragment_tokens_it->second) {
         for (Token parsed_tok : parsed_toks) {
-          if (parsed_tok.kind() == TokenKind::END_OF_FILE_MARKER ||
-              parsed_tok.kind() == TokenKind::END_OF_MACRO_EXPANSION_MARKER) {
-            continue;
-          }
-
           if (auto file_tok_of_parsed_tok = parsed_tok.file_token()) {
             file_to_frag_toks[file_tok_of_parsed_tok->id()].push_back(parsed_tok);
           }
@@ -792,7 +787,7 @@ void CodeView::EmitEventsForIndex(unsigned index) {
     if (num_locs == 1u) {
       auto [frag_tok_id, decl_id] = d->code->tok_decl_ids[locs_begin_index];
       assert(frag_tok_id != kInvalidEntityId);
-      loc.SetFragmentTokenId(frag_tok_id);
+      loc.SetParsedTokenId(frag_tok_id);
       loc.SetReferencedDeclarationId(decl_id);
 
       emit TokenPressEvent(loc);
@@ -802,7 +797,7 @@ void CodeView::EmitEventsForIndex(unsigned index) {
       for (auto i = locs_begin_index; i < locs_end_index; ++i) {
         auto [frag_tok_id, decl_id] = d->code->tok_decl_ids[i];
         assert(frag_tok_id != kInvalidEntityId);
-        loc.SetFragmentTokenId(frag_tok_id);
+        loc.SetParsedTokenId(frag_tok_id);
         loc.SetReferencedDeclarationId(decl_id);
         locs[i - locs_begin_index] = loc;
       }

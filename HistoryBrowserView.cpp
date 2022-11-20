@@ -321,8 +321,8 @@ void HistoryBrowserView::AddDeclarationsUnderRoot(const EventLocations &locs) {
       Token frag_tok;
       Token file_tok;
 
-      if (loc.UnpackFragmentTokenId()) {
-        auto tok_ent = index.entity(loc.FragmentTokenId());
+      if (loc.UnpackParsedTokenId()) {
+        auto tok_ent = index.entity(loc.ParsedTokenId());
         if (std::holds_alternative<Token>(tok_ent)) {
           frag_tok = std::move(std::get<Token>(tok_ent));
         }
@@ -330,7 +330,7 @@ void HistoryBrowserView::AddDeclarationsUnderRoot(const EventLocations &locs) {
 
       if (!frag_tok) {
         frag_tok = DeclFragmentToken(decl).value();
-        loc.SetFragmentTokenId(frag_tok.id());
+        loc.SetParsedTokenId(frag_tok.id());
       }
 
       if (loc.UnpackFileTokenId()) {

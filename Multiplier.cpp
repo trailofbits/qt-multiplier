@@ -458,7 +458,9 @@ void Multiplier::InitializeMenus(void) {
 void Multiplier::UpdateMenus(void) {
   bool is_disconnected = d->connection_state == ConnectionState::kNotConnected;
   bool is_connected = d->connection_state == ConnectionState::kConnected;
-  d->menus.import_database_action->setEnabled(is_disconnected);
+  if (d->menus.import_database_action) {
+    d->menus.import_database_action->setEnabled(is_disconnected);
+  }
   d->menus.view_reference_browser_action->setEnabled(is_connected);
   d->menus.view_history_browser_action->setEnabled(is_connected);
   d->menus.view_file_browser_action->setEnabled(is_connected);

@@ -653,7 +653,7 @@ void OmniBoxView::OnSymbolItemClicked(QTreeWidgetItem *item, int column) {
   EventLocation loc;
   loc.SetReferencedDeclarationId(decl.id());
   if (auto frag_tok = decl.token()) {
-    loc.SetFragmentTokenId(frag_tok.id());
+    loc.SetParsedTokenId(frag_tok.id());
   }
   loc.SetFileTokenId(tok_id);
 
@@ -805,7 +805,7 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
 
   std::optional<Fragment> frag;
   std::optional<File> file;
-  std::optional<std::variant<TokenRange, TokenSubstitution>> highlight_tok;
+  std::optional<std::variant<TokenRange, MacroSubstitution>> highlight_tok;
 
 
   if (std::holds_alternative<Decl>(maybe_entity)) {
@@ -852,8 +852,8 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
     file.emplace(File::containing(*frag));
     highlight_tok.emplace(entity.tokens());
 
-  } else if (std::holds_alternative<TokenSubstitution>(maybe_entity)) {
-    auto entity = std::get<TokenSubstitution>(maybe_entity);
+  } else if (std::holds_alternative<MacroSubstitution>(maybe_entity)) {
+    auto entity = std::get<MacroSubstitution>(maybe_entity);
     frag.emplace(Fragment::containing(entity));
     file.emplace(File::containing(entity));
 
@@ -931,7 +931,11 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
   }
   
   if (highlight_tok && std::holds_alternative<mx::TokenRange>(*highlight_tok)) {
-    d->entity_result_code_view->ScrollToFileToken(std::get<mx::TokenRange>(*highlight_tok));
+
+    // TODO(pag): Use macro substitutions.
+    d->entity_result_code_view->ScrollToFileToken(
+        std::get<mx::TokenRange>(*highlight_tok).file_tokens());
+
   } else if (frag) {
     d->entity_result_code_view->ScrollToFileToken(frag->file_tokens());
   } else if (auto entity = std::get<Token>(maybe_entity)) {
@@ -951,7 +955,7 @@ void OmniBoxView::OnEntityTokenPressEvent(EventLocations locs) {
   for (EventLocation loc : locs) {
     emit TokenPressEvent(EventSource::kEntityIDSearchResultSource, loc);
     if (loc.UnpackDeclarationId()) {
-      loc.SetFragmentTokenId(kInvalidEntityId);
+      loc.SetParsedTokenId(kInvalidEntityId);
       loc.SetFileTokenId(kInvalidEntityId);
       emit TokenPressEvent(EventSource::kEntityIDSearchResultDest, loc);
     }
