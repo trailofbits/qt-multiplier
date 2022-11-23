@@ -36,6 +36,8 @@ find_package(sqlite-multiplier CONFIG REQUIRED)
 find_package(Python3 3.7 MODULE REQUIRED COMPONENTS Development)
 find_package(py-multiplier CONFIG REQUIRED)
 
+add_subdirectory("libraries")
+
 if(PLATFORM_MACOS)
   set(CMAKE_INSTALL_RPATH "@executable_path/../${CMAKE_INSTALL_LIBDIR}")
 elseif(PLATFORM_LINUX)
@@ -108,6 +110,7 @@ add_executable("${exe_name}"
 
 target_link_libraries("${exe_name}" PRIVATE
   multiplier::mx-api
+  phantomstyle
   ${MX_QT}::Core
   ${MX_QT}::Widgets
   sqlite-multiplier::mxsqlitebridge
@@ -195,6 +198,7 @@ if(PLATFORM_MACOS)
       "$<TARGET_FILE:mx-gui>"
       "$<TARGET_FILE:multiplier::mx-index>"
       "$<TARGET_FILE:sqlite-multiplier::mxsqlitebridge>"
+      "$<TARGET_FILE:phantomstyle>"
       "${lib_lto_path}"
       "${lib_remarks_path}"
       "${plist_path}"
@@ -213,10 +217,12 @@ if(PLATFORM_MACOS)
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:sqlite-multiplier::mxsqlitebridge>" "${output_bundle_path}/Contents/lib/mxsqlitebridge.a"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_lto_path}" "${output_bundle_path}/Contents/lib/${lib_lto_name}"
     COMMAND "${CMAKE_COMMAND}" -E copy "${lib_remarks_path}" "${output_bundle_path}/Contents/lib/${lib_remarks_name}"
+    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:phantomstyle>" "${output_bundle_path}/Contents/lib"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${multiplier_include_dir}/multiplier" "${output_bundle_path}/Contents/include/multiplier"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${multiplier_library_path}" "${output_bundle_path}/Contents/lib/cmake/multiplier"
     COMMAND "${install_name_tool}" -change "@rpath/${lib_lto_name}" "@loader_path/../lib/${lib_lto_name}" "${output_bundle_path}/Contents/bin/mx-index"
     COMMAND "${install_name_tool}" -change "@rpath/${lib_remarks_name}" "@loader_path/../lib/${lib_remarks_name}" "${output_bundle_path}/Contents/bin/mx-index"
+    COMMAND "${install_name_tool}" -change "@rpath/libphantomstyle.dylib" "@loader_path/../lib/libphantomstyle.dylib" "${output_bundle_path}/Contents/MacOS/Multiplier"
     COMMAND "${CMAKE_COMMAND}" -E copy "${plist_path}" "${output_bundle_path}/Contents/Info.plist"
     COMMAND "${CMAKE_COMMAND}" -E copy "${icon_path}" "${output_bundle_path}/Contents/Resources/Logo.ico"
   )

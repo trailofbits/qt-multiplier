@@ -28,7 +28,7 @@
 #include <system_error>
 #include <tuple>
 #include <variant>
-
+#include <phantomstyle.h>
 
 #include "CodeView.h"
 #include "Configuration.h"
@@ -65,6 +65,8 @@ namespace {
 }
 
 int main(int argc, char *argv[]) {
+  QApplication::setStyle(new PhantomStyle());
+
   QApplication application(argc, argv);
   application.setApplicationName("Multiplier");
 
@@ -130,27 +132,6 @@ int main(int argc, char *argv[]) {
   ADD_FONT(":/Fonts/Fonts/Source_Code_Pro/static/SourceCodePro-SemiBoldItalic.ttf");
 
   mx::gui::Configuration config;
-
-  if (getenv("MX_NO_CUSTOM_THEME") == nullptr) {
-    qApp->setStyle(config.style);
-    QPalette dark_palette;
-    dark_palette.setColor(QPalette::Window, QColor(53,53,53));
-    dark_palette.setColor(QPalette::WindowText, QColor(240, 240, 240));
-    dark_palette.setColor(QPalette::Base, QColor(35, 35, 35));
-    dark_palette.setColor(QPalette::AlternateBase, QColor(53,53,53));
-    dark_palette.setColor(QPalette::ToolTipBase, QColor(240, 240, 240));
-    dark_palette.setColor(QPalette::ToolTipText, QColor(240, 240, 240));
-    dark_palette.setColor(QPalette::Text, QColor(240, 240, 240));
-    dark_palette.setColor(QPalette::Button, QColor(53,53,53));
-    dark_palette.setColor(QPalette::ButtonText, QColor(240, 240, 240));
-    dark_palette.setColor(QPalette::BrightText, Qt::red);
-    dark_palette.setColor(QPalette::Link, QColor(42, 130, 218));
-
-    dark_palette.setColor(QPalette::Highlight, QColor(42, 130, 218));
-    dark_palette.setColor(QPalette::HighlightedText, Qt::white);
-
-    qApp->setPalette(dark_palette);
-  }
 
   // Per Josh Hofing:
   //
