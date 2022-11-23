@@ -24,6 +24,9 @@ brew install qt@5
 #### Build QT Multiplier
 
 
+As qt-multiplier uses submodules, make sure to pass `--recursive` when cloning the repository. If the source code has already been cloned you can initialize them with the following command: `git submodule update --init --recursive`
+
+
 ```shell
 cmake \
   -DCMAKE_BUILD_TYPE=Release \
