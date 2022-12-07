@@ -14,29 +14,17 @@ project(qt-multiplier CXX)
 
 include("cmake/system.cmake")
 include("cmake/utils.cmake")
+include("cmake/options.cmake")
+include("cmake/build_flags.cmake")
 
 if(PLATFORM_MACOS)
   include("cmake/macdeployqt.cmake")
 endif()
 
-set(MX_QT_VERSION "5" CACHE STRING "Which version to use for the Qt SDK")
-
-set(MX_QT "Qt${MX_QT_VERSION}")
-set(MX_GUI_DIR "${CMAKE_CURRENT_LIST_DIR}")
-set(MX_QT_COMPONENTS Core Widgets)
-if(MX_QT_VERSION GREATER "5")
-  list(APPEND MX_QT_COMPONENTS Core5Compat)
-endif()
-find_package(${MX_QT} COMPONENTS ${MX_QT_COMPONENTS} REQUIRED)
-
 find_package(Intl REQUIRED)
-find_package(multiplier CONFIG REQUIRED)
-
-find_package(sqlite-multiplier CONFIG REQUIRED)
-find_package(Python3 3.7 MODULE REQUIRED COMPONENTS Development)
-find_package(py-multiplier CONFIG REQUIRED)
 
 add_subdirectory("libraries")
+add_subdirectory("components")
 
 if(PLATFORM_MACOS)
   set(CMAKE_INSTALL_RPATH "@executable_path/../${CMAKE_INSTALL_LIBDIR}")
@@ -111,25 +99,14 @@ add_executable("${exe_name}"
 target_link_libraries("${exe_name}" PRIVATE
   multiplier::mx-api
   phantomstyle
-  ${MX_QT}::Core
-  ${MX_QT}::Widgets
+  thirdparty_qt
   sqlite-multiplier::mxsqlitebridge
   Python3::Python
   py-multiplier::py-multiplier
+  codeview
 )
 
-if(MX_QT_VERSION GREATER "5")
-  target_link_libraries("${exe_name}" PRIVATE
-    ${MX_QT}::Core5Compat
-  )
-endif()
-
-set_target_properties("${exe_name}"
-  PROPERTIES
-    AUTOMOC TRUE
-    AUTOUIC TRUE
-    AUTORCC TRUE
-)
+enable_qt_properties("${exe_name}")
 
 target_compile_definitions("${exe_name}" PRIVATE
   PY_SSIZE_T_CLEAN

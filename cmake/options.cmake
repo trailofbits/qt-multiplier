@@ -6,9 +6,5 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_subdirectory("phantomstyle")
-add_subdirectory("qt")
-add_subdirectory("python")
-add_subdirectory("multiplier")
-add_subdirectory("py-multiplier")
-add_subdirectory("sqlite-multiplier")
+set(MX_QT_VERSION "5" CACHE STRING "Qt version")
+set(MX_PYTHON_VERSION "3.7" CACHE STRING "Python version")

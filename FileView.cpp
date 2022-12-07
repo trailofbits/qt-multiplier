@@ -13,6 +13,7 @@
 #include <QVBoxLayout>
 
 #include <multiplier/Index.h>
+#include <multiplier/ui/ICodeView2.h>
 
 #include "CodeView.h"
 #include "Configuration.h"
@@ -48,6 +49,13 @@ FileView::FileView(Multiplier &multiplier, std::filesystem::path file_path,
   d->layout->addWidget(d->content);
   d->content->SetFile(multiplier.Index(), file_id);
   d->content->viewport()->installEventFilter(&multiplier);
+
+  /////////////////////////
+  auto code_model = ICodeModel::Create(multiplier.FileLocationCache(), multiplier.Index());
+  auto code_view2 = ICodeView2::Create(code_model, this);
+  code_model->SetFile(multiplier.Index(), file_id);
+  d->layout->addWidget(code_view2);
+  /////////////////////////
 
   connect(d->content, &CodeView::TokenPressEvent,
           this, &FileView::ActOnTokenPressEvent);

@@ -25,17 +25,11 @@ target_compile_options("phantomstyle" PRIVATE
 )
 
 target_link_libraries("phantomstyle" PRIVATE
-  ${MX_QT}::Core
-  ${MX_QT}::Widgets
-)
-
-set_target_properties("phantomstyle"
-  PROPERTIES
-    AUTOMOC TRUE
-    AUTOUIC TRUE
-    AUTORCC TRUE
+  thirdparty_qt
 )
 
 target_include_directories("phantomstyle" INTERFACE
   "${library_root}/phantom"
 )
+
+enable_qt_properties("phantomstyle")

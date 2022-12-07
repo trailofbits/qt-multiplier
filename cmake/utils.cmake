@@ -39,3 +39,16 @@ function(mx_deploy_targets target_name target_bundle_path)
     endif()
   endforeach()
 endfunction()
+
+function(enable_qt_properties target_name)
+  if(NOT TARGET "${target_name}")
+    message(FATAL_ERROR "qt-multiplier: Target not found: ${target_name}")
+  endif()
+
+  set_target_properties("${target_name}"
+    PROPERTIES
+      AUTOMOC true
+      AUTOUIC true
+      AUTORCC true
+  )
+endfunction()
