@@ -13,8 +13,7 @@
 #include <multiplier/Iterator.h>
 #include <multiplier/Token.h>
 #include <multiplier/Use.h>
-
-#include "CodeTheme.h"
+#include <multiplier/CodeTheme.h>
 
 #include <iostream>
 
@@ -440,8 +439,6 @@ TokenClass ClassifyToken(const Token &tok) {
 // Categorize a token.
 TokenCategory CategorizeToken(const Token &token, TokenClass tok_class,
                               DeclCategory decl_category) {
-  TokenCategory kind = TokenCategory::kUnknown;
-
   auto is_whitespace = token.kind() == TokenKind::WHITESPACE;
   for (auto ch : token.data()) {
     switch (ch) {

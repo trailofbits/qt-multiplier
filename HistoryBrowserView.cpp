@@ -18,11 +18,11 @@
 
 #include <deque>
 #include <multiplier/Index.h>
+#include <multiplier/Util.h>
 #include <unordered_map>
 
 #include "Configuration.h"
 #include "Multiplier.h"
-#include "Util.h"
 
 #include <iostream>
 

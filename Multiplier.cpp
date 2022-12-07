@@ -32,13 +32,14 @@
 #include <QTimer>
 
 #include <algorithm>
-#include <multiplier/Index.h>
 #include <tuple>
 #include <vector>
 
+#include <multiplier/Index.h>
+#include <multiplier/CodeTheme.h>
+
 #include "Configuration.h"
 #include "CodeBrowserView.h"
-#include "CodeTheme.h"
 #include "FileBrowserView.h"
 #include "FileView.h"
 #include "HistoryBrowserView.h"

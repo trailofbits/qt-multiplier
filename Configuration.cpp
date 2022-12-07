@@ -11,7 +11,7 @@
 #include <QFile>
 #include <QFileInfo>
 
-#include "CodeTheme.h"
+#include <multiplier/CodeTheme.h>
 
 #include <cstdlib>
 

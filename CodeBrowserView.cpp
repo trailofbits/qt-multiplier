@@ -20,7 +20,8 @@
 #include "FileView.h"
 #include "Multiplier.h"
 #include "OmniBoxView.h"
-#include "Util.h"
+
+#include <multiplier/Util.h>
 
 #include <iostream>
 

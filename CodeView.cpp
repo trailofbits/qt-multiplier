@@ -28,15 +28,16 @@
 #include <cmath>
 #include <iostream>
 #include <map>
-#include <multiplier/AST.h>
-#include <multiplier/Index.h>
 #include <optional>
 #include <unordered_map>
 #include <vector>
 
+#include <multiplier/AST.h>
+#include <multiplier/Index.h>
+#include <multiplier/Util.h>
+#include <multiplier/CodeTheme.h>
+
 #include "Code.h"
-#include "CodeTheme.h"
-#include "Util.h"
 
 namespace mx::gui {
 namespace {

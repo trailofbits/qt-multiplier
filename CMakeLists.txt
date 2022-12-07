@@ -39,9 +39,6 @@ add_executable("${exe_name}"
   
   Code.h
   
-  CodeTheme.cpp
-  CodeTheme.h
-  
   CodeBrowserView.cpp
   CodeBrowserView.h
   
@@ -91,9 +88,6 @@ add_executable("${exe_name}"
   
   TitleNamePrompt.cpp
   TitleNamePrompt.h
-  
-  Util.cpp
-  Util.h
 )
 
 target_link_libraries("${exe_name}" PRIVATE
@@ -104,6 +98,8 @@ target_link_libraries("${exe_name}" PRIVATE
   Python3::Python
   py-multiplier::py-multiplier
   codeview
+  mx_util
+  mx_codetheme
 )
 
 enable_qt_properties("${exe_name}")

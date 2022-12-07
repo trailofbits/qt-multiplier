@@ -23,11 +23,12 @@
 #include <tuple>
 #include <unordered_map>
 
-#include "CodeTheme.h"
+#include <multiplier/Util.h>
+#include <multiplier/CodeTheme.h>
+
 #include "CodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
-#include "Util.h"
 
 // NOTE(pag): Put last for Qt.
 #include <filesystem>

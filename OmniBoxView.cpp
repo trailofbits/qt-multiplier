@@ -33,16 +33,16 @@
 #include <multiplier/Index.h>
 #include <multiplier/Re2.h>
 #include <multiplier/Weggli.h>
+#include <multiplier/CodeTheme.h>
+#include <multiplier/Util.h>
 #include <string>
 #include <variant>
 
 #include "CodeSearchResults.h"
-#include "CodeTheme.h"
 #include "CodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 #include "TitleNamePrompt.h"
-#include "Util.h"
 
 namespace mx::gui {
 namespace {
