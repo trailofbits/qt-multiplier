@@ -7,12 +7,15 @@
 #pragma once
 
 #include <multiplier/Types.h>
-
-#include <QBrush>
 #include <QString>
+#include <QBrush>
 #include <utility>
 #include <vector>
 
+QT_BEGIN_NAMESPACE
+class QPainter;
+class QRectF;
+QT_END_NAMESPACE
 namespace mx::gui {
 
 class Code {
@@ -34,9 +37,9 @@ class Code {
   // Line number of the last character of the last token.
   unsigned last_line{0u};
 
-  //  // Paint the tokens in the range `[begin_index, end_index)`.
-  //  void PaintTokens(const QRectF &rect, QPainter *painter, unsigned begin_index,
-  //                   unsigned end_index) const;
+//  // Paint the tokens in the range `[begin_index, end_index)`.
+//  void PaintTokens(const QRectF &rect, QPainter *painter, unsigned begin_index,
+//                   unsigned end_index) const;
 };
 
 }  // namespace mx::gui

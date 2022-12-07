@@ -10,6 +10,7 @@
 #include <QRunnable>
 
 #include <multiplier/Types.h>
+#include <multiplier/Index.h>
 #include <multiplier/CodeTheme.h>
 
 namespace mx::gui {

@@ -10,6 +10,10 @@ add_library("mx_util"
   include/multiplier/Util.h
   src/Util.h
   src/Util.cpp
+
+  include/multiplier/DownloadCodeThread.h
+  src/DownloadCodeThread.h
+  src/DownloadCodeThread.cpp
 )
 
 target_link_libraries("mx_util" PRIVATE

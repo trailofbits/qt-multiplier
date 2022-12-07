@@ -24,6 +24,8 @@ target_link_libraries("codeview" PRIVATE
   "qtmx_cxx_flags"
   "thirdparty_qt"
   "multiplier::mx-api"
+  "mx_util"
+  "mx_codetheme"
 )
 
 target_include_directories("codeview" PRIVATE
