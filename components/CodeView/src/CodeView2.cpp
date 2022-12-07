@@ -79,6 +79,7 @@ void CodeView2::InstallModel(ICodeModel *model) {
 }
 
 void CodeView2::InitializeWidgets() {
+  // TODO(alessandro): This should be part of the theme
   QFont font("Monaco");
   font.setStyleHint(QFont::TypeWriter);
   setFont(font);
@@ -88,7 +89,7 @@ void CodeView2::InitializeWidgets() {
   d->text_edit->setReadOnly(true);
   d->text_edit->setOverwriteMode(false);
   d->text_edit->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  //d->text_edit->installEventFilter(this);
+  d->text_edit->installEventFilter(this);
 
   d->gutter = new QWidget();
   d->gutter->setFont(font);
@@ -125,6 +126,7 @@ void CodeView2::OnModelReset() {
     for (int token_index = 0; token_index < token_count; ++token_index) {
       const auto &token_var =
           d->model->Data({row_index, token_index}, Qt::DisplayRole);
+
       if (!token_var.isValid()) {
         continue;
       }
@@ -140,7 +142,7 @@ void CodeView2::OnModelReset() {
 }
 
 void CodeView2::OnCursorPositionChange() {
-  // TODO(alessandro): This should be either computed or part of the theme
+  // TODO(alessandro): This should be part of the theme
   QTextEdit::ExtraSelection selection;
   selection.format.setBackground(QColor(Qt::black));
   selection.format.setProperty(QTextFormat::FullWidthSelection, true);
@@ -158,7 +160,7 @@ void CodeView2::OnGutterPaintEvent(QPaintEvent *event) {
 }
 
 void CodeView2::OnTextEditPaintEvent(QPaintEvent *event) {
-  QPainter painter(d->gutter);
+  QPainter painter(d->text_edit);
 
   const auto &base_color = d->text_edit->palette().base();
   painter.fillRect(event->rect(), base_color);

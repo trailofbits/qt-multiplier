@@ -24,17 +24,15 @@ class ICodeModel : public QObject {
   Q_OBJECT
 
  public:
-  enum class TokenClass {
-    kUnknown,
-    kIdentifier,
-    kMacroName,
-    kKeyword,
-    kObjectiveCKeyword,
-    kPreProcessorKeyword,
-    kBuiltinTypeName,
-    kPunctuation,
-    kLiteral,
-    kComment
+  // Other compatible roles:
+  // Qt::ToolTipRole
+  // Qt::DisplayRole
+  enum {
+    TokenIdRole = Qt::UserRole,
+    TokenCategoryRole,
+    TokenDeclListRole,
+    TokenClassRole,
+    TokenRole,
   };
 
   static ICodeModel *Create(const FileLocationCache &file_location_cache,

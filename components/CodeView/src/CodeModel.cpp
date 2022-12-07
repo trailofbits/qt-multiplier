@@ -66,6 +66,9 @@ void CodeModel::SetFile(const Index &index, RawEntityId file_id) {
 
   d->state = ModelState::UpdateInProgress;
 
+  // TODO(alessandro): This will not play nice if there are other components
+  // that can end up using the same ID. Convert this to cancellable requests
+  // and remove the need to use IDs
   auto prev_counter = d->counter.fetch_add(1u);  // Go to the next version.
 
   auto downloader = DownloadCodeThread::CreateFileDownloader(
@@ -76,7 +79,7 @@ void CodeModel::SetFile(const Index &index, RawEntityId file_id) {
           &CodeModel::OnDownloadFailed);
 
   connect(downloader, &DownloadCodeThread::RenderCode, this,
-          &CodeModel::OnRenderCode);
+          &CodeModel::OnDownloadSucceeded);
 
   QThreadPool::globalInstance()->start(downloader);
 
@@ -152,8 +155,9 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache, Index index,
 void CodeModel::OnDownloadFailed() {
   emit ModelAboutToBeReset();
 
-  // TODO(alessandro): We have no idea which request has failed. Trying
-  // to display a message here is racy
+  // TODO(alessandro): We have no idea which request (numer) has failed. Trying
+  // to display a message here is racy. Remove the IDs and use a single re-usable
+  // thread
   d->state = ModelState::UpdateFailed;
   d->token_row_list.clear();
   d->code.reset();
@@ -161,7 +165,7 @@ void CodeModel::OnDownloadFailed() {
   emit ModelReset();
 }
 
-void CodeModel::OnRenderCode(void *code, uint64_t counter) {
+void CodeModel::OnDownloadSucceeded(void *code, uint64_t counter) {
   emit ModelAboutToBeReset();
 
   // TODO(alessandro): Remove `counter` usage and add support for

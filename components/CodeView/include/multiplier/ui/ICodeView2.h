@@ -18,24 +18,6 @@ class ICodeView2 : public QWidget {
   Q_OBJECT
 
  public:
-  // Other compatible roles:
-  // Qt::ToolTipRole
-  // Qt::DisplayRole
-  // Qt::ForegroundRole
-  // Qt::BackgroundRole
-  // Qt::FontRole
-  enum {
-    ItalicStyleRole = Qt::UserRole,
-    BoldStyleRole,
-    UnderlineStyleRole,
-    StrikeOutStyleRole,
-    TokenIdRole,
-    RowNumberRole,
-    FileNameRole,
-    CollapsibleRole,
-    TokenClassRole,
-  };
-
   static ICodeView2 *Create(ICodeModel *model, QWidget *parent = nullptr);
 
   ICodeView2(QWidget *parent) : QWidget(parent) {}

@@ -41,7 +41,7 @@ class CodeModel final : public ICodeModel {
 
  private slots:
   void OnDownloadFailed();
-  void OnRenderCode(void *code, uint64_t counter);
+  void OnDownloadSucceeded(void *code, uint64_t counter);
 
   friend class ICodeModel;
 };

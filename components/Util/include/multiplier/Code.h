@@ -7,6 +7,8 @@
 #pragma once
 
 #include <multiplier/Types.h>
+#include <multiplier/Util.h>
+
 #include <QString>
 #include <QBrush>
 #include <utility>
@@ -20,6 +22,8 @@ namespace mx::gui {
 
 class Code {
  public:
+  // TODO(alessandro): only the code view widget should have a dependency
+  // on the CodeTheme class and other visual components (like QBrush)
   QString data;
   std::vector<int> start_of_token;
   std::vector<bool> italic;
@@ -30,6 +34,10 @@ class Code {
   std::vector<RawEntityId> file_token_ids;
   std::vector<std::pair<RawEntityId, RawEntityId>> tok_decl_ids;
   std::vector<unsigned> tok_decl_ids_begin;
+  std::vector<TokenCategory> token_category_list;
+  std::vector<std::vector<Decl>> token_decl_list;
+  std::vector<Token> token_list;
+  std::vector<TokenClass> token_class_list;
 
   // Line number of the first character of the first token.
   unsigned first_line{0u};

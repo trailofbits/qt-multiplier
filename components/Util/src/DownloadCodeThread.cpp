@@ -233,6 +233,10 @@ void DownloadCodeThread::run(void) {
   code->start_of_token.reserve(num_file_tokens + 1u);
   code->file_token_ids.reserve(num_file_tokens);
   code->tok_decl_ids_begin.reserve(num_file_tokens + 1);
+  code->token_category_list.reserve(num_file_tokens);
+  code->token_decl_list.reserve(num_file_tokens);
+  code->token_list.reserve(num_file_tokens);
+  code->token_class_list.reserve(num_file_tokens);
 
   // Figure out min and max line numbers.
   if (d->file_tokens) {
@@ -380,6 +384,10 @@ void DownloadCodeThread::run(void) {
         &(d->theme.TokenForegroundColor(file_tok, tok_decls, kind)));
     code->background.push_back(
         &(d->theme.TokenBackgroundColor(file_tok, tok_decls, kind)));
+    code->token_category_list.push_back(kind);
+    code->token_decl_list.push_back(std::move(tok_decls));
+    code->token_list.push_back(file_tok);
+    code->token_class_list.push_back(file_tok_class);
   }
 
   code->start_of_token.push_back(code->data.size());
