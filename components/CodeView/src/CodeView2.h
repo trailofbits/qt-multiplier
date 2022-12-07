@@ -10,7 +10,7 @@
 
 #include <multiplier/ui/ICodeView2.h>
 
-namespace mx {
+namespace mx::gui {
 
 class CodeView2 final : public ICodeView2 {
   Q_OBJECT
@@ -39,4 +39,4 @@ class CodeView2 final : public ICodeView2 {
   friend class ICodeView2;
 };
 
-}  // namespace mx
+}  // namespace mx::gui

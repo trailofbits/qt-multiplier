@@ -12,7 +12,7 @@
 
 #include <memory>
 
-namespace mx {
+namespace mx::gui {
 
 class CodeModel final : public ICodeModel {
   Q_OBJECT
@@ -43,4 +43,4 @@ class CodeModel final : public ICodeModel {
   friend class ICodeModel;
 };
 
-}  // namespace mx
+}  // namespace mx::gui

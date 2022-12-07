@@ -24,7 +24,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace mx {
+namespace mx::gui {
 
 namespace {
 
@@ -33,7 +33,7 @@ class QPlainTextEditMod final : public QPlainTextEdit {
   QPlainTextEditMod(QWidget *parent = nullptr) : QPlainTextEdit(parent) {}
   virtual ~QPlainTextEditMod() override{};
 
-  friend class mx::CodeView2;
+  friend class mx::gui::CodeView2;
 };
 
 struct ModelCursor final {
@@ -207,4 +207,4 @@ void CodeView2::OnTextEditUpdateRequest(const QRect &, int) {
   d->gutter->update();
 }
 
-}  // namespace mx
+}  // namespace mx::gui

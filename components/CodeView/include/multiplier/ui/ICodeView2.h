@@ -12,7 +12,7 @@
 
 #include <QWidget>
 
-namespace mx {
+namespace mx::gui {
 
 class ICodeView2 : public QWidget {
   Q_OBJECT
@@ -45,4 +45,4 @@ class ICodeView2 : public QWidget {
   ICodeView2 &operator=(const ICodeView2 &) = delete;
 };
 
-}  // namespace mx
+}  // namespace mx::gui

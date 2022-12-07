@@ -13,7 +13,7 @@
 
 #include <QAbstractTableModel>
 
-namespace mx {
+namespace mx::gui {
 
 class ICodeModel : public QAbstractTableModel {
   Q_OBJECT
@@ -47,4 +47,4 @@ class ICodeModel : public QAbstractTableModel {
   ICodeModel &operator=(const ICodeModel &) = delete;
 };
 
-}  // namespace mx
+}  // namespace mx::gui

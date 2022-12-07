@@ -8,7 +8,7 @@
 
 #include "CodeModel.h"
 
-namespace mx {
+namespace mx::gui {
 
 struct CodeModel::PrivateData final {
   PrivateData(const FileLocationCache &file_location_cache_, Index index_)
@@ -52,4 +52,4 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache, Index index,
     : ICodeModel(parent),
       d(new PrivateData(file_location_cache, index)) {}
 
-}  // namespace mx
+}  // namespace mx::gui

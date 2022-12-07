@@ -10,11 +10,11 @@
 
 #include "CodeModel.h"
 
-namespace mx {
+namespace mx::gui {
 
 ICodeModel *ICodeModel::Create(const FileLocationCache &file_location_cache,
                                Index index, QObject *parent) {
   return new CodeModel(file_location_cache, index, parent);
 }
 
-}  // namespace mx
+}  // namespace mx::gui

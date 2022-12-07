@@ -88,6 +88,9 @@ add_executable("${exe_name}"
   
   TitleNamePrompt.cpp
   TitleNamePrompt.h
+
+  DownloadCodeThread.h
+  DownloadCodeThread.cpp
 )
 
 target_link_libraries("${exe_name}" PRIVATE

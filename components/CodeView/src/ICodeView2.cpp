@@ -10,10 +10,10 @@
 
 #include "CodeView2.h"
 
-namespace mx {
+namespace mx::gui {
 
 ICodeView2 *ICodeView2::Create(ICodeModel *model, QWidget *parent) {
   return new CodeView2(model, parent);
 }
 
-}  // namespace mx
+}  // namespace mx::gui

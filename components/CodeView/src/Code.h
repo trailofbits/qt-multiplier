@@ -12,7 +12,7 @@
 #include <QString>
 #include <vector>
 
-namespace mx {
+namespace mx::gui {
 
 class Code {
  public:
