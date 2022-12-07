@@ -25,13 +25,10 @@ class CodeModel final : public ICodeModel {
 
   virtual void SetFile(const Index &index, RawEntityId file_id) override;
 
-  virtual int
-  rowCount(const QModelIndex &parent = QModelIndex()) const override;
+  virtual int RowCount() const override;
+  virtual int TokenCount(int row) const override;
 
-  virtual int
-  columnCount(const QModelIndex &parent = QModelIndex()) const override;
-
-  virtual QVariant data(const QModelIndex &index,
+  virtual QVariant Data(const CodeModelIndex &index,
                         int role = Qt::DisplayRole) const override;
 
  protected:

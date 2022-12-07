@@ -11,11 +11,16 @@
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
 
-#include <QAbstractTableModel>
+#include <QObject>
 
 namespace mx::gui {
 
-class ICodeModel : public QAbstractTableModel {
+struct CodeModelIndex {
+  int row{};
+  int token_index{};
+};
+
+class ICodeModel : public QObject {
   Q_OBJECT
 
  public:
@@ -40,11 +45,21 @@ class ICodeModel : public QAbstractTableModel {
 
   virtual void SetFile(const Index &index, RawEntityId file_id) = 0;
 
-  ICodeModel(QObject *parent) : QAbstractTableModel(parent) {}
+  virtual int RowCount() const = 0;
+  virtual int TokenCount(int row) const = 0;
+
+  virtual QVariant Data(const CodeModelIndex &index,
+                        int role = Qt::DisplayRole) const = 0;
+
+  ICodeModel(QObject *parent) : QObject(parent) {}
   virtual ~ICodeModel() override = default;
 
   ICodeModel(const ICodeModel &) = delete;
   ICodeModel &operator=(const ICodeModel &) = delete;
+
+ signals:
+  void ModelAboutToBeReset();
+  void ModelReset();
 };
 
 }  // namespace mx::gui

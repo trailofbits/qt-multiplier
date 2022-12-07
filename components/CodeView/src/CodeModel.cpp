@@ -14,6 +14,7 @@
 #include <QDebug>
 #include <QThreadPool>
 #include <atomic>
+#include <iostream>
 #include <vector>
 
 namespace mx::gui {
@@ -44,7 +45,7 @@ struct CodeModel::PrivateData final {
   const FileLocationCache &file_location_cache;
   Index index;
 
-  std::atomic_uint64_t counter{0};
+  std::atomic_uint64_t counter{1000};
   ModelState state{ModelState::Ready};
   std::unique_ptr<Code> code;
   TokenRowList token_row_list;
@@ -61,7 +62,7 @@ Index &CodeModel::GetIndex() {
 }
 
 void CodeModel::SetFile(const Index &index, RawEntityId file_id) {
-  emit beginResetModel();
+  emit ModelAboutToBeReset();
 
   d->state = ModelState::UpdateInProgress;
 
@@ -79,35 +80,68 @@ void CodeModel::SetFile(const Index &index, RawEntityId file_id) {
 
   QThreadPool::globalInstance()->start(downloader);
 
-  emit endResetModel();
+  emit ModelReset();
 }
 
-int CodeModel::rowCount(const QModelIndex &parent) const {
+int CodeModel::RowCount() const {
   if (d->state == ModelState::UpdateInProgress) {
     return 1;
   }
 
-  return 0;
+  return static_cast<int>(d->token_row_list.size());
 }
 
-int CodeModel::columnCount(const QModelIndex &parent) const {
-  if (d->state == ModelState::UpdateInProgress) {
-    return 1;
+int CodeModel::TokenCount(int row) const {
+  if (d->state == ModelState::UpdateInProgress ||
+      d->state == ModelState::UpdateFailed) {
+    if (row == 0) {
+      return 1;
+    }
+
+    return 0;
   }
 
-  return 0;
+  auto row_index = static_cast<std::size_t>(row);
+  if (row_index >= d->token_row_list.size()) {
+    return 0;
+  }
+
+  const auto &token_row = d->token_row_list.at(row_index);
+  return static_cast<int>(token_row.size());
 }
 
-QVariant CodeModel::data(const QModelIndex &index, int role) const {
-  if (d->state == ModelState::UpdateInProgress) {
-    if (index.row() != 0 || index.column() != 0 || role != Qt::DisplayRole) {
+QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
+  if (role != Qt::DisplayRole) {
+    return QVariant();
+  }
+
+  if (d->state == ModelState::UpdateInProgress ||
+      d->state == ModelState::UpdateFailed) {
+    if (index.row != 0 || index.token_index != 0) {
       return QVariant();
     }
 
-    return QString(tr("Update in progress..."));
+    if (d->state == ModelState::UpdateInProgress) {
+      return tr("Update in progress...");
+    } else {
+      return tr("Update failed");
+    }
   }
 
-  return QVariant();
+  auto row_index = static_cast<std::size_t>(index.row);
+  if (row_index >= d->token_row_list.size()) {
+    return 0;
+  }
+
+  const auto &token_row = d->token_row_list.at(row_index);
+
+  auto column_index = static_cast<std::size_t>(index.token_index);
+  if (column_index >= token_row.size()) {
+    return QVariant();
+  }
+
+  const auto &column = token_row.at(column_index);
+  return column.data;
 }
 
 CodeModel::CodeModel(const FileLocationCache &file_location_cache, Index index,
@@ -116,23 +150,29 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache, Index index,
       d(new PrivateData(file_location_cache, index)) {}
 
 void CodeModel::OnDownloadFailed() {
+  emit ModelAboutToBeReset();
+
   // TODO(alessandro): We have no idea which request has failed. Trying
   // to display a message here is racy
   d->state = ModelState::UpdateFailed;
-  emit dataChanged(index(0, 0), index(0, 0));
+  d->token_row_list.clear();
+  d->code.reset();
+
+  emit ModelReset();
 }
 
 void CodeModel::OnRenderCode(void *code, uint64_t counter) {
+  emit ModelAboutToBeReset();
+
   // TODO(alessandro): Remove `counter` usage and add support for
   // aborting pending requests
   if (d->counter.load() != counter) {
-    emit beginResetModel();
     d->state = ModelState::UpdateFailed;
-    emit endResetModel();
+    emit ModelReset();
     return;
   }
 
-  emit beginResetModel();
+  d->state = ModelState::Ready;
 
   {
     // TODO(alessandro): Avoid reinterpret_cast
@@ -158,18 +198,19 @@ void CodeModel::OnRenderCode(void *code, uint64_t counter) {
 
     QString buffer;
     for (const auto &c : token) {
-      if (c != '\n') {
-        buffer.append(c);
+      if (c == QChar::LineSeparator) {
+        auto current_column_copy = current_column;
+        current_column_copy.data = std::move(buffer);
+        buffer.clear();
+
+        current_row.push_back(std::move(current_column_copy));
+        d->token_row_list.push_back(std::move(current_row));
+        current_row.clear();
+
         continue;
       }
 
-      auto current_column_copy = current_column;
-      current_column_copy.data = std::move(buffer);
-      buffer.clear();
-
-      current_row.push_back(std::move(current_column_copy));
-      d->token_row_list.push_back(std::move(current_row));
-      current_row.clear();
+      buffer.append(c);
     }
 
     if (!buffer.isEmpty()) {
@@ -180,7 +221,12 @@ void CodeModel::OnRenderCode(void *code, uint64_t counter) {
     }
   }
 
-  emit endResetModel();
+  if (!current_row.empty()) {
+    d->token_row_list.push_back(std::move(current_row));
+    current_row.clear();
+  }
+
+  emit ModelReset();
 }
 
 }  // namespace mx::gui

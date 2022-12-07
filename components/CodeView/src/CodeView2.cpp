@@ -8,7 +8,6 @@
 
 #include "CodeView2.h"
 
-#include <QDebug>
 #include <QFont>
 #include <QHBoxLayout>
 #include <QPaintEvent>
@@ -34,13 +33,6 @@ class QPlainTextEditMod final : public QPlainTextEdit {
   virtual ~QPlainTextEditMod() override{};
 
   friend class mx::gui::CodeView2;
-};
-
-struct ModelCursor final {
-  std::size_t active_line_size{};
-  QModelIndex parent;
-  int row{};
-  int column{};
 };
 
 }  // namespace
@@ -83,7 +75,7 @@ void CodeView2::InstallModel(ICodeModel *model) {
   d->model = model;
   d->model->setParent(this);
 
-  connect(d->model, &ICodeModel::dataChanged, this, &CodeView2::OnDataChanged);
+  connect(d->model, &ICodeModel::ModelReset, this, &CodeView2::OnModelReset);
 }
 
 void CodeView2::InitializeWidgets() {
@@ -96,7 +88,7 @@ void CodeView2::InitializeWidgets() {
   d->text_edit->setReadOnly(true);
   d->text_edit->setOverwriteMode(false);
   d->text_edit->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  d->text_edit->installEventFilter(this);
+  //d->text_edit->installEventFilter(this);
 
   d->gutter = new QWidget();
   d->gutter->setFont(font);
@@ -114,65 +106,34 @@ void CodeView2::InitializeWidgets() {
   connect(d->text_edit, &QPlainTextEditMod::updateRequest, this,
           &CodeView2::OnTextEditUpdateRequest);
 
-  OnDataChanged();
+  OnModelReset();
 }
 
-void CodeView2::OnDataChanged() {
+void CodeView2::OnModelReset() {
   d->text_edit->clear();
-  return;
 
   auto document = new QTextDocument(this);
   auto document_layout = new QPlainTextDocumentLayout(document);
   document->setDocumentLayout(document_layout);
   d->text_edit->setDocument(document);
 
-  std::stack<ModelCursor> model_cursor_stack;
-  model_cursor_stack.push({0, QModelIndex(), 0, 0});
-
   auto cursor = std::make_unique<QTextCursor>(document);
 
-  for (;;) {
-  restart:
-    if (model_cursor_stack.empty()) {
-      break;
-    }
-
-    auto model_cursor = model_cursor_stack.top();
-    model_cursor_stack.pop();
-
-    model_cursor.active_line_size = 0;
-
-    auto row_count = d->model->rowCount(model_cursor.parent);
-
-    for (; model_cursor.row < row_count; ++model_cursor.row) {
-      for (;; ++model_cursor.column) {
-        auto index = d->model->index(model_cursor.row, model_cursor.column,
-                                     model_cursor.parent);
-
-        auto display_role = d->model->data(index, Qt::DisplayRole);
-        if (!display_role.isValid()) {
-          break;
-        }
-
-        const auto &buffer = display_role.toString();
-        model_cursor.active_line_size +=
-            static_cast<std::size_t>(buffer.size());
-
-        cursor->insertText(buffer);
-
-        if (d->model->rowCount(index) > 0) {
-          model_cursor_stack.push(model_cursor);
-          model_cursor_stack.push({0, index, 0, 0});
-
-          cursor->insertText("\n");
-
-          goto restart;
-        }
+  auto row_count = d->model->RowCount();
+  for (int row_index = 0; row_index < row_count; ++row_index) {
+    auto token_count = d->model->TokenCount(row_index);
+    for (int token_index = 0; token_index < token_count; ++token_index) {
+      const auto &token_var =
+          d->model->Data({row_index, token_index}, Qt::DisplayRole);
+      if (!token_var.isValid()) {
+        continue;
       }
 
-      model_cursor.column = 0;
-      cursor->insertText("\n");
+      const auto &token = token_var.toString();
+      cursor->insertText(token);
     }
+
+    cursor->insertText("\n");
   }
 
   d->gutter->setMinimumWidth(100);
@@ -180,13 +141,13 @@ void CodeView2::OnDataChanged() {
 
 void CodeView2::OnCursorPositionChange() {
   // TODO(alessandro): This should be either computed or part of the theme
-  /*QTextEdit::ExtraSelection selection;
+  QTextEdit::ExtraSelection selection;
   selection.format.setBackground(QColor(Qt::black));
   selection.format.setProperty(QTextFormat::FullWidthSelection, true);
   selection.cursor = d->text_edit->textCursor();
   selection.cursor.clearSelection();
 
-  d->text_edit->setExtraSelections({std::move(selection)});*/
+  d->text_edit->setExtraSelections({std::move(selection)});
 }
 
 void CodeView2::OnGutterPaintEvent(QPaintEvent *event) {

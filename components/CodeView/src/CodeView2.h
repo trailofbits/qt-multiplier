@@ -30,7 +30,7 @@ class CodeView2 final : public ICodeView2 {
   void InitializeWidgets();
 
  private slots:
-  void OnDataChanged();
+  void OnModelReset();
   void OnCursorPositionChange();
   void OnGutterPaintEvent(QPaintEvent *event);
   void OnTextEditPaintEvent(QPaintEvent *event);

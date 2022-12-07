@@ -382,11 +382,6 @@ void CodeView::OnRenderCode(void *code_, uint64_t counter) {
 
   cursor.beginEditBlock();
   for (auto i = 0u; i < num_tokens; ++i) {
-    if (false) {
-      auto tok_start = start_of_token[i];
-      auto tok_end = start_of_token[i + 1];
-      qDebug() << "tok_start:" << tok_start << ", tok_end:" << tok_end << "\n";
-    }
     cursor.setPosition(start_of_token[i], QTextCursor::MoveMode::MoveAnchor);
     cursor.setPosition(start_of_token[i + 1], QTextCursor::MoveMode::KeepAnchor);
     format.setForeground(*(foreground_color[i]));
