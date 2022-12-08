@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/ICodeModel.h>
 
 #include <QWidget>
@@ -19,12 +20,17 @@ class ICodeView2 : public QWidget {
 
  public:
   static ICodeView2 *Create(ICodeModel *model, QWidget *parent = nullptr);
+  virtual void setTheme(const CodeViewTheme &theme) = 0;
 
   ICodeView2(QWidget *parent) : QWidget(parent) {}
   virtual ~ICodeView2() override = default;
 
   ICodeView2(const ICodeView2 &) = delete;
   ICodeView2 &operator=(const ICodeView2 &) = delete;
+
+ signals:
+  void TokenClicked(const CodeModelIndex &index, Qt::MouseButtons mouse_buttons,
+                    bool double_click);
 };
 
 }  // namespace mx::gui

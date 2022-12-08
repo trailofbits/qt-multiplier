@@ -18,6 +18,12 @@ add_library("codeview"
 
   src/CodeModel.h
   src/CodeModel.cpp
+
+  include/multiplier/ui/CodeViewTheme.h
+  src/CodeViewTheme.cpp
+
+  src/DefaultCodeViewThemes.h
+  src/DefaultCodeViewThemes.cpp
 )
 
 target_link_libraries("codeview" PRIVATE

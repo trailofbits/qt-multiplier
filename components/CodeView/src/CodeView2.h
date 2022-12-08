@@ -16,6 +16,7 @@ class CodeView2 final : public ICodeView2 {
   Q_OBJECT
 
  public:
+  void setTheme(const CodeViewTheme &theme) override;
   virtual ~CodeView2() override;
 
  protected:
@@ -28,12 +29,17 @@ class CodeView2 final : public ICodeView2 {
   virtual bool eventFilter(QObject *, QEvent *) override;
   void InstallModel(ICodeModel *model);
   void InitializeWidgets();
+  std::optional<CodeModelIndex> ModelIndexFromMousePosition(QPoint pos);
+  void OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
+                                          bool double_click);
+  void ApplyTextFormatting();
 
  private slots:
   void OnModelReset();
+  void OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event);
+  void OnTextEditViewportMouseButtonDblClick(QMouseEvent *event);
   void OnCursorPositionChange();
   void OnGutterPaintEvent(QPaintEvent *event);
-  void OnTextEditPaintEvent(QPaintEvent *event);
   void OnTextEditUpdateRequest(const QRect &, int);
 
   friend class ICodeView2;

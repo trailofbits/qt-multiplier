@@ -29,6 +29,7 @@ enum class ModelState {
 
 struct TokenColumn final {
   RawEntityId file_token_id;
+  TokenCategory token_category;
   QString data;
 };
 
@@ -114,13 +115,9 @@ int CodeModel::TokenCount(int row) const {
 }
 
 QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
-  if (role != Qt::DisplayRole) {
-    return QVariant();
-  }
-
   if (d->state == ModelState::UpdateInProgress ||
       d->state == ModelState::UpdateFailed) {
-    if (index.row != 0 || index.token_index != 0) {
+    if (index.row != 0 || index.token_index != 0 || role != Qt::DisplayRole) {
       return QVariant();
     }
 
@@ -144,7 +141,17 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
   }
 
   const auto &column = token_row.at(column_index);
-  return column.data;
+
+  switch (role) {
+  case Qt::DisplayRole:
+    return column.data;
+
+  case TokenCategoryRole:
+    return static_cast<std::uint32_t>(column.token_category);
+
+  default:
+    return QVariant();
+  }
 }
 
 CodeModel::CodeModel(const FileLocationCache &file_location_cache, Index index,
@@ -199,6 +206,7 @@ void CodeModel::OnDownloadSucceeded(void *code, uint64_t counter) {
     auto token = d->code->data.mid(token_start, token_length);
 
     current_column.file_token_id = d->code->file_token_ids[i];
+    current_column.token_category = d->code->token_category_list[i];
 
     QString buffer;
     for (const auto &c : token) {
