@@ -31,6 +31,8 @@ class ICodeView2 : public QWidget {
  signals:
   void TokenClicked(const CodeModelIndex &index, Qt::MouseButtons mouse_buttons,
                     bool double_click);
+
+  void TokenHovered(const CodeModelIndex &index);
 };
 
 }  // namespace mx::gui

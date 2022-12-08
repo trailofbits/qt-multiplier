@@ -8,9 +8,9 @@
 
 #include "CodeView2.h"
 
-#include <QDebug>
 #include <QFont>
 #include <QHBoxLayout>
+#include <QMetaMethod>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
@@ -21,6 +21,7 @@
 #include <QTextDocument>
 #include <QWidget>
 #include <memory>
+#include <optional>
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
@@ -102,11 +103,14 @@ CodeViewTheme::Style GetTextStyle(const CodeViewTheme &code_theme,
 
 struct CodeView2::PrivateData final {
   ICodeModel *model{nullptr};
+
   QPlainTextEditMod *text_edit{nullptr};
+  QWidget *gutter{nullptr};
+
   TextBlockIndex text_block_index;
   CodeViewTheme theme;
 
-  QWidget *gutter{nullptr};
+  std::optional<CodeModelIndex> opt_prev_hovered_model_index;
 };
 
 void CodeView2::setTheme(const CodeViewTheme &theme) {
@@ -131,6 +135,16 @@ bool CodeView2::eventFilter(QObject *obj, QEvent *event) {
     if (obj == d->gutter) {
       OnGutterPaintEvent(paint_event);
       return true;
+    }
+
+    return false;
+
+  } else if (event->type() == QEvent::MouseMove) {
+    auto mouse_event = static_cast<QMouseEvent *>(event);
+
+    if (obj == d->text_edit->viewport()) {
+      OnTextEditViewportMouseMoveEvent(mouse_event);
+      return false;
     }
 
     return false;
@@ -180,6 +194,7 @@ void CodeView2::InitializeWidgets() {
   d->text_edit->setOverwriteMode(false);
   d->text_edit->setTextInteractionFlags(Qt::TextSelectableByMouse);
   d->text_edit->viewport()->installEventFilter(this);
+  d->text_edit->viewport()->setMouseTracking(true);
 
   d->gutter = new QWidget();
   d->gutter->setFont(font);
@@ -187,6 +202,7 @@ void CodeView2::InitializeWidgets() {
 
   auto layout = new QHBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(0);
   layout->addWidget(d->gutter);
   layout->addWidget(d->text_edit);
   setLayout(layout);
@@ -224,6 +240,33 @@ CodeView2::ModelIndexFromMousePosition(QPoint pos) {
   return text_block_index_it->index;
 }
 
+void CodeView2::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
+  if (!isSignalConnected(QMetaMethod::fromSignal(&CodeView2::TokenHovered))) {
+    return;
+  }
+
+  auto opt_model_index = ModelIndexFromMousePosition(event->pos());
+  if (!opt_model_index.has_value()) {
+    d->opt_prev_hovered_model_index = std::nullopt;
+    return;
+  }
+
+  const auto &model_index = opt_model_index.value();
+
+  if (d->opt_prev_hovered_model_index.has_value()) {
+    const auto &prev_hovered_model_index =
+        d->opt_prev_hovered_model_index.value();
+
+    if (prev_hovered_model_index.row == model_index.row &&
+        prev_hovered_model_index.token_index == model_index.token_index) {
+      return;
+    }
+  }
+
+  d->opt_prev_hovered_model_index = model_index;
+  emit TokenHovered(model_index);
+}
+
 void CodeView2::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
                                                    bool double_click) {
   auto opt_model_index = ModelIndexFromMousePosition(event->pos());
@@ -242,6 +285,9 @@ void CodeView2::ApplyTextFormatting() {
 
   palette.setColor(QPalette::Base, d->theme.default_background_color);
   palette.setColor(QPalette::Text, d->theme.default_foreground_color);
+
+  palette.setColor(QPalette::AlternateBase, d->theme.default_background_color);
+  d->text_edit->setPalette(palette);
 
   QTextCharFormat text_format;
   auto L_updateTextFormat = [&](const QVariant &token_category_var) {

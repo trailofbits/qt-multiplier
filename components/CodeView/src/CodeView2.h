@@ -29,9 +29,12 @@ class CodeView2 final : public ICodeView2 {
   virtual bool eventFilter(QObject *, QEvent *) override;
   void InstallModel(ICodeModel *model);
   void InitializeWidgets();
+
   std::optional<CodeModelIndex> ModelIndexFromMousePosition(QPoint pos);
+  void OnTextEditViewportMouseMoveEvent(QMouseEvent *event);
   void OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
                                           bool double_click);
+
   void ApplyTextFormatting();
 
  private slots:
