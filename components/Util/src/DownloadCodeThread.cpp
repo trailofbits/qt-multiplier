@@ -11,6 +11,7 @@
 #include <multiplier/CodeTheme.h>
 #include <multiplier/Index.h>
 #include <multiplier/Util.h>
+#include <multiplier/ui/RPC.h>
 
 #include <QApplication>
 #include <QBrush>
@@ -56,12 +57,7 @@ struct DownloadCodeThread::PrivateData {
   const FileLocationCache locs;
   const uint64_t counter;
 
-  std::optional<RawEntityId> file_id;
-  std::optional<RawEntityId> fragment_id;
-  std::optional<std::pair<RawEntityId, RawEntityId>> token_range;
-
-  std::map<RawEntityId, std::vector<TokenList>> fragment_tokens;
-  TokenRange file_tokens;
+  Result<TokenRangeData, RPCErrorCode> token_range_data_res;
 
   inline explicit PrivateData(Index index_, const CodeTheme &theme_,
                               const FileLocationCache &locs_, uint64_t counter_)
@@ -69,10 +65,6 @@ struct DownloadCodeThread::PrivateData {
         theme(theme_),
         locs(locs_),
         counter(counter_) {}
-
-  bool DownloadFileTokens(void);
-  bool DownloadFragmentTokens(void);
-  bool DownloadRangeTokens(void);
 };
 
 DownloadCodeThread::DownloadCodeThread(PrivateData *d_) : d(std::move(d_)) {
@@ -85,7 +77,10 @@ DownloadCodeThread *DownloadCodeThread::CreateFileDownloader(
     const Index &index_, const CodeTheme &theme_,
     const FileLocationCache &locs_, uint64_t counter_, RawEntityId file_id_) {
   auto d = new PrivateData(index_, theme_, locs_, counter_);
-  d->file_id.emplace(file_id_);
+
+  d->token_range_data_res =
+      DownloadEntityTokens(index_, DownloadRequestType::FileTokens, file_id_);
+
   return new DownloadCodeThread(d);
 }
 
@@ -93,7 +88,10 @@ DownloadCodeThread *DownloadCodeThread::CreateFragmentDownloader(
     const Index &index_, const CodeTheme &theme_,
     const FileLocationCache &locs_, uint64_t counter_, RawEntityId frag_id_) {
   auto d = new PrivateData(index_, theme_, locs_, counter_);
-  d->fragment_id.emplace(frag_id_);
+
+  d->token_range_data_res = DownloadEntityTokens(
+      index_, DownloadRequestType::FragmentTokens, frag_id_);
+
   return new DownloadCodeThread(d);
 }
 
@@ -103,118 +101,22 @@ DownloadCodeThread *DownloadCodeThread::CreateTokenRangeDownloader(
     RawEntityId end_tok_id) {
 
   auto d = new PrivateData(index_, theme_, locs_, counter_);
-  d->token_range.emplace(begin_tok_id, end_tok_id);
+
+  d->token_range_data_res = DownloadTokenRange(
+      index_, DownloadRequestType::FragmentTokens, begin_tok_id, end_tok_id);
+
   return new DownloadCodeThread(d);
 }
 
-bool DownloadCodeThread::PrivateData::DownloadFileTokens(void) {
-  auto file = index.file(file_id.value());
-  if (!file) {
-    return false;
-  }
-
-  file_tokens = file->tokens();
-
-  // Download all of the fragments and build an index of the starting
-  // locations of each fragment in this file.
-  for (auto fragment : Fragment::in(file.value())) {
-    for (Token tok : fragment.file_tokens()) {
-      fragment_tokens[tok.id()].emplace_back(fragment.parsed_tokens());
-      break;
-    }
-  }
-
-  return true;
-}
-
-bool DownloadCodeThread::PrivateData::DownloadFragmentTokens(void) {
-  auto fragment = index.fragment(fragment_id.value());
-  if (!fragment) {
-    return false;
-  }
-
-  file_tokens = fragment->file_tokens();
-  for (const Token &tok : file_tokens) {
-    fragment_tokens[tok.id()].emplace_back(fragment->parsed_tokens());
-    break;
-  }
-
-  return true;
-}
-
-bool DownloadCodeThread::PrivateData::DownloadRangeTokens(void) {
-  VariantId begin_vid = EntityId(token_range->first).Unpack();
-  VariantId end_vid = EntityId(token_range->second).Unpack();
-
-  if (begin_vid.index() != end_vid.index()) {
-    return false;
-  }
-
-  // Show a range of file tokens.
-  if (std::holds_alternative<FileTokenId>(begin_vid) &&
-      std::holds_alternative<FileTokenId>(end_vid)) {
-
-    FileTokenId begin_fid = std::get<FileTokenId>(begin_vid);
-    FileTokenId end_fid = std::get<FileTokenId>(end_vid);
-
-    if (begin_fid.file_id != end_fid.file_id ||
-        begin_fid.offset > end_fid.offset) {
-      return false;
-    }
-
-    file_id.emplace(begin_fid.file_id);
-    if (!DownloadFileTokens()) {
-      return false;
-    }
-
-    file_tokens = file_tokens.slice(begin_fid.offset, end_fid.offset + 1u);
-    return true;
-
-    // Show a range of fragment tokens.
-  } else if (std::holds_alternative<ParsedTokenId>(begin_vid) &&
-             std::holds_alternative<ParsedTokenId>(end_vid)) {
-
-    ParsedTokenId begin_fid = std::get<ParsedTokenId>(begin_vid);
-    ParsedTokenId end_fid = std::get<ParsedTokenId>(end_vid);
-
-    if (begin_fid.fragment_id != end_fid.fragment_id ||
-        begin_fid.offset > end_fid.offset) {
-      return false;
-    }
-
-    fragment_id.emplace(EntityId(FragmentId(begin_fid.fragment_id)));
-    if (!DownloadFragmentTokens()) {
-      return false;
-    }
-
-    file_tokens = file_tokens.slice(begin_fid.offset, end_fid.offset + 1u);
-    return true;
-
-  } else {
-    return false;
-  }
-}
-
 void DownloadCodeThread::run(void) {
-
-  if (d->file_id) {
-    if (!d->DownloadFileTokens()) {
-      emit DownloadFailed();
-      return;
-    }
-  } else if (d->fragment_id) {
-    if (!d->DownloadFragmentTokens()) {
-      emit DownloadFailed();
-      return;
-    }
-  } else if (d->token_range) {
-    if (!d->DownloadRangeTokens()) {
-      emit DownloadFailed();
-      return;
-    }
+  if (!d->token_range_data_res.Succeeded()) {
+    throw d->token_range_data_res.TakeError();
   }
 
-  const auto num_file_tokens = d->file_tokens.size();
+  auto token_range_data = d->token_range_data_res.TakeValue();
+  d->token_range_data_res = {};
+
+  const auto num_file_tokens = token_range_data.file_tokens.size();
   if (!num_file_tokens) {
     emit DownloadFailed();
     return;
@@ -224,7 +126,8 @@ void DownloadCodeThread::run(void) {
 
   d->theme.BeginTokens();
 
-  code->data.reserve(static_cast<int>(d->file_tokens.data().size()));
+  code->data.reserve(
+      static_cast<int>(token_range_data.file_tokens.data().size()));
   code->bold.reserve(num_file_tokens);
   code->italic.reserve(num_file_tokens);
   code->underline.reserve(num_file_tokens);
@@ -239,11 +142,13 @@ void DownloadCodeThread::run(void) {
   code->token_class_list.reserve(num_file_tokens);
 
   // Figure out min and max line numbers.
-  if (d->file_tokens) {
-    if (auto first_loc = d->file_tokens.front().location(d->locs)) {
+  if (token_range_data.file_tokens) {
+    if (auto first_loc =
+            token_range_data.file_tokens.front().location(d->locs)) {
       code->first_line = first_loc->first;
     }
-    if (auto last_loc = d->file_tokens.back().next_location(d->locs)) {
+    if (auto last_loc =
+            token_range_data.file_tokens.back().next_location(d->locs)) {
       code->last_line = last_loc->first;
     }
   }
@@ -252,7 +157,7 @@ void DownloadCodeThread::run(void) {
   std::vector<Decl> tok_decls;
 
   RawEntityId last_file_tok_id = kInvalidEntityId;
-  for (Token file_tok : d->file_tokens) {
+  for (Token file_tok : token_range_data.file_tokens) {
     RawEntityId file_tok_id = file_tok.id();
 
     // Sortedness needed for `CodeView::ScrollToToken`.
@@ -267,8 +172,9 @@ void DownloadCodeThread::run(void) {
     // This token corresponds to the beginning of a fragment. We might have a
     // one-to-many mapping of file tokens to fragment tokens. So when we come
     // across the first token
-    if (auto fragment_tokens_it = d->fragment_tokens.find(file_tok_id);
-        fragment_tokens_it != d->fragment_tokens.end()) {
+    if (auto fragment_tokens_it =
+            token_range_data.fragment_tokens.find(file_tok_id);
+        fragment_tokens_it != token_range_data.fragment_tokens.end()) {
       for (const TokenList &parsed_toks : fragment_tokens_it->second) {
         for (Token parsed_tok : parsed_toks) {
           if (auto file_tok_of_parsed_tok = parsed_tok.file_token()) {
@@ -278,7 +184,7 @@ void DownloadCodeThread::run(void) {
         }
       }
 
-      d->fragment_tokens.erase(file_tok_id);  // Garbage collect.
+      token_range_data.fragment_tokens.erase(file_tok_id);  // Garbage collect.
     }
 
     auto tok_start = code->data.size();
