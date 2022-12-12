@@ -53,7 +53,7 @@ FileView::FileView(Multiplier &multiplier, std::filesystem::path file_path,
   /////////////////////////
   auto code_model = ICodeModel::Create(multiplier.FileLocationCache(), multiplier.Index());
   auto code_view2 = ICodeView2::Create(code_model, this);
-  code_model->SetFile(multiplier.Index(), file_id);
+  code_model->SetFile(file_id);
   d->layout->addWidget(code_view2);
   /////////////////////////
 

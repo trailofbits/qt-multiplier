@@ -12,6 +12,7 @@
 #include <multiplier/Index.h>
 
 #include <QObject>
+#include <QVariant>
 
 namespace mx::gui {
 
@@ -27,8 +28,7 @@ class ICodeModel : public QObject {
   // Other compatible roles:
   // Qt::DisplayRole
   enum {
-    TokenIdRole = Qt::UserRole,
-    TokenCategoryRole,
+    TokenCategoryRole = Qt::UserRole,
   };
 
   static ICodeModel *Create(const FileLocationCache &file_location_cache,
@@ -37,7 +37,7 @@ class ICodeModel : public QObject {
   virtual const FileLocationCache &GetFileLocationCache() const = 0;
   virtual Index &GetIndex() = 0;
 
-  virtual void SetFile(const Index &index, RawEntityId file_id) = 0;
+  virtual void SetFile(RawEntityId file_id) = 0;
 
   virtual int RowCount() const = 0;
   virtual int TokenCount(int row) const = 0;

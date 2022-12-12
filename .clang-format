@@ -33,7 +33,7 @@ ContinuationIndentWidth: '4'
 Cpp11BracedListStyle: 'true'
 DerivePointerAlignment: 'false'
 FixNamespaceComments: 'true'
-IncludeBlocks: Regroup
+IncludeBlocks: Preserve
 IndentCaseLabels: 'true'
 IndentPPDirectives: AfterHash
 IndentWidth: '2'
@@ -44,7 +44,7 @@ MaxEmptyLinesToKeep: '2'
 NamespaceIndentation: None
 PointerAlignment: Right
 ReflowComments: 'false'
-SortIncludes: 'true'
+SortIncludes: 'false'
 SortUsingDeclarations: 'true'
 SpaceAfterCStyleCast: 'true'
 SpaceAfterLogicalNot: 'false'

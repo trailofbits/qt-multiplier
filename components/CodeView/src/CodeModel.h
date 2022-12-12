@@ -23,7 +23,7 @@ class CodeModel final : public ICodeModel {
   virtual const FileLocationCache &GetFileLocationCache() const override;
   virtual Index &GetIndex() override;
 
-  virtual void SetFile(const Index &index, RawEntityId file_id) override;
+  virtual void SetFile(RawEntityId file_id) override;
 
   virtual int RowCount() const override;
   virtual int TokenCount(int row) const override;

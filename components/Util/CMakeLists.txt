@@ -14,6 +14,9 @@ add_library("mx_util"
   include/multiplier/DownloadCodeThread.h
   src/DownloadCodeThread.h
   src/DownloadCodeThread.cpp
+
+  include/multiplier/ui/RPC.h
+  src/RPC.cpp
 )
 
 target_link_libraries("mx_util" PRIVATE

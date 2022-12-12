@@ -45,11 +45,11 @@ struct CodeModel::PrivateData final {
 
   const FileLocationCache &file_location_cache;
   Index index;
+  TokenRowList token_row_list;
 
   std::atomic_uint64_t counter{1000};
   ModelState state{ModelState::Ready};
   std::unique_ptr<Code> code;
-  TokenRowList token_row_list;
 };
 
 CodeModel::~CodeModel() {}
@@ -62,7 +62,7 @@ Index &CodeModel::GetIndex() {
   return d->index;
 }
 
-void CodeModel::SetFile(const Index &index, RawEntityId file_id) {
+void CodeModel::SetFile(RawEntityId file_id) {
   emit ModelAboutToBeReset();
 
   d->state = ModelState::UpdateInProgress;
@@ -73,7 +73,7 @@ void CodeModel::SetFile(const Index &index, RawEntityId file_id) {
   auto prev_counter = d->counter.fetch_add(1u);  // Go to the next version.
 
   auto downloader = DownloadCodeThread::CreateFileDownloader(
-      index, CodeTheme::DefaultTheme(), GetFileLocationCache(),
+      GetIndex(), CodeTheme::DefaultTheme(), GetFileLocationCache(),
       prev_counter + 1u, file_id);
 
   connect(downloader, &DownloadCodeThread::DownloadFailed, this,
@@ -143,14 +143,12 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
   const auto &column = token_row.at(column_index);
 
   switch (role) {
-  case Qt::DisplayRole:
-    return column.data;
+    case Qt::DisplayRole: return column.data;
 
-  case TokenCategoryRole:
-    return static_cast<std::uint32_t>(column.token_category);
+    case TokenCategoryRole:
+      return static_cast<std::uint32_t>(column.token_category);
 
-  default:
-    return QVariant();
+    default: return QVariant();
   }
 }
 
