@@ -58,8 +58,8 @@ DownloadEntityTokens(const Index &index, DownloadRequestType request_type,
 }
 
 Result<TokenRangeData, RPCErrorCode>
-DownloadTokenRange(const Index &index, DownloadRequestType request_type,
-                   RawEntityId start_entity_id, RawEntityId end_entity_id) {
+DownloadTokenRange(const Index &index, RawEntityId start_entity_id,
+                   RawEntityId end_entity_id) {
 
   VariantId begin_vid = EntityId(start_entity_id).Unpack();
   VariantId end_vid = EntityId(end_entity_id).Unpack();

@@ -13,29 +13,9 @@
 #include <multiplier/Util.h>
 #include <multiplier/ui/RPC.h>
 
-#include <QApplication>
-#include <QBrush>
-#include <QColor>
-#include <QFont>
-#include <QFontMetrics>
-#include <QMenu>
-#include <QMouseEvent>
-#include <QPaintEvent>
-#include <QPainter>
-#include <QPlainTextDocumentLayout>
-#include <QPlainTextEdit>
 #include <QString>
-#include <QStringRef>
-#include <QTextBlock>
-#include <QTextDocument>
-#include <QThreadPool>
-#include <atomic>
 #include <cassert>
 #include <cmath>
-#include <iostream>
-#include <map>
-#include <optional>
-#include <unordered_map>
 #include <vector>
 
 namespace mx::gui {
@@ -52,75 +32,94 @@ enum class CodeViewState {
 }  // namespace
 
 struct DownloadCodeThread::PrivateData {
-  const Index index;
-  const CodeTheme &theme;
-  const FileLocationCache locs;
-  const uint64_t counter;
-
-  Result<TokenRangeData, RPCErrorCode> token_range_data_res;
-
-  inline explicit PrivateData(Index index_, const CodeTheme &theme_,
-                              const FileLocationCache &locs_, uint64_t counter_)
+  PrivateData(const Index &index_, const CodeTheme &theme_,
+              const FileLocationCache &locs_, uint64_t counter_,
+              Request request_)
       : index(std::move(index_)),
         theme(theme_),
         locs(locs_),
-        counter(counter_) {}
-};
+        counter(counter_),
+        request(request_) {}
 
-DownloadCodeThread::DownloadCodeThread(PrivateData *d_) : d(std::move(d_)) {
-  setAutoDelete(true);
-}
+  const Index &index;
+  const CodeTheme &theme;
+  const FileLocationCache &locs;
+  const uint64_t counter;
+  Request request;
+};
 
 DownloadCodeThread::~DownloadCodeThread(void) {}
 
 DownloadCodeThread *DownloadCodeThread::CreateFileDownloader(
-    const Index &index_, const CodeTheme &theme_,
-    const FileLocationCache &locs_, uint64_t counter_, RawEntityId file_id_) {
-  auto d = new PrivateData(index_, theme_, locs_, counter_);
+    const Index &index, const CodeTheme &code_theme,
+    const FileLocationCache &file_location_cache, const std::uint64_t &counter,
+    const RawEntityId &file_id) {
 
-  d->token_range_data_res =
-      DownloadEntityTokens(index_, DownloadRequestType::FileTokens, file_id_);
+  SingleEntityRequest request{
+      DownloadRequestType::FileTokens,
+      file_id,
+  };
 
-  return new DownloadCodeThread(d);
+  return new DownloadCodeThread(index, code_theme, file_location_cache, counter,
+                                std::move(request));
 }
 
 DownloadCodeThread *DownloadCodeThread::CreateFragmentDownloader(
-    const Index &index_, const CodeTheme &theme_,
-    const FileLocationCache &locs_, uint64_t counter_, RawEntityId frag_id_) {
-  auto d = new PrivateData(index_, theme_, locs_, counter_);
+    const Index &index, const CodeTheme &code_theme,
+    const FileLocationCache &file_location_cache, const std::uint64_t &counter,
+    const RawEntityId &fragment_id) {
 
-  d->token_range_data_res = DownloadEntityTokens(
-      index_, DownloadRequestType::FragmentTokens, frag_id_);
+  SingleEntityRequest request{
+      DownloadRequestType::FragmentTokens,
+      fragment_id,
+  };
 
-  return new DownloadCodeThread(d);
+  return new DownloadCodeThread(index, code_theme, file_location_cache, counter,
+                                std::move(request));
 }
 
 DownloadCodeThread *DownloadCodeThread::CreateTokenRangeDownloader(
-    const Index &index_, const CodeTheme &theme_,
-    const FileLocationCache &locs_, uint64_t counter_, RawEntityId begin_tok_id,
-    RawEntityId end_tok_id) {
+    const Index &index, const CodeTheme &code_theme,
+    const FileLocationCache &file_location_cache, const std::uint64_t &counter,
+    const RawEntityId &start_entity_id, const RawEntityId &end_entity_id) {
 
-  auto d = new PrivateData(index_, theme_, locs_, counter_);
+  EntityRangeRequest request{
+      start_entity_id,
+      end_entity_id,
+  };
 
-  d->token_range_data_res = DownloadTokenRange(
-      index_, DownloadRequestType::FragmentTokens, begin_tok_id, end_tok_id);
+  return new DownloadCodeThread(index, code_theme, file_location_cache, counter,
+                                std::move(request));
+}
 
-  return new DownloadCodeThread(d);
+DownloadCodeThread::DownloadCodeThread(
+    const Index &index, const CodeTheme &code_theme,
+    const FileLocationCache &file_location_cache, uint64_t counter,
+    const Request &request)
+    : d(new PrivateData(index, code_theme, file_location_cache, counter,
+                        request)) {
+  setAutoDelete(true);
 }
 
 void DownloadCodeThread::run(void) {
-  if (!d->token_range_data_res.Succeeded()) {
-    throw d->token_range_data_res.TakeError();
+  Result<TokenRangeData, RPCErrorCode> token_range_data_res;
+  if (std::holds_alternative<SingleEntityRequest>(d->request)) {
+    const auto &request = std::get<SingleEntityRequest>(d->request);
+    token_range_data_res = DownloadEntityTokens(
+        d->index, request.download_request_type, request.entity_id);
+
+  } else {
+    const auto &request = std::get<EntityRangeRequest>(d->request);
+    token_range_data_res = DownloadTokenRange(d->index, request.start_entity_id,
+                                              request.end_entity_id);
   }
 
-  auto token_range_data = d->token_range_data_res.TakeValue();
-  d->token_range_data_res = {};
-
-  const auto num_file_tokens = token_range_data.file_tokens.size();
-  if (!num_file_tokens) {
+  if (!token_range_data_res.Succeeded()) {
     emit DownloadFailed();
-    return;
   }
+
+  auto token_range_data = token_range_data_res.TakeValue();
+  auto num_file_tokens = token_range_data.file_tokens.size();
 
   auto code = new Code;
 
@@ -153,7 +152,7 @@ void DownloadCodeThread::run(void) {
     }
   }
 
-  std::map<RawEntityId, std::vector<Token>> file_to_frag_toks;
+  std::unordered_map<RawEntityId, std::vector<Token>> file_to_frag_toks;
   std::vector<Decl> tok_decls;
 
   RawEntityId last_file_tok_id = kInvalidEntityId;

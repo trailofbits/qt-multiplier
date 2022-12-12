@@ -43,7 +43,7 @@ DownloadEntityTokens(const Index &index, DownloadRequestType request_type,
                      RawEntityId entity_id);
 
 Result<TokenRangeData, RPCErrorCode>
-DownloadTokenRange(const Index &index, DownloadRequestType request_type,
-                   RawEntityId start_entity_id, RawEntityId end_entity_id);
+DownloadTokenRange(const Index &index, RawEntityId start_entity_id,
+                   RawEntityId end_entity_id);
 
 }  // namespace mx::gui
