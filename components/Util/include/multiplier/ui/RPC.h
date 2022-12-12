@@ -17,6 +17,7 @@
 namespace mx::gui {
 
 enum class RPCErrorCode {
+  NoDataReceived,
   InvalidEntityID,
   InvalidDownloadRequestType,
   IndexMismatch,

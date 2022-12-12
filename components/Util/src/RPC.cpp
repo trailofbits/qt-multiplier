@@ -23,6 +23,9 @@ DownloadEntityTokens(const Index &index, DownloadRequestType request_type,
     }
 
     output.file_tokens = file->tokens();
+    if (output.file_tokens.size() == 0) {
+      return RPCErrorCode::NoDataReceived;
+    }
 
     for (auto fragment : Fragment::in(file.value())) {
       for (const auto &tok : fragment.file_tokens()) {
@@ -38,6 +41,10 @@ DownloadEntityTokens(const Index &index, DownloadRequestType request_type,
     }
 
     output.file_tokens = fragment->file_tokens();
+    if (output.file_tokens.size() == 0) {
+      return RPCErrorCode::NoDataReceived;
+    }
+
     for (const auto &tok : output.file_tokens) {
       output.fragment_tokens[tok.id()].emplace_back(fragment->parsed_tokens());
       break;
@@ -78,6 +85,7 @@ DownloadTokenRange(const Index &index, DownloadRequestType request_type,
 
     auto output_res = DownloadEntityTokens(
         index, DownloadRequestType::FileTokens, begin_fid.file_id);
+
     if (!output_res.Succeeded()) {
       return output_res.TakeError();
     }
