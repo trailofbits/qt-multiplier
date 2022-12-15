@@ -11,12 +11,14 @@ add_library("mx_util"
   src/Util.h
   src/Util.cpp
 
-  include/multiplier/DownloadCodeThread.h
-  src/DownloadCodeThread.h
-  src/DownloadCodeThread.cpp
+  include/multiplier/ui/IRPC.h
+  src/IRPC.cpp
 
-  include/multiplier/ui/RPC.h
+  src/RPC.h
   src/RPC.cpp
+
+  src/multiplier/rpc/requests/IndexedTokenRange.h
+  src/multiplier/rpc/requests/IndexedTokenRange.cpp
 )
 
 target_link_libraries("mx_util" PRIVATE
@@ -28,6 +30,7 @@ target_link_libraries("mx_util" PRIVATE
 
 target_include_directories("mx_util" PRIVATE
   "include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
 target_include_directories("mx_util" SYSTEM INTERFACE

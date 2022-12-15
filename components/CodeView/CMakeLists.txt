@@ -6,7 +6,7 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_library("codeview"
+add_library("mx_codeview"
   include/multiplier/ui/ICodeView2.h
   src/ICodeView2.cpp
 
@@ -26,7 +26,7 @@ add_library("codeview"
   src/DefaultCodeViewThemes.cpp
 )
 
-target_link_libraries("codeview" PRIVATE
+target_link_libraries("mx_codeview" PRIVATE
   "qtmx_cxx_flags"
   "thirdparty_qt"
   "multiplier::mx-api"
@@ -34,12 +34,12 @@ target_link_libraries("codeview" PRIVATE
   "mx_codetheme"
 )
 
-target_include_directories("codeview" PRIVATE
+target_include_directories("mx_codeview" PRIVATE
   "include"
 )
 
-target_include_directories("codeview" SYSTEM INTERFACE
+target_include_directories("mx_codeview" SYSTEM INTERFACE
   "include"
 )
 
-enable_qt_properties("codeview")
+enable_qt_properties("mx_codeview")

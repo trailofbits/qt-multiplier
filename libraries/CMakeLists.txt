@@ -6,7 +6,6 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_subdirectory("phantomstyle")
 add_subdirectory("qt")
 add_subdirectory("python")
 add_subdirectory("multiplier")

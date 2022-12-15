@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <multiplier/Types.h>
+#include <multiplier/Util.h>
 #include <optional>
 #include <QColor>
 #include <QFont>
@@ -22,45 +23,6 @@ class Type;
 class TokenRange;
 class MacroSubstitution;
 namespace gui {
-
-enum class TokenCategory : unsigned char {
-  // These line up with `TokenClass`.
-  kUnknown,
-  kIdentifier,
-  kMacroName,
-  kKeyword,
-  kObjectiveCKeyword,
-  kPreProcessorKeyword,
-  kBuiltinTypeName,
-  kPunctuation,
-  kLiteral,
-  kComment,
-
-  // These line up with `DeclCategory`.
-  kLocalVariable,
-  kGlobalVariable,
-  kParameterVariable,
-  kFunction,
-  kInstanceMethod,
-  kInstanceMember,
-  kClassMethod,
-  kClassMember,
-  kThis,
-  kClass,
-  kStruct,
-  kUnion,
-  kInterface,
-  kEnum,
-  kEnumerator,
-  kNamespace,
-  kTypeAlias,
-  kTemplateParameterType,
-  kTemplateParameterValue,
-  kLabel,
-
-  // Extra.
-  kWhitespace
-};
 
 struct TokenFormat {
   bool bold;

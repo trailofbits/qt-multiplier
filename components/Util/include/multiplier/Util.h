@@ -21,7 +21,44 @@ enum class DeclCategory : unsigned char;
 
 namespace gui {
 
-enum class TokenCategory : unsigned char;
+enum class TokenCategory : unsigned char {
+  // These line up with `TokenClass`.
+  kUnknown,
+  kIdentifier,
+  kMacroName,
+  kKeyword,
+  kObjectiveCKeyword,
+  kPreProcessorKeyword,
+  kBuiltinTypeName,
+  kPunctuation,
+  kLiteral,
+  kComment,
+
+  // These line up with `DeclCategory`.
+  kLocalVariable,
+  kGlobalVariable,
+  kParameterVariable,
+  kFunction,
+  kInstanceMethod,
+  kInstanceMember,
+  kClassMethod,
+  kClassMember,
+  kThis,
+  kClass,
+  kStruct,
+  kUnion,
+  kInterface,
+  kEnum,
+  kEnumerator,
+  kNamespace,
+  kTypeAlias,
+  kTemplateParameterType,
+  kTemplateParameterValue,
+  kLabel,
+
+  // Extra.
+  kWhitespace
+};
 
 enum class TokenClass {
   kUnknown,
@@ -90,7 +127,7 @@ RawEntityId DeclFileLocation(const Decl &decl);
 std::optional<Decl> NearestDeclFor(const Index &index, RawEntityId id);
 
 // Create a breadcrumbs string of the token contexts.
-QString TokenBreadCrumbs(const Token &ent, bool run_length_encode=true);
+QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 
 }  // namespace gui
 }  // namespace mx

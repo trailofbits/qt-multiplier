@@ -35,8 +35,6 @@ class CodeView2 final : public ICodeView2 {
   void OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
                                           bool double_click);
 
-  void ApplyTextFormatting();
-
  private slots:
   void OnModelReset();
   void OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event);

@@ -40,8 +40,7 @@ class CodeModel final : public ICodeModel {
   std::unique_ptr<PrivateData> d;
 
  private slots:
-  void OnDownloadFailed();
-  void OnDownloadSucceeded(void *code, uint64_t counter);
+  void FutureResultStateChanged();
 
   friend class ICodeModel;
 };

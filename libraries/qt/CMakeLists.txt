@@ -9,10 +9,11 @@
 set(qt_component_list
   "Core"
   "Widgets"
+  "Concurrent"
 )
 
 if(MX_QT_VERSION GREATER "5")
-  list(qt_component_list APPEND "Core5Compat")
+  list(APPEND qt_component_list "Core5Compat")
 endif()
 
 find_package("Qt${MX_QT_VERSION}"

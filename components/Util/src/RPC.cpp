@@ -1,133 +1,81 @@
-/*
-  Copyright (c) 2022-present, Trail of Bits, Inc.
-  All rights reserved.
+// Copyright (c) 2022-present, Trail of Bits, Inc.
+// All rights reserved.
+//
+// This source code is licensed in accordance with the terms specified in
+// the LICENSE file found in the root directory of this source tree.
 
-  This source code is licensed in accordance with the terms specified in
-  the LICENSE file found in the root directory of this source tree.
-*/
+#include "RPC.h"
 
-#include <multiplier/ui/RPC.h>
+#include <multiplier/rpc/requests/IndexedTokenRange.h>
+
+#include <QThreadPool>
+#include <QtConcurrent>
 
 namespace mx::gui {
 
-Result<TokenRangeData, RPCErrorCode>
-DownloadEntityTokens(const Index &index, DownloadRequestType request_type,
-                     RawEntityId entity_id) {
+namespace {
 
-  TokenRangeData output;
-
-  if (request_type == DownloadRequestType::FileTokens) {
-    auto file = index.file(entity_id);
-    if (!file) {
-      return RPCErrorCode::InvalidEntityID;
-    }
-
-    output.file_tokens = file->tokens();
-    if (output.file_tokens.size() == 0) {
-      return RPCErrorCode::NoDataReceived;
-    }
-
-    for (auto fragment : Fragment::in(file.value())) {
-      for (const auto &tok : fragment.file_tokens()) {
-        output.fragment_tokens[tok.id()].emplace_back(fragment.parsed_tokens());
-        break;
-      }
-    }
-
-  } else if (request_type == DownloadRequestType::FragmentTokens) {
-    auto fragment = index.fragment(entity_id);
-    if (!fragment) {
-      return RPCErrorCode::InvalidEntityID;
-    }
-
-    output.file_tokens = fragment->file_tokens();
-    if (output.file_tokens.size() == 0) {
-      return RPCErrorCode::NoDataReceived;
-    }
-
-    for (const auto &tok : output.file_tokens) {
-      output.fragment_tokens[tok.id()].emplace_back(fragment->parsed_tokens());
-      break;
-    }
-
-  } else {
-    return RPCErrorCode::InvalidDownloadRequestType;
-  }
-
-  return output;
+void ExecuteRequest(QPromise<RPC::Result> &result_promise, const Index &index,
+                    const FileLocationCache &file_location_cache,
+                    const Request &request) {
+  CreateIndexedTokenRangeData(result_promise, index, file_location_cache,
+                              request);
 }
 
-Result<TokenRangeData, RPCErrorCode>
-DownloadTokenRange(const Index &index, RawEntityId start_entity_id,
-                   RawEntityId end_entity_id) {
+}  // namespace
 
-  VariantId begin_vid = EntityId(start_entity_id).Unpack();
-  VariantId end_vid = EntityId(end_entity_id).Unpack();
+struct RPC::PrivateData {
+  PrivateData(const Index &index_,
+              const FileLocationCache &file_location_cache_)
+      : index(std::move(index_)),
+        file_location_cache(file_location_cache_) {}
 
-  if (begin_vid.index() != end_vid.index()) {
-    return RPCErrorCode::IndexMismatch;
-  }
+  const Index &index;
+  const FileLocationCache &file_location_cache;
 
-  // Show a range of file tokens.
-  if (std::holds_alternative<FileTokenId>(begin_vid) &&
-      std::holds_alternative<FileTokenId>(end_vid)) {
+  QThreadPool thread_pool;
+};
 
-    const auto &begin_fid = std::get<FileTokenId>(begin_vid);
-    const auto &end_fid = std::get<FileTokenId>(end_vid);
+RPC::~RPC() {}
 
-    if (begin_fid.file_id != end_fid.file_id) {
-      return RPCErrorCode::FileMismatch;
-    }
+RPC::FutureResult RPC::DownloadFile(const RawEntityId &file_id) {
 
-    if (begin_fid.offset > end_fid.offset) {
-      return RPCErrorCode::InvalidFileOffsetRange;
-    }
+  Request request{SingleEntityRequest{
+      DownloadRequestType::FileTokens,
+      file_id,
+  }};
 
-    auto output_res = DownloadEntityTokens(
-        index, DownloadRequestType::FileTokens, begin_fid.file_id);
+  return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
+                           d->file_location_cache, std::move(request));
+}
 
-    if (!output_res.Succeeded()) {
-      return output_res.TakeError();
-    }
+RPC::FutureResult RPC::DownloadFragment(const RawEntityId &fragment_id) {
 
-    auto output = output_res.TakeValue();
-    output.file_tokens =
-        output.file_tokens.slice(begin_fid.offset, end_fid.offset + 1u);
+  Request request{SingleEntityRequest{
+      DownloadRequestType::FragmentTokens,
+      fragment_id,
+  }};
 
-    return output;
+  return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
+                           d->file_location_cache, std::move(request));
+}
 
-    // Show a range of fragment tokens.
-  } else if (std::holds_alternative<ParsedTokenId>(begin_vid) &&
-             std::holds_alternative<ParsedTokenId>(end_vid)) {
+RPC::FutureResult RPC::DownloadTokenRange(const RawEntityId &start_entity_id,
+                                          const RawEntityId &end_entity_id) {
 
-    ParsedTokenId begin_fid = std::get<ParsedTokenId>(begin_vid);
-    ParsedTokenId end_fid = std::get<ParsedTokenId>(end_vid);
+  Request request{EntityRangeRequest{
+      start_entity_id,
+      end_entity_id,
+  }};
 
-    if (begin_fid.fragment_id != end_fid.fragment_id) {
-      return RPCErrorCode::FragmentMismatch;
-    }
+  return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
+                           d->file_location_cache, std::move(request));
+}
 
-    if (begin_fid.offset > end_fid.offset) {
-      return RPCErrorCode::InvalidFragmentOffsetRange;
-    }
+RPC::RPC(const Index &index, const FileLocationCache &file_location_cache)
+    : d(new PrivateData(index, file_location_cache)) {
 
-    RawEntityId entity_id{EntityId(FragmentId(begin_fid.fragment_id))};
-    auto output_res = DownloadEntityTokens(
-        index, DownloadRequestType::FragmentTokens, entity_id);
-
-    if (!output_res.Succeeded()) {
-      return output_res.TakeError();
-    }
-
-    auto output = output_res.TakeValue();
-    output.file_tokens =
-        output.file_tokens.slice(begin_fid.offset, end_fid.offset + 1u);
-
-    return output;
-
-  } else {
-    return RPCErrorCode::InvalidTokenRangeRequest;
-  }
+  d->thread_pool.setMaxThreadCount(4);
 }
 
 }  // namespace mx::gui

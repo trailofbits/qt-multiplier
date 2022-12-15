@@ -9,13 +9,12 @@
 #include "CodeModel.h"
 
 #include <multiplier/Code.h>
-#include <multiplier/DownloadCodeThread.h>
+#include <multiplier/ui/IRPC.h>
 
-#include <QDebug>
-#include <QThreadPool>
-#include <atomic>
-#include <iostream>
+#include <QString>
+
 #include <vector>
+#include <iostream>
 
 namespace mx::gui {
 
@@ -24,6 +23,7 @@ namespace {
 enum class ModelState {
   UpdateInProgress,
   UpdateFailed,
+  UpdateCancelled,
   Ready,
 };
 
@@ -45,11 +45,13 @@ struct CodeModel::PrivateData final {
 
   const FileLocationCache &file_location_cache;
   Index index;
-  TokenRowList token_row_list;
 
-  std::atomic_uint64_t counter{1000};
-  ModelState state{ModelState::Ready};
-  std::unique_ptr<Code> code;
+  IRPC::Ptr rpc;
+  IRPC::FutureResult future_result;
+  QFutureWatcher<IRPC::Result> future_watcher;
+
+  ModelState model_state{ModelState::Ready};
+  TokenRowList token_row_list;
 };
 
 CodeModel::~CodeModel() {}
@@ -65,30 +67,22 @@ Index &CodeModel::GetIndex() {
 void CodeModel::SetFile(RawEntityId file_id) {
   emit ModelAboutToBeReset();
 
-  d->state = ModelState::UpdateInProgress;
+  if (d->future_result.isRunning()) {
+    d->future_result.cancel();
+  }
 
-  // TODO(alessandro): This will not play nice if there are other components
-  // that can end up using the same ID. Convert this to cancellable requests
-  // and remove the need to use IDs
-  auto prev_counter = d->counter.fetch_add(1u);  // Go to the next version.
+  d->future_result = d->rpc->DownloadFile(file_id);
+  d->future_watcher.setFuture(d->future_result);
 
-  auto downloader = DownloadCodeThread::CreateFileDownloader(
-      GetIndex(), CodeTheme::DefaultTheme(), GetFileLocationCache(),
-      prev_counter + 1u, file_id);
+  d->token_row_list.clear();
 
-  connect(downloader, &DownloadCodeThread::DownloadFailed, this,
-          &CodeModel::OnDownloadFailed);
-
-  connect(downloader, &DownloadCodeThread::RenderCode, this,
-          &CodeModel::OnDownloadSucceeded);
-
-  QThreadPool::globalInstance()->start(downloader);
+  d->model_state = ModelState::UpdateInProgress;
 
   emit ModelReset();
 }
 
 int CodeModel::RowCount() const {
-  if (d->state == ModelState::UpdateInProgress) {
+  if (d->model_state != ModelState::Ready) {
     return 1;
   }
 
@@ -96,13 +90,8 @@ int CodeModel::RowCount() const {
 }
 
 int CodeModel::TokenCount(int row) const {
-  if (d->state == ModelState::UpdateInProgress ||
-      d->state == ModelState::UpdateFailed) {
-    if (row == 0) {
-      return 1;
-    }
-
-    return 0;
+  if (d->model_state != ModelState::Ready) {
+    return (row == 0 ? 1 : 0);
   }
 
   auto row_index = static_cast<std::size_t>(row);
@@ -115,16 +104,16 @@ int CodeModel::TokenCount(int row) const {
 }
 
 QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
-  if (d->state == ModelState::UpdateInProgress ||
-      d->state == ModelState::UpdateFailed) {
+  if (d->model_state != ModelState::Ready) {
     if (index.row != 0 || index.token_index != 0 || role != Qt::DisplayRole) {
       return QVariant();
     }
 
-    if (d->state == ModelState::UpdateInProgress) {
-      return tr("Update in progress...");
-    } else {
-      return tr("Update failed");
+    switch (d->model_state) {
+      case ModelState::UpdateInProgress: return tr("Update in progress...");
+      case ModelState::UpdateCancelled: return tr("Update cancelled");
+      case ModelState::UpdateFailed: return tr("Update failed");
+      case ModelState::Ready: __builtin_unreachable();
     }
   }
 
@@ -155,56 +144,56 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
 CodeModel::CodeModel(const FileLocationCache &file_location_cache, Index index,
                      QObject *parent)
     : ICodeModel(parent),
-      d(new PrivateData(file_location_cache, index)) {}
+      d(new PrivateData(file_location_cache, index)) {
 
-void CodeModel::OnDownloadFailed() {
-  emit ModelAboutToBeReset();
-
-  // TODO(alessandro): We have no idea which request (numer) has failed. Trying
-  // to display a message here is racy. Remove the IDs and use a single re-usable
-  // thread
-  d->state = ModelState::UpdateFailed;
-  d->token_row_list.clear();
-  d->code.reset();
-
-  emit ModelReset();
+  d->rpc = IRPC::Create(index, file_location_cache);
+  connect(&d->future_watcher, &QFutureWatcher<IRPC::Result>::finished, this,
+          &CodeModel::FutureResultStateChanged);
 }
 
-void CodeModel::OnDownloadSucceeded(void *code, uint64_t counter) {
-  emit ModelAboutToBeReset();
+void CodeModel::FutureResultStateChanged() {
+  d->token_row_list.clear();
 
-  // TODO(alessandro): Remove `counter` usage and add support for
-  // aborting pending requests
-  if (d->counter.load() != counter) {
-    d->state = ModelState::UpdateFailed;
+  if (d->future_result.isCanceled()) {
+    emit ModelAboutToBeReset();
+
+    d->model_state = ModelState::UpdateCancelled;
+
     emit ModelReset();
+
     return;
   }
 
-  d->state = ModelState::Ready;
+  auto future_result = d->future_result.takeResult();
 
-  {
-    // TODO(alessandro): Avoid reinterpret_cast
-    std::unique_ptr<Code> temp_code(reinterpret_cast<Code *>(code));
-    d->code.swap(temp_code);
+  if (!future_result.Succeeded()) {
+    emit ModelAboutToBeReset();
+
+    d->model_state = ModelState::UpdateFailed;
+
+    emit ModelReset();
+
+    return;
   }
 
-  d->token_row_list.clear();
+  emit ModelAboutToBeReset();
 
-  auto token_count = d->code->start_of_token.size() - 1;
+  auto indexed_token_range_data = future_result.TakeValue();
+  auto token_count = indexed_token_range_data.start_of_token.size() - 1;
 
   TokenRow current_row;
   TokenColumn current_column;
 
   for (std::size_t i = 0; i < token_count; ++i) {
-    auto token_start = d->code->start_of_token[i];
-    auto token_end = d->code->start_of_token[i + 1];
+    auto token_start = indexed_token_range_data.start_of_token[i];
+    auto token_end = indexed_token_range_data.start_of_token[i + 1];
     auto token_length = token_end - token_start;
 
-    auto token = d->code->data.mid(token_start, token_length);
+    auto token = indexed_token_range_data.data.mid(token_start, token_length);
 
-    current_column.file_token_id = d->code->file_token_ids[i];
-    current_column.token_category = d->code->token_category_list[i];
+    current_column.file_token_id = indexed_token_range_data.file_token_ids[i];
+    current_column.token_category =
+        indexed_token_range_data.token_category_list[i];
 
     QString buffer;
     for (const auto &c : token) {
@@ -235,6 +224,8 @@ void CodeModel::OnDownloadSucceeded(void *code, uint64_t counter) {
     d->token_row_list.push_back(std::move(current_row));
     current_row.clear();
   }
+
+  d->model_state = ModelState::Ready;
 
   emit ModelReset();
 }

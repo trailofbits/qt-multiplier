@@ -28,7 +28,7 @@
 #include <system_error>
 #include <tuple>
 #include <variant>
-#include <phantomstyle.h>
+//#include <phantomstyle.h>
 
 #include "CodeView.h"
 #include "Configuration.h"
@@ -65,7 +65,7 @@ namespace {
 }
 
 int main(int argc, char *argv[]) {
-  QApplication::setStyle(new PhantomStyle());
+  //QApplication::setStyle(new PhantomStyle());
 
   QApplication application(argc, argv);
   application.setApplicationName("Multiplier");

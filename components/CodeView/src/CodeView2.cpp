@@ -20,6 +20,9 @@
 #include <QTextCharFormat>
 #include <QTextDocument>
 #include <QWidget>
+#include <QProgressDialog>
+
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <stack>
@@ -115,7 +118,8 @@ struct CodeView2::PrivateData final {
 
 void CodeView2::setTheme(const CodeViewTheme &theme) {
   d->theme = theme;
-  ApplyTextFormatting();
+
+  OnModelReset();
 }
 
 CodeView2::~CodeView2() {}
@@ -278,7 +282,7 @@ void CodeView2::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
   emit TokenClicked(model_index, event->buttons(), double_click);
 }
 
-void CodeView2::ApplyTextFormatting() {
+void CodeView2::OnModelReset() {
   auto palette = d->text_edit->palette();
   palette.setColor(QPalette::Window, d->theme.default_background_color);
   palette.setColor(QPalette::WindowText, d->theme.default_foreground_color);
@@ -289,10 +293,19 @@ void CodeView2::ApplyTextFormatting() {
   palette.setColor(QPalette::AlternateBase, d->theme.default_background_color);
   d->text_edit->setPalette(palette);
 
-  QTextCharFormat text_format;
-  auto L_updateTextFormat = [&](const QVariant &token_category_var) {
+  d->text_edit->clear();
+  d->text_block_index.clear();
+
+  auto document = new QTextDocument(this);
+  auto document_layout = new QPlainTextDocumentLayout(document);
+  document->setDocumentLayout(document_layout);
+  d->text_edit->setDocument(document);
+
+  auto L_updateTextFormat = [&](QTextCharFormat &text_format,
+                                const QVariant &token_category_var) {
     auto background_color =
         GetTextBackgroundColor(d->theme, token_category_var);
+
     text_format.setBackground(background_color);
 
     auto foreground_color =
@@ -309,41 +322,34 @@ void CodeView2::ApplyTextFormatting() {
     text_format.setFontStrikeOut(text_style.strikeout);
   };
 
-  for (const auto &text_block_index_entry : d->text_block_index) {
-    auto text_cursor = d->text_edit->textCursor();
-
-    text_cursor.setPosition(text_block_index_entry.start_position,
-                            QTextCursor::MoveMode::MoveAnchor);
-
-    text_cursor.setPosition(text_block_index_entry.end_position,
-                            QTextCursor::MoveMode::KeepAnchor);
-
-    auto token_category_var = d->model->Data(text_block_index_entry.index,
-                                             ICodeModel::TokenCategoryRole);
-
-    L_updateTextFormat(token_category_var);
-    text_cursor.setCharFormat(text_format);
-  }
-}
-
-void CodeView2::OnModelReset() {
-  d->text_edit->clear();
-  d->text_block_index.clear();
-
-  auto document = new QTextDocument(this);
-  auto document_layout = new QPlainTextDocumentLayout(document);
-  document->setDocumentLayout(document_layout);
-  d->text_edit->setDocument(document);
-
   auto cursor = std::make_unique<QTextCursor>(document);
-
   auto row_count = d->model->RowCount();
-  for (int row_index = 0; row_index < row_count; ++row_index) {
+
+  QProgressDialog progress(tr("Generating rows..."), tr("Abort"), 0, row_count,
+                           this);
+  progress.setWindowModality(Qt::WindowModal);
+
+  CodeModelIndex model_index;
+  QTextCharFormat text_format;
+
+  cursor->beginEditBlock();
+
+  for (int row_index = 0; row_index < row_count && !progress.wasCanceled();
+       ++row_index) {
+    model_index.row = row_index;
+
+    if ((row_index % 100) == 0) {
+      progress.setValue(row_index);
+    }
+
     auto token_count = d->model->TokenCount(row_index);
     for (int token_index = 0; token_index < token_count; ++token_index) {
-      const auto &token_var =
-          d->model->Data({row_index, token_index}, Qt::DisplayRole);
+      if (progress.wasCanceled()) {
+        break;
+      }
 
+      model_index.token_index = token_index;
+      const auto &token_var = d->model->Data(model_index, Qt::DisplayRole);
       if (!token_var.isValid()) {
         continue;
       }
@@ -354,16 +360,26 @@ void CodeView2::OnModelReset() {
       index_entry.start_position = cursor->position();
       index_entry.end_position =
           index_entry.start_position + static_cast<int>(token.size());
+
       index_entry.index = {row_index, token_index};
       d->text_block_index.push_back(std::move(index_entry));
 
-      cursor->insertText(token);
+      const auto &index = d->text_block_index.back().index;
+      auto token_category_var =
+          d->model->Data(index, ICodeModel::TokenCategoryRole);
+
+      L_updateTextFormat(text_format, token_category_var);
+      cursor->insertText(token, text_format);
     }
 
     cursor->insertText("\n");
   }
 
-  ApplyTextFormatting();
+  cursor->endEditBlock();
+
+  if (!progress.wasCanceled()) {
+    progress.setValue(100);
+  }
 
   d->gutter->setMinimumWidth(100);
 }

@@ -1,0 +1,43 @@
+/*
+  Copyright (c) 2022-present, Trail of Bits, Inc.
+  All rights reserved.
+
+  This source code is licensed in accordance with the terms specified in
+  the LICENSE file found in the root directory of this source tree.
+*/
+
+#pragma once
+
+#include <multiplier/ui/IRPC.h>
+
+#include <QPromise>
+
+#include <unordered_map>
+
+namespace mx::gui {
+
+enum class DownloadRequestType {
+  FileTokens,
+  FragmentTokens,
+};
+
+struct SingleEntityRequest final {
+  DownloadRequestType download_request_type;
+  RawEntityId entity_id;
+};
+
+struct EntityRangeRequest final {
+  RawEntityId start_entity_id;
+  RawEntityId end_entity_id;
+};
+
+using Request = std::variant<SingleEntityRequest, EntityRangeRequest>;
+using IndexedTokenRangeDataResult = Result<IndexedTokenRangeData, RPCErrorCode>;
+using IndexedTokenRangeDataResultPromise =
+    QPromise<IndexedTokenRangeDataResult>;
+
+void CreateIndexedTokenRangeData(
+    IndexedTokenRangeDataResultPromise &result_promise, const Index &index,
+    const FileLocationCache &file_location_cache, const Request &request);
+
+}  // namespace mx::gui

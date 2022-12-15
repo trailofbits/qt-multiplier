@@ -37,7 +37,7 @@
 #include <multiplier/Index.h>
 #include <multiplier/Util.h>
 #include <multiplier/CodeTheme.h>
-#include <multiplier/DownloadCodeThread.h>
+//#include <multiplier/DownloadCodeThread.h>
 
 #include "Code.h"
 
@@ -183,12 +183,12 @@ void CodeView::SetFile(const File &file) {
 }
 
 void CodeView::SetFile(const Index &index, RawEntityId file_id) {
-  d->state = CodeViewState::kDownloading;
+  /*d->state = CodeViewState::kDownloading;
   d->scroll_target_eid = kInvalidEntityId;
   auto prev_counter = d->counter.fetch_add(1u);  // Go to the next version.
 
   auto downloader = DownloadCodeThread::CreateFileDownloader(
-      index, d->theme, d->locs, prev_counter + 1u, file_id);
+      index, d->locs, file_id);
 
   connect(downloader, &DownloadCodeThread::DownloadFailed,
           this, &CodeView::OnDownloadFailed);
@@ -197,20 +197,20 @@ void CodeView::SetFile(const Index &index, RawEntityId file_id) {
           this, &CodeView::OnRenderCode);
 
   QThreadPool::globalInstance()->start(downloader);
-  update();
+  update();*/
 }
 
 void CodeView::SetFragment(const Fragment &fragment) {
-  SetFragment(Index::containing(fragment), fragment.id());
+  //SetFragment(Index::containing(fragment), fragment.id());
 }
 
 void CodeView::SetFragment(const Index &index, RawEntityId fragment_id) {
-  d->state = CodeViewState::kDownloading;
+  /*d->state = CodeViewState::kDownloading;
   d->scroll_target_eid = kInvalidEntityId;
   auto prev_counter = d->counter.fetch_add(1u);  // Go to the next version.
 
   auto downloader = DownloadCodeThread::CreateFragmentDownloader(
-      index, d->theme, d->locs, prev_counter + 1u, fragment_id);
+      index, d->locs, fragment_id);
 
   connect(downloader, &DownloadCodeThread::DownloadFailed,
           this, &CodeView::OnDownloadFailed);
@@ -219,17 +219,17 @@ void CodeView::SetFragment(const Index &index, RawEntityId fragment_id) {
           this, &CodeView::OnRenderCode);
 
   QThreadPool::globalInstance()->start(downloader);
-  update();
+  update();*/
 }
 
 void CodeView::SetTokenRange(const Index &index, RawEntityId begin_tok_id,
                              RawEntityId end_tok_id) {
-  d->state = CodeViewState::kDownloading;
+  /*d->state = CodeViewState::kDownloading;
   d->scroll_target_eid = kInvalidEntityId;
   auto prev_counter = d->counter.fetch_add(1u);  // Go to the next version.
 
   auto downloader = DownloadCodeThread::CreateTokenRangeDownloader(
-      index, d->theme, d->locs, prev_counter + 1u, begin_tok_id, end_tok_id);
+      index, d->locs, begin_tok_id, end_tok_id);
 
   connect(downloader, &DownloadCodeThread::DownloadFailed,
           this, &CodeView::OnDownloadFailed);
@@ -238,7 +238,7 @@ void CodeView::SetTokenRange(const Index &index, RawEntityId begin_tok_id,
           this, &CodeView::OnRenderCode);
 
   QThreadPool::globalInstance()->start(downloader);
-  update();
+  update();*/
 }
 
 void CodeView::Clear(void) {
