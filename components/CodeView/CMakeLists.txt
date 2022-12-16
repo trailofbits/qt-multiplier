@@ -7,11 +7,11 @@
 #
 
 add_library("mx_codeview"
-  include/multiplier/ui/ICodeView2.h
-  src/ICodeView2.cpp
+  include/multiplier/ui/ICodeView.h
+  src/ICodeView.cpp
 
-  src/CodeView2.h
-  src/CodeView2.cpp
+  src/CodeView.h
+  src/CodeView.cpp
 
   include/multiplier/ui/ICodeModel.h
   src/ICodeModel.cpp

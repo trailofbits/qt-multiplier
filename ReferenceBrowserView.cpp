@@ -26,7 +26,7 @@
 #include <multiplier/Util.h>
 #include <multiplier/CodeTheme.h>
 
-#include "CodeView.h"
+#include "OldCodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 
@@ -219,7 +219,7 @@ struct ReferenceBrowserView::PrivateData {
   HighlightRangeTheme theme;
 
   // Code preview.
-  CodeView *code{nullptr};
+  OldCodeView *code{nullptr};
   QTreeWidgetItem *active_item{nullptr};
 
   // Used to detect re-entrancy issues when the underlying view is swapped out.
@@ -364,14 +364,14 @@ void ReferenceBrowserView::InitializeWidgets(void) {
 
   // Create and connect the code preview.
   if (config.code_preview.visible) {
-    d->code = new CodeView(
+    d->code = new OldCodeView(
         d->theme,
         d->multiplier.FileLocationCache(),
         d->multiplier.Index());
     d->code->viewport()->installEventFilter(&(d->multiplier));
     d->splitter->addWidget(d->code);
 
-    connect(d->code, &CodeView::TokenPressEvent,
+    connect(d->code, &OldCodeView::TokenPressEvent,
             this, &ReferenceBrowserView::ActOnTokenPressEvent);
   }
 

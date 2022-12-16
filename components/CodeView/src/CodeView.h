@@ -8,19 +8,19 @@
 
 #pragma once
 
-#include <multiplier/ui/ICodeView2.h>
+#include <multiplier/ui/ICodeView.h>
 
 namespace mx::gui {
 
-class CodeView2 final : public ICodeView2 {
+class CodeView final : public ICodeView {
   Q_OBJECT
 
  public:
   void setTheme(const CodeViewTheme &theme) override;
-  virtual ~CodeView2() override;
+  virtual ~CodeView() override;
 
  protected:
-  CodeView2(ICodeModel *model, QWidget *parent);
+  CodeView(ICodeModel *model, QWidget *parent);
 
  private:
   struct PrivateData;
@@ -43,7 +43,7 @@ class CodeView2 final : public ICodeView2 {
   void OnGutterPaintEvent(QPaintEvent *event);
   void OnTextEditUpdateRequest(const QRect &, int);
 
-  friend class ICodeView2;
+  friend class ICodeView;
 };
 
 }  // namespace mx::gui

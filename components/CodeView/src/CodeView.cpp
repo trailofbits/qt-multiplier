@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "CodeView2.h"
+#include "CodeView.h"
 
 #include <QFont>
 #include <QHBoxLayout>
@@ -40,7 +40,7 @@ class QPlainTextEditMod final : public QPlainTextEdit {
   QPlainTextEditMod(QWidget *parent = nullptr) : QPlainTextEdit(parent) {}
   virtual ~QPlainTextEditMod() override{};
 
-  friend class mx::gui::CodeView2;
+  friend class mx::gui::CodeView;
 };
 
 struct TextBlockIndexEntry final {
@@ -104,7 +104,7 @@ CodeViewTheme::Style GetTextStyle(const CodeViewTheme &code_theme,
 
 }  // namespace
 
-struct CodeView2::PrivateData final {
+struct CodeView::PrivateData final {
   ICodeModel *model{nullptr};
 
   QPlainTextEditMod *text_edit{nullptr};
@@ -116,23 +116,23 @@ struct CodeView2::PrivateData final {
   std::optional<CodeModelIndex> opt_prev_hovered_model_index;
 };
 
-void CodeView2::setTheme(const CodeViewTheme &theme) {
+void CodeView::setTheme(const CodeViewTheme &theme) {
   d->theme = theme;
 
   OnModelReset();
 }
 
-CodeView2::~CodeView2() {}
+CodeView::~CodeView() {}
 
-CodeView2::CodeView2(ICodeModel *model, QWidget *parent)
-    : ICodeView2(parent),
+CodeView::CodeView(ICodeModel *model, QWidget *parent)
+    : ICodeView(parent),
       d(new PrivateData) {
 
   InstallModel(model);
   InitializeWidgets();
 }
 
-bool CodeView2::eventFilter(QObject *obj, QEvent *event) {
+bool CodeView::eventFilter(QObject *obj, QEvent *event) {
   if (event->type() == QEvent::Paint) {
     auto paint_event = static_cast<QPaintEvent *>(event);
 
@@ -177,14 +177,14 @@ bool CodeView2::eventFilter(QObject *obj, QEvent *event) {
   return false;
 }
 
-void CodeView2::InstallModel(ICodeModel *model) {
+void CodeView::InstallModel(ICodeModel *model) {
   d->model = model;
   d->model->setParent(this);
 
-  connect(d->model, &ICodeModel::ModelReset, this, &CodeView2::OnModelReset);
+  connect(d->model, &ICodeModel::ModelReset, this, &CodeView::OnModelReset);
 }
 
-void CodeView2::InitializeWidgets() {
+void CodeView::InitializeWidgets() {
   d->theme = kDefaultDarkCodeViewTheme;
 
   // TODO(alessandro): This should be part of the theme
@@ -212,16 +212,16 @@ void CodeView2::InitializeWidgets() {
   setLayout(layout);
 
   connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged, this,
-          &CodeView2::OnCursorPositionChange);
+          &CodeView::OnCursorPositionChange);
 
   connect(d->text_edit, &QPlainTextEditMod::updateRequest, this,
-          &CodeView2::OnTextEditUpdateRequest);
+          &CodeView::OnTextEditUpdateRequest);
 
   OnModelReset();
 }
 
 std::optional<CodeModelIndex>
-CodeView2::ModelIndexFromMousePosition(QPoint pos) {
+CodeView::ModelIndexFromMousePosition(QPoint pos) {
   auto text_cursor = d->text_edit->cursorForPosition(pos);
   auto cursor_position = text_cursor.position();
 
@@ -244,8 +244,8 @@ CodeView2::ModelIndexFromMousePosition(QPoint pos) {
   return text_block_index_it->index;
 }
 
-void CodeView2::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
-  if (!isSignalConnected(QMetaMethod::fromSignal(&CodeView2::TokenHovered))) {
+void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
+  if (!isSignalConnected(QMetaMethod::fromSignal(&CodeView::TokenHovered))) {
     return;
   }
 
@@ -271,7 +271,7 @@ void CodeView2::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
   emit TokenHovered(model_index);
 }
 
-void CodeView2::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
+void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
                                                    bool double_click) {
   auto opt_model_index = ModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
@@ -282,7 +282,7 @@ void CodeView2::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
   emit TokenClicked(model_index, event->buttons(), double_click);
 }
 
-void CodeView2::OnModelReset() {
+void CodeView::OnModelReset() {
   auto palette = d->text_edit->palette();
   palette.setColor(QPalette::Window, d->theme.default_background_color);
   palette.setColor(QPalette::WindowText, d->theme.default_foreground_color);
@@ -384,15 +384,15 @@ void CodeView2::OnModelReset() {
   d->gutter->setMinimumWidth(100);
 }
 
-void CodeView2::OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event) {
+void CodeView::OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event) {
   OnTextEditViewportMouseButtonEvent(event, false);
 }
 
-void CodeView2::OnTextEditViewportMouseButtonDblClick(QMouseEvent *event) {
+void CodeView::OnTextEditViewportMouseButtonDblClick(QMouseEvent *event) {
   OnTextEditViewportMouseButtonEvent(event, true);
 }
 
-void CodeView2::OnCursorPositionChange() {
+void CodeView::OnCursorPositionChange() {
   // TODO(alessandro): This should be part of the theme
   QTextEdit::ExtraSelection selection;
   selection.format.setBackground(QColor(Qt::black));
@@ -403,14 +403,14 @@ void CodeView2::OnCursorPositionChange() {
   d->text_edit->setExtraSelections({std::move(selection)});
 }
 
-void CodeView2::OnGutterPaintEvent(QPaintEvent *event) {
+void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
   QPainter painter(d->gutter);
 
   const auto &base_color = d->text_edit->palette().base();
   painter.fillRect(event->rect(), base_color);
 }
 
-void CodeView2::OnTextEditUpdateRequest(const QRect &, int) {
+void CodeView::OnTextEditUpdateRequest(const QRect &, int) {
   d->gutter->update();
 }
 

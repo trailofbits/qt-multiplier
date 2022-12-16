@@ -4,7 +4,7 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "CodeView.h"
+#include "OldCodeView.h"
 
 #include <QApplication>
 #include <QBrush>
@@ -55,7 +55,7 @@ enum class CodeViewState {
 
 }  // namespace
 
-struct CodeView::PrivateData {
+struct OldCodeView::PrivateData {
 
   // Current rendering state for the code view.
   CodeViewState state{CodeViewState::kInitialized};
@@ -88,16 +88,16 @@ struct CodeView::PrivateData {
         index(index_) {}
 };
 
-CodeView::~CodeView(void) {}
+OldCodeView::~OldCodeView(void) {}
 
-CodeView::CodeView(const CodeTheme &theme_, const FileLocationCache &locs_, Index index_,
+OldCodeView::OldCodeView(const CodeTheme &theme_, const FileLocationCache &locs_, Index index_,
                    QWidget *parent)
     : QPlainTextEdit(parent),
       d(std::make_unique<PrivateData>(theme_, locs_, index_)) {
   InitializeWidgets();
 }
 
-void CodeView::ScrollToFileToken(const TokenRange &range) {
+void OldCodeView::ScrollToFileToken(const TokenRange &range) {
   if (range) {
     ScrollToFileToken(range[0].id());
   } else {
@@ -105,7 +105,7 @@ void CodeView::ScrollToFileToken(const TokenRange &range) {
   }
 }
 
-void CodeView::ScrollToFileToken(const Token &tok) {
+void OldCodeView::ScrollToFileToken(const Token &tok) {
   if (tok) {
     ScrollToFileToken(tok.id());
   } else {
@@ -113,7 +113,7 @@ void CodeView::ScrollToFileToken(const Token &tok) {
   }
 }
 
-void CodeView::ScrollToFileToken(RawEntityId file_tok_id) {
+void OldCodeView::ScrollToFileToken(RawEntityId file_tok_id) {
   if (d->state != CodeViewState::kRendered) {
     d->scroll_target_eid = file_tok_id;
     return;
@@ -178,11 +178,11 @@ void CodeView::ScrollToFileToken(RawEntityId file_tok_id) {
   centerCursor();
 }
 
-void CodeView::SetFile(const File &file) {
+void OldCodeView::SetFile(const File &file) {
   SetFile(Index::containing(file), file.id());
 }
 
-void CodeView::SetFile(const Index &index, RawEntityId file_id) {
+void OldCodeView::SetFile(const Index &index, RawEntityId file_id) {
   /*d->state = CodeViewState::kDownloading;
   d->scroll_target_eid = kInvalidEntityId;
   auto prev_counter = d->counter.fetch_add(1u);  // Go to the next version.
@@ -191,20 +191,20 @@ void CodeView::SetFile(const Index &index, RawEntityId file_id) {
       index, d->locs, file_id);
 
   connect(downloader, &DownloadCodeThread::DownloadFailed,
-          this, &CodeView::OnDownloadFailed);
+          this, &OldCodeView::OnDownloadFailed);
 
   connect(downloader, &DownloadCodeThread::RenderCode,
-          this, &CodeView::OnRenderCode);
+          this, &OldCodeView::OnRenderCode);
 
   QThreadPool::globalInstance()->start(downloader);
   update();*/
 }
 
-void CodeView::SetFragment(const Fragment &fragment) {
+void OldCodeView::SetFragment(const Fragment &fragment) {
   //SetFragment(Index::containing(fragment), fragment.id());
 }
 
-void CodeView::SetFragment(const Index &index, RawEntityId fragment_id) {
+void OldCodeView::SetFragment(const Index &index, RawEntityId fragment_id) {
   /*d->state = CodeViewState::kDownloading;
   d->scroll_target_eid = kInvalidEntityId;
   auto prev_counter = d->counter.fetch_add(1u);  // Go to the next version.
@@ -213,16 +213,16 @@ void CodeView::SetFragment(const Index &index, RawEntityId fragment_id) {
       index, d->locs, fragment_id);
 
   connect(downloader, &DownloadCodeThread::DownloadFailed,
-          this, &CodeView::OnDownloadFailed);
+          this, &OldCodeView::OnDownloadFailed);
 
   connect(downloader, &DownloadCodeThread::RenderCode,
-          this, &CodeView::OnRenderCode);
+          this, &OldCodeView::OnRenderCode);
 
   QThreadPool::globalInstance()->start(downloader);
   update();*/
 }
 
-void CodeView::SetTokenRange(const Index &index, RawEntityId begin_tok_id,
+void OldCodeView::SetTokenRange(const Index &index, RawEntityId begin_tok_id,
                              RawEntityId end_tok_id) {
   /*d->state = CodeViewState::kDownloading;
   d->scroll_target_eid = kInvalidEntityId;
@@ -232,16 +232,16 @@ void CodeView::SetTokenRange(const Index &index, RawEntityId begin_tok_id,
       index, d->locs, begin_tok_id, end_tok_id);
 
   connect(downloader, &DownloadCodeThread::DownloadFailed,
-          this, &CodeView::OnDownloadFailed);
+          this, &OldCodeView::OnDownloadFailed);
 
   connect(downloader, &DownloadCodeThread::RenderCode,
-          this, &CodeView::OnRenderCode);
+          this, &OldCodeView::OnRenderCode);
 
   QThreadPool::globalInstance()->start(downloader);
   update();*/
 }
 
-void CodeView::Clear(void) {
+void OldCodeView::Clear(void) {
   d->counter.fetch_add(1u);
   d->state = CodeViewState::kInitialized;
   d->code.reset();
@@ -250,7 +250,7 @@ void CodeView::Clear(void) {
   this->QPlainTextEdit::clear();
 }
 
-void CodeView::InitializeWidgets(void) {
+void OldCodeView::InitializeWidgets(void) {
 
   setReadOnly(true);
   setOverwriteMode(false);
@@ -260,11 +260,11 @@ void CodeView::InitializeWidgets(void) {
   setFont(d->theme.Font());
 
   d->line_area = new CodeViewLineNumberArea(this);
-  connect(this, &CodeView::updateRequest,
-          this, &CodeView::UpdateLineNumberArea);
+  connect(this, &OldCodeView::updateRequest,
+          this, &OldCodeView::UpdateLineNumberArea);
 
-  connect(this, &CodeView::DataChanged,
-          this, &CodeView::UpdateLineNumberAreaWidth);
+  connect(this, &OldCodeView::DataChanged,
+          this, &OldCodeView::UpdateLineNumberAreaWidth);
 
   QFontMetrics fm(font());
   setLineWrapMode(d->theme.LineWrap() ?
@@ -278,20 +278,20 @@ void CodeView::InitializeWidgets(void) {
   setPalette(p);
   setBackgroundVisible(false);
 
-  connect(this, &CodeView::cursorPositionChanged,
-          this, &CodeView::OnHighlightLine);
+  connect(this, &OldCodeView::cursorPositionChanged,
+          this, &OldCodeView::OnHighlightLine);
   
-  connect(this, &CodeView::customContextMenuRequested,
-          this, &CodeView::ShowContextMenu);
+  connect(this, &OldCodeView::customContextMenuRequested,
+          this, &OldCodeView::ShowContextMenu);
 
   update();
 }
 
-void CodeView::UpdateLineNumberAreaWidth(void) {
+void OldCodeView::UpdateLineNumberAreaWidth(void) {
   setViewportMargins(LineNumberAreaWidth(), 0, 0, 0);
 }
 
-void CodeView::UpdateLineNumberArea(const QRect &rect, int dy) {
+void OldCodeView::UpdateLineNumberArea(const QRect &rect, int dy) {
   if (dy) {
     d->line_area->scroll(0, dy);
   } else {
@@ -302,12 +302,12 @@ void CodeView::UpdateLineNumberArea(const QRect &rect, int dy) {
   }
 }
 
-void CodeView::OnDownloadFailed(void) {
+void OldCodeView::OnDownloadFailed(void) {
   d->state = CodeViewState::kFailed;
   update();
 }
 
-void CodeView::OnHighlightLine(void) {
+void OldCodeView::OnHighlightLine(void) {
   if (d->state != CodeViewState::kRendered) {
     return;
   }
@@ -323,7 +323,7 @@ void CodeView::OnHighlightLine(void) {
   setExtraSelections(extra_selections);
 }
 
-void CodeView::OnRenderCode(void *code_, uint64_t counter) {
+void OldCodeView::OnRenderCode(void *code_, uint64_t counter) {
   std::unique_ptr<Code> code(reinterpret_cast<Code *>(code_));
   if (d->counter.load() != counter) {
     return;
@@ -402,7 +402,7 @@ void CodeView::OnRenderCode(void *code_, uint64_t counter) {
   update();
 }
 
-std::optional<std::pair<unsigned, int>> CodeView::TokenIndexForPosition(
+std::optional<std::pair<unsigned, int>> OldCodeView::TokenIndexForPosition(
     const QPoint &pos) const {
 
   if (d->state != CodeViewState::kRendered) {
@@ -430,7 +430,7 @@ std::optional<std::pair<unsigned, int>> CodeView::TokenIndexForPosition(
       static_cast<unsigned>((it - begin_it) - 1), cursor.blockNumber());
 }
 
-void CodeView::EmitEventsForIndex(unsigned index) {
+void OldCodeView::EmitEventsForIndex(unsigned index) {
 
   assert((index + 1u) < d->code->tok_decl_ids_begin.size());
   auto locs_begin_index = d->code->tok_decl_ids_begin[index];
@@ -469,7 +469,7 @@ void CodeView::EmitEventsForIndex(unsigned index) {
   }
 }
 
-void CodeView::mousePressEvent(QMouseEvent *event) {
+void OldCodeView::mousePressEvent(QMouseEvent *event) {
   if (auto pos = TokenIndexForPosition(event->pos())) {
     auto [index, block] = pos.value();
     d->last_block = block;
@@ -480,7 +480,7 @@ void CodeView::mousePressEvent(QMouseEvent *event) {
   this->QPlainTextEdit::mousePressEvent(event);
 }
 
-void CodeView::ShowContextMenu(const QPoint& point) {
+void OldCodeView::ShowContextMenu(const QPoint& point) {
   if (auto pos = TokenIndexForPosition(point)) {
     auto [index, block] = pos.value();
 
@@ -622,7 +622,7 @@ void CodeView::ShowContextMenu(const QPoint& point) {
   }
 }
 
-void CodeView::resizeEvent(QResizeEvent *event) {
+void OldCodeView::resizeEvent(QResizeEvent *event) {
   this->QPlainTextEdit::resizeEvent(event);
 
   QRect cr = contentsRect();
@@ -630,12 +630,12 @@ void CodeView::resizeEvent(QResizeEvent *event) {
                                   LineNumberAreaWidth(), cr.height()));
 }
 
-void CodeView::scrollContentsBy(int dx, int dy) {
+void OldCodeView::scrollContentsBy(int dx, int dy) {
   d->last_block = -1;
   this->QPlainTextEdit::scrollContentsBy(dx, dy);
 }
 
-void CodeView::paintEvent(QPaintEvent *event) {
+void OldCodeView::paintEvent(QPaintEvent *event) {
   QString message;
   switch (d->state) {
     case CodeViewState::kInitialized:
@@ -682,7 +682,7 @@ void CodeView::paintEvent(QPaintEvent *event) {
   event->accept();
 }
 
-int CodeView::LineNumberAreaWidth(void) {
+int OldCodeView::LineNumberAreaWidth(void) {
   if (d->state != CodeViewState::kRendered) {
     return 0;
   }
@@ -702,7 +702,7 @@ int CodeView::LineNumberAreaWidth(void) {
       3 + (metrics.horizontalAdvance(QLatin1Char('9')) * num_digits)));
 }
 
-void CodeView::LineNumberAreaPaintEvent(QPaintEvent *event) {
+void OldCodeView::LineNumberAreaPaintEvent(QPaintEvent *event) {
   QPainter painter(d->line_area);
   painter.fillRect(event->rect(), d->theme.LineNumberBackgroundColor());
 
@@ -730,7 +730,7 @@ void CodeView::LineNumberAreaPaintEvent(QPaintEvent *event) {
   }
 }
 
-CodeViewLineNumberArea::CodeViewLineNumberArea(CodeView *code_view_)
+CodeViewLineNumberArea::CodeViewLineNumberArea(OldCodeView *code_view_)
     : QWidget(code_view_),
       code_view(code_view_) {}
 

@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/ICodeView2.h>
+#include <multiplier/ui/ICodeModel.h>
 
 #include "CodeModel.h"
 

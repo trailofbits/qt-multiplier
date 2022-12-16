@@ -39,7 +39,7 @@
 #include <variant>
 
 #include "CodeSearchResults.h"
-#include "CodeView.h"
+#include "OldCodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 #include "TitleNamePrompt.h"
@@ -128,7 +128,7 @@ struct OmniBoxView::PrivateData {
 
   QWidget *entity_box{nullptr};
   QGridLayout *entity_layout{nullptr};
-  CodeView *entity_result_code_view{nullptr};
+  OldCodeView *entity_result_code_view{nullptr};
   QLineEdit *entity_input{nullptr};
   QPushButton *entity_button{nullptr};
   QWidget *entity_results{nullptr};
@@ -892,14 +892,14 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
 
   if (highlight_tok) {
     d->entity_result_theme = new HighlightRangeTheme(d->multiplier.CodeTheme());
-    d->entity_result_code_view = new CodeView(*d->entity_result_theme,
+    d->entity_result_code_view = new OldCodeView(*d->entity_result_theme,
         d->multiplier.FileLocationCache(), d->multiplier.Index());
   }
 
-  connect(d->entity_result_code_view, &CodeView::SetSingleEntityGlobal,
+  connect(d->entity_result_code_view, &OldCodeView::SetSingleEntityGlobal,
           &d->multiplier, &Multiplier::SetSingleEntityGlobal);
 
-  connect(d->entity_result_code_view, &CodeView::SetMultipleEntitiesGlobal,
+  connect(d->entity_result_code_view, &OldCodeView::SetMultipleEntitiesGlobal,
           &d->multiplier, &Multiplier::SetMultipleEntitiesGlobal);
 
   d->multiplier.CodeTheme().BeginTokens();
@@ -943,7 +943,7 @@ void OmniBoxView::OnFoundEntity(VariantEntity maybe_entity, unsigned counter) {
   }
 
   // Event to reference view of a file at selected token (cmd + click)
-  connect(d->entity_result_code_view, &CodeView::TokenPressEvent,
+  connect(d->entity_result_code_view, &OldCodeView::TokenPressEvent,
       this, &OmniBoxView::OnEntityTokenPressEvent);
 
   d->multiplier.CodeTheme().EndTokens();

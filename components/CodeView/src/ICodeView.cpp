@@ -6,14 +6,14 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/ICodeView2.h>
+#include <multiplier/ui/ICodeView.h>
 
-#include "CodeView2.h"
+#include "CodeView.h"
 
 namespace mx::gui {
 
-ICodeView2 *ICodeView2::Create(ICodeModel *model, QWidget *parent) {
-  return new CodeView2(model, parent);
+ICodeView *ICodeView::Create(ICodeModel *model, QWidget *parent) {
+  return new CodeView(model, parent);
 }
 
 }  // namespace mx::gui

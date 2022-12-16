@@ -36,7 +36,7 @@ class CodeViewLineNumberArea;
 // A view for code. Code views have baked-in themes once initialized. Themes
 // have access to rich data only available during render-time, such as whether
 // or not a declaration has a definition.
-class CodeView final : public QPlainTextEdit {
+class OldCodeView final : public QPlainTextEdit {
   Q_OBJECT
 
   friend class CodeViewLineNumberArea;
@@ -45,8 +45,8 @@ class CodeView final : public QPlainTextEdit {
   std::unique_ptr<PrivateData> d;
 
  public:
-  virtual ~CodeView(void);
-  CodeView(const CodeTheme &theme_, const FileLocationCache &locs_, Index index_,
+  virtual ~OldCodeView(void);
+  OldCodeView(const CodeTheme &theme_, const FileLocationCache &locs_, Index index_,
            QWidget *parent = nullptr);
 
   void ScrollToFileToken(const TokenRange &tok);
@@ -100,11 +100,11 @@ class CodeView final : public QPlainTextEdit {
 class CodeViewLineNumberArea final : public QWidget {
   Q_OBJECT
 
-  friend class CodeView;
+  friend class OldCodeView;
 
-  CodeView * const code_view;
+  OldCodeView * const code_view;
 
-  CodeViewLineNumberArea(CodeView *code_view_);
+  CodeViewLineNumberArea(OldCodeView *code_view_);
 
  protected:
   inline void paintEvent(QPaintEvent *event) Q_DECL_FINAL {

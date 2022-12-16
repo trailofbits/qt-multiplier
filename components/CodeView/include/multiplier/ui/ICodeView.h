@@ -15,18 +15,18 @@
 
 namespace mx::gui {
 
-class ICodeView2 : public QWidget {
+class ICodeView : public QWidget {
   Q_OBJECT
 
  public:
-  static ICodeView2 *Create(ICodeModel *model, QWidget *parent = nullptr);
+  static ICodeView *Create(ICodeModel *model, QWidget *parent = nullptr);
   virtual void setTheme(const CodeViewTheme &theme) = 0;
 
-  ICodeView2(QWidget *parent) : QWidget(parent) {}
-  virtual ~ICodeView2() override = default;
+  ICodeView(QWidget *parent) : QWidget(parent) {}
+  virtual ~ICodeView() override = default;
 
-  ICodeView2(const ICodeView2 &) = delete;
-  ICodeView2 &operator=(const ICodeView2 &) = delete;
+  ICodeView(const ICodeView &) = delete;
+  ICodeView &operator=(const ICodeView &) = delete;
 
  signals:
   void TokenClicked(const CodeModelIndex &index, Qt::MouseButtons mouse_buttons,

@@ -37,7 +37,7 @@
 #include <vector>
 
 #include "Code.h"
-#include "CodeView.h"
+#include "OldCodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 
@@ -88,7 +88,7 @@ class CodeSearchResultsModelImpl {
   std::vector<uint8_t> capture_indexes;
   int last_capture_indexes_row{-1};
 
-  // Formatted tokens from the results. Also used by `CodeView`.
+  // Formatted tokens from the results. Also used by `OldCodeView`.
   Code code;
 
   int num_columns{0};
@@ -131,7 +131,7 @@ class CodeSearchResultsModelImpl {
 
 // Try to recover the details to render the tokens. This goes and accumulates
 // stuff into `d.code`, which is the same backing datastructure used by
-// `CodeView`. This approach mostly just lets us keep data in a small number of
+// `OldCodeView`. This approach mostly just lets us keep data in a small number of
 // giant linear containers, rather than a large number of small-to-medium sized
 // linear containers.
 std::pair<unsigned, unsigned> RowData::Tokens(CodeSearchResultsModelImpl &d) {
@@ -867,7 +867,7 @@ struct CodeSearchResultsView::PrivateData {
   QVBoxLayout *layout{nullptr};
   QSplitter *splitter{nullptr};
   QTableView *table{nullptr};
-  CodeView *code{nullptr};
+  OldCodeView *code{nullptr};
   HighlightRangeTheme theme;
 
   inline PrivateData(CodeSearchResultsModel *model_)
@@ -975,19 +975,19 @@ void CodeSearchResultsView::InitializeWidgets(void) {
 
   // Create and connect the code preview.
   if (config.code_preview.visible) {
-    d->code = new CodeView(
+    d->code = new OldCodeView(
         d->theme, d->model_data->multiplier.FileLocationCache(), d->model_data->multiplier.Index());
     d->code->viewport()->installEventFilter(&(d->model_data->multiplier));
     d->splitter->addWidget(d->code);
     d->code->hide();
 
-    connect(d->code, &CodeView::TokenPressEvent,
+    connect(d->code, &OldCodeView::TokenPressEvent,
             this, &CodeSearchResultsView::ActOnTokenPressEvent);
 
-    connect(d->code, &CodeView::SetSingleEntityGlobal,
+    connect(d->code, &OldCodeView::SetSingleEntityGlobal,
             &d->model_data->multiplier, &Multiplier::SetSingleEntityGlobal);
 
-    connect(d->code, &CodeView::SetMultipleEntitiesGlobal,
+    connect(d->code, &OldCodeView::SetMultipleEntitiesGlobal,
             &d->model_data->multiplier, &Multiplier::SetMultipleEntitiesGlobal);
   }
 

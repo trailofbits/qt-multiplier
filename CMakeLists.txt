@@ -45,8 +45,8 @@ add_executable("${exe_name}"
   CodeSearchResults.cpp
   CodeSearchResults.h
   
-  CodeView.cpp
-  CodeView.h
+  OldCodeView.cpp
+  OldCodeView.h
   
   Configuration.cpp
   Configuration.h

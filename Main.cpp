@@ -30,7 +30,7 @@
 #include <variant>
 //#include <phantomstyle.h>
 
-#include "CodeView.h"
+#include "OldCodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 #include "ReferenceBrowserView.h"

@@ -13,9 +13,9 @@
 #include <QVBoxLayout>
 
 #include <multiplier/Index.h>
-#include <multiplier/ui/ICodeView2.h>
+#include <multiplier/ui/ICodeView.h>
 
-#include "CodeView.h"
+#include "OldCodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 
@@ -24,7 +24,7 @@ namespace mx::gui {
 struct FileView::PrivateData {
   FileConfiguration &config;
   QVBoxLayout *layout{nullptr};
-  CodeView *content{nullptr};
+  OldCodeView *content{nullptr};
 
   inline PrivateData(FileConfiguration &config_)
       : config(config_) {}
@@ -43,7 +43,7 @@ FileView::FileView(Multiplier &multiplier, std::filesystem::path file_path,
   d->layout->setContentsMargins(0, 0, 0, 0);
   setLayout(d->layout);
 
-  d->content = new CodeView(multiplier.CodeTheme(),
+  d->content = new OldCodeView(multiplier.CodeTheme(),
                             multiplier.FileLocationCache(),
                             multiplier.Index());
   d->layout->addWidget(d->content);
@@ -52,21 +52,21 @@ FileView::FileView(Multiplier &multiplier, std::filesystem::path file_path,
 
   /////////////////////////
   auto code_model = ICodeModel::Create(multiplier.FileLocationCache(), multiplier.Index());
-  auto code_view2 = ICodeView2::Create(code_model, this);
+  auto code_view2 = ICodeView::Create(code_model, this);
   code_model->SetFile(file_id);
   d->layout->addWidget(code_view2);
   /////////////////////////
 
-  connect(d->content, &CodeView::TokenPressEvent,
+  connect(d->content, &OldCodeView::TokenPressEvent,
           this, &FileView::ActOnTokenPressEvent);
 
   connect(this, &FileView::TokenPressEvent,
           &multiplier, &Multiplier::ActOnTokenPressEvent);
 
-  connect(d->content, &CodeView::SetSingleEntityGlobal,
+  connect(d->content, &OldCodeView::SetSingleEntityGlobal,
           &multiplier, &Multiplier::SetSingleEntityGlobal);
 
-  connect(d->content, &CodeView::SetMultipleEntitiesGlobal,
+  connect(d->content, &OldCodeView::SetMultipleEntitiesGlobal,
           &multiplier, &Multiplier::SetMultipleEntitiesGlobal);
 }
 
