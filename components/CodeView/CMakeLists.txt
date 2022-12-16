@@ -31,6 +31,7 @@ target_link_libraries("mx_codeview" PRIVATE
   "thirdparty_qt"
   "multiplier::mx-api"
   "mx_util"
+  "mx_database"
   "mx_codetheme"
 )
 

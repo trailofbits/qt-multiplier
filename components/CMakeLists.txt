@@ -7,5 +7,6 @@
 #
 
 add_subdirectory("CodeView")
+add_subdirectory("Database")
 add_subdirectory("Util")
 add_subdirectory("CodeTheme")

@@ -6,7 +6,7 @@
 
 #include "RPC.h"
 
-#include <multiplier/rpc/requests/IndexedTokenRange.h>
+#include <requests/IndexedTokenRange.h>
 
 #include <QThreadPool>
 #include <QtConcurrent>

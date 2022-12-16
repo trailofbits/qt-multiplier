@@ -10,15 +10,6 @@ add_library("mx_util"
   include/multiplier/Util.h
   src/Util.h
   src/Util.cpp
-
-  include/multiplier/ui/IRPC.h
-  src/IRPC.cpp
-
-  src/RPC.h
-  src/RPC.cpp
-
-  src/multiplier/rpc/requests/IndexedTokenRange.h
-  src/multiplier/rpc/requests/IndexedTokenRange.cpp
 )
 
 target_link_libraries("mx_util" PRIVATE

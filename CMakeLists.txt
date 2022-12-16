@@ -99,6 +99,7 @@ target_link_libraries("${exe_name}" PRIVATE
   mx_codeview
   mx_util
   mx_codetheme
+  mx_database
 )
 
 enable_qt_properties("${exe_name}")
