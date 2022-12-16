@@ -51,14 +51,14 @@ struct IndexedTokenRangeData final {
   OptionalLineNumberInfo opt_line_number_info;
 };
 
-class IRPC {
+class IDatabase {
  public:
-  using Ptr = std::unique_ptr<IRPC>;
+  using Ptr = std::unique_ptr<IDatabase>;
   using Result = Result<IndexedTokenRangeData, RPCErrorCode>;
   using FutureResult = QFuture<Result>;
 
-  IRPC() = default;
-  virtual ~IRPC() = default;
+  IDatabase() = default;
+  virtual ~IDatabase() = default;
 
   static Ptr Create(const Index &index,
                     const FileLocationCache &file_location_cache);
@@ -68,8 +68,8 @@ class IRPC {
   virtual FutureResult DownloadTokenRange(const RawEntityId &start_entity_id,
                                           const RawEntityId &end_entity_id) = 0;
 
-  IRPC(const IRPC &) = delete;
-  IRPC &operator=(const IRPC &) = delete;
+  IDatabase(const IDatabase &) = delete;
+  IDatabase &operator=(const IDatabase &) = delete;
 };
 
 }  // namespace mx::gui

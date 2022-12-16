@@ -7,11 +7,11 @@
 #
 
 add_library("mx_database"
-  include/multiplier/ui/IRPC.h
-  src/IRPC.cpp
+  include/multiplier/ui/IDatabase.h
+  src/IDatabase.cpp
 
-  src/RPC.h
-  src/RPC.cpp
+  src/Database.h
+  src/Database.cpp
 
   src/requests/IndexedTokenRange.h
   src/requests/IndexedTokenRange.cpp

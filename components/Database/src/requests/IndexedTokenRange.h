@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IRPC.h>
+#include <multiplier/ui/IDatabase.h>
 
 #include <QPromise>
 

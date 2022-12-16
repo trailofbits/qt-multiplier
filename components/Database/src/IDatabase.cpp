@@ -4,15 +4,15 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "RPC.h"
+#include "Database.h"
 
-#include <multiplier/ui/IRPC.h>
+#include <multiplier/ui/IDatabase.h>
 
 namespace mx::gui {
 
-IRPC::Ptr IRPC::Create(const Index &index,
-                       const FileLocationCache &file_location_cache) {
-  return Ptr(new RPC(index, file_location_cache));
+IDatabase::Ptr IDatabase::Create(const Index &index,
+                                 const FileLocationCache &file_location_cache) {
+  return Ptr(new Database(index, file_location_cache));
 }
 
 }  // namespace mx::gui

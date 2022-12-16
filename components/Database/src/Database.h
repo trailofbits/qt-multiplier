@@ -6,13 +6,13 @@
 
 #pragma once
 
-#include <multiplier/ui/IRPC.h>
+#include <multiplier/ui/IDatabase.h>
 
 namespace mx::gui {
 
-class RPC final : public IRPC {
+class Database final : public IDatabase {
  public:
-  virtual ~RPC() override;
+  virtual ~Database() override;
 
   virtual FutureResult DownloadFile(const RawEntityId &file_id) override;
 
@@ -27,9 +27,9 @@ class RPC final : public IRPC {
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
-  RPC(const Index &index, const FileLocationCache &file_location_cache);
+  Database(const Index &index, const FileLocationCache &file_location_cache);
 
-  friend class IRPC;
+  friend class IDatabase;
 };
 
 }  // namespace mx::gui

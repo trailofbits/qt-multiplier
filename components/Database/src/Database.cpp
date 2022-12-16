@@ -4,7 +4,7 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "RPC.h"
+#include "Database.h"
 
 #include <requests/IndexedTokenRange.h>
 
@@ -15,7 +15,8 @@ namespace mx::gui {
 
 namespace {
 
-void ExecuteRequest(QPromise<RPC::Result> &result_promise, const Index &index,
+void ExecuteRequest(QPromise<Database::Result> &result_promise,
+                    const Index &index,
                     const FileLocationCache &file_location_cache,
                     const Request &request) {
   CreateIndexedTokenRangeData(result_promise, index, file_location_cache,
@@ -24,7 +25,7 @@ void ExecuteRequest(QPromise<RPC::Result> &result_promise, const Index &index,
 
 }  // namespace
 
-struct RPC::PrivateData {
+struct Database::PrivateData {
   PrivateData(const Index &index_,
               const FileLocationCache &file_location_cache_)
       : index(std::move(index_)),
@@ -36,9 +37,9 @@ struct RPC::PrivateData {
   QThreadPool thread_pool;
 };
 
-RPC::~RPC() {}
+Database::~Database() {}
 
-RPC::FutureResult RPC::DownloadFile(const RawEntityId &file_id) {
+Database::FutureResult Database::DownloadFile(const RawEntityId &file_id) {
 
   Request request{SingleEntityRequest{
       DownloadRequestType::FileTokens,
@@ -49,7 +50,8 @@ RPC::FutureResult RPC::DownloadFile(const RawEntityId &file_id) {
                            d->file_location_cache, std::move(request));
 }
 
-RPC::FutureResult RPC::DownloadFragment(const RawEntityId &fragment_id) {
+Database::FutureResult
+Database::DownloadFragment(const RawEntityId &fragment_id) {
 
   Request request{SingleEntityRequest{
       DownloadRequestType::FragmentTokens,
@@ -60,8 +62,9 @@ RPC::FutureResult RPC::DownloadFragment(const RawEntityId &fragment_id) {
                            d->file_location_cache, std::move(request));
 }
 
-RPC::FutureResult RPC::DownloadTokenRange(const RawEntityId &start_entity_id,
-                                          const RawEntityId &end_entity_id) {
+Database::FutureResult
+Database::DownloadTokenRange(const RawEntityId &start_entity_id,
+                             const RawEntityId &end_entity_id) {
 
   Request request{EntityRangeRequest{
       start_entity_id,
@@ -72,7 +75,8 @@ RPC::FutureResult RPC::DownloadTokenRange(const RawEntityId &start_entity_id,
                            d->file_location_cache, std::move(request));
 }
 
-RPC::RPC(const Index &index, const FileLocationCache &file_location_cache)
+Database::Database(const Index &index,
+                   const FileLocationCache &file_location_cache)
     : d(new PrivateData(index, file_location_cache)) {
 
   d->thread_pool.setMaxThreadCount(4);

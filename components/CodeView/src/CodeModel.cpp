@@ -9,7 +9,7 @@
 #include "CodeModel.h"
 
 #include <multiplier/Code.h>
-#include <multiplier/ui/IRPC.h>
+#include <multiplier/ui/IDatabase.h>
 
 #include <QString>
 
@@ -46,9 +46,9 @@ struct CodeModel::PrivateData final {
   const FileLocationCache &file_location_cache;
   Index index;
 
-  IRPC::Ptr rpc;
-  IRPC::FutureResult future_result;
-  QFutureWatcher<IRPC::Result> future_watcher;
+  IDatabase::Ptr database;
+  IDatabase::FutureResult future_result;
+  QFutureWatcher<IDatabase::Result> future_watcher;
 
   ModelState model_state{ModelState::Ready};
   TokenRowList token_row_list;
@@ -71,7 +71,7 @@ void CodeModel::SetFile(RawEntityId file_id) {
     d->future_result.cancel();
   }
 
-  d->future_result = d->rpc->DownloadFile(file_id);
+  d->future_result = d->database->DownloadFile(file_id);
   d->future_watcher.setFuture(d->future_result);
 
   d->token_row_list.clear();
@@ -146,9 +146,9 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache, Index index,
     : ICodeModel(parent),
       d(new PrivateData(file_location_cache, index)) {
 
-  d->rpc = IRPC::Create(index, file_location_cache);
-  connect(&d->future_watcher, &QFutureWatcher<IRPC::Result>::finished, this,
-          &CodeModel::FutureResultStateChanged);
+  d->database = IDatabase::Create(index, file_location_cache);
+  connect(&d->future_watcher, &QFutureWatcher<IDatabase::Result>::finished,
+          this, &CodeModel::FutureResultStateChanged);
 }
 
 void CodeModel::FutureResultStateChanged() {
