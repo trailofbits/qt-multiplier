@@ -8,7 +8,6 @@
 
 #include "CodeModel.h"
 
-#include <multiplier/Code.h>
 #include <multiplier/ui/IDatabase.h>
 
 #include <QString>
