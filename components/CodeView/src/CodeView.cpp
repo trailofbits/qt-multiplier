@@ -50,6 +50,8 @@ struct TextBlockIndexEntry final {
 };
 
 using TextBlockIndex = std::vector<TextBlockIndexEntry>;
+using FileTokenIdToTextBlockIndexEntry =
+    std::unordered_map<RawEntityId, std::size_t>;
 
 QColor GetTextColorMapEntry(
     const QVariant &token_category_var, const QColor &default_color,
@@ -111,6 +113,8 @@ struct CodeView::PrivateData final {
   QWidget *gutter{nullptr};
 
   TextBlockIndex text_block_index;
+  FileTokenIdToTextBlockIndexEntry file_token_to_test_block;
+
   CodeViewTheme theme;
 
   std::optional<CodeModelIndex> opt_prev_hovered_model_index;
@@ -123,6 +127,83 @@ void CodeView::setTheme(const CodeViewTheme &theme) {
 }
 
 CodeView::~CodeView() {}
+
+std::optional<int>
+CodeView::GetFileTokenCursorPosition(const RawEntityId &file_token_id) const {
+  if (!IsValidFileToken(file_token_id)) {
+    return std::nullopt;
+  }
+
+  auto it = d->file_token_to_test_block.find(file_token_id);
+  if (it == d->file_token_to_test_block.end()) {
+    return std::nullopt;
+  }
+
+  const auto &text_block_index_elem = it->second;
+
+  const auto &text_block_index_entry =
+      d->text_block_index.at(text_block_index_elem);
+
+  return text_block_index_entry.start_position;
+}
+
+std::optional<int> CodeView::GetTokenCursorPosition(const Token &token) const {
+  if (!token) {
+    return std::nullopt;
+  }
+
+  return GetFileTokenCursorPosition(token.id());
+}
+
+std::optional<int> CodeView::GetStartTokenRangeCursorPosition(
+    const TokenRange &token_range) const {
+  if (!token_range) {
+    return std::nullopt;
+  }
+
+  return GetFileTokenCursorPosition(token_range[0].id());
+}
+
+bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) const {
+  auto text_cursor = d->text_edit->textCursor();
+  text_cursor.setPosition(start);
+
+  d->text_edit->moveCursor(QTextCursor::End);
+  d->text_edit->setTextCursor(text_cursor);
+  d->text_edit->centerCursor();
+
+  if (opt_end.has_value()) {
+    text_cursor.setPosition(opt_end.value(), QTextCursor::MoveMode::KeepAnchor);
+  }
+
+  return true;
+}
+
+bool CodeView::ScrollToFileToken(const RawEntityId &file_token_id) const {
+  auto opt_token_pos = GetFileTokenCursorPosition(file_token_id);
+  if (!opt_token_pos.has_value()) {
+    return false;
+  }
+
+  const auto &token_pos = opt_token_pos.value();
+  return SetCursorPosition(token_pos, std::nullopt);
+}
+
+bool CodeView::ScrollToToken(const Token &token) const {
+  if (!token) {
+    return false;
+  }
+
+  return ScrollToFileToken(token.id());
+}
+
+bool CodeView::ScrollToTokenRange(const TokenRange &token_range) const {
+  if (!token_range) {
+    return false;
+  }
+
+  return ScrollToFileToken(token_range[0].id());
+}
 
 CodeView::CodeView(ICodeModel *model, QWidget *parent)
     : ICodeView(parent),
@@ -220,6 +301,15 @@ void CodeView::InitializeWidgets() {
   OnModelReset();
 }
 
+bool CodeView::IsValidFileToken(const RawEntityId &file_token_id) const {
+  if (file_token_id == kInvalidEntityId) {
+    return false;
+  }
+
+  const auto &variant_id = EntityId(file_token_id).Unpack();
+  return std::holds_alternative<FileTokenId>(variant_id);
+}
+
 std::optional<CodeModelIndex>
 CodeView::ModelIndexFromMousePosition(QPoint pos) {
   auto text_cursor = d->text_edit->cursorForPosition(pos);
@@ -272,7 +362,7 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
 }
 
 void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
-                                                   bool double_click) {
+                                                  bool double_click) {
   auto opt_model_index = ModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
     return;
@@ -295,6 +385,7 @@ void CodeView::OnModelReset() {
 
   d->text_edit->clear();
   d->text_block_index.clear();
+  d->file_token_to_test_block.clear();
 
   auto document = new QTextDocument(this);
   auto document_layout = new QPlainTextDocumentLayout(document);
@@ -355,6 +446,17 @@ void CodeView::OnModelReset() {
       }
 
       const auto &token = token_var.toString();
+
+      const auto &token_id_var =
+          d->model->Data(model_index, ICodeModel::TokenRawEntityIdRole);
+
+      RawEntityId file_token_id{kInvalidEntityId};
+      if (token_id_var.isValid()) {
+        file_token_id = static_cast<RawEntityId>(token_id_var.toULongLong());
+      }
+
+      d->file_token_to_test_block.insert(
+          {file_token_id, d->text_block_index.size()});
 
       TextBlockIndexEntry index_entry;
       index_entry.start_position = cursor->position();

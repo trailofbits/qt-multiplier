@@ -11,6 +11,8 @@
 #include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/ICodeModel.h>
 
+#include <optional>
+
 #include <QWidget>
 
 namespace mx::gui {
@@ -24,6 +26,23 @@ class ICodeView : public QWidget {
 
   ICodeView(QWidget *parent) : QWidget(parent) {}
   virtual ~ICodeView() override = default;
+
+  virtual std::optional<int>
+  GetFileTokenCursorPosition(const RawEntityId &file_token_id) const = 0;
+
+  virtual std::optional<int>
+  GetTokenCursorPosition(const Token &token) const = 0;
+
+  virtual std::optional<int>
+  GetStartTokenRangeCursorPosition(const TokenRange &token_range) const = 0;
+
+  virtual bool
+  SetCursorPosition(int start,
+                    std::optional<int> opt_end = std::nullopt) const = 0;
+
+  virtual bool ScrollToFileToken(const RawEntityId &file_token_id) const = 0;
+  virtual bool ScrollToToken(const Token &token) const = 0;
+  virtual bool ScrollToTokenRange(const TokenRange &token_range) const = 0;
 
   ICodeView(const ICodeView &) = delete;
   ICodeView &operator=(const ICodeView &) = delete;

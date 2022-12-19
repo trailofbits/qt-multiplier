@@ -136,6 +136,9 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
     case TokenCategoryRole:
       return static_cast<std::uint32_t>(column.token_category);
 
+    case TokenRawEntityIdRole:
+      return static_cast<std::uint64_t>(column.file_token_id);
+
     default: return QVariant();
   }
 }
