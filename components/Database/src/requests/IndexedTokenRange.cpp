@@ -208,6 +208,8 @@ void CreateIndexedTokenRangeData(
   std::unordered_map<RawEntityId, std::vector<Token>> file_to_frag_toks;
   std::vector<Decl> tok_decls;
 
+  bool sortedness_precondition_error{false};
+
   std::optional<RawEntityId> opt_last_file_tok_id;
   for (const auto &file_tok : token_range_data.file_tokens) {
     if (result_promise.isCanceled()) {
@@ -219,7 +221,8 @@ void CreateIndexedTokenRangeData(
 
     // Sortedness needed for `CodeView::ScrollToToken`.
     if (opt_last_file_tok_id.has_value() &&
-        opt_last_file_tok_id.value() < file_tok_id) {
+        opt_last_file_tok_id.value() < file_tok_id &&
+        !sortedness_precondition_error) {
       // TODO(alessandro): This was originally an assert. It seems like
       // this condition is not met, so it's commented out for now.
       // result_promise.addResult(RPCErrorCode::InvalidFileTokenSorting);
@@ -227,6 +230,8 @@ void CreateIndexedTokenRangeData(
 
       std::cerr << "Invalid precondition in " __FILE__ << "@" << __LINE__
                 << "\n";
+
+      sortedness_precondition_error = true;
     }
 
     opt_last_file_tok_id = file_tok_id;
