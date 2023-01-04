@@ -7,8 +7,11 @@
 */
 
 #include "CodeView.h"
+#include "SearchWidget.h"
+#include "DefaultCodeViewThemes.h"
 
 #include <QFont>
+#include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QMetaMethod>
 #include <QMouseEvent>
@@ -21,15 +24,13 @@
 #include <QTextDocument>
 #include <QWidget>
 #include <QProgressDialog>
+#include <QLineEdit>
+#include <QLabel>
+#include <QShortcut>
+#include <QRegularExpression>
 
-#include <iostream>
-#include <memory>
-#include <optional>
-#include <stack>
 #include <unordered_map>
-#include <unordered_set>
-
-#include "DefaultCodeViewThemes.h"
+#include <iostream>
 
 namespace mx::gui {
 
@@ -111,6 +112,7 @@ struct CodeView::PrivateData final {
 
   QPlainTextEditMod *text_edit{nullptr};
   QWidget *gutter{nullptr};
+  SearchWidget *search_widget{nullptr};
 
   TextBlockIndex text_block_index;
   FileTokenIdToTextBlockIndexEntry file_token_to_test_block;
@@ -273,6 +275,7 @@ void CodeView::InitializeWidgets() {
   font.setStyleHint(QFont::TypeWriter);
   setFont(font);
 
+  // Code viewer
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setFont(font);
   d->text_edit->setReadOnly(true);
@@ -281,23 +284,47 @@ void CodeView::InitializeWidgets() {
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
 
-  d->gutter = new QWidget();
-  d->gutter->setFont(font);
-  d->gutter->installEventFilter(this);
-
-  auto layout = new QHBoxLayout();
-  layout->setContentsMargins(0, 0, 0, 0);
-  layout->setSpacing(0);
-  layout->addWidget(d->gutter);
-  layout->addWidget(d->text_edit);
-  setLayout(layout);
-
   connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged, this,
           &CodeView::OnCursorPositionChange);
 
   connect(d->text_edit, &QPlainTextEditMod::updateRequest, this,
           &CodeView::OnTextEditUpdateRequest);
 
+  // Gutter
+  d->gutter = new QWidget();
+  d->gutter->setFont(font);
+  d->gutter->installEventFilter(this);
+
+  // Search widget
+  d->search_widget = new SearchWidget(d->text_edit);
+  d->search_widget->Activate();
+
+  auto enable_search_shortcut = new QShortcut(this);
+  enable_search_shortcut->setKey(QKeySequence("Ctrl+F"));
+  connect(enable_search_shortcut, &QShortcut::activated, d->search_widget,
+          &SearchWidget::Activate);
+
+  auto disable_search_shortcut = new QShortcut(this);
+  disable_search_shortcut->setKey(QKeySequence("Escape"));
+  connect(disable_search_shortcut, &QShortcut::activated, d->search_widget,
+          &SearchWidget::Deactivate);
+
+  // Layout for the gutter and code view
+  auto code_layout = new QHBoxLayout();
+  code_layout->setContentsMargins(0, 0, 0, 0);
+  code_layout->setSpacing(0);
+  code_layout->addWidget(d->gutter);
+  code_layout->addWidget(d->text_edit);
+
+  // Main layout
+  auto main_layout = new QVBoxLayout();
+  main_layout->setContentsMargins(0, 0, 0, 0);
+  main_layout->setSpacing(0);
+  main_layout->addItem(code_layout);
+  main_layout->addWidget(d->search_widget);
+  setLayout(main_layout);
+
+  // Force an update
   OnModelReset();
 }
 
@@ -373,6 +400,8 @@ void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
 }
 
 void CodeView::OnModelReset() {
+  d->search_widget->Deactivate();
+
   auto palette = d->text_edit->palette();
   palette.setColor(QPalette::Window, d->theme.default_background_color);
   palette.setColor(QPalette::WindowText, d->theme.default_foreground_color);

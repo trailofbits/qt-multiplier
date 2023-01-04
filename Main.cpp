@@ -66,6 +66,7 @@ namespace {
 
 int main(int argc, char *argv[]) {
   //QApplication::setStyle(new PhantomStyle());
+  QApplication::setStyle("Fusion");
 
   QApplication application(argc, argv);
   application.setApplicationName("Multiplier");

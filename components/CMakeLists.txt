@@ -6,6 +6,7 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
+add_subdirectory("Assert")
 add_subdirectory("CodeView")
 add_subdirectory("Database")
 add_subdirectory("Util")

@@ -24,6 +24,13 @@ add_library("mx_codeview"
 
   src/DefaultCodeViewThemes.h
   src/DefaultCodeViewThemes.cpp
+
+  src/SearchWidget.h
+  src/SearchWidget.cpp
+)
+
+target_sources("mx_codeview" INTERFACE
+  Resources/Resources.qrc
 )
 
 target_link_libraries("mx_codeview" PRIVATE
@@ -33,6 +40,7 @@ target_link_libraries("mx_codeview" PRIVATE
   "mx_util"
   "mx_database"
   "mx_codetheme"
+  "mx_assert"
 )
 
 target_include_directories("mx_codeview" PRIVATE
