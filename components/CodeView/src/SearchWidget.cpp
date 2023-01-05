@@ -372,13 +372,53 @@ void SearchWidget::OnTextSearch() {
     }
 
   } else {
+    auto options = d->case_sensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
+    qsizetype current_pos{};
+
+    for (;;) {
+      auto next_pos = contents.indexOf(search_pattern, current_pos, options);
+      if (next_pos == -1) {
+        break;
+      }
+
+      bool save_result{true};
+      if (d->whole_word) {
+        std::vector<QChar> char_list;
+        if (next_pos != 0) {
+          char_list.push_back(contents.at(next_pos - 1));
+        }
+
+        auto end_pos = next_pos + search_pattern.size();
+        if (end_pos < contents.size() - 1) {
+          char_list.push_back(contents.at(end_pos));
+        }
+
+        for (const auto &c : char_list) {
+          auto valid_character = !(c.isLetter() || c.isDigit());
+          if (!valid_character) {
+            save_result = false;
+            break;
+          }
+        }
+      }
+
+      if (save_result) {
+        d->result_list.push_back(
+            std::make_pair(next_pos, next_pos + search_pattern.size()));
+      }
+
+      current_pos = next_pos + search_pattern.size();
+    }
   }
 
   EnableNavigation(!d->result_list.empty());
 
-  SetDisplayMessage(
-      false,
-      tr("Found ") + QString::number(d->result_list.size()) + tr(" results"));
+  if (d->result_list.empty()) {
+    SetDisplayMessage(true, tr("No results found"));
+
+  } else {
+    NavigateToResult(0);
+  }
 }
 
 }  // namespace mx::gui
