@@ -8,8 +8,9 @@
 
 #pragma once
 
+#include <multiplier/ui/ICodeView.h>
+
 #include <QWidget>
-#include <QPlainTextEdit>
 
 namespace mx::gui {
 
@@ -17,7 +18,7 @@ class SearchWidget final : public QWidget {
   Q_OBJECT
 
  public:
-  SearchWidget(QPlainTextEdit *text_edit, QWidget *parent = nullptr);
+  SearchWidget(ICodeView *code_view, QWidget *parent = nullptr);
 
   virtual ~SearchWidget() override;
 
@@ -32,6 +33,9 @@ class SearchWidget final : public QWidget {
   void Activate();
   void Deactivate();
 
+  void OnShowPrevResult();
+  void OnShowNextResult();
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
@@ -43,6 +47,9 @@ class SearchWidget final : public QWidget {
   void ClearDisplayMessage();
 
   void EnableNavigation(bool enable);
+  void NavigateToResult(std::size_t result_index);
+
+  std::size_t GetNextResultIndex(bool forward_direction);
 
  private slots:
   void OnSearchInputTextChanged(const QString &text);
@@ -50,8 +57,6 @@ class SearchWidget final : public QWidget {
   void OnWholeWordSearchOptionToggled(bool checked);
   void OnRegexSearchOptionToggled(bool checked);
   void OnTextSearch();
-  void OnShowPrevResult();
-  void OnShowNextResult();
 };
 
 }  // namespace mx::gui

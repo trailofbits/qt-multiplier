@@ -36,9 +36,12 @@ class ICodeView : public QWidget {
   virtual std::optional<int>
   GetStartTokenRangeCursorPosition(const TokenRange &token_range) const = 0;
 
+  virtual int GetCursorPosition() const = 0;
   virtual bool
   SetCursorPosition(int start,
                     std::optional<int> opt_end = std::nullopt) const = 0;
+
+  virtual QString Text() const = 0;
 
   virtual bool ScrollToFileToken(const RawEntityId &file_token_id) const = 0;
   virtual bool ScrollToToken(const Token &token) const = 0;

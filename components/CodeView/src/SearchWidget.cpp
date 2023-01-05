@@ -21,7 +21,7 @@
 namespace mx::gui {
 
 struct SearchWidget::PrivateData final {
-  QPlainTextEdit *text_edit{nullptr};
+  ICodeView *code_view{nullptr};
 
   bool case_sensitive{false};
   bool whole_word{false};
@@ -53,14 +53,13 @@ struct SearchWidget::PrivateData final {
   QTimer signal_timer;
 
   std::vector<std::pair<int, int>> result_list;
-  std::optional<std::size_t> opt_active_result;
 };
 
-SearchWidget::SearchWidget(QPlainTextEdit *text_edit, QWidget *parent)
+SearchWidget::SearchWidget(ICodeView *code_view, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
-  d->text_edit = text_edit;
+  d->code_view = code_view;
 
   LoadIcons();
   InitializeWidgets();
@@ -85,6 +84,24 @@ void SearchWidget::Deactivate() {
 
   d->search_input_error_display->clear();
   d->search_input_error_display->setVisible(false);
+}
+
+void SearchWidget::OnShowPrevResult() {
+  if (d->result_list.empty() || !isVisible()) {
+    return;
+  }
+
+  auto result_index = GetNextResultIndex(false);
+  NavigateToResult(result_index);
+}
+
+void SearchWidget::OnShowNextResult() {
+  if (d->result_list.empty() || !isVisible()) {
+    return;
+  }
+
+  auto result_index = GetNextResultIndex(true);
+  NavigateToResult(result_index);
 }
 
 void SearchWidget::LoadIcons() {
@@ -221,6 +238,49 @@ void SearchWidget::EnableNavigation(bool enable) {
   d->show_next_result->setEnabled(enable);
 }
 
+void SearchWidget::NavigateToResult(std::size_t result_index) {
+  SetDisplayMessage(false, tr("Showing result ") +
+                               QString::number(result_index + 1) + tr(" of ") +
+                               QString::number(d->result_list.size()));
+
+  const auto &result = d->result_list[result_index];
+  d->code_view->SetCursorPosition(result.first, result.second);
+}
+
+std::size_t SearchWidget::GetNextResultIndex(bool forward_direction) {
+  auto cursor_pos = d->code_view->GetCursorPosition();
+  std::optional<std::size_t> opt_next_index;
+
+  if (forward_direction) {
+    std::size_t index{};
+    for (const auto &result : d->result_list) {
+      if (cursor_pos < result.first) {
+        opt_next_index = index;
+        break;
+      }
+
+      ++index;
+    }
+
+  } else {
+    std::size_t index{d->result_list.size() - 1};
+    for (auto result_it = d->result_list.rbegin();
+         result_it != d->result_list.rend(); ++result_it) {
+
+      const auto &result = *result_it;
+      if (cursor_pos > result.second) {
+        opt_next_index = index;
+        break;
+      }
+
+      --index;
+    }
+  }
+
+  return opt_next_index.value_or(forward_direction ? 0
+                                                   : d->result_list.size() - 1);
+}
+
 void SearchWidget::OnSearchInputTextChanged(const QString &text) {
   ClearDisplayMessage();
   d->signal_timer.stop();
@@ -279,10 +339,9 @@ void SearchWidget::OnTextSearch() {
   d->signal_timer.stop();
 
   auto search_pattern = d->search_input->text();
-  auto contents = d->text_edit->toPlainText();
+  auto contents = d->code_view->Text();
 
   d->result_list.clear();
-  d->opt_active_result = std::nullopt;
 
   if (d->enable_regex) {
     QRegularExpression::PatternOption options{
@@ -320,64 +379,6 @@ void SearchWidget::OnTextSearch() {
   SetDisplayMessage(
       false,
       tr("Found ") + QString::number(d->result_list.size()) + tr(" results"));
-}
-
-void SearchWidget::OnShowPrevResult() {
-  std::size_t active_result{};
-  if (d->opt_active_result.has_value()) {
-    active_result = d->opt_active_result.value();
-
-    if (active_result == 0) {
-      active_result = d->result_list.size() - 1;
-    } else {
-      --active_result;
-    }
-  }
-
-  SetDisplayMessage(false, tr("Showing result ") +
-                               QString::number(active_result + 1) + tr(" of ") +
-                               QString::number(d->result_list.size()));
-
-  const auto &result = d->result_list[active_result];
-
-  auto text_cursor = d->text_edit->textCursor();
-  text_cursor.setPosition(result.first, QTextCursor::MoveMode::MoveAnchor);
-  text_cursor.setPosition(result.second, QTextCursor::MoveMode::KeepAnchor);
-
-  d->text_edit->moveCursor(QTextCursor::End);
-  d->text_edit->setTextCursor(text_cursor);
-  d->text_edit->centerCursor();
-
-  d->opt_active_result = active_result;
-}
-
-void SearchWidget::OnShowNextResult() {
-  std::size_t active_result{};
-  if (d->opt_active_result.has_value()) {
-    active_result = d->opt_active_result.value();
-
-    if (active_result == d->result_list.size()) {
-      active_result = 0;
-    } else {
-      ++active_result;
-    }
-  }
-
-  SetDisplayMessage(false, tr("Showing result ") +
-                               QString::number(active_result + 1) + tr(" of ") +
-                               QString::number(d->result_list.size()));
-
-  const auto &result = d->result_list[active_result];
-
-  auto text_cursor = d->text_edit->textCursor();
-  text_cursor.setPosition(result.first, QTextCursor::MoveMode::MoveAnchor);
-  text_cursor.setPosition(result.second, QTextCursor::MoveMode::KeepAnchor);
-
-  d->text_edit->moveCursor(QTextCursor::End);
-  d->text_edit->setTextCursor(text_cursor);
-  d->text_edit->centerCursor();
-
-  d->opt_active_result = active_result;
 }
 
 }  // namespace mx::gui

@@ -28,8 +28,11 @@ class CodeView final : public ICodeView {
   virtual std::optional<int> GetStartTokenRangeCursorPosition(
       const TokenRange &token_range) const override;
 
+  virtual int GetCursorPosition() const override;
   virtual bool SetCursorPosition(int start,
                                  std::optional<int> opt_end) const override;
+
+  virtual QString Text() const override;
 
   virtual bool
   ScrollToFileToken(const RawEntityId &file_token_id) const override;

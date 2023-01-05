@@ -166,9 +166,14 @@ std::optional<int> CodeView::GetStartTokenRangeCursorPosition(
   return GetFileTokenCursorPosition(token_range[0].id());
 }
 
+int CodeView::GetCursorPosition() const {
+  auto text_cursor = d->text_edit->textCursor();
+  return text_cursor.position();
+}
+
 bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) const {
   auto text_cursor = d->text_edit->textCursor();
-  text_cursor.setPosition(start);
+  text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
 
   d->text_edit->moveCursor(QTextCursor::End);
   d->text_edit->setTextCursor(text_cursor);
@@ -176,9 +181,14 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) const {
 
   if (opt_end.has_value()) {
     text_cursor.setPosition(opt_end.value(), QTextCursor::MoveMode::KeepAnchor);
+    d->text_edit->setTextCursor(text_cursor);
   }
 
   return true;
+}
+
+QString CodeView::Text() const {
+  return d->text_edit->toPlainText();
 }
 
 bool CodeView::ScrollToFileToken(const RawEntityId &file_token_id) const {
@@ -279,8 +289,7 @@ void CodeView::InitializeWidgets() {
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setFont(font);
   d->text_edit->setReadOnly(true);
-  d->text_edit->setOverwriteMode(false);
-  d->text_edit->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  d->text_edit->setTextInteractionFlags(Qt::TextBrowserInteraction);
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
 
@@ -296,13 +305,23 @@ void CodeView::InitializeWidgets() {
   d->gutter->installEventFilter(this);
 
   // Search widget
-  d->search_widget = new SearchWidget(d->text_edit);
+  d->search_widget = new SearchWidget(this);
   d->search_widget->Activate();
 
   auto enable_search_shortcut = new QShortcut(this);
   enable_search_shortcut->setKey(QKeySequence("Ctrl+F"));
   connect(enable_search_shortcut, &QShortcut::activated, d->search_widget,
           &SearchWidget::Activate);
+
+  auto search_previous_shortcut = new QShortcut(this);
+  search_previous_shortcut->setKey(QKeySequence("Shift+F3"));
+  connect(search_previous_shortcut, &QShortcut::activated, d->search_widget,
+          &SearchWidget::OnShowPrevResult);
+
+  auto search_next_shortcut = new QShortcut(this);
+  search_next_shortcut->setKey(QKeySequence("F3"));
+  connect(search_next_shortcut, &QShortcut::activated, d->search_widget,
+          &SearchWidget::OnShowNextResult);
 
   auto disable_search_shortcut = new QShortcut(this);
   disable_search_shortcut->setKey(QKeySequence("Escape"));

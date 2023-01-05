@@ -15,7 +15,6 @@
 #include <multiplier/Index.h>
 #include <multiplier/ui/ICodeView.h>
 
-#include "OldCodeView.h"
 #include "Configuration.h"
 #include "Multiplier.h"
 
@@ -23,8 +22,9 @@ namespace mx::gui {
 
 struct FileView::PrivateData {
   FileConfiguration &config;
-  QVBoxLayout *layout{nullptr};
-  OldCodeView *content{nullptr};
+
+  ICodeModel *code_model{nullptr};
+  ICodeView *code_view{nullptr};
 
   inline PrivateData(FileConfiguration &config_)
       : config(config_) {}
@@ -39,25 +39,23 @@ FileView::FileView(Multiplier &multiplier, std::filesystem::path file_path,
 
   setWindowTitle(file_path.c_str());
 
-  d->layout = new QVBoxLayout;
-  d->layout->setContentsMargins(0, 0, 0, 0);
-  setLayout(d->layout);
-
-  d->content = new OldCodeView(multiplier.CodeTheme(),
+  /*d->content = new OldCodeView(multiplier.CodeTheme(),
                             multiplier.FileLocationCache(),
                             multiplier.Index());
   d->layout->addWidget(d->content);
   d->content->SetFile(multiplier.Index(), file_id);
-  d->content->viewport()->installEventFilter(&multiplier);
+  d->content->viewport()->installEventFilter(&multiplier);*/
 
-  /////////////////////////
   auto code_model = ICodeModel::Create(multiplier.FileLocationCache(), multiplier.Index());
-  auto code_view2 = ICodeView::Create(code_model, this);
+  auto code_view = ICodeView::Create(code_model, this);
   code_model->SetFile(file_id);
-  d->layout->addWidget(code_view2);
-  /////////////////////////
 
-  connect(d->content, &OldCodeView::TokenPressEvent,
+  auto layout = new QVBoxLayout;
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->addWidget(code_view);
+  setLayout(layout);
+
+  /*connect(d->content, &OldCodeView::TokenPressEvent,
           this, &FileView::ActOnTokenPressEvent);
 
   connect(this, &FileView::TokenPressEvent,
@@ -67,11 +65,11 @@ FileView::FileView(Multiplier &multiplier, std::filesystem::path file_path,
           &multiplier, &Multiplier::SetSingleEntityGlobal);
 
   connect(d->content, &OldCodeView::SetMultipleEntitiesGlobal,
-          &multiplier, &Multiplier::SetMultipleEntitiesGlobal);
+          &multiplier, &Multiplier::SetMultipleEntitiesGlobal);*/
 }
 
 void FileView::ScrollToToken(RawEntityId file_tok_id) const {
-  d->content->ScrollToFileToken(file_tok_id);
+  //d->content->ScrollToFileToken(file_tok_id);
 }
 
 void FileView::ActOnTokenPressEvent(EventLocations locs) {
@@ -81,14 +79,14 @@ void FileView::ActOnTokenPressEvent(EventLocations locs) {
   //            itself. Therefore, we need to "mute" some of the components
   //            that we actually have data for.
 
-  for (EventLocation loc : locs) {
+  /*for (EventLocation loc : locs) {
     emit TokenPressEvent(EventSource::kCodeBrowserClickSource, loc);
     if (loc.UnpackDeclarationId()) {
       loc.SetParsedTokenId(kInvalidEntityId);
       loc.SetFileTokenId(kInvalidEntityId);
       emit TokenPressEvent(EventSource::kCodeBrowserClickDest, loc);
     }
-  }
+  }*/
 }
 
 }  // namespace mx::gui
