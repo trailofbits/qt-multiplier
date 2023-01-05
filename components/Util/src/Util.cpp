@@ -605,7 +605,7 @@ std::optional<Decl> DeclForToken(const Token &token) {
       break;
   }
 
-  for (auto context = TokenContext::of(token); context;
+  for (auto context = token.context(); context;
        context = context->parent()) {
 
     if (auto stmt = context->as_statement()) {
@@ -645,7 +645,7 @@ std::optional<Decl> DeclForToken(const Token &token) {
         std::cerr << "\tFile ID: " << file->id() << '\n';
       }
       std::cerr << "\tContext:";
-      for (auto context = TokenContext::of(token); context;
+      for (auto context = token.context(); context;
            context = context->parent()) {
 
         if (auto stmt = context->as_statement()) {
@@ -698,23 +698,35 @@ EntityBaseOffsetPair GetFragmentOffset(RawEntityId id) {
   VariantId vid = EntityId(id).Unpack();
   if (std::holds_alternative<DeclarationId>(vid)) {
     auto eid = std::get<DeclarationId>(vid);
-    return {EntityId(FragmentId(eid.fragment_id)), eid.offset};
+    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
   } else if (std::holds_alternative<StatementId>(vid)) {
     auto eid = std::get<StatementId>(vid);
-    return {EntityId(FragmentId(eid.fragment_id)), eid.offset};
+    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
   } else if (std::holds_alternative<TypeId>(vid)) {
     auto eid = std::get<TypeId>(vid);
-    return {EntityId(FragmentId(eid.fragment_id)), eid.offset};
+    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
   } else if (std::holds_alternative<ParsedTokenId>(vid)) {
     auto eid = std::get<ParsedTokenId>(vid);
-    return {EntityId(FragmentId(eid.fragment_id)), eid.offset};
+    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
-  } else if (std::holds_alternative<MacroSubstitutionId>(vid)) {
-    auto eid = std::get<MacroSubstitutionId>(vid);
-    return {EntityId(FragmentId(eid.fragment_id)), eid.offset};
+  } else if (std::holds_alternative<MacroId>(vid)) {
+    auto eid = std::get<MacroId>(vid);
+    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
+
+  } else if (std::holds_alternative<AttributeId>(vid)) {
+    auto eid = std::get<AttributeId>(vid);
+    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
+
+  } else if (std::holds_alternative<ParsedTokenId>(vid)) {
+    auto eid = std::get<ParsedTokenId>(vid);
+    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
+
+  } else if (std::holds_alternative<MacroTokenId>(vid)) {
+    auto eid = std::get<MacroTokenId>(vid);
+    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
   } else {
     return {kInvalidEntityId, 0u};
@@ -727,7 +739,7 @@ EntityBaseOffsetPair GetFileOffset(RawEntityId id) {
   VariantId vid = EntityId(id).Unpack();
   if (std::holds_alternative<FileTokenId>(vid)) {
     auto eid = std::get<FileTokenId>(vid);
-    return {eid.file_id, eid.offset};
+    return {EntityId(FileId(eid.file_id)).Pack(), eid.offset};
 
   } else {
     return {kInvalidEntityId, 0u};
@@ -745,7 +757,7 @@ Decl CanonicalDecl(const Decl &decl) {
 
 // Return the "canonical" ID of a declaration. This tries to get us the
 // definition when possible.
-RawEntityId CanonicalId(const Decl &decl) {
+PackedDeclarationId CanonicalId(const Decl &decl) {
   return CanonicalDecl(decl).id();
 }
 
@@ -757,12 +769,13 @@ QString DeclName(const Decl &decl) {
                                static_cast<int>(name_data.size()));
     }
   }
-  return QString("%1(%2)").arg(EnumeratorName(decl.category())).arg(decl.id());
+  return QString("%1(%2)").arg(EnumeratorName(decl.category()))
+                          .arg(decl.id().Pack());
 }
 
 // Return the file location of an entity.
 RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
-  auto entity = index.entity(eid);
+  VariantEntity entity = index.entity(eid);
   if (std::holds_alternative<Decl>(entity)) {
     return DeclFileLocation(std::get<Decl>(entity));
 
@@ -772,40 +785,45 @@ RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
     Stmt stmt = std::get<Stmt>(entity);
     for (Token token : stmt.tokens()) {
       if (auto nearest_file_loc = token.nearest_file_token()) {
-        return nearest_file_loc->id();
+        return nearest_file_loc->id().Pack();
       }
     }
 
-    return Fragment::containing(stmt).file_tokens().begin()->id();
+    if (auto file_toks = Fragment::containing(stmt).file_tokens()) {
+      return file_toks.begin()->id().Pack();
+    }
 
   // Type; walk to the containing fragment.
   } else if (std::holds_alternative<Type>(entity)) {
     Type type = std::get<Type>(entity);
-    return Fragment::containing(type).file_tokens().begin()->id();
+    if (auto file_toks = Fragment::containing(type).file_tokens()) {
+      return file_toks.begin()->id().Pack();
+    }
 
   // Token substitution; walk up to the file location.
-  } else if (std::holds_alternative<MacroSubstitution>(entity)) {
-    auto sub = std::get<MacroSubstitution>(entity);
-    for (;;) {
-      for (auto tok_sub : sub.before()) {
-        if (std::holds_alternative<Token>(tok_sub)) {
-          Token tok = std::get<Token>(tok_sub);
-          if (auto nearest_file_loc = tok.nearest_file_token()) {
-            return nearest_file_loc->id();
-          }
+  } else if (std::holds_alternative<Macro>(entity)) {
+    Macro macro = std::get<Macro>(entity);
+    for (auto parent = macro.parent(); parent;
+         macro = std::move(parent.value())) {}
 
-        } else if (std::holds_alternative<MacroSubstitution>(tok_sub)) {
-          sub = std::get<MacroSubstitution>(tok_sub);
-          goto next_sub;
+    for (auto made_progress = true; made_progress;) {
+      made_progress = false;
+      for (MacroOrToken node : macro.children()) {
+        if (std::holds_alternative<Macro>(node)) {
+          macro = std::move(std::get<Macro>(node));
+          made_progress = true;
+          break;
+        } else if (std::holds_alternative<Token>(node)) {
+          if (auto file_tok = std::get<Token>(node).nearest_file_token()) {
+            return file_tok->id().Pack();
+          }
         }
       }
-      return kInvalidEntityId;
-    next_sub:
-      continue;
     }
+
   } else if (std::holds_alternative<Token>(entity)) {
     if (auto file_tok = std::get<Token>(entity).nearest_file_token()) {
-      return file_tok->id();
+      return file_tok->id().Pack();
     }
   }
   return kInvalidEntityId;
@@ -853,7 +871,7 @@ std::optional<Token> DeclFileToken(const Decl &decl) {
 // declaration.
 RawEntityId DeclFileLocation(const Decl &decl) {
   if (auto tok = DeclFileToken(decl)) {
-    return tok->id();
+    return tok->id().Pack();
   } else {
     return kInvalidEntityId;
   }
@@ -945,7 +963,7 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode) {
 
   BreadCrumbs crumbs(run_length_encode);
 
-  for (auto context = TokenContext::of(ent);
+  for (auto context = ent.context();
        context; context = context->parent()) {
     ++i;
 

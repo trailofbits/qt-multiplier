@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <multiplier/Token.h>
 #include <multiplier/ui/ICodeView.h>
 
 namespace mx::gui {
@@ -20,7 +21,7 @@ class CodeView final : public ICodeView {
   virtual ~CodeView() override;
 
   virtual std::optional<int>
-  GetFileTokenCursorPosition(const RawEntityId &file_token_id) const override;
+  GetFileTokenCursorPosition(RawEntityId file_token_id) const override;
 
   virtual std::optional<int>
   GetTokenCursorPosition(const Token &token) const override;
@@ -35,7 +36,7 @@ class CodeView final : public ICodeView {
   virtual QString Text() const override;
 
   virtual bool
-  ScrollToFileToken(const RawEntityId &file_token_id) const override;
+  ScrollToFileToken(RawEntityId file_token_id) const override;
 
   virtual bool ScrollToToken(const Token &token) const override;
   virtual bool ScrollToTokenRange(const TokenRange &token_range) const override;

@@ -14,10 +14,9 @@ class Database final : public IDatabase {
  public:
   virtual ~Database() override;
 
-  virtual FutureResult DownloadFile(const RawEntityId &file_id) override;
+  virtual FutureResult DownloadFile(PackedFileId file_id) override;
 
-  virtual FutureResult
-  DownloadFragment(const RawEntityId &fragment_id) override;
+  virtual FutureResult DownloadFragment(PackedFragmentId fragment_id) override;
 
   virtual FutureResult
   DownloadTokenRange(const RawEntityId &start_entity_id,

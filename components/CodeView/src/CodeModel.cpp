@@ -38,11 +38,12 @@ using TokenRowList = std::vector<TokenRow>;
 }  // namespace
 
 struct CodeModel::PrivateData final {
-  PrivateData(const FileLocationCache &file_location_cache_, Index index_)
+  PrivateData(const FileLocationCache &file_location_cache_,
+              const Index &index_)
       : file_location_cache(file_location_cache_),
-        index(std::move(index_)) {}
+        index(index_) {}
 
-  const FileLocationCache &file_location_cache;
+  FileLocationCache file_location_cache;
   Index index;
 
   IDatabase::Ptr database;
@@ -63,7 +64,7 @@ Index &CodeModel::GetIndex() {
   return d->index;
 }
 
-void CodeModel::SetFile(RawEntityId file_id) {
+void CodeModel::SetFile(PackedFileId file_id) {
   emit ModelAboutToBeReset();
 
   if (d->future_result.isRunning()) {
@@ -143,8 +144,8 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
   }
 }
 
-CodeModel::CodeModel(const FileLocationCache &file_location_cache, Index index,
-                     QObject *parent)
+CodeModel::CodeModel(const FileLocationCache &file_location_cache,
+                     const Index &index, QObject *parent)
     : ICodeModel(parent),
       d(new PrivateData(file_location_cache, index)) {
 

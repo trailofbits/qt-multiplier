@@ -99,7 +99,7 @@ EntityBaseOffsetPair GetFileOffset(RawEntityId id);
 
 // Return the "canonical" ID of a declaration. This tries to get us the
 // definition when possible.
-RawEntityId CanonicalId(const Decl &decl);
+PackedDeclarationId CanonicalId(const Decl &decl);
 
 // Return the "canonical" version of a declaration. This tries to get us the
 // definition when possible.

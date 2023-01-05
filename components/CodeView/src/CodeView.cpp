@@ -131,7 +131,7 @@ void CodeView::setTheme(const CodeViewTheme &theme) {
 CodeView::~CodeView() {}
 
 std::optional<int>
-CodeView::GetFileTokenCursorPosition(const RawEntityId &file_token_id) const {
+CodeView::GetFileTokenCursorPosition(RawEntityId file_token_id) const {
   if (!IsValidFileToken(file_token_id)) {
     return std::nullopt;
   }
@@ -154,7 +154,7 @@ std::optional<int> CodeView::GetTokenCursorPosition(const Token &token) const {
     return std::nullopt;
   }
 
-  return GetFileTokenCursorPosition(token.id());
+  return GetFileTokenCursorPosition(token.id().Pack());
 }
 
 std::optional<int> CodeView::GetStartTokenRangeCursorPosition(
@@ -163,7 +163,7 @@ std::optional<int> CodeView::GetStartTokenRangeCursorPosition(
     return std::nullopt;
   }
 
-  return GetFileTokenCursorPosition(token_range[0].id());
+  return GetFileTokenCursorPosition(token_range[0].id().Pack());
 }
 
 int CodeView::GetCursorPosition() const {
@@ -191,7 +191,7 @@ QString CodeView::Text() const {
   return d->text_edit->toPlainText();
 }
 
-bool CodeView::ScrollToFileToken(const RawEntityId &file_token_id) const {
+bool CodeView::ScrollToFileToken(RawEntityId file_token_id) const {
   auto opt_token_pos = GetFileTokenCursorPosition(file_token_id);
   if (!opt_token_pos.has_value()) {
     return false;
@@ -206,7 +206,7 @@ bool CodeView::ScrollToToken(const Token &token) const {
     return false;
   }
 
-  return ScrollToFileToken(token.id());
+  return ScrollToFileToken(token.id().Pack());
 }
 
 bool CodeView::ScrollToTokenRange(const TokenRange &token_range) const {
@@ -214,7 +214,7 @@ bool CodeView::ScrollToTokenRange(const TokenRange &token_range) const {
     return false;
   }
 
-  return ScrollToFileToken(token_range[0].id());
+  return ScrollToFileToken(token_range[0].id().Pack());
 }
 
 CodeView::CodeView(ICodeModel *model, QWidget *parent)

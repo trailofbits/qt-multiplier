@@ -7,7 +7,8 @@
 #
 
 add_subdirectory("qt")
-add_subdirectory("python")
+#add_subdirectory("phantomstyle")
+#add_subdirectory("python")
 add_subdirectory("multiplier")
-add_subdirectory("py-multiplier")
-add_subdirectory("sqlite-multiplier")
+#add_subdirectory("py-multiplier")
+#add_subdirectory("sqlite-multiplier")
