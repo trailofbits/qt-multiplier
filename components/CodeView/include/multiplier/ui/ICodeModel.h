@@ -8,12 +8,14 @@
 
 #pragma once
 
-#include <multiplier/File.h>
-#include <multiplier/Index.h>
-
+#include <multiplier/Types.h>
 #include <QObject>
 #include <QVariant>
 
+namespace mx {
+class FileLocationCache;
+class Index;
+}  // namespace mx
 namespace mx::gui {
 
 struct CodeModelIndex {
@@ -33,12 +35,12 @@ class ICodeModel : public QObject {
   };
 
   static ICodeModel *Create(const FileLocationCache &file_location_cache,
-                            Index index, QObject *parent = nullptr);
+                            const Index &index, QObject *parent = nullptr);
 
   virtual const FileLocationCache &GetFileLocationCache() const = 0;
   virtual Index &GetIndex() = 0;
 
-  virtual void SetFile(RawEntityId file_id) = 0;
+  virtual void SetFile(PackedFileId file_id) = 0;
 
   virtual int RowCount() const = 0;
   virtual int TokenCount(int row) const = 0;

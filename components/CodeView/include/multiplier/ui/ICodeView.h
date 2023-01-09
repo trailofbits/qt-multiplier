@@ -15,6 +15,10 @@
 
 #include <QWidget>
 
+namespace mx {
+class Token;
+class TokenRange;
+}  // namespace mx
 namespace mx::gui {
 
 class ICodeView : public QWidget {
@@ -28,7 +32,7 @@ class ICodeView : public QWidget {
   virtual ~ICodeView() override = default;
 
   virtual std::optional<int>
-  GetFileTokenCursorPosition(const RawEntityId &file_token_id) const = 0;
+  GetFileTokenCursorPosition(RawEntityId file_token_id) const = 0;
 
   virtual std::optional<int>
   GetTokenCursorPosition(const Token &token) const = 0;
@@ -43,7 +47,7 @@ class ICodeView : public QWidget {
 
   virtual QString Text() const = 0;
 
-  virtual bool ScrollToFileToken(const RawEntityId &file_token_id) const = 0;
+  virtual bool ScrollToFileToken(RawEntityId file_token_id) const = 0;
   virtual bool ScrollToToken(const Token &token) const = 0;
   virtual bool ScrollToTokenRange(const TokenRange &token_range) const = 0;
 

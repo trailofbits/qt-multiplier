@@ -10,6 +10,9 @@
 
 #include <multiplier/ui/ICodeModel.h>
 
+#include <multiplier/File.h>
+#include <multiplier/Index.h>
+
 #include <memory>
 
 namespace mx::gui {
@@ -23,7 +26,7 @@ class CodeModel final : public ICodeModel {
   virtual const FileLocationCache &GetFileLocationCache() const override;
   virtual Index &GetIndex() override;
 
-  virtual void SetFile(RawEntityId file_id) override;
+  virtual void SetFile(PackedFileId file_id) override;
 
   virtual int RowCount() const override;
   virtual int TokenCount(int row) const override;
@@ -32,7 +35,7 @@ class CodeModel final : public ICodeModel {
                         int role = Qt::DisplayRole) const override;
 
  protected:
-  CodeModel(const FileLocationCache &file_location_cache, Index index,
+  CodeModel(const FileLocationCache &file_location_cache, const Index &index,
             QObject *parent);
 
  private:

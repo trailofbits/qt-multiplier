@@ -16,7 +16,7 @@ namespace {
 
 struct TokenRangeData final {
   TokenRange file_tokens;
-  std::unordered_map<RawEntityId, std::vector<TokenList>> fragment_tokens;
+  std::unordered_map<RawEntityId, std::vector<TokenRange>> fragment_tokens;
 };
 
 Result<TokenRangeData, RPCErrorCode>
@@ -37,13 +37,14 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
       return RPCErrorCode::NoDataReceived;
     }
 
-    for (auto fragment : Fragment::in(file.value())) {
-      for (const auto &tok : fragment.file_tokens()) {
+    for (Fragment fragment : file->fragments()) {
+      for (const Token &tok : fragment.file_tokens()) {
         if (result_promise.isCanceled()) {
           return RPCErrorCode::Interrupted;
         }
 
-        output.fragment_tokens[tok.id()].emplace_back(fragment.parsed_tokens());
+        RawEntityId raw_tok_id = tok.id().Pack();
+        output.fragment_tokens[raw_tok_id].emplace_back(fragment.parsed_tokens());
         break;
       }
     }
@@ -59,12 +60,13 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
       return RPCErrorCode::NoDataReceived;
     }
 
-    for (const auto &tok : output.file_tokens) {
+    for (const Token &tok : output.file_tokens) {
       if (result_promise.isCanceled()) {
         return RPCErrorCode::Interrupted;
       }
 
-      output.fragment_tokens[tok.id()].emplace_back(fragment->parsed_tokens());
+      RawEntityId raw_tok_id = tok.id().Pack();
+      output.fragment_tokens[raw_tok_id].emplace_back(fragment->parsed_tokens());
       break;
     }
 
@@ -102,9 +104,10 @@ DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
       return RPCErrorCode::InvalidFileOffsetRange;
     }
 
+    RawEntityId entity_id{EntityId(FragmentId(begin_fid.file_id)).Pack()};
     auto output_res = DownloadEntityTokens(result_promise, index,
                                            DownloadRequestType::FileTokens,
-                                           begin_fid.file_id);
+                                           entity_id);
 
     if (!output_res.Succeeded()) {
       return output_res.TakeError();
@@ -116,7 +119,7 @@ DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
 
     return output;
 
-    // Show a range of fragment tokens.
+  // Show a range of fragment tokens.
   } else if (std::holds_alternative<ParsedTokenId>(begin_vid) &&
              std::holds_alternative<ParsedTokenId>(end_vid)) {
 
@@ -131,7 +134,7 @@ DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
       return RPCErrorCode::InvalidFragmentOffsetRange;
     }
 
-    RawEntityId entity_id{EntityId(FragmentId(begin_fid.fragment_id))};
+    RawEntityId entity_id{EntityId(FragmentId(begin_fid.fragment_id)).Pack()};
     auto output_res = DownloadEntityTokens(
         result_promise, index, DownloadRequestType::FragmentTokens, entity_id);
 
@@ -217,7 +220,7 @@ void CreateIndexedTokenRangeData(
       return;
     }
 
-    const auto &file_tok_id = file_tok.id();
+    const RawEntityId file_tok_id = file_tok.id().Pack();
 
     // Sortedness needed for `CodeView::ScrollToToken`.
     if (opt_last_file_tok_id.has_value() &&
@@ -244,8 +247,8 @@ void CreateIndexedTokenRangeData(
     if (fragment_tokens_it != token_range_data.fragment_tokens.end()) {
       const auto &parsed_token_list = fragment_tokens_it->second;
 
-      for (const auto &parsed_toks : parsed_token_list) {
-        for (const auto &parsed_tok : parsed_toks) {
+      for (const TokenRange &parsed_toks : parsed_token_list) {
+        for (const Token &parsed_tok : parsed_toks) {
           if (result_promise.isCanceled()) {
             result_promise.addResult(RPCErrorCode::Interrupted);
             return;
@@ -254,7 +257,7 @@ void CreateIndexedTokenRangeData(
           const auto &file_tok_of_parsed_tok = parsed_tok.file_token();
 
           if (file_tok_of_parsed_tok) {
-            const auto &id = file_tok_of_parsed_tok->id();
+            const RawEntityId id = file_tok_of_parsed_tok->id().Pack();
             file_to_frag_toks[id].push_back(parsed_tok);
           }
         }
@@ -337,7 +340,8 @@ void CreateIndexedTokenRangeData(
             continue;
           }
 
-          output.tok_decl_ids.emplace_back(frag_tok.id(), related_decl->id());
+          output.tok_decl_ids.emplace_back(frag_tok.id().Pack(),
+                                           related_decl->id().Pack());
           tok_decls.emplace_back(related_decl.value());
           has_added_decl = true;
 
@@ -347,7 +351,8 @@ void CreateIndexedTokenRangeData(
           }
 
         } else {
-          output.tok_decl_ids.emplace_back(frag_tok.id(), kInvalidEntityId);
+          output.tok_decl_ids.emplace_back(frag_tok.id().Pack(),
+                                           kInvalidEntityId);
         }
 
         // Try to make a better default classification of this token (for syntax

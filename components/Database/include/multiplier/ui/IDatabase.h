@@ -63,8 +63,8 @@ class IDatabase {
   static Ptr Create(const Index &index,
                     const FileLocationCache &file_location_cache);
 
-  virtual FutureResult DownloadFile(const RawEntityId &file_id) = 0;
-  virtual FutureResult DownloadFragment(const RawEntityId &fragment_id) = 0;
+  virtual FutureResult DownloadFile(PackedFileId file_id) = 0;
+  virtual FutureResult DownloadFragment(PackedFragmentId fragment_id) = 0;
   virtual FutureResult DownloadTokenRange(const RawEntityId &start_entity_id,
                                           const RawEntityId &end_entity_id) = 0;
 

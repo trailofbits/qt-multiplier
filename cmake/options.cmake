@@ -6,5 +6,5 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-set(MX_QT_VERSION "5" CACHE STRING "Qt version")
+set(MX_QT_VERSION "6" CACHE STRING "Qt version")
 set(MX_PYTHON_VERSION "3.7" CACHE STRING "Python version")

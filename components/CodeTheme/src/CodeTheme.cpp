@@ -396,10 +396,12 @@ const QBrush &HighlightRangeTheme::TokenBackgroundColor(
       tok, related_decls, kind);
 
   if (d->type && d->tokens.index_of(tok)) {
-    if (auto type = mx::TokenContext::of(tok)->as_type()) {
-      if (type->id().Pack() == d->type->id().Pack()) {
-        QBrush brush_inv(d->background, brush.style());
-        return d->inverted_colors.emplace(&brush, brush_inv).first->second;
+    if (auto tok_context = tok.context()) {
+      if (auto type = tok_context->as_type()) {
+        if (type->id().Pack() == d->type->id().Pack()) {
+          QBrush brush_inv(d->background, brush.style());
+          return d->inverted_colors.emplace(&brush, brush_inv).first->second;
+        }
       }
     }
     return brush;
@@ -422,10 +424,12 @@ const QBrush &HighlightRangeTheme::TokenForegroundColor(
       tok, related_decls, kind);
 
   if (d->type && d->tokens.index_of(tok)) {
-    if (auto type = mx::TokenContext::of(tok)->as_type()) {
-      if (type->id().Pack() == d->type->id().Pack()) {
-         QBrush brush_inv(d->background, brush.style());
-        return d->inverted_colors.emplace(&brush, brush_inv).first->second;
+    if (auto tok_context = tok.context()) {
+      if (auto type = tok_context->as_type()) {
+        if (type->id().Pack() == d->type->id().Pack()) {
+           QBrush brush_inv(d->background, brush.style());
+          return d->inverted_colors.emplace(&brush, brush_inv).first->second;
+        }
       }
     }
     return brush;

@@ -31,19 +31,19 @@ struct Database::PrivateData {
       : index(std::move(index_)),
         file_location_cache(file_location_cache_) {}
 
-  const Index &index;
-  const FileLocationCache &file_location_cache;
+  const Index index;
+  const FileLocationCache file_location_cache;
 
   QThreadPool thread_pool;
 };
 
 Database::~Database() {}
 
-Database::FutureResult Database::DownloadFile(const RawEntityId &file_id) {
+Database::FutureResult Database::DownloadFile(PackedFileId file_id) {
 
   Request request{SingleEntityRequest{
       DownloadRequestType::FileTokens,
-      file_id,
+      file_id.Pack(),
   }};
 
   return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
@@ -51,11 +51,11 @@ Database::FutureResult Database::DownloadFile(const RawEntityId &file_id) {
 }
 
 Database::FutureResult
-Database::DownloadFragment(const RawEntityId &fragment_id) {
+Database::DownloadFragment(PackedFragmentId fragment_id) {
 
   Request request{SingleEntityRequest{
       DownloadRequestType::FragmentTokens,
-      fragment_id,
+      fragment_id.Pack(),
   }};
 
   return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
