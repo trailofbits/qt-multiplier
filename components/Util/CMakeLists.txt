@@ -16,7 +16,6 @@ target_link_libraries("mx_util" PRIVATE
   "qtmx_cxx_flags"
   "thirdparty_qt"
   "multiplier::mx-api"
-  "mx_codetheme"
 )
 
 target_include_directories("mx_util" PRIVATE

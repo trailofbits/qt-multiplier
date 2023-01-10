@@ -36,8 +36,8 @@ add_library("mx-gui" STATIC
   Resources/resources.qrc
   Multiplier.cpp
   Multiplier.h
-  "MacOSUtils.h"
-  "MacOSUtils.mm"
+  MacOSUtils.h
+  MacOSUtils.mm
 )
 
 target_link_libraries("mx-gui"
@@ -46,7 +46,6 @@ target_link_libraries("mx-gui"
     thirdparty_qt
     mx_codeview
     mx_util
-    mx_codetheme
     mx_database
 )
 

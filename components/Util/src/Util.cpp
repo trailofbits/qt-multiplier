@@ -13,7 +13,6 @@
 #include <multiplier/Iterator.h>
 #include <multiplier/Token.h>
 #include <multiplier/Use.h>
-#include <multiplier/CodeTheme.h>
 
 #include <iostream>
 

@@ -35,8 +35,7 @@ class CodeView final : public ICodeView {
 
   virtual QString Text() const override;
 
-  virtual bool
-  ScrollToFileToken(RawEntityId file_token_id) const override;
+  virtual bool ScrollToFileToken(RawEntityId file_token_id) const override;
 
   virtual bool ScrollToToken(const Token &token) const override;
   virtual bool ScrollToTokenRange(const TokenRange &token_range) const override;
@@ -51,7 +50,7 @@ class CodeView final : public ICodeView {
   virtual bool eventFilter(QObject *, QEvent *) override;
   void InstallModel(ICodeModel *model);
   void InitializeWidgets();
-  bool IsValidFileToken(const RawEntityId &file_token_id) const;
+  bool IsValidFileToken(RawEntityId file_token_id) const;
 
   std::optional<CodeModelIndex> ModelIndexFromMousePosition(QPoint pos);
   void OnTextEditViewportMouseMoveEvent(QMouseEvent *event);

@@ -347,7 +347,7 @@ void CodeView::InitializeWidgets() {
   OnModelReset();
 }
 
-bool CodeView::IsValidFileToken(const RawEntityId &file_token_id) const {
+bool CodeView::IsValidFileToken(RawEntityId file_token_id) const {
   if (file_token_id == kInvalidEntityId) {
     return false;
   }

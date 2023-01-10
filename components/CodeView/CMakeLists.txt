@@ -39,7 +39,6 @@ target_link_libraries("mx_codeview" PRIVATE
   "multiplier::mx-api"
   "mx_util"
   "mx_database"
-  "mx_codetheme"
   "mx_assert"
 )
 

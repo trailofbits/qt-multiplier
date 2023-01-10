@@ -8,14 +8,13 @@
 
 #pragma once
 
-// TODO(alessandro): The token category should not be a property of the
-// theme. It should be a property of the token. Migrate this elsewhere
-#include <multiplier/CodeTheme.h>
+#include <multiplier/Util.h>
 
-#include <QColor>
 #include <filesystem>
 #include <optional>
 #include <unordered_map>
+
+#include <QColor>
 
 namespace mx::gui {
 
