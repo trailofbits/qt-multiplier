@@ -44,7 +44,8 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
         }
 
         RawEntityId raw_tok_id = tok.id().Pack();
-        output.fragment_tokens[raw_tok_id].emplace_back(fragment.parsed_tokens());
+        output.fragment_tokens[raw_tok_id].emplace_back(
+            fragment.parsed_tokens());
         break;
       }
     }
@@ -66,7 +67,8 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
       }
 
       RawEntityId raw_tok_id = tok.id().Pack();
-      output.fragment_tokens[raw_tok_id].emplace_back(fragment->parsed_tokens());
+      output.fragment_tokens[raw_tok_id].emplace_back(
+          fragment->parsed_tokens());
       break;
     }
 
@@ -105,9 +107,8 @@ DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
     }
 
     RawEntityId entity_id{EntityId(FragmentId(begin_fid.file_id)).Pack()};
-    auto output_res = DownloadEntityTokens(result_promise, index,
-                                           DownloadRequestType::FileTokens,
-                                           entity_id);
+    auto output_res = DownloadEntityTokens(
+        result_promise, index, DownloadRequestType::FileTokens, entity_id);
 
     if (!output_res.Succeeded()) {
       return output_res.TakeError();
@@ -119,7 +120,7 @@ DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
 
     return output;
 
-  // Show a range of fragment tokens.
+    // Show a range of fragment tokens.
   } else if (std::holds_alternative<ParsedTokenId>(begin_vid) &&
              std::holds_alternative<ParsedTokenId>(end_vid)) {
 

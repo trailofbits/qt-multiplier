@@ -6,4 +6,8 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-find_package("py-multiplier" CONFIG REQUIRED GLOBAL)
+if(PLATFORM_MACOS)
+  set(CMAKE_INSTALL_RPATH "@executable_path/../${CMAKE_INSTALL_LIBDIR}")
+elseif(PLATFORM_LINUX)
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+endif()

@@ -22,8 +22,7 @@ namespace mx::gui {
 // indicators for syntax coloring.
 TokenClass ClassifyToken(const Token &tok) {
   switch (tok.kind()) {
-    case TokenKind::COMMENT:
-      return TokenClass::kComment;
+    case TokenKind::COMMENT: return TokenClass::kComment;
     case TokenKind::NUMERIC_CONSTANT:
     case TokenKind::CHARACTER_CONSTANT:
     case TokenKind::WIDE_CHARACTER_CONSTANT:
@@ -35,8 +34,7 @@ TokenClass ClassifyToken(const Token &tok) {
     case TokenKind::HEADER_NAME:
     case TokenKind::UTF8_STRING_LITERAL:
     case TokenKind::UTF16_STRING_LITERAL:
-    case TokenKind::UTF32_STRING_LITERAL:
-      return TokenClass::kLiteral;
+    case TokenKind::UTF32_STRING_LITERAL: return TokenClass::kLiteral;
     case TokenKind::L_SQUARE:
     case TokenKind::R_SQUARE:
     case TokenKind::L_PARENTHESIS:
@@ -93,8 +91,7 @@ TokenClass ClassifyToken(const Token &tok) {
     case TokenKind::AT:
     case TokenKind::LESS_LESS_LESS:
     case TokenKind::GREATER_GREATER_GREATER:
-    case TokenKind::CARETCARET:
-      return TokenClass::kPunctuation;
+    case TokenKind::CARETCARET: return TokenClass::kPunctuation;
     case TokenKind::KEYWORD_DOUBLE:
     case TokenKind::KEYWORD_LONG:
     case TokenKind::KEYWORD_FLOAT:
@@ -124,8 +121,7 @@ TokenClass ClassifyToken(const Token &tok) {
     case TokenKind::KEYWORD___SPTR:
     case TokenKind::KEYWORD___UPTR:
     case TokenKind::KEYWORD___W64:
-    case TokenKind::KEYWORD___INT64:
-      return TokenClass::kBuiltinTypeName;
+    case TokenKind::KEYWORD___INT64: return TokenClass::kBuiltinTypeName;
 
     case TokenKind::KEYWORD__EXT_INT:
     case TokenKind::KEYWORD__BIT_INT:
@@ -373,8 +369,7 @@ TokenClass ClassifyToken(const Token &tok) {
     case TokenKind::KEYWORD___BUILTIN_BIT_CAST:
     case TokenKind::KEYWORD___BUILTIN_AVAILABLE:
     case TokenKind::KEYWORD___BUILTIN_SYCL_UNIQUE_STABLE_NAME:
-    case TokenKind::KEYWORD___UNKNOWN_ANYTYPE:
-      return TokenClass::kKeyword;
+    case TokenKind::KEYWORD___UNKNOWN_ANYTYPE: return TokenClass::kKeyword;
     case TokenKind::PP_IF:
     case TokenKind::PP_IFDEF:
     case TokenKind::PP_IFNDEF:
@@ -399,8 +394,7 @@ TokenClass ClassifyToken(const Token &tok) {
     case TokenKind::PP_ASSERT:
     case TokenKind::PP_UNASSERT:
     case TokenKind::PP___PUBLIC_MACRO:
-    case TokenKind::PP___PRIVATE_MACRO:
-      return TokenClass::kPreProcessorKeyword;
+    case TokenKind::PP___PRIVATE_MACRO: return TokenClass::kPreProcessorKeyword;
     case TokenKind::OBJC_AT_CLASS:
     case TokenKind::OBJC_AT_COMPATIBILITY_ALIAS:
     case TokenKind::OBJC_AT_DEFINITIONS:
@@ -426,12 +420,9 @@ TokenClass ClassifyToken(const Token &tok) {
     case TokenKind::OBJC_AT_SYNTHESIZE:
     case TokenKind::OBJC_AT_DYNAMIC:
     case TokenKind::OBJC_AT_IMPORT:
-    case TokenKind::OBJC_AT_AVAILABLE:
-      return TokenClass::kObjectiveCKeyword;
-    case TokenKind::IDENTIFIER:
-      return TokenClass::kIdentifier;
-    default:
-      return TokenClass::kUnknown;
+    case TokenKind::OBJC_AT_AVAILABLE: return TokenClass::kObjectiveCKeyword;
+    case TokenKind::IDENTIFIER: return TokenClass::kIdentifier;
+    default: return TokenClass::kUnknown;
   }
 }
 
@@ -444,11 +435,8 @@ TokenCategory CategorizeToken(const Token &token, TokenClass tok_class,
       case ' ':
       case '\t':
       case '\r':
-      case '\n':
-        continue;
-      default:
-        is_whitespace = false;
-        break;
+      case '\n': continue;
+      default: is_whitespace = false; break;
     }
   }
 
@@ -506,7 +494,7 @@ static std::optional<Decl> VisitStmt(const Stmt &stmt, const Token &token) {
       return ls->declaration();
     }
 
-  // Backup.
+    // Backup.
   } else if (auto call = CallExpr::from(stmt)) {
     if (call->expression_token().id() == token.id()) {
       if (auto called_decl = call->callee_declaration()) {
@@ -547,8 +535,7 @@ static std::optional<Decl> VisitType(const Type &type, const Token &token) {
 // Try to determine the declarations associated with this token.
 std::optional<Decl> DeclForToken(const Token &token) {
   switch (token.kind()) {
-    default:
-      return std::nullopt;
+    default: return std::nullopt;
 
     case TokenKind::L_SQUARE:
     case TokenKind::R_SQUARE:
@@ -600,12 +587,10 @@ std::optional<Decl> DeclForToken(const Token &token) {
     case TokenKind::KEYWORD_DELETE:
     case TokenKind::KEYWORD_NEW:
     case TokenKind::KEYWORD_OPERATOR:
-    case TokenKind::IDENTIFIER:
-      break;
+    case TokenKind::IDENTIFIER: break;
   }
 
-  for (auto context = token.context(); context;
-       context = context->parent()) {
+  for (auto context = token.context(); context; context = context->parent()) {
 
     if (auto stmt = context->as_statement()) {
       if (auto decl = VisitStmt(stmt.value(), token)) {
@@ -638,7 +623,8 @@ std::optional<Decl> DeclForToken(const Token &token) {
 #if 1
   if (ClassifyToken(token) == TokenClass::kIdentifier) {
     if (std::optional<Fragment> frag = Fragment::containing(token)) {
-      std::cerr << "Missing decl for '" << token.data() << "': " << token.id() << ":\n";
+      std::cerr << "Missing decl for '" << token.data() << "': " << token.id()
+                << ":\n";
       std::cerr << "\tFragment ID: " << frag->id() << '\n';
       if (auto file = File::containing(token)) {
         std::cerr << "\tFile ID: " << file->id() << '\n';
@@ -648,14 +634,17 @@ std::optional<Decl> DeclForToken(const Token &token) {
            context = context->parent()) {
 
         if (auto stmt = context->as_statement()) {
-          std::cerr << " -> " << EnumeratorName(stmt->kind()) << "(" << stmt->id() << ")";
+          std::cerr << " -> " << EnumeratorName(stmt->kind()) << "("
+                    << stmt->id() << ")";
 
         } else if (auto type = context->as_type()) {
-          std::cerr << " -> " << EnumeratorName(type->kind()) << "(" << type->id() << ")";
+          std::cerr << " -> " << EnumeratorName(type->kind()) << "("
+                    << type->id() << ")";
 
         } else if (auto decl = context->as_declaration()) {
-          std::cerr << " -> " << EnumeratorName(decl->kind()) << "(" << decl->id() << ")";
-        
+          std::cerr << " -> " << EnumeratorName(decl->kind()) << "("
+                    << decl->id() << ")";
+
         } else if (auto attr = context->as_attribute()) {
           std::cerr << " -> ATTRIBUTE(" << attr->token().data() << ")";
 
@@ -673,13 +662,15 @@ std::optional<Decl> DeclForToken(const Token &token) {
         if (auto decl = use.as_declaration()) {
           for (auto sel : EnumerationRange<TokenUseSelector>()) {
             if (use.has_selector(sel)) {
-              std::cerr << '\t' << EnumeratorName(decl->kind()) << "::" << EnumeratorName(sel) << '\n';
+              std::cerr << '\t' << EnumeratorName(decl->kind())
+                        << "::" << EnumeratorName(sel) << '\n';
             }
           }
         } else if (auto stmt = use.as_statement()) {
           for (auto sel : EnumerationRange<TokenUseSelector>()) {
             if (use.has_selector(sel)) {
-              std::cerr << '\t' << EnumeratorName(stmt->kind()) << "::" << EnumeratorName(sel) << '\n';
+              std::cerr << '\t' << EnumeratorName(stmt->kind())
+                        << "::" << EnumeratorName(sel) << '\n';
             }
           }
         }
@@ -768,8 +759,9 @@ QString DeclName(const Decl &decl) {
                                static_cast<int>(name_data.size()));
     }
   }
-  return QString("%1(%2)").arg(EnumeratorName(decl.category()))
-                          .arg(decl.id().Pack());
+  return QString("%1(%2)")
+      .arg(EnumeratorName(decl.category()))
+      .arg(decl.id().Pack());
 }
 
 // Return the file location of an entity.
@@ -778,9 +770,10 @@ RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
   if (std::holds_alternative<Decl>(entity)) {
     return DeclFileLocation(std::get<Decl>(entity));
 
-  // Statement, walk to the first fragent token, or the beginning of the
-  // fragment.
-  } if (std::holds_alternative<Stmt>(entity)) {
+    // Statement, walk to the first fragent token, or the beginning of the
+    // fragment.
+  }
+  if (std::holds_alternative<Stmt>(entity)) {
     Stmt stmt = std::get<Stmt>(entity);
     for (Token token : stmt.tokens()) {
       if (auto nearest_file_loc = token.nearest_file_token()) {
@@ -792,18 +785,19 @@ RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
       return file_toks.begin()->id().Pack();
     }
 
-  // Type; walk to the containing fragment.
+    // Type; walk to the containing fragment.
   } else if (std::holds_alternative<Type>(entity)) {
     Type type = std::get<Type>(entity);
     if (auto file_toks = Fragment::containing(type).file_tokens()) {
       return file_toks.begin()->id().Pack();
     }
 
-  // Token substitution; walk up to the file location.
+    // Token substitution; walk up to the file location.
   } else if (std::holds_alternative<Macro>(entity)) {
     Macro macro = std::get<Macro>(entity);
     for (auto parent = macro.parent(); parent;
-         macro = std::move(parent.value())) {}
+         macro = std::move(parent.value())) {
+    }
 
     for (auto made_progress = true; made_progress;) {
       made_progress = false;
@@ -942,7 +936,8 @@ struct BreadCrumbs {
       ++repetitions;
 
     } else if (repetitions < 9) {
-      breadcrumbs.append(kBreadCrumb.arg(kReps[repetitions]).arg(sep).arg(name));
+      breadcrumbs.append(
+          kBreadCrumb.arg(kReps[repetitions]).arg(sep).arg(name));
       repetitions = 0;
 
     } else {
@@ -962,8 +957,7 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode) {
 
   BreadCrumbs crumbs(run_length_encode);
 
-  for (auto context = ent.context();
-       context; context = context->parent()) {
+  for (auto context = ent.context(); context; context = context->parent()) {
     ++i;
 
     if (auto cdecl = context->as_declaration()) {
@@ -976,17 +970,17 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode) {
       switch (cstmt->kind()) {
         case StmtKind::DECL_REF_EXPR:
         case StmtKind::COMPOUND_STMT:
-        case StmtKind::PAREN_EXPR:
-          break;
+        case StmtKind::PAREN_EXPR: break;
         case StmtKind::UNARY_EXPR_OR_TYPE_TRAIT_EXPR: {
-          auto &expr = reinterpret_cast<const UnaryExprOrTypeTraitExpr &>(
-              cstmt.value());
+          auto &expr =
+              reinterpret_cast<const UnaryExprOrTypeTraitExpr &>(cstmt.value());
           crumbs.AddEnum(expr.expression_or_trait_kind());
           continue;
         }
 
         case StmtKind::IMPLICIT_CAST_EXPR: {
-          auto &cast = reinterpret_cast<const ImplicitCastExpr &>(cstmt.value());
+          auto &cast =
+              reinterpret_cast<const ImplicitCastExpr &>(cstmt.value());
           auto ck = cast.cast_kind();
           if (ck != CastKind::L_VALUE_TO_R_VALUE && ck != CastKind::BIT_CAST &&
               ck != CastKind::FUNCTION_TO_POINTER_DECAY &&
@@ -1016,9 +1010,7 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode) {
           }
           [[clang::fallthrough]];
 
-        default:
-          crumbs.AddEnum(cstmt->kind());
-          break;
+        default: crumbs.AddEnum(cstmt->kind()); break;
       }
     }
   }

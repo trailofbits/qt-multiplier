@@ -4,12 +4,8 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#pragma once
-
-#include <QColor>
-
 namespace mx::gui {
 
-void setTitleBarColor(WId window_handle, const QColor color, bool transparent);
+void RegisterMetaTypes();
 
 }  // namespace mx::gui
