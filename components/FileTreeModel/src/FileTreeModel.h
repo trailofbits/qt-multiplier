@@ -22,6 +22,9 @@ class FileTreeModel final : public IFileTreeModel {
 
   virtual void Update() override;
 
+  virtual std::optional<PackedFileId>
+  GetFileIdentifier(const QModelIndex &index) const override;
+
   virtual QModelIndex index(int row, int column,
                             const QModelIndex &parent) const override;
 

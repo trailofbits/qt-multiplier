@@ -21,6 +21,13 @@ class MainWindow final : public QMainWindow {
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
+
+  void InitializeWidgets();
+  void CreateFileTreeDock();
+  void CreateCodeView();
+
+ private slots:
+  void OnFileTreeItemClicked(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

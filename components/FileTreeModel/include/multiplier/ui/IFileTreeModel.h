@@ -21,6 +21,11 @@ class IFileTreeModel : public QAbstractItemModel {
   static IFileTreeModel *Create(mx::Index index, QObject *parent = nullptr);
   virtual void Update() = 0;
 
+  // TODO(alessandro): This should be available through
+  // QAbstractItemModel::data(index, IFileTreeModel::FileIdentifierRole)
+  virtual std::optional<PackedFileId>
+  GetFileIdentifier(const QModelIndex &index) const = 0;
+
   IFileTreeModel(QObject *parent) : QAbstractItemModel(parent) {}
   virtual ~IFileTreeModel() override = default;
 

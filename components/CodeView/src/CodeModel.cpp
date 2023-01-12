@@ -110,9 +110,11 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
     }
 
     switch (d->model_state) {
-      case ModelState::UpdateInProgress: return tr("Update in progress...");
-      case ModelState::UpdateCancelled: return tr("Update cancelled");
-      case ModelState::UpdateFailed: return tr("Update failed");
+      case ModelState::UpdateInProgress:
+        return tr("The token request has started");
+      case ModelState::UpdateCancelled:
+        return tr("The token request has been cancelled");
+      case ModelState::UpdateFailed: return tr("The token request has failed");
       case ModelState::Ready: __builtin_unreachable();
     }
   }
