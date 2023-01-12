@@ -14,7 +14,8 @@
 
 #include <QDockWidget>
 #include <QTreeView>
-#include <QApplication>
+#include <QFileDialog>
+#include <QDir>
 
 namespace mx::gui {
 
@@ -27,13 +28,12 @@ struct MainWindow::PrivateData final {
 };
 
 MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
-  const auto &argument_list = QApplication::arguments();
-  if (argument_list.size() != 2) {
-    throw std::runtime_error("Missing parameter: database path");
-  }
+  setWindowTitle("Multiplier");
+  setWindowIcon(QIcon(":/Icons/Multiplier"));
 
-  const auto &database_path = argument_list[1].toStdString();
-  d->index = mx::EntityProvider::from_database(database_path);
+  auto database_path = QFileDialog::getOpenFileName(
+      this, tr("Select a Multiplier database"), QDir::homePath());
+  d->index = mx::EntityProvider::from_database(database_path.toStdString());
 
   InitializeWidgets();
 }

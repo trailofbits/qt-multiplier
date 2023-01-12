@@ -1,5 +1,5 @@
 <RCC>
     <qresource prefix="/Icons">
-        <file alias="appicon">Icons/Logo.ico</file>
+        <file alias="Multiplier">Icons/Multiplier.icns</file>
     </qresource>
 </RCC>

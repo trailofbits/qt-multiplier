@@ -8,7 +8,19 @@
 
 cmake_minimum_required(VERSION 3.19)
 
-add_executable("multiplier"
+set(MACOSX_BUNDLE_ICON_FILE
+  "Multiplier.icns"
+)
+
+set(multiplier_icon_path
+  "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Icons/${MACOSX_BUNDLE_ICON_FILE}"
+)
+
+set_source_files_properties("${multiplier_icon_path}" PROPERTIES
+  MACOSX_PACKAGE_LOCATION "Resources"
+)
+
+add_executable("multiplier" MACOSX_BUNDLE
   src/main.cpp
 
   src/MainWindow.h
@@ -21,6 +33,7 @@ add_executable("multiplier"
 target_sources("multiplier" PRIVATE
   Resources/resources.qrc
   Info.plist
+  "${multiplier_icon_path}"
 )
 
 target_link_libraries("multiplier"
