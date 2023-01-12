@@ -25,12 +25,13 @@ target_sources("multiplier" PRIVATE
 
 target_link_libraries("multiplier"
   PUBLIC
-    multiplier::mx-api
-    thirdparty_qt
-    mx_codeview
-    mx_util
-    mx_database
-    mx_fontdatabase
+    "multiplier::mx-api"
+    "thirdparty_qt"
+    "mx_codeview"
+    "mx_util"
+    "mx_database"
+    "mx_fontdatabase"
+    "mx_filetreemodel"
 )
 
 enable_qt_properties("multiplier")

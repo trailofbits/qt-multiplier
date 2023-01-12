@@ -6,27 +6,34 @@
 
 #include "MainWindow.h"
 
-#include <QDebug>
-#include <QFontDatabase>
-#include <QMetaType>
-#include <QPixmap>
+#include <QTreeView>
 
-#include <climits>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <filesystem>
-#include <memory>
 #include <multiplier/Index.h>
-#include <system_error>
-#include <tuple>
-#include <variant>
+#include <multiplier/ui/IFileTreeModel.h>
 
 namespace mx::gui {
 
-struct MainWindow::PrivateData final {};
+namespace {
 
-MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {}
+const std::string kDatabasePath{"/Users/alessandro/Downloads/pcre2.db"};
+
+}
+
+struct MainWindow::PrivateData final {
+  mx::Index index;
+};
+
+MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
+  d->index = mx::EntityProvider::from_database(kDatabasePath);
+  auto model = IFileTreeModel::Create(d->index, this);
+
+  auto tree_view = new QTreeView();
+  tree_view->setModel(model);
+  tree_view->expandRecursively(QModelIndex());
+  tree_view->setHeaderHidden(true);
+
+  setCentralWidget(tree_view);
+}
 
 MainWindow::~MainWindow() {}
 
