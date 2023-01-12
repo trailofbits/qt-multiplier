@@ -14,14 +14,9 @@
 
 #include <QDockWidget>
 #include <QTreeView>
+#include <QApplication>
 
 namespace mx::gui {
-
-namespace {
-
-const std::string kDatabasePath{"/Users/alessandro/Downloads/pcre2.db"};
-
-}
 
 struct MainWindow::PrivateData final {
   mx::Index index;
@@ -32,7 +27,13 @@ struct MainWindow::PrivateData final {
 };
 
 MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
-  d->index = mx::EntityProvider::from_database(kDatabasePath);
+  const auto &argument_list = QApplication::arguments();
+  if (argument_list.size() != 2) {
+    throw std::runtime_error("Missing parameter: database path");
+  }
+
+  const auto &database_path = argument_list[1].toStdString();
+  d->index = mx::EntityProvider::from_database(database_path);
 
   InitializeWidgets();
 }
