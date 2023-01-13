@@ -16,6 +16,7 @@
 #include <QTreeView>
 #include <QFileDialog>
 #include <QDir>
+#include <QTabWidget>
 
 namespace mx::gui {
 
@@ -66,10 +67,13 @@ void MainWindow::CreateFileTreeDock() {
 }
 
 void MainWindow::CreateCodeView() {
-  d->code_model = ICodeModel::Create(d->file_loc_cache, d->index, this);
+  auto tab_widget = new QTabWidget();
+  setCentralWidget(tab_widget);
 
+  d->code_model = ICodeModel::Create(d->file_loc_cache, d->index, this);
   auto code_view = ICodeView::Create(d->code_model);
-  setCentralWidget(code_view);
+
+  tab_widget->addTab(code_view, tr("Empty"));
 }
 
 void MainWindow::OnFileTreeItemClicked(const QModelIndex &index) {
@@ -77,6 +81,14 @@ void MainWindow::OnFileTreeItemClicked(const QModelIndex &index) {
   if (!opt_file_identifier.has_value()) {
     return;
   }
+
+  auto file_name_var = d->file_tree_model->data(index);
+  if (!file_name_var.isValid()) {
+    file_name_var = tr("Unnamed file");
+  }
+
+  auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
+  tab_widget.setTabText(0, file_name_var.toString());
 
   const auto &file_identifier = opt_file_identifier.value();
   d->code_model->SetFile(file_identifier);
