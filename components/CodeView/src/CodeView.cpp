@@ -381,23 +381,13 @@ CodeView::ModelIndexFromMousePosition(QPoint pos) {
   auto text_cursor = d->text_edit->cursorForPosition(pos);
   auto cursor_position = text_cursor.position();
 
-  // clang-format off
-  auto text_block_index_it = std::find_if(
-    d->text_block_index.begin(),
-    d->text_block_index.end(),
-
-    [&](const TextBlockIndexEntry &text_block_index_entry) -> bool {
-      return (cursor_position >= text_block_index_entry.start_position &&
-              cursor_position < text_block_index_entry.end_position);
-    }
-  );
-  // clang-format on
-
-  if (text_block_index_it == d->text_block_index.end()) {
+  CodeModelIndex code_model_index{};
+  if (!GetCodeModelIndexFromCursorPosition(
+          code_model_index, d->text_block_index, cursor_position)) {
     return std::nullopt;
   }
 
-  return text_block_index_it->index;
+  return code_model_index;
 }
 
 void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
