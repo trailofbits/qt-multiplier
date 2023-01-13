@@ -30,8 +30,9 @@ class ICodeModel : public QObject {
   // Other compatible roles:
   // Qt::DisplayRole
   enum {
-    TokenCategoryRole = Qt::UserRole,
+    TokenCategoryRole = Qt::UserRole + 1,
     TokenRawEntityIdRole,
+    LineNumberRole,
   };
 
   static ICodeModel *Create(const FileLocationCache &file_location_cache,

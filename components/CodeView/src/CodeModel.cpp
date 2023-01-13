@@ -9,6 +9,7 @@
 #include "CodeModel.h"
 
 #include <multiplier/ui/IDatabase.h>
+#include <multiplier/Util.h>
 
 #include <QString>
 
@@ -32,7 +33,13 @@ struct TokenColumn final {
   QString data;
 };
 
-using TokenRow = std::vector<TokenColumn>;
+using TokenColumnList = std::vector<TokenColumn>;
+
+struct TokenRow final {
+  std::size_t line_number{};
+  TokenColumnList column_list;
+};
+
 using TokenRowList = std::vector<TokenRow>;
 
 }  // namespace
@@ -100,22 +107,37 @@ int CodeModel::TokenCount(int row) const {
   }
 
   const auto &token_row = d->token_row_list.at(row_index);
-  return static_cast<int>(token_row.size());
+  return static_cast<int>(token_row.column_list.size());
 }
 
 QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
   if (d->model_state != ModelState::Ready) {
-    if (index.row != 0 || index.token_index != 0 || role != Qt::DisplayRole) {
+    if (index.row != 0 || index.token_index != 0) {
       return QVariant();
     }
 
-    switch (d->model_state) {
-      case ModelState::UpdateInProgress:
-        return tr("The token request has started");
-      case ModelState::UpdateCancelled:
-        return tr("The token request has been cancelled");
-      case ModelState::UpdateFailed: return tr("The token request has failed");
-      case ModelState::Ready: __builtin_unreachable();
+    if (role == LineNumberRole || role == TokenRawEntityIdRole) {
+      return 1;
+
+    } else if (role == TokenCategoryRole) {
+      return static_cast<std::uint32_t>(TokenCategory::kComment);
+
+    } else if (role == Qt::DisplayRole) {
+      switch (d->model_state) {
+        case ModelState::UpdateInProgress:
+          return tr("// The token request has started");
+
+        case ModelState::UpdateCancelled:
+          return tr("// The token request has been cancelled");
+
+        case ModelState::UpdateFailed:
+          return tr("// The token request has failed");
+
+        case ModelState::Ready: __builtin_unreachable();
+      }
+
+    } else {
+      return QVariant();
     }
   }
 
@@ -127,11 +149,11 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
   const auto &token_row = d->token_row_list.at(row_index);
 
   auto column_index = static_cast<std::size_t>(index.token_index);
-  if (column_index >= token_row.size()) {
+  if (column_index >= token_row.column_list.size()) {
     return QVariant();
   }
 
-  const auto &column = token_row.at(column_index);
+  const auto &column = token_row.column_list.at(column_index);
 
   switch (role) {
     case Qt::DisplayRole: return column.data;
@@ -141,6 +163,9 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
 
     case TokenRawEntityIdRole:
       return static_cast<std::uint64_t>(column.file_token_id);
+
+    case LineNumberRole:
+      return static_cast<std::uint64_t>(token_row.line_number);
 
     default: return QVariant();
   }
@@ -188,6 +213,7 @@ void CodeModel::FutureResultStateChanged() {
 
   TokenRow current_row;
   TokenColumn current_column;
+  std::size_t current_line_number{1};
 
   for (std::size_t i = 0; i < token_count; ++i) {
     auto token_start = indexed_token_range_data.start_of_token[i];
@@ -207,9 +233,13 @@ void CodeModel::FutureResultStateChanged() {
         current_column_copy.data = std::move(buffer);
         buffer.clear();
 
-        current_row.push_back(std::move(current_column_copy));
+        current_row.column_list.push_back(std::move(current_column_copy));
+        current_row.line_number = current_line_number;
+
         d->token_row_list.push_back(std::move(current_row));
-        current_row.clear();
+        current_row.column_list.clear();
+
+        ++current_line_number;
 
         continue;
       }
@@ -221,13 +251,14 @@ void CodeModel::FutureResultStateChanged() {
       current_column.data = std::move(buffer);
       buffer.clear();
 
-      current_row.push_back(std::move(current_column));
+      current_row.line_number = current_line_number;
+      current_row.column_list.push_back(std::move(current_column));
     }
   }
 
-  if (!current_row.empty()) {
+  if (!current_row.column_list.empty()) {
+    current_row.line_number = current_line_number;
     d->token_row_list.push_back(std::move(current_row));
-    current_row.clear();
   }
 
   d->model_state = ModelState::Ready;

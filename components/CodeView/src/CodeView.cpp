@@ -24,13 +24,10 @@
 #include <QTextDocument>
 #include <QWidget>
 #include <QProgressDialog>
-#include <QLineEdit>
-#include <QLabel>
 #include <QShortcut>
-#include <QRegularExpression>
+#include <QFontMetrics>
 
 #include <unordered_map>
-#include <iostream>
 
 namespace mx::gui {
 
@@ -103,6 +100,29 @@ CodeViewTheme::Style GetTextStyle(const CodeViewTheme &code_theme,
   } else {
     return it->second;
   }
+}
+
+bool GetCodeModelIndexFromCursorPosition(CodeModelIndex &code_model_index,
+                                         const TextBlockIndex &text_block_index,
+                                         int cursor_position) {
+  // clang-format off
+  auto text_block_index_it = std::find_if(
+    text_block_index.begin(),
+    text_block_index.end(),
+
+    [&](const TextBlockIndexEntry &text_block_index_entry) -> bool {
+      return (cursor_position >= text_block_index_entry.start_position &&
+              cursor_position <= text_block_index_entry.end_position);
+    }
+  );
+  // clang-format on
+
+  if (text_block_index_it == text_block_index.end()) {
+    return false;
+  }
+
+  code_model_index = text_block_index_it->index;
+  return true;
 }
 
 }  // namespace
@@ -436,8 +456,11 @@ void CodeView::OnModelReset() {
   d->file_token_to_test_block.clear();
 
   auto document = new QTextDocument(this);
+  document->setDefaultFont(font());
+
   auto document_layout = new QPlainTextDocumentLayout(document);
   document->setDocumentLayout(document_layout);
+
   d->text_edit->setDocument(document);
 
   auto L_updateTextFormat = [&](QTextCharFormat &text_format,
@@ -473,6 +496,8 @@ void CodeView::OnModelReset() {
 
   cursor->beginEditBlock();
 
+  std::size_t highest_line_number{};
+
   for (int row_index = 0; row_index < row_count && !progress.wasCanceled();
        ++row_index) {
     model_index.row = row_index;
@@ -491,6 +516,14 @@ void CodeView::OnModelReset() {
       const auto &token_var = d->model->Data(model_index, Qt::DisplayRole);
       if (!token_var.isValid()) {
         continue;
+      }
+
+      const auto &line_number_var =
+          d->model->Data(model_index, ICodeModel::LineNumberRole);
+      if (line_number_var.isValid()) {
+        auto line_number =
+            static_cast<std::size_t>(line_number_var.toULongLong());
+        highest_line_number = std::max(line_number, highest_line_number);
       }
 
       const auto &token = token_var.toString();
@@ -531,7 +564,10 @@ void CodeView::OnModelReset() {
     progress.setValue(100);
   }
 
-  d->gutter->setMinimumWidth(100);
+  auto required_gutter_width = fontMetrics().horizontalAdvance(
+      QString::number(highest_line_number) + "0000");
+
+  d->gutter->setMinimumWidth(required_gutter_width);
 }
 
 void CodeView::OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event) {
@@ -558,10 +594,55 @@ void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
 
   const auto &base_color = d->text_edit->palette().base();
   painter.fillRect(event->rect(), base_color);
+
+  const auto &text_color = d->text_edit->palette().text();
+  painter.setPen(text_color.color());
+
+  painter.setFont(font());
+
+  QTextBlock block = d->text_edit->firstVisibleBlock();
+  int top = qRound(d->text_edit->blockBoundingGeometry(block)
+                       .translated(d->text_edit->contentOffset())
+                       .top());
+
+  int bottom = top + qRound(d->text_edit->blockBoundingRect(block).height());
+
+  CodeModelIndex code_model_index{};
+
+  auto right_line_num_margin = d->gutter->width() - (d->gutter->width() / 3);
+
+  while (block.isValid() && top <= event->rect().bottom()) {
+    if (block.isVisible() && bottom >= event->rect().top()) {
+      auto succeeded = GetCodeModelIndexFromCursorPosition(
+          code_model_index, d->text_block_index, block.position());
+
+      if (succeeded) {
+        auto line_number_var =
+            d->model->Data(code_model_index, ICodeModel::LineNumberRole);
+
+        if (line_number_var.isValid()) {
+          auto line_number =
+              static_cast<std::size_t>(line_number_var.toULongLong());
+
+          painter.drawText(0, top, right_line_num_margin,
+                           fontMetrics().height(), Qt::AlignRight,
+                           QString::number(line_number));
+        }
+      }
+    }
+
+    block = block.next();
+    top = bottom;
+    bottom = top + qRound(d->text_edit->blockBoundingRect(block).height());
+  }
 }
 
-void CodeView::OnTextEditUpdateRequest(const QRect &, int) {
-  d->gutter->update();
+void CodeView::OnTextEditUpdateRequest(const QRect &rect, int dy) {
+  if (dy) {
+    d->gutter->scroll(0, dy);
+  } else {
+    d->gutter->update(0, rect.y(), d->gutter->width(), rect.height());
+  }
 }
 
 }  // namespace mx::gui

@@ -63,7 +63,7 @@ class CodeView final : public ICodeView {
   void OnTextEditViewportMouseButtonDblClick(QMouseEvent *event);
   void OnCursorPositionChange();
   void OnGutterPaintEvent(QPaintEvent *event);
-  void OnTextEditUpdateRequest(const QRect &, int);
+  void OnTextEditUpdateRequest(const QRect &rect, int dy);
 
   friend class ICodeView;
 };
