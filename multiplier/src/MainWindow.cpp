@@ -34,7 +34,8 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
 
   auto database_path = QFileDialog::getOpenFileName(
       this, tr("Select a Multiplier database"), QDir::homePath());
-  d->index = mx::EntityProvider::from_database(database_path.toStdString());
+  d->index = mx::EntityProvider::in_memory_cache(
+      mx::EntityProvider::from_database(database_path.toStdString()));
 
   InitializeWidgets();
 }

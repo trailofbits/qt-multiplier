@@ -41,13 +41,11 @@ struct IndexedTokenRangeData final {
 
   QString data;
   std::vector<int> start_of_token;
+
   std::vector<RawEntityId> file_token_ids;
-  std::vector<std::pair<RawEntityId, RawEntityId>> tok_decl_ids;
-  std::vector<std::uint64_t> tok_decl_ids_begin;
+  std::vector<std::uint64_t> entity_ids_begin;
+  std::vector<RawEntityId> entity_ids;
   std::vector<TokenCategory> token_category_list;
-  std::vector<std::vector<Decl>> token_decl_list;
-  std::vector<Token> token_list;
-  std::vector<TokenClass> token_class_list;
   OptionalLineNumberInfo opt_line_number_info;
 };
 

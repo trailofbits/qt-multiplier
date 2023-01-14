@@ -8,14 +8,16 @@
 
 #pragma once
 
-#include <multiplier/Util.h>
-
 #include <filesystem>
 #include <optional>
 #include <unordered_map>
 
 #include <QColor>
 
+namespace mx {
+enum class TokenKind : unsigned short;
+enum class TokenCategory : unsigned char;
+}  // namespace mx
 namespace mx::gui {
 
 struct CodeViewTheme final {

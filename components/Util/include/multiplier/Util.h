@@ -15,74 +15,7 @@ namespace mx {
 class Decl;
 class Index;
 class Token;
-
-enum class TokenKind : unsigned short;
-enum class DeclCategory : unsigned char;
-
 namespace gui {
-
-enum class TokenCategory : unsigned char {
-  // These line up with `TokenClass`.
-  kUnknown,
-  kIdentifier,
-  kMacroName,
-  kKeyword,
-  kObjectiveCKeyword,
-  kPreProcessorKeyword,
-  kBuiltinTypeName,
-  kPunctuation,
-  kLiteral,
-  kComment,
-
-  // These line up with `DeclCategory`.
-  kLocalVariable,
-  kGlobalVariable,
-  kParameterVariable,
-  kFunction,
-  kInstanceMethod,
-  kInstanceMember,
-  kClassMethod,
-  kClassMember,
-  kThis,
-  kClass,
-  kStruct,
-  kUnion,
-  kInterface,
-  kEnum,
-  kEnumerator,
-  kNamespace,
-  kTypeAlias,
-  kTemplateParameterType,
-  kTemplateParameterValue,
-  kLabel,
-
-  // Extra.
-  kWhitespace
-};
-
-enum class TokenClass {
-  kUnknown,
-  kIdentifier,
-  kMacroName,
-  kKeyword,
-  kObjectiveCKeyword,
-  kPreProcessorKeyword,
-  kBuiltinTypeName,
-  kPunctuation,
-  kLiteral,
-  kComment
-};
-
-// Classify a token kind into a `TokenClass`. Token classes are good baseline
-// indicators for syntax coloring.
-TokenClass ClassifyToken(const Token &token);
-
-// Categorize a token.
-TokenCategory CategorizeToken(const Token &token, TokenClass tok_class,
-                              DeclCategory decl_category);
-
-// Categorize a token.
-TokenCategory CategorizeToken(const Token &token, DeclCategory decl_category);
 
 // Try to determine the declarations associated with this token.
 std::optional<Decl> DeclForToken(const Token &token);

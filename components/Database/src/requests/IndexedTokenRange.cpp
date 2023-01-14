@@ -190,12 +190,8 @@ void CreateIndexedTokenRangeData(
   auto num_file_tokens = token_range_data.file_tokens.size();
   output.start_of_token.reserve(num_file_tokens + 1);
   output.file_token_ids.reserve(num_file_tokens);
-  output.tok_decl_ids.reserve(num_file_tokens);
-  output.tok_decl_ids_begin.reserve(num_file_tokens + 1);
+  output.entity_ids_begin.reserve(num_file_tokens + 1);
   output.token_category_list.reserve(num_file_tokens);
-  output.token_decl_list.reserve(num_file_tokens);
-  output.token_list.reserve(num_file_tokens);
-  output.token_class_list.reserve(num_file_tokens);
 
   if (token_range_data.file_tokens) {
     const auto &first_loc =
@@ -210,12 +206,11 @@ void CreateIndexedTokenRangeData(
   }
 
   std::unordered_map<RawEntityId, std::vector<Token>> file_to_frag_toks;
-  std::vector<Decl> tok_decls;
+  std::vector<RawEntityId> tok_entities;
 
-  bool sortedness_precondition_error{false};
+  RawEntityId opt_last_file_tok_id = kInvalidEntityId;
 
-  std::optional<RawEntityId> opt_last_file_tok_id;
-  for (const auto &file_tok : token_range_data.file_tokens) {
+  for (const Token &file_tok : token_range_data.file_tokens) {
     if (result_promise.isCanceled()) {
       result_promise.addResult(RPCErrorCode::Interrupted);
       return;
@@ -223,19 +218,10 @@ void CreateIndexedTokenRangeData(
 
     const RawEntityId file_tok_id = file_tok.id().Pack();
 
-    // Sortedness needed for `CodeView::ScrollToToken`.
-    if (opt_last_file_tok_id.has_value() &&
-        opt_last_file_tok_id.value() < file_tok_id &&
-        !sortedness_precondition_error) {
-      // TODO(alessandro): This was originally an assert. It seems like
-      // this condition is not met, so it's commented out for now.
-      // result_promise.addResult(RPCErrorCode::InvalidFileTokenSorting);
-      // return;
-
-      std::cerr << "Invalid precondition in " __FILE__ << "@" << __LINE__
-                << "\n";
-
-      sortedness_precondition_error = true;
+    if (file_tok_id >= opt_last_file_tok_id) {
+      std::cerr << "Invalid precondition in " __FILE__ << ':' << __LINE__
+                << "\nLast file toke id was " << opt_last_file_tok_id
+                << " and current is " << file_tok_id << "\n\n";
     }
 
     opt_last_file_tok_id = file_tok_id;
@@ -263,18 +249,14 @@ void CreateIndexedTokenRangeData(
           }
         }
       }
-
-      // Garbage collect.
-      //token_range_data.fragment_tokens.erase(file_tok_id);
     }
 
-    auto tok_start = output.data.size();
-
-    const auto &utf8_tok = file_tok.data();
+    std::string_view utf8_tok = file_tok.data();
     int num_utf8_bytes = static_cast<int>(utf8_tok.size());
+    int tok_start = static_cast<int>(output.data.size());
 
     bool is_empty = true;
-    for (const auto &ch : QString::fromUtf8(utf8_tok.data(), num_utf8_bytes)) {
+    for (const QChar ch : QString::fromUtf8(utf8_tok.data(), num_utf8_bytes)) {
       switch (ch.unicode()) {
         case QChar::Tabulation:
           is_empty = false;
@@ -306,16 +288,9 @@ void CreateIndexedTokenRangeData(
       continue;
     }
 
-    // This is a template of sorts for this location.
-    output.file_token_ids.push_back(file_tok_id);
-    output.tok_decl_ids_begin.push_back(
-        static_cast<std::uint64_t>(output.tok_decl_ids.size()));
+    TokenCategory category = file_tok.category();
 
-    DeclCategory category = DeclCategory::UNKNOWN;
-    TokenClass file_tok_class = ClassifyToken(file_tok);
-
-    auto has_added_decl = false;
-    tok_decls.clear();
+    tok_entities.clear();
 
     // Try to find all declarations associated with this token. There could be
     // multiple if there are multiple fragments overlapping this specific piece
@@ -330,57 +305,40 @@ void CreateIndexedTokenRangeData(
           return;
         }
 
-        if (auto related_decl = DeclForToken(frag_tok)) {
-
-          // Don't repeat the same declarations.
-          //
-          // TODO(pag): Investigate this related to the diagnosis in
-          //            Issue #118.
-          if (has_added_decl &&
-              output.tok_decl_ids.back().second == related_decl->id()) {
-            continue;
-          }
-
-          output.tok_decl_ids.emplace_back(frag_tok.id().Pack(),
-                                           related_decl->id().Pack());
-          tok_decls.emplace_back(related_decl.value());
-          has_added_decl = true;
-
-          // Take the first category we get.
-          if (category == DeclCategory::UNKNOWN) {
-            category = related_decl->category();
-          }
-
-        } else {
-          output.tok_decl_ids.emplace_back(frag_tok.id().Pack(),
-                                           kInvalidEntityId);
-        }
-
         // Try to make a better default classification of this token (for syntax
         // coloring in the absence of declaration info).
-        if (TokenClass frag_tok_class = ClassifyToken(frag_tok);
-            frag_tok_class != file_tok_class &&
-            frag_tok_class != TokenClass::kUnknown &&
-            frag_tok_class != TokenClass::kIdentifier) {
-          file_tok_class = frag_tok_class;
+        category = frag_tok.category();
+
+        // If this token has a related entity id, then keep track of it.
+        if (auto related_entity_id = frag_tok.related_entity_id()) {
+          tok_entities.push_back(related_entity_id.Pack());
         }
       }
 
       file_to_frag_toks.erase(file_tok_id);  // Garbage collect.
     }
 
-    TokenCategory kind = CategorizeToken(file_tok, file_tok_class, category);
+    // This is a template of sorts for this location.
+    output.file_token_ids.push_back(file_tok_id);
+    output.entity_ids_begin.push_back(
+        static_cast<std::uint64_t>(output.entity_ids.size()));
+
+    // Add in the related entity IDs.
+    if (!tok_entities.empty()) {
+      std::sort(tok_entities.begin(), tok_entities.end());
+      auto end = std::unique(tok_entities.begin(), tok_entities.end());
+      for (auto it = tok_entities.begin(); it != end; ++it) {
+        output.entity_ids.push_back(*it);
+      }
+    }
 
     output.start_of_token.push_back(static_cast<int>(tok_start));
-    output.token_category_list.push_back(kind);
-    output.token_decl_list.push_back(std::move(tok_decls));
-    output.token_list.push_back(file_tok);
-    output.token_class_list.push_back(file_tok_class);
+    output.token_category_list.push_back(category);
   }
 
   output.start_of_token.push_back(static_cast<int>(output.data.size()));
-  output.tok_decl_ids_begin.push_back(
-      static_cast<unsigned>(output.tok_decl_ids.size()));
+  output.entity_ids_begin.push_back(
+      static_cast<unsigned>(output.entity_ids.size()));
 
   result_promise.addResult(std::move(output));
 }

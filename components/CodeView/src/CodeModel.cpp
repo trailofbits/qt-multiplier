@@ -9,7 +9,7 @@
 #include "CodeModel.h"
 
 #include <multiplier/ui/IDatabase.h>
-#include <multiplier/Util.h>
+#include <multiplier/Entities/TokenCategory.h>
 
 #include <QString>
 
@@ -120,7 +120,7 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
       return 1;
 
     } else if (role == TokenCategoryRole) {
-      return static_cast<std::uint32_t>(TokenCategory::kComment);
+      return static_cast<std::uint32_t>(TokenCategory::COMMENT);
 
     } else if (role == Qt::DisplayRole) {
       switch (d->model_state) {
@@ -208,7 +208,7 @@ void CodeModel::FutureResultStateChanged() {
 
   emit ModelAboutToBeReset();
 
-  auto indexed_token_range_data = future_result.TakeValue();
+  IndexedTokenRangeData indexed_token_range_data = future_result.TakeValue();
   auto token_count = indexed_token_range_data.start_of_token.size() - 1;
 
   TokenRow current_row;
