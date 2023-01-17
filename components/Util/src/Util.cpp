@@ -113,7 +113,7 @@ RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
     Stmt stmt = std::get<Stmt>(entity);
     for (Token token : stmt.tokens()) {
       if (auto nearest_file_loc = token.nearest_file_token()) {
-        return nearest_file_loc->id().Pack();
+        return nearest_file_loc.id().Pack();
       }
     }
 
@@ -144,7 +144,7 @@ RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
           break;
         } else if (std::holds_alternative<Token>(node)) {
           if (auto file_tok = std::get<Token>(node).nearest_file_token()) {
-            return file_tok->id().Pack();
+            return file_tok.id().Pack();
           }
         }
       }
@@ -152,7 +152,7 @@ RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
 
   } else if (std::holds_alternative<Token>(entity)) {
     if (auto file_tok = std::get<Token>(entity).nearest_file_token()) {
-      return file_tok->id().Pack();
+      return file_tok.id().Pack();
     }
   }
   return kInvalidEntityId;
