@@ -369,7 +369,7 @@ void CodeView::InitializeWidgets() {
   setLayout(main_layout);
 
   // TODO(alessandro): This should be part of the theme
-  QFont font("Monaco");
+  QFont font("Source Code Pro");
   font.setStyleHint(QFont::TypeWriter);
   setFont(font);
 
