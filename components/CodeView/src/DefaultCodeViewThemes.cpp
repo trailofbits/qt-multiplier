@@ -14,6 +14,8 @@ namespace mx::gui {
 
 // clang-format off
 const CodeViewTheme kDefaultDarkCodeViewTheme{
+  "Source Code Pro",
+
   // default_background_color
   QColor::fromRgb(20, 20, 20),
 

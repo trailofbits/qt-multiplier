@@ -18,6 +18,7 @@ namespace mx {
 enum class TokenKind : unsigned short;
 enum class TokenCategory : unsigned char;
 }  // namespace mx
+
 namespace mx::gui {
 
 struct CodeViewTheme final {
@@ -27,6 +28,8 @@ struct CodeViewTheme final {
     bool strikeout{false};
     bool italic{false};
   };
+
+  QString font_name;
 
   QColor default_background_color;
   QColor default_foreground_color;

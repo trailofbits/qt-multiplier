@@ -146,6 +146,10 @@ struct CodeView::PrivateData final {
 void CodeView::setTheme(const CodeViewTheme &theme) {
   d->theme = theme;
 
+  QFont font(d->theme.font_name);
+  font.setStyleHint(QFont::TypeWriter);
+  setFont(font);
+
   OnModelReset();
 }
 
@@ -310,8 +314,6 @@ void CodeView::InstallModel(ICodeModel *model) {
 }
 
 void CodeView::InitializeWidgets() {
-  d->theme = kDefaultDarkCodeViewTheme;
-
   // Code viewer
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setReadOnly(true);
@@ -368,13 +370,8 @@ void CodeView::InitializeWidgets() {
   main_layout->addWidget(d->search_widget);
   setLayout(main_layout);
 
-  // TODO(alessandro): This should be part of the theme
-  QFont font("Source Code Pro");
-  font.setStyleHint(QFont::TypeWriter);
-  setFont(font);
-
-  // Force an update
-  OnModelReset();
+  // This will also cause a model reset update
+  setTheme(kDefaultDarkCodeViewTheme);
 }
 
 bool CodeView::IsValidFileToken(RawEntityId file_token_id) const {
