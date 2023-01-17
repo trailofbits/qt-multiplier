@@ -26,6 +26,7 @@
 #include <QProgressDialog>
 #include <QShortcut>
 #include <QFontMetrics>
+#include <QWheelEvent>
 
 #include <unordered_map>
 
@@ -285,6 +286,17 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
     }
 
     return false;
+
+  } else if (event->type() == QEvent::Wheel) {
+    auto wheel_event = static_cast<QWheelEvent *>(event);
+
+    if (obj == d->text_edit->viewport() &&
+        (wheel_event->modifiers() & Qt::ControlModifier) != 0) {
+
+      OnTextEditTextZoom(wheel_event);
+    }
+
+    return false;
   }
 
   return false;
@@ -300,14 +312,8 @@ void CodeView::InstallModel(ICodeModel *model) {
 void CodeView::InitializeWidgets() {
   d->theme = kDefaultDarkCodeViewTheme;
 
-  // TODO(alessandro): This should be part of the theme
-  QFont font("Monaco");
-  font.setStyleHint(QFont::TypeWriter);
-  setFont(font);
-
   // Code viewer
   d->text_edit = new QPlainTextEditMod();
-  d->text_edit->setFont(font);
   d->text_edit->setReadOnly(true);
   d->text_edit->setTextInteractionFlags(Qt::TextBrowserInteraction);
   d->text_edit->viewport()->installEventFilter(this);
@@ -321,7 +327,6 @@ void CodeView::InitializeWidgets() {
 
   // Gutter
   d->gutter = new QWidget();
-  d->gutter->setFont(font);
   d->gutter->installEventFilter(this);
 
   // Search widget
@@ -362,6 +367,11 @@ void CodeView::InitializeWidgets() {
   main_layout->addItem(code_layout);
   main_layout->addWidget(d->search_widget);
   setLayout(main_layout);
+
+  // TODO(alessandro): This should be part of the theme
+  QFont font("Monaco");
+  font.setStyleHint(QFont::TypeWriter);
+  setFont(font);
 
   // Force an update
   OnModelReset();
@@ -426,6 +436,23 @@ void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
 
   const auto &model_index = opt_model_index.value();
   emit TokenClicked(model_index, event->buttons(), double_click);
+}
+
+void CodeView::OnTextEditTextZoom(QWheelEvent *event) {
+  float delta = event->angleDelta().y() / 120.0f;
+  if (delta == 0.0f) {
+    return;
+  }
+
+  auto font = d->text_edit->font();
+
+  auto point_size = font.pointSizeF() + delta;
+  if (point_size <= 0.0f) {
+    return;
+  }
+
+  font.setPointSizeF(point_size);
+  setFont(font);
 }
 
 void CodeView::OnModelReset() {

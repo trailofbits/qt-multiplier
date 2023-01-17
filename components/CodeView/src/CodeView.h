@@ -57,6 +57,8 @@ class CodeView final : public ICodeView {
   void OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
                                           bool double_click);
 
+  void OnTextEditTextZoom(QWheelEvent *event);
+
  private slots:
   void OnModelReset();
   void OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event);
