@@ -244,7 +244,7 @@ void CreateIndexedTokenRangeData(
           const auto &file_tok_of_parsed_tok = parsed_tok.file_token();
 
           if (file_tok_of_parsed_tok) {
-            const RawEntityId id = file_tok_of_parsed_tok->id().Pack();
+            const RawEntityId id = file_tok_of_parsed_tok.id().Pack();
             file_to_frag_toks[id].push_back(parsed_tok);
           }
         }
