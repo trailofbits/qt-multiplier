@@ -61,6 +61,7 @@ class CodeView final : public ICodeView {
 
  private slots:
   void OnModelReset();
+  void UpdateGutterWidth();
   void OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event);
   void OnTextEditViewportMouseButtonDblClick(QMouseEvent *event);
   void OnCursorPositionChange();

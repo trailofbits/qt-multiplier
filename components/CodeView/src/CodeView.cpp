@@ -137,6 +137,7 @@ struct CodeView::PrivateData final {
 
   TextBlockIndex text_block_index;
   FileTokenIdToTextBlockIndexEntry file_token_to_test_block;
+  std::size_t highest_line_number{};
 
   CodeViewTheme theme;
 
@@ -450,6 +451,8 @@ void CodeView::OnTextEditTextZoom(QWheelEvent *event) {
 
   font.setPointSizeF(point_size);
   setFont(font);
+
+  UpdateGutterWidth();
 }
 
 void CodeView::OnModelReset() {
@@ -468,6 +471,7 @@ void CodeView::OnModelReset() {
   d->text_edit->clear();
   d->text_block_index.clear();
   d->file_token_to_test_block.clear();
+  d->highest_line_number = 0;
 
   auto document = new QTextDocument(this);
   document->setDefaultFont(font());
@@ -534,9 +538,11 @@ void CodeView::OnModelReset() {
 
       const auto &line_number_var =
           d->model->Data(model_index, ICodeModel::LineNumberRole);
+
       if (line_number_var.isValid()) {
         auto line_number =
             static_cast<std::size_t>(line_number_var.toULongLong());
+
         highest_line_number = std::max(line_number, highest_line_number);
       }
 
@@ -578,8 +584,14 @@ void CodeView::OnModelReset() {
     progress.setValue(100);
   }
 
+  d->highest_line_number = highest_line_number;
+
+  UpdateGutterWidth();
+}
+
+void CodeView::UpdateGutterWidth() {
   auto required_gutter_width = fontMetrics().horizontalAdvance(
-      QString::number(highest_line_number) + "0000");
+      QString::number(d->highest_line_number) + "0000");
 
   d->gutter->setMinimumWidth(required_gutter_width);
 }
