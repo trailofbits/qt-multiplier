@@ -14,7 +14,11 @@ namespace mx::gui {
 
 // clang-format off
 const CodeViewTheme kDefaultDarkCodeViewTheme{
+  // Font name
   "Source Code Pro",
+
+  // Line highlight color
+  QColor(Qt::black),
 
   // default_background_color
   QColor::fromRgb(20, 20, 20),

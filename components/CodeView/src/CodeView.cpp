@@ -605,9 +605,8 @@ void CodeView::OnTextEditViewportMouseButtonDblClick(QMouseEvent *event) {
 }
 
 void CodeView::OnCursorPositionChange() {
-  // TODO(alessandro): This should be part of the theme
   QTextEdit::ExtraSelection selection;
-  selection.format.setBackground(QColor(Qt::black));
+  selection.format.setBackground(d->theme.line_highlight_color);
   selection.format.setProperty(QTextFormat::FullWidthSelection, true);
   selection.cursor = d->text_edit->textCursor();
   selection.cursor.clearSelection();
