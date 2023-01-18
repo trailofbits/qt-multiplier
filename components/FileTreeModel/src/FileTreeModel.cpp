@@ -61,7 +61,7 @@ QModelIndex FileTreeModel::index(int row, int column,
 
   const auto &parent_node = parent_node_it->second;
 
-  if (row >= parent_node.child_map.size()) {
+  if (row >= static_cast<int>(parent_node.child_map.size())) {
     return QModelIndex();
   }
 
@@ -153,7 +153,7 @@ int FileTreeModel::rowCount(const QModelIndex &parent) const {
   return static_cast<int>(parent_node.child_map.size());
 }
 
-int FileTreeModel::columnCount(const QModelIndex &parent) const {
+int FileTreeModel::columnCount(const QModelIndex &) const {
   if (d->node_map.empty()) {
     return 0;
   }
@@ -194,7 +194,7 @@ FileTreeModel::NodeMap FileTreeModel::ParsePathList(
 
   std::uint64_t node_id_generator{0};
 
-  NodeMap node_map = {{0, {"ROOT", std::nullopt}}};
+  NodeMap node_map = {{0, {"ROOT", std::nullopt, {}, {}}}};
 
   for (const auto &file_path_p : path_list) {
     const auto &path = file_path_p.first;

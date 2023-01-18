@@ -444,15 +444,15 @@ void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
 }
 
 void CodeView::OnTextEditTextZoom(QWheelEvent *event) {
-  float delta = event->angleDelta().y() / 120.0f;
-  if (delta == 0.0f) {
+  qreal delta = static_cast<qreal>(event->angleDelta().y()) / 120.0;
+  if (delta == 0.0) {
     return;
   }
 
   auto font = d->text_edit->font();
 
-  auto point_size = font.pointSizeF() + delta;
-  if (point_size <= 0.0f) {
+  qreal point_size = font.pointSizeF() + delta;
+  if (point_size <= 0.0) {
     return;
   }
 
