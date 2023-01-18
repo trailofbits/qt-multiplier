@@ -35,6 +35,9 @@ struct CodeViewTheme final {
   QColor default_background_color;
   QColor default_foreground_color;
 
+  QColor default_gutter_background;
+  QColor default_gutter_foreground;
+
   std::unordered_map<TokenCategory, Style> token_style_map;
   std::unordered_map<TokenCategory, QColor> token_background_color_map;
   std::unordered_map<TokenCategory, QColor> token_foreground_color_map;

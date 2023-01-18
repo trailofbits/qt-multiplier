@@ -26,6 +26,12 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
   // default_foreground_color
   QColor::fromRgb(255, 255, 255),
 
+  // default_gutter_background
+  QColor::fromRgb(20, 20, 20),
+
+  // default_gutter_foreground
+  QColor::fromRgb(255, 255, 255),
+
   // token_style_map
   {
     { TokenCategory::MACRO_DIRECTIVE_NAME, { true, false, false, false } },

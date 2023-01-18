@@ -623,13 +623,9 @@ void CodeView::OnCursorPositionChange() {
 
 void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
   QPainter painter(d->gutter);
+  painter.fillRect(event->rect(), d->theme.default_gutter_background);
 
-  const auto &base_color = d->text_edit->palette().base();
-  painter.fillRect(event->rect(), base_color);
-
-  const auto &text_color = d->text_edit->palette().text();
-  painter.setPen(text_color.color());
-
+  painter.setPen(d->theme.default_gutter_foreground);
   painter.setFont(font());
 
   QTextBlock block = d->text_edit->firstVisibleBlock();
