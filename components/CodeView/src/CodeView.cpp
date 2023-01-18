@@ -217,6 +217,11 @@ QString CodeView::Text() const {
   return d->text_edit->toPlainText();
 }
 
+void CodeView::SetWordWrapping(bool enabled) {
+  d->text_edit->setWordWrapMode(enabled ? QTextOption::WordWrap
+                                        : QTextOption::NoWrap);
+}
+
 bool CodeView::ScrollToFileToken(RawEntityId file_token_id) const {
   auto opt_token_pos = GetFileTokenCursorPosition(file_token_id);
   if (!opt_token_pos.has_value()) {
@@ -249,6 +254,8 @@ CodeView::CodeView(ICodeModel *model, QWidget *parent)
 
   InstallModel(model);
   InitializeWidgets();
+
+  SetWordWrapping(false);
 }
 
 bool CodeView::eventFilter(QObject *obj, QEvent *event) {

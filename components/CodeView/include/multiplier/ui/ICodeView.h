@@ -46,6 +46,7 @@ class ICodeView : public QWidget {
                     std::optional<int> opt_end = std::nullopt) const = 0;
 
   virtual QString Text() const = 0;
+  virtual void SetWordWrapping(bool enabled) = 0;
 
   virtual bool ScrollToFileToken(RawEntityId file_token_id) const = 0;
   virtual bool ScrollToToken(const Token &token) const = 0;

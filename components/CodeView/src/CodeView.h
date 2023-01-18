@@ -34,6 +34,7 @@ class CodeView final : public ICodeView {
                                  std::optional<int> opt_end) const override;
 
   virtual QString Text() const override;
+  virtual void SetWordWrapping(bool enabled) override;
 
   virtual bool ScrollToFileToken(RawEntityId file_token_id) const override;
 
