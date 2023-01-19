@@ -28,7 +28,6 @@
 #include <QFontMetrics>
 #include <QWheelEvent>
 
-#include <iostream>
 #include <unordered_map>
 
 namespace mx::gui {
