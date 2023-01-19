@@ -28,6 +28,7 @@
 #include <QFontMetrics>
 #include <QWheelEvent>
 
+#include <iostream>
 #include <unordered_map>
 
 namespace mx::gui {
@@ -140,11 +141,12 @@ struct CodeView::PrivateData final {
   std::size_t highest_line_number{};
 
   CodeViewTheme theme;
+  std::size_t tab_width{4};
 
   std::optional<CodeModelIndex> opt_prev_hovered_model_index;
 };
 
-void CodeView::setTheme(const CodeViewTheme &theme) {
+void CodeView::SetTheme(const CodeViewTheme &theme) {
   d->theme = theme;
 
   QFont font(d->theme.font_name);
@@ -152,6 +154,12 @@ void CodeView::setTheme(const CodeViewTheme &theme) {
   setFont(font);
 
   OnModelReset();
+}
+
+void CodeView::SetTabWidth(std::size_t width) {
+  d->tab_width = width;
+
+  UpdateTabStopDistance();
 }
 
 CodeView::~CodeView() {}
@@ -379,7 +387,10 @@ void CodeView::InitializeWidgets() {
   setLayout(main_layout);
 
   // This will also cause a model reset update
-  setTheme(kDefaultDarkCodeViewTheme);
+  SetTheme(kDefaultDarkCodeViewTheme);
+
+  // Apply the default tab stop distance
+  SetTabWidth(4);
 }
 
 bool CodeView::IsValidFileToken(RawEntityId file_token_id) const {
@@ -459,7 +470,16 @@ void CodeView::OnTextEditTextZoom(QWheelEvent *event) {
   font.setPointSizeF(point_size);
   setFont(font);
 
+  UpdateTabStopDistance();
   UpdateGutterWidth();
+}
+
+void CodeView::UpdateTabStopDistance() {
+  QFontMetricsF font_metrics(d->text_edit->font());
+
+  auto base_width = font_metrics.horizontalAdvance(QChar::VisualTabCharacter);
+  d->text_edit->setTabStopDistance(base_width *
+                                   static_cast<qreal>(d->tab_width));
 }
 
 void CodeView::OnModelReset() {

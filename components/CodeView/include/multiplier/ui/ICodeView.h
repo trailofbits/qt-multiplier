@@ -26,7 +26,9 @@ class ICodeView : public QWidget {
 
  public:
   static ICodeView *Create(ICodeModel *model, QWidget *parent = nullptr);
-  virtual void setTheme(const CodeViewTheme &theme) = 0;
+
+  virtual void SetTheme(const CodeViewTheme &theme) = 0;
+  virtual void SetTabWidth(std::size_t width) = 0;
 
   ICodeView(QWidget *parent) : QWidget(parent) {}
   virtual ~ICodeView() override = default;

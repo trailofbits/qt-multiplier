@@ -17,7 +17,9 @@ class CodeView final : public ICodeView {
   Q_OBJECT
 
  public:
-  void setTheme(const CodeViewTheme &theme) override;
+  virtual void SetTheme(const CodeViewTheme &theme) override;
+  virtual void SetTabWidth(std::size_t width) override;
+
   virtual ~CodeView() override;
 
   virtual std::optional<int>
@@ -59,6 +61,7 @@ class CodeView final : public ICodeView {
                                           bool double_click);
 
   void OnTextEditTextZoom(QWheelEvent *event);
+  void UpdateTabStopDistance();
 
  private slots:
   void OnModelReset();
