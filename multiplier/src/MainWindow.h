@@ -28,6 +28,7 @@ class MainWindow final : public QMainWindow {
 
  private slots:
   void OnFileTreeItemClicked(const QModelIndex &index);
+  void OnToggleWordWrap(bool checked);
 };
 
 }  // namespace mx::gui

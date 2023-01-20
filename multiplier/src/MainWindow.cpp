@@ -17,6 +17,8 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QTabWidget>
+#include <QMenu>
+#include <QMenuBar>
 
 namespace mx::gui {
 
@@ -26,6 +28,8 @@ struct MainWindow::PrivateData final {
 
   mx::FileLocationCache file_loc_cache;
   ICodeModel *code_model{nullptr};
+
+  QMenu *view_menu{nullptr};
 };
 
 MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
@@ -43,6 +47,9 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
 MainWindow::~MainWindow() {}
 
 void MainWindow::InitializeWidgets() {
+  d->view_menu = new QMenu(tr("View"));
+  menuBar()->addMenu(d->view_menu);
+
   CreateFileTreeDock();
   CreateCodeView();
 }
@@ -73,8 +80,18 @@ void MainWindow::CreateCodeView() {
 
   d->code_model = ICodeModel::Create(d->file_loc_cache, d->index, this);
   auto code_view = ICodeView::Create(d->code_model);
+  code_view->SetWordWrapping(false);
 
   tab_widget->addTab(code_view, tr("Empty"));
+
+  auto toggle_word_wrap_action = new QAction(tr("Enable word wrap"));
+  toggle_word_wrap_action->setCheckable(true);
+  toggle_word_wrap_action->setChecked(false);
+
+  connect(toggle_word_wrap_action, &QAction::triggered, this,
+          &MainWindow::OnToggleWordWrap);
+
+  d->view_menu->addAction(toggle_word_wrap_action);
 }
 
 void MainWindow::OnFileTreeItemClicked(const QModelIndex &index) {
@@ -93,6 +110,12 @@ void MainWindow::OnFileTreeItemClicked(const QModelIndex &index) {
 
   const auto &file_identifier = opt_file_identifier.value();
   d->code_model->SetFile(file_identifier);
+}
+
+void MainWindow::OnToggleWordWrap(bool checked) {
+  auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
+  auto &code_view = *static_cast<ICodeView *>(tab_widget.widget(0));
+  code_view.SetWordWrapping(checked);
 }
 
 }  // namespace mx::gui
