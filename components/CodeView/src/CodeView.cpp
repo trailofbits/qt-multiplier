@@ -29,6 +29,9 @@
 #include <QWheelEvent>
 
 #include <unordered_map>
+#include <vector>
+#include <optional>
+#include <unordered_set>
 
 namespace mx::gui {
 
@@ -37,6 +40,7 @@ namespace {
 class QPlainTextEditMod final : public QPlainTextEdit {
  public:
   QPlainTextEditMod(QWidget *parent = nullptr) : QPlainTextEdit(parent) {}
+
   virtual ~QPlainTextEditMod() override{};
 
   friend class mx::gui::CodeView;
@@ -52,12 +56,29 @@ using TextBlockIndex = std::vector<TextBlockIndexEntry>;
 using FileTokenIdToTextBlockIndexEntry =
     std::unordered_map<RawEntityId, std::size_t>;
 
-QColor GetTextColorMapEntry(
-    const QVariant &token_category_var, const QColor &default_color,
+using UniqueColumnIdToTextBlockIndexEntry =
+    std::unordered_map<std::uint64_t, std::size_t>;
+
+struct TokenGroupEntry final {
+  int start_position{};
+  int end_position{};
+  CodeModelIndex index;
+};
+
+using TokenGroupMap =
+    std::unordered_map<std::uint64_t, std::vector<TokenGroupEntry>>;
+
+std::uint64_t CodeModelIndexToInteger(const CodeModelIndex &index) {
+  return (static_cast<std::uint64_t>(index.row) << 32) |
+         static_cast<std::uint64_t>(index.token_index);
+}
+
+std::optional<QColor> GetTextColorMapEntry(
+    const QVariant &token_category_var,
     const std::unordered_map<TokenCategory, QColor> &color_map) {
 
   if (!token_category_var.isValid()) {
-    return default_color;
+    return std::nullopt;
   }
 
   const auto &token_category =
@@ -65,24 +86,26 @@ QColor GetTextColorMapEntry(
 
   auto it = color_map.find(token_category);
   if (it == color_map.end()) {
-    return default_color;
+    return std::nullopt;
+
   } else {
     return it->second;
   }
 }
 
-QColor GetTextBackgroundColor(const CodeViewTheme &code_theme,
-                              const QVariant &token_category_var) {
+std::optional<QColor>
+GetTextBackgroundColor(const CodeViewTheme &code_theme,
+                       const QVariant &token_category_var) {
   return GetTextColorMapEntry(token_category_var,
-                              code_theme.default_background_color,
                               code_theme.token_background_color_map);
 }
 
 QColor GetTextForegroundColor(const CodeViewTheme &code_theme,
                               const QVariant &token_category_var) {
-  return GetTextColorMapEntry(token_category_var,
-                              code_theme.default_foreground_color,
-                              code_theme.token_foreground_color_map);
+  auto opt_color = GetTextColorMapEntry(token_category_var,
+                                        code_theme.token_foreground_color_map);
+
+  return opt_color.value_or(code_theme.default_foreground_color);
 }
 
 CodeViewTheme::Style GetTextStyle(const CodeViewTheme &code_theme,
@@ -136,7 +159,9 @@ struct CodeView::PrivateData final {
   SearchWidget *search_widget{nullptr};
 
   TextBlockIndex text_block_index;
-  FileTokenIdToTextBlockIndexEntry file_token_to_test_block;
+  FileTokenIdToTextBlockIndexEntry file_token_to_text_block;
+  UniqueColumnIdToTextBlockIndexEntry column_id_to_text_block;
+  TokenGroupMap token_group_map;
   std::size_t highest_line_number{};
 
   CodeViewTheme theme;
@@ -169,8 +194,8 @@ CodeView::GetFileTokenCursorPosition(RawEntityId file_token_id) const {
     return std::nullopt;
   }
 
-  auto it = d->file_token_to_test_block.find(file_token_id);
-  if (it == d->file_token_to_test_block.end()) {
+  auto it = d->file_token_to_text_block.find(file_token_id);
+  if (it == d->file_token_to_text_block.end()) {
     return std::nullopt;
   }
 
@@ -330,14 +355,12 @@ void CodeView::InstallModel(ICodeModel *model) {
 
 void CodeView::InitializeWidgets() {
   // Code viewer
+
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setReadOnly(true);
   d->text_edit->setTextInteractionFlags(Qt::TextBrowserInteraction);
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
-
-  connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged, this,
-          &CodeView::OnCursorPositionChange);
 
   connect(d->text_edit, &QPlainTextEditMod::updateRequest, this,
           &CodeView::OnTextEditUpdateRequest);
@@ -481,6 +504,106 @@ void CodeView::UpdateTabStopDistance() {
                                    static_cast<qreal>(d->tab_width));
 }
 
+void CodeView::UpdateGutterWidth() {
+  auto required_gutter_width = fontMetrics().horizontalAdvance(
+      QString::number(d->highest_line_number) + "000");
+
+  d->gutter->setMinimumWidth(required_gutter_width);
+}
+
+void CodeView::UpdateTokenGroupColors() {
+  // TODO(alessandro): These should be either derived from the
+  // active palette or taken from the theme.
+  static std::vector<QColor> kColorMap{
+      QColor::fromRgb(0x101119), QColor::fromRgb(0x0F171A),
+      QColor::fromRgb(0x060E0B), QColor::fromRgb(0x1C1A0C),
+      QColor::fromRgb(0x221607), QColor::fromRgb(0x291500),
+      QColor::fromRgb(0x2B1412), QColor::fromRgb(0x2B121D),
+      QColor::fromRgb(0x2C1125), QColor::fromRgb(0x1E0B1E),
+  };
+
+  std::size_t color_map_index{};
+  QList<QTextEdit::ExtraSelection> extra_selection_list;
+  QTextEdit::ExtraSelection selection;
+
+  std::unordered_set<std::uint64_t> visited_model_index_list;
+  std::unordered_set<int> colored_line_list;
+
+  for (const auto &token_group_map_p : d->token_group_map) {
+    const auto &token_group = token_group_map_p.second;
+
+    const auto &group_color = kColorMap.at(color_map_index);
+    ++color_map_index;
+
+    for (const auto &token : token_group) {
+      auto unique_column_id = CodeModelIndexToInteger(token.index);
+      visited_model_index_list.insert(unique_column_id);
+
+      selection = {};
+      selection.format.setBackground(group_color);
+      selection.cursor = d->text_edit->textCursor();
+      selection.cursor.setPosition(token.start_position,
+                                   QTextCursor::MoveMode::MoveAnchor);
+
+      selection.cursor.setPosition(token.end_position,
+                                   QTextCursor::MoveMode::KeepAnchor);
+
+      extra_selection_list.append(std::move(selection));
+
+      auto column_count = d->model->TokenCount(token.index.row);
+      auto is_last = token.index.token_index + 1 == column_count;
+
+      if (is_last) {
+        colored_line_list.insert(token.index.row);
+
+        selection = {};
+        selection.format.setBackground(group_color);
+        selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+        selection.cursor = d->text_edit->textCursor();
+        selection.cursor.setPosition(token.start_position,
+                                     QTextCursor::MoveMode::MoveAnchor);
+
+        selection.cursor.clearSelection();
+        extra_selection_list.prepend(std::move(selection));
+      }
+    }
+  }
+
+  for (const auto &colored_line : colored_line_list) {
+    auto column_count = d->model->TokenCount(colored_line);
+
+    for (int column = 0; column < column_count; ++column) {
+      auto unique_column_id = CodeModelIndexToInteger({colored_line, column});
+      if (visited_model_index_list.count(unique_column_id) > 0) {
+        continue;
+      }
+
+      auto column_id_to_text_block_it =
+          d->column_id_to_text_block.find(unique_column_id);
+      if (column_id_to_text_block_it == d->column_id_to_text_block.end()) {
+        continue;
+      }
+
+      const auto &text_block_index_elem = column_id_to_text_block_it->second;
+      const auto &text_block_index_entry =
+          d->text_block_index.at(text_block_index_elem);
+
+      selection = {};
+      selection.format.setBackground(d->theme.default_background_color);
+      selection.cursor = d->text_edit->textCursor();
+      selection.cursor.setPosition(text_block_index_entry.start_position,
+                                   QTextCursor::MoveMode::MoveAnchor);
+
+      selection.cursor.setPosition(text_block_index_entry.end_position,
+                                   QTextCursor::MoveMode::KeepAnchor);
+
+      extra_selection_list.append(std::move(selection));
+    }
+  }
+
+  d->text_edit->setExtraSelections(std::move(extra_selection_list));
+}
+
 void CodeView::OnModelReset() {
   d->search_widget->Deactivate();
 
@@ -496,7 +619,8 @@ void CodeView::OnModelReset() {
 
   d->text_edit->clear();
   d->text_block_index.clear();
-  d->file_token_to_test_block.clear();
+  d->file_token_to_text_block.clear();
+  d->column_id_to_text_block.clear();
   d->highest_line_number = 0;
 
   auto document = new QTextDocument(this);
@@ -509,10 +633,12 @@ void CodeView::OnModelReset() {
 
   auto L_updateTextFormat = [&](QTextCharFormat &text_format,
                                 const QVariant &token_category_var) {
-    auto background_color =
+    auto opt_background_color =
         GetTextBackgroundColor(d->theme, token_category_var);
 
-    text_format.setBackground(background_color);
+    if (opt_background_color.has_value()) {
+      text_format.setBackground(opt_background_color.value());
+    }
 
     auto foreground_color =
         GetTextForegroundColor(d->theme, token_category_var);
@@ -577,13 +703,22 @@ void CodeView::OnModelReset() {
       const auto &token_id_var =
           d->model->Data(model_index, ICodeModel::TokenRawEntityIdRole);
 
-      RawEntityId file_token_id{kInvalidEntityId};
-      if (token_id_var.isValid()) {
-        file_token_id = static_cast<RawEntityId>(token_id_var.toULongLong());
+      if (!token_id_var.isValid()) {
+        continue;
       }
 
-      d->file_token_to_test_block.insert(
+      auto file_token_id = static_cast<RawEntityId>(token_id_var.toULongLong());
+
+      // TODO(alessandro): This index is used for things like ScrollToToken. When
+      // we split tokens however, we could end up with two different tokens using
+      // the same id. This will make this insertion fail, breaking the lookup
+      // functionality for some tokens.
+      d->file_token_to_text_block.insert(
           {file_token_id, d->text_block_index.size()});
+
+      auto unique_column_id = CodeModelIndexToInteger(model_index);
+      d->column_id_to_text_block.insert(
+          {unique_column_id, d->text_block_index.size()});
 
       TextBlockIndexEntry index_entry;
       index_entry.start_position = cursor->position();
@@ -591,6 +726,26 @@ void CodeView::OnModelReset() {
           index_entry.start_position + static_cast<int>(token.size());
 
       index_entry.index = {row_index, token_index};
+
+      const auto &token_group_id_var =
+          d->model->Data(model_index, ICodeModel::TokenGroupIdRole);
+
+      if (token_group_id_var.isValid()) {
+        auto token_group_id =
+            static_cast<std::uint64_t>(token_group_id_var.toULongLong());
+
+        auto token_group_map_it = d->token_group_map.find(token_group_id);
+        if (token_group_map_it == d->token_group_map.end()) {
+          auto insert_status = d->token_group_map.insert({token_group_id, {}});
+          token_group_map_it = insert_status.first;
+        }
+
+        auto &token_group = token_group_map_it->second;
+        token_group.push_back(TokenGroupEntry{index_entry.start_position,
+                                              index_entry.end_position,
+                                              index_entry.index});
+      }
+
       d->text_block_index.push_back(std::move(index_entry));
 
       const auto &index = d->text_block_index.back().index;
@@ -613,13 +768,7 @@ void CodeView::OnModelReset() {
   d->highest_line_number = highest_line_number;
 
   UpdateGutterWidth();
-}
-
-void CodeView::UpdateGutterWidth() {
-  auto required_gutter_width = fontMetrics().horizontalAdvance(
-      QString::number(d->highest_line_number) + "0000");
-
-  d->gutter->setMinimumWidth(required_gutter_width);
+  UpdateTokenGroupColors();
 }
 
 void CodeView::OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event) {
@@ -628,16 +777,6 @@ void CodeView::OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event) {
 
 void CodeView::OnTextEditViewportMouseButtonDblClick(QMouseEvent *event) {
   OnTextEditViewportMouseButtonEvent(event, true);
-}
-
-void CodeView::OnCursorPositionChange() {
-  QTextEdit::ExtraSelection selection;
-  selection.format.setBackground(d->theme.line_highlight_color);
-  selection.format.setProperty(QTextFormat::FullWidthSelection, true);
-  selection.cursor = d->text_edit->textCursor();
-  selection.cursor.clearSelection();
-
-  d->text_edit->setExtraSelections({std::move(selection)});
 }
 
 void CodeView::OnGutterPaintEvent(QPaintEvent *event) {

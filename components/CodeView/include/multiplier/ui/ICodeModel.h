@@ -33,6 +33,7 @@ class ICodeModel : public QObject {
     TokenCategoryRole = Qt::UserRole + 1,
     TokenRawEntityIdRole,
     LineNumberRole,
+    TokenGroupIdRole,
   };
 
   static ICodeModel *Create(const FileLocationCache &file_location_cache,

@@ -62,13 +62,13 @@ class CodeView final : public ICodeView {
 
   void OnTextEditTextZoom(QWheelEvent *event);
   void UpdateTabStopDistance();
+  void UpdateGutterWidth();
+  void UpdateTokenGroupColors();
 
  private slots:
   void OnModelReset();
-  void UpdateGutterWidth();
   void OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event);
   void OnTextEditViewportMouseButtonDblClick(QMouseEvent *event);
-  void OnCursorPositionChange();
   void OnGutterPaintEvent(QPaintEvent *event);
   void OnTextEditUpdateRequest(const QRect &rect, int dy);
 

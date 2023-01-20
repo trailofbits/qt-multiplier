@@ -31,6 +31,7 @@ struct TokenColumn final {
   RawEntityId file_token_id;
   TokenCategory token_category;
   QString data;
+  std::optional<std::uint64_t> opt_token_group_id;
 };
 
 using TokenColumnList = std::vector<TokenColumn>;
@@ -166,6 +167,14 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
 
     case LineNumberRole:
       return static_cast<std::uint64_t>(token_row.line_number);
+
+    case TokenGroupIdRole: {
+      if (!column.opt_token_group_id.has_value()) {
+        return QVariant();
+      }
+
+      return column.opt_token_group_id.value();
+    }
 
     default: return QVariant();
   }
