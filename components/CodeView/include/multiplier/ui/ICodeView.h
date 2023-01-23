@@ -34,15 +34,10 @@ class ICodeView : public QWidget {
   virtual ~ICodeView() override = default;
 
   virtual std::optional<int>
-  GetFileTokenCursorPosition(RawEntityId file_token_id) const = 0;
-
-  virtual std::optional<int>
-  GetTokenCursorPosition(const Token &token) const = 0;
-
-  virtual std::optional<int>
-  GetStartTokenRangeCursorPosition(const TokenRange &token_range) const = 0;
+  GetEntityCursorPosition(RawEntityId entity_id) const = 0;
 
   virtual int GetCursorPosition() const = 0;
+
   virtual bool
   SetCursorPosition(int start,
                     std::optional<int> opt_end = std::nullopt) const = 0;
@@ -50,7 +45,7 @@ class ICodeView : public QWidget {
   virtual QString Text() const = 0;
   virtual void SetWordWrapping(bool enabled) = 0;
 
-  virtual bool ScrollToFileToken(RawEntityId file_token_id) const = 0;
+  virtual bool ScrollToEntityId(RawEntityId entity_id) const = 0;
   virtual bool ScrollToToken(const Token &token) const = 0;
   virtual bool ScrollToTokenRange(const TokenRange &token_range) const = 0;
 

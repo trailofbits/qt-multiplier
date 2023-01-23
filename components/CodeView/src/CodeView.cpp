@@ -28,9 +28,6 @@
 #include <QFontMetrics>
 #include <QWheelEvent>
 
-#include <unordered_map>
-#include <vector>
-#include <optional>
 #include <unordered_set>
 
 namespace mx::gui {
@@ -46,109 +43,6 @@ class QPlainTextEditMod final : public QPlainTextEdit {
   friend class mx::gui::CodeView;
 };
 
-struct TextBlockIndexEntry final {
-  int start_position{};
-  int end_position{};
-  CodeModelIndex index;
-};
-
-using TextBlockIndex = std::vector<TextBlockIndexEntry>;
-using FileTokenIdToTextBlockIndexEntry =
-    std::unordered_map<RawEntityId, std::size_t>;
-
-using UniqueColumnIdToTextBlockIndexEntry =
-    std::unordered_map<std::uint64_t, std::size_t>;
-
-struct TokenGroupEntry final {
-  int start_position{};
-  int end_position{};
-  CodeModelIndex index;
-};
-
-using TokenGroupMap =
-    std::unordered_map<std::uint64_t, std::vector<TokenGroupEntry>>;
-
-std::uint64_t CodeModelIndexToInteger(const CodeModelIndex &index) {
-  return (static_cast<std::uint64_t>(index.row) << 32) |
-         static_cast<std::uint64_t>(index.token_index);
-}
-
-std::optional<QColor> GetTextColorMapEntry(
-    const QVariant &token_category_var,
-    const std::unordered_map<TokenCategory, QColor> &color_map) {
-
-  if (!token_category_var.isValid()) {
-    return std::nullopt;
-  }
-
-  const auto &token_category =
-      static_cast<TokenCategory>(token_category_var.toUInt());
-
-  auto it = color_map.find(token_category);
-  if (it == color_map.end()) {
-    return std::nullopt;
-
-  } else {
-    return it->second;
-  }
-}
-
-std::optional<QColor>
-GetTextBackgroundColor(const CodeViewTheme &code_theme,
-                       const QVariant &token_category_var) {
-  return GetTextColorMapEntry(token_category_var,
-                              code_theme.token_background_color_map);
-}
-
-QColor GetTextForegroundColor(const CodeViewTheme &code_theme,
-                              const QVariant &token_category_var) {
-  auto opt_color = GetTextColorMapEntry(token_category_var,
-                                        code_theme.token_foreground_color_map);
-
-  return opt_color.value_or(code_theme.default_foreground_color);
-}
-
-CodeViewTheme::Style GetTextStyle(const CodeViewTheme &code_theme,
-                                  const QVariant &token_category_var) {
-
-  if (!token_category_var.isValid()) {
-    return {};
-  }
-
-  const auto &token_category =
-      static_cast<TokenCategory>(token_category_var.toUInt());
-
-  auto it = code_theme.token_style_map.find(token_category);
-  if (it == code_theme.token_style_map.end()) {
-    return {};
-  } else {
-    return it->second;
-  }
-}
-
-bool GetCodeModelIndexFromCursorPosition(CodeModelIndex &code_model_index,
-                                         const TextBlockIndex &text_block_index,
-                                         int cursor_position) {
-  // clang-format off
-  auto text_block_index_it = std::find_if(
-    text_block_index.begin(),
-    text_block_index.end(),
-
-    [&](const TextBlockIndexEntry &text_block_index_entry) -> bool {
-      return (cursor_position >= text_block_index_entry.start_position &&
-              cursor_position <= text_block_index_entry.end_position);
-    }
-  );
-  // clang-format on
-
-  if (text_block_index_it == text_block_index.end()) {
-    return false;
-  }
-
-  code_model_index = text_block_index_it->index;
-  return true;
-}
-
 }  // namespace
 
 struct CodeView::PrivateData final {
@@ -158,11 +52,7 @@ struct CodeView::PrivateData final {
   QWidget *gutter{nullptr};
   SearchWidget *search_widget{nullptr};
 
-  TextBlockIndex text_block_index;
-  FileTokenIdToTextBlockIndexEntry file_token_to_text_block;
-  UniqueColumnIdToTextBlockIndexEntry column_id_to_text_block;
-  TokenGroupMap token_group_map;
-  std::size_t highest_line_number{};
+  TokenMap token_map;
 
   CodeViewTheme theme;
   std::size_t tab_width{4};
@@ -177,6 +67,16 @@ void CodeView::SetTheme(const CodeViewTheme &theme) {
   font.setStyleHint(QFont::TypeWriter);
   setFont(font);
 
+  auto palette = d->text_edit->palette();
+  palette.setColor(QPalette::Window, d->theme.default_background_color);
+  palette.setColor(QPalette::WindowText, d->theme.default_foreground_color);
+
+  palette.setColor(QPalette::Base, d->theme.default_background_color);
+  palette.setColor(QPalette::Text, d->theme.default_foreground_color);
+
+  palette.setColor(QPalette::AlternateBase, d->theme.default_background_color);
+  d->text_edit->setPalette(palette);
+
   OnModelReset();
 }
 
@@ -189,39 +89,20 @@ void CodeView::SetTabWidth(std::size_t width) {
 CodeView::~CodeView() {}
 
 std::optional<int>
-CodeView::GetFileTokenCursorPosition(RawEntityId file_token_id) const {
-  if (!IsValidFileToken(file_token_id)) {
+CodeView::GetEntityCursorPosition(RawEntityId entity_id) const {
+  if (entity_id == kInvalidEntityId) {
     return std::nullopt;
   }
 
-  auto it = d->file_token_to_text_block.find(file_token_id);
-  if (it == d->file_token_to_text_block.end()) {
+  auto unique_token_id_list_it =
+      d->token_map.entity_id_to_unique_token_id_list.find(entity_id);
+  if (unique_token_id_list_it ==
+      d->token_map.entity_id_to_unique_token_id_list.end()) {
     return std::nullopt;
   }
 
-  const auto &text_block_index_elem = it->second;
-
-  const auto &text_block_index_entry =
-      d->text_block_index.at(text_block_index_elem);
-
-  return text_block_index_entry.start_position;
-}
-
-std::optional<int> CodeView::GetTokenCursorPosition(const Token &token) const {
-  if (!token) {
-    return std::nullopt;
-  }
-
-  return GetFileTokenCursorPosition(token.id().Pack());
-}
-
-std::optional<int> CodeView::GetStartTokenRangeCursorPosition(
-    const TokenRange &token_range) const {
-  if (!token_range) {
-    return std::nullopt;
-  }
-
-  return GetFileTokenCursorPosition(token_range[0].id().Pack());
+  const auto &unique_token_id_list = unique_token_id_list_it->second;
+  return unique_token_id_list.front();
 }
 
 int CodeView::GetCursorPosition() const {
@@ -230,7 +111,15 @@ int CodeView::GetCursorPosition() const {
 }
 
 bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) const {
+
   auto text_cursor = d->text_edit->textCursor();
+  text_cursor.movePosition(QTextCursor::End);
+
+  auto max_position = text_cursor.position();
+  if (start >= max_position || opt_end.value_or(start) >= max_position) {
+    return false;
+  }
+
   text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
 
   d->text_edit->moveCursor(QTextCursor::End);
@@ -254,8 +143,8 @@ void CodeView::SetWordWrapping(bool enabled) {
                                         : QTextOption::NoWrap);
 }
 
-bool CodeView::ScrollToFileToken(RawEntityId file_token_id) const {
-  auto opt_token_pos = GetFileTokenCursorPosition(file_token_id);
+bool CodeView::ScrollToEntityId(RawEntityId entity_id) const {
+  auto opt_token_pos = GetEntityCursorPosition(entity_id);
   if (!opt_token_pos.has_value()) {
     return false;
   }
@@ -269,7 +158,7 @@ bool CodeView::ScrollToToken(const Token &token) const {
     return false;
   }
 
-  return ScrollToFileToken(token.id().Pack());
+  return ScrollToEntityId(token.id().Pack());
 }
 
 bool CodeView::ScrollToTokenRange(const TokenRange &token_range) const {
@@ -277,7 +166,7 @@ bool CodeView::ScrollToTokenRange(const TokenRange &token_range) const {
     return false;
   }
 
-  return ScrollToFileToken(token_range[0].id().Pack());
+  return ScrollToEntityId(token_range[0].id().Pack());
 }
 
 CodeView::CodeView(ICodeModel *model, QWidget *parent)
@@ -425,17 +314,9 @@ bool CodeView::IsValidFileToken(RawEntityId file_token_id) const {
 }
 
 std::optional<CodeModelIndex>
-CodeView::ModelIndexFromMousePosition(QPoint pos) {
+CodeView::GetCodeModelIndexFromMousePosition(const QPoint &pos) {
   auto text_cursor = d->text_edit->cursorForPosition(pos);
-  auto cursor_position = text_cursor.position();
-
-  CodeModelIndex code_model_index{};
-  if (!GetCodeModelIndexFromCursorPosition(
-          code_model_index, d->text_block_index, cursor_position)) {
-    return std::nullopt;
-  }
-
-  return code_model_index;
+  return GetCodeModelIndexFromTextCursor(d->token_map, text_cursor);
 }
 
 void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
@@ -443,7 +324,7 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
     return;
   }
 
-  auto opt_model_index = ModelIndexFromMousePosition(event->pos());
+  auto opt_model_index = GetCodeModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
     d->opt_prev_hovered_model_index = std::nullopt;
     return;
@@ -467,7 +348,7 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
 
 void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
                                                   bool double_click) {
-  auto opt_model_index = ModelIndexFromMousePosition(event->pos());
+  auto opt_model_index = GetCodeModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
     return;
   }
@@ -506,7 +387,7 @@ void CodeView::UpdateTabStopDistance() {
 
 void CodeView::UpdateGutterWidth() {
   auto required_gutter_width = fontMetrics().horizontalAdvance(
-      QString::number(d->highest_line_number) + "000");
+      QString::number(d->token_map.highest_line_number) + "000");
 
   d->gutter->setMinimumWidth(required_gutter_width);
 }
@@ -529,38 +410,40 @@ void CodeView::UpdateTokenGroupColors() {
   std::unordered_set<std::uint64_t> visited_model_index_list;
   std::unordered_set<int> colored_line_list;
 
-  for (const auto &token_group_map_p : d->token_group_map) {
-    const auto &token_group = token_group_map_p.second;
+  for (const auto &token_group_p :
+       d->token_map.token_group_id_to_unique_token_id_list) {
+    const auto &unique_token_id_list = token_group_p.second;
 
     const auto &group_color = kColorMap.at(color_map_index);
     ++color_map_index;
 
-    for (const auto &token : token_group) {
-      auto unique_column_id = CodeModelIndexToInteger(token.index);
-      visited_model_index_list.insert(unique_column_id);
+    for (const auto &unique_token_id : unique_token_id_list) {
+      const auto &token_map_entry = d->token_map.data.at(unique_token_id);
+      visited_model_index_list.insert(unique_token_id);
 
       selection = {};
       selection.format.setBackground(group_color);
       selection.cursor = d->text_edit->textCursor();
-      selection.cursor.setPosition(token.start_position,
+      selection.cursor.setPosition(token_map_entry.cursor_start,
                                    QTextCursor::MoveMode::MoveAnchor);
 
-      selection.cursor.setPosition(token.end_position,
+      selection.cursor.setPosition(token_map_entry.cursor_end,
                                    QTextCursor::MoveMode::KeepAnchor);
 
       extra_selection_list.append(std::move(selection));
 
-      auto column_count = d->model->TokenCount(token.index.row);
-      auto is_last = token.index.token_index + 1 == column_count;
+      auto column_count = d->model->TokenCount(token_map_entry.model_index.row);
+      auto is_last =
+          token_map_entry.model_index.token_index + 1 == column_count;
 
       if (is_last) {
-        colored_line_list.insert(token.index.row);
+        colored_line_list.insert(token_map_entry.model_index.row);
 
         selection = {};
         selection.format.setBackground(group_color);
         selection.format.setProperty(QTextFormat::FullWidthSelection, true);
         selection.cursor = d->text_edit->textCursor();
-        selection.cursor.setPosition(token.start_position,
+        selection.cursor.setPosition(token_map_entry.cursor_end,
                                      QTextCursor::MoveMode::MoveAnchor);
 
         selection.cursor.clearSelection();
@@ -573,28 +456,20 @@ void CodeView::UpdateTokenGroupColors() {
     auto column_count = d->model->TokenCount(colored_line);
 
     for (int column = 0; column < column_count; ++column) {
-      auto unique_column_id = CodeModelIndexToInteger({colored_line, column});
-      if (visited_model_index_list.count(unique_column_id) > 0) {
+      auto unique_token_id = GetUniqueTokenIdentifier({colored_line, column});
+      if (visited_model_index_list.count(unique_token_id) > 0) {
         continue;
       }
 
-      auto column_id_to_text_block_it =
-          d->column_id_to_text_block.find(unique_column_id);
-      if (column_id_to_text_block_it == d->column_id_to_text_block.end()) {
-        continue;
-      }
-
-      const auto &text_block_index_elem = column_id_to_text_block_it->second;
-      const auto &text_block_index_entry =
-          d->text_block_index.at(text_block_index_elem);
+      const auto &token_map_entry = d->token_map.data.at(unique_token_id);
 
       selection = {};
       selection.format.setBackground(d->theme.default_background_color);
       selection.cursor = d->text_edit->textCursor();
-      selection.cursor.setPosition(text_block_index_entry.start_position,
+      selection.cursor.setPosition(token_map_entry.cursor_start,
                                    QTextCursor::MoveMode::MoveAnchor);
 
-      selection.cursor.setPosition(text_block_index_entry.end_position,
+      selection.cursor.setPosition(token_map_entry.cursor_end,
                                    QTextCursor::MoveMode::KeepAnchor);
 
       extra_selection_list.append(std::move(selection));
@@ -604,168 +479,375 @@ void CodeView::UpdateTokenGroupColors() {
   d->text_edit->setExtraSelections(std::move(extra_selection_list));
 }
 
-void CodeView::OnModelReset() {
-  d->search_widget->Deactivate();
+std::uint64_t CodeView::GetUniqueTokenIdentifier(const CodeModelIndex &index) {
 
-  auto palette = d->text_edit->palette();
-  palette.setColor(QPalette::Window, d->theme.default_background_color);
-  palette.setColor(QPalette::WindowText, d->theme.default_foreground_color);
+  return (static_cast<std::uint64_t>(index.row) << 32) |
+         static_cast<std::uint64_t>(index.token_index);
+}
 
-  palette.setColor(QPalette::Base, d->theme.default_background_color);
-  palette.setColor(QPalette::Text, d->theme.default_foreground_color);
+std::optional<std::size_t>
+CodeView::GetLineNumberFromBlockNumber(const TokenMap &token_map,
+                                       int block_number) {
 
-  palette.setColor(QPalette::AlternateBase, d->theme.default_background_color);
-  d->text_edit->setPalette(palette);
+  auto line_number_it =
+      token_map.block_number_to_line_number.find(block_number);
+  if (line_number_it == token_map.block_number_to_line_number.end()) {
+    return std::nullopt;
+  }
 
-  d->text_edit->clear();
-  d->text_block_index.clear();
-  d->file_token_to_text_block.clear();
-  d->column_id_to_text_block.clear();
-  d->highest_line_number = 0;
+  return line_number_it->second;
+}
 
-  auto document = new QTextDocument(this);
-  document->setDefaultFont(font());
+std::optional<CodeModelIndex>
+CodeView::GetCodeModelIndexFromTextCursor(const TokenMap &token_map,
+                                          const QTextCursor &cursor) {
 
+  auto line_number = cursor.blockNumber();
+
+  auto token_unique_id_list_it =
+      token_map.block_number_to_unique_token_id_list.find(line_number);
+
+  if (token_unique_id_list_it ==
+      token_map.block_number_to_unique_token_id_list.end()) {
+
+    return std::nullopt;
+  }
+
+  const auto &token_unique_id_list = token_unique_id_list_it->second;
+
+  auto cursor_position = cursor.position();
+  for (const auto &token_unique_id : token_unique_id_list) {
+    const auto &token_map_entry = token_map.data.at(token_unique_id);
+    if (cursor_position > token_map_entry.cursor_end) {
+      break;
+    }
+
+    if (cursor_position >= token_map_entry.cursor_start &&
+        cursor_position <= token_map_entry.cursor_end) {
+
+      return token_map_entry.model_index;
+    }
+  }
+
+  return std::nullopt;
+}
+
+std::vector<int>
+CodeView::GetTextCursorListFromRawEntityId(const TokenMap &token_map,
+                                           const RawEntityId &entity_id) {
+
+  auto token_unique_id_list_it =
+      token_map.entity_id_to_unique_token_id_list.find(entity_id);
+
+  if (token_unique_id_list_it ==
+      token_map.entity_id_to_unique_token_id_list.end()) {
+    return {};
+  }
+
+  const auto &token_unique_id_list = token_unique_id_list_it->second;
+
+  std::vector<int> cursor_list;
+
+  for (const auto &token_unique_id : token_unique_id_list) {
+    const auto &token_map_entry = token_map.data.at(token_unique_id);
+    cursor_list.push_back(token_map_entry.cursor_start);
+  }
+
+  return cursor_list;
+}
+
+QTextDocument *CodeView::CreateTextDocument(
+    CodeView::TokenMap &token_map, const ICodeModel &model,
+    const CodeViewTheme &theme,
+    const std::optional<CreateTextDocumentProgressCallback>
+        &opt_progress_callback) {
+
+  token_map = {};
+
+  auto document = new QTextDocument();
   auto document_layout = new QPlainTextDocumentLayout(document);
   document->setDocumentLayout(document_layout);
 
-  d->text_edit->setDocument(document);
+  auto row_count = model.RowCount();
+  if (row_count == 0) {
+    return document;
+  }
 
-  auto L_updateTextFormat = [&](QTextCharFormat &text_format,
-                                const QVariant &token_category_var) {
-    auto opt_background_color =
-        GetTextBackgroundColor(d->theme, token_category_var);
+  QTextCursor cursor(document);
+  cursor.beginEditBlock();
 
-    if (opt_background_color.has_value()) {
-      text_format.setBackground(opt_background_color.value());
+  auto L_updateProgress = [&](int current_row) -> bool {
+    if (!opt_progress_callback.has_value()) {
+      return true;
     }
 
-    auto foreground_color =
-        GetTextForegroundColor(d->theme, token_category_var);
+    const auto &progress_callback = opt_progress_callback.value();
 
-    text_format.setForeground(foreground_color);
+    if (current_row == row_count) {
+      static_cast<void>(progress_callback(100));
+      return true;
+    }
 
-    auto text_style = GetTextStyle(d->theme, token_category_var);
-    text_format.setFontItalic(text_style.italic);
-    text_format.setFontWeight(text_style.bold ? QFont::DemiBold
-                                              : QFont::Normal);
+    if ((current_row % 100) != 0) {
+      return true;
+    }
 
-    text_format.setFontUnderline(text_style.underline);
-    text_format.setFontStrikeOut(text_style.strikeout);
+    auto current_progress = (current_row * 100) / row_count;
+    return progress_callback(current_progress);
   };
 
-  auto cursor = std::make_unique<QTextCursor>(document);
-  auto row_count = d->model->RowCount();
-
-  QProgressDialog progress(tr("Generating rows..."), tr("Abort"), 0, row_count,
-                           this);
-  progress.setWindowModality(Qt::WindowModal);
-
-  CodeModelIndex model_index;
-  QTextCharFormat text_format;
-
-  cursor->beginEditBlock();
-
-  std::size_t highest_line_number{};
-
-  for (int row_index = 0; row_index < row_count && !progress.wasCanceled();
-       ++row_index) {
-    model_index.row = row_index;
-
-    if ((row_index % 100) == 0) {
-      progress.setValue(row_index);
+  for (int row_index = 0; row_index < row_count; ++row_index) {
+    if (!L_updateProgress(row_index)) {
+      break;
     }
 
-    auto token_count = d->model->TokenCount(row_index);
+    CodeModelIndex model_index = {row_index, 0};
+    auto line_mappings_need_update{true};
+    auto token_count = model.TokenCount(row_index);
+
     for (int token_index = 0; token_index < token_count; ++token_index) {
-      if (progress.wasCanceled()) {
-        break;
-      }
-
-      model_index.token_index = token_index;
-      const auto &token_var = d->model->Data(model_index, Qt::DisplayRole);
-      if (!token_var.isValid()) {
-        continue;
-      }
-
+      // Update the highest line number value
       const auto &line_number_var =
-          d->model->Data(model_index, ICodeModel::LineNumberRole);
+          model.Data(model_index, ICodeModel::LineNumberRole);
 
       if (line_number_var.isValid()) {
         auto line_number =
             static_cast<std::size_t>(line_number_var.toULongLong());
 
-        highest_line_number = std::max(line_number, highest_line_number);
+        token_map.highest_line_number =
+            std::max(line_number, token_map.highest_line_number);
+
+        if (line_mappings_need_update) {
+          auto block_number = cursor.blockNumber();
+
+          token_map.line_number_to_block_number.insert(
+              {line_number, block_number});
+
+          token_map.block_number_to_line_number.insert(
+              {block_number, line_number});
+
+          line_mappings_need_update = false;
+        }
       }
 
-      const auto &token = token_var.toString();
-
-      const auto &token_id_var =
-          d->model->Data(model_index, ICodeModel::TokenRawEntityIdRole);
-
-      if (!token_id_var.isValid()) {
+      // Get the token that will have to be displayed on screen. There is nothing
+      // else to do here if it is not visible
+      model_index.token_index = token_index;
+      const auto &token_var = model.Data(model_index, Qt::DisplayRole);
+      if (!token_var.isValid()) {
         continue;
       }
 
-      auto file_token_id = static_cast<RawEntityId>(token_id_var.toULongLong());
+      const auto &token = token_var.toString();
+      if (token.isEmpty()) {
+        continue;
+      }
 
-      // TODO(alessandro): This index is used for things like ScrollToToken. When
-      // we split tokens however, we could end up with two different tokens using
-      // the same id. This will make this insertion fail, breaking the lookup
-      // functionality for some tokens.
-      d->file_token_to_text_block.insert(
-          {file_token_id, d->text_block_index.size()});
+      // Generate the token map entry
+      auto unique_token_id = GetUniqueTokenIdentifier(model_index);
 
-      auto unique_column_id = CodeModelIndexToInteger(model_index);
-      d->column_id_to_text_block.insert(
-          {unique_column_id, d->text_block_index.size()});
+      TokenMap::Entry entry{};
+      entry.cursor_start = cursor.position();
+      entry.cursor_end = entry.cursor_start + static_cast<int>(token.size());
+      entry.model_index = model_index;
 
-      TextBlockIndexEntry index_entry;
-      index_entry.start_position = cursor->position();
-      index_entry.end_position =
-          index_entry.start_position + static_cast<int>(token.size());
+      token_map.data.insert({unique_token_id, std::move(entry)});
 
-      index_entry.index = {row_index, token_index};
+      // Add the entry to the RawEntityId index
+      const auto &entity_id_var =
+          model.Data(model_index, ICodeModel::TokenRawEntityIdRole);
 
+      if (entity_id_var.isValid()) {
+        auto entity_id = static_cast<RawEntityId>(entity_id_var.toULongLong());
+        if (entity_id != kInvalidEntityId) {
+          auto unique_token_id_list_it =
+              token_map.entity_id_to_unique_token_id_list.find(entity_id);
+          if (unique_token_id_list_it ==
+              token_map.entity_id_to_unique_token_id_list.end()) {
+            auto insert_status =
+                token_map.entity_id_to_unique_token_id_list.insert(
+                    {entity_id, {}});
+            unique_token_id_list_it = insert_status.first;
+          }
+
+          auto &unique_token_id_list = unique_token_id_list_it->second;
+          unique_token_id_list.push_back(unique_token_id);
+        }
+      }
+
+      // Add the entry to the block number index
+      {
+        auto block_number = cursor.blockNumber();
+
+        auto unique_token_id_list_it =
+            token_map.block_number_to_unique_token_id_list.find(block_number);
+
+        if (unique_token_id_list_it ==
+            token_map.block_number_to_unique_token_id_list.end()) {
+
+          auto insert_status =
+              token_map.block_number_to_unique_token_id_list.insert(
+                  {block_number, {}});
+
+          unique_token_id_list_it = insert_status.first;
+        }
+
+        auto &unique_token_id_list = unique_token_id_list_it->second;
+        unique_token_id_list.push_back(unique_token_id);
+      }
+
+      // Add the entry to the token group index
       const auto &token_group_id_var =
-          d->model->Data(model_index, ICodeModel::TokenGroupIdRole);
+          model.Data(model_index, ICodeModel::TokenGroupIdRole);
 
       if (token_group_id_var.isValid()) {
         auto token_group_id =
             static_cast<std::uint64_t>(token_group_id_var.toULongLong());
 
-        auto token_group_map_it = d->token_group_map.find(token_group_id);
-        if (token_group_map_it == d->token_group_map.end()) {
-          auto insert_status = d->token_group_map.insert({token_group_id, {}});
-          token_group_map_it = insert_status.first;
+        auto unique_token_id_list_it =
+            token_map.token_group_id_to_unique_token_id_list.find(
+                token_group_id);
+
+        if (unique_token_id_list_it ==
+            token_map.token_group_id_to_unique_token_id_list.end()) {
+
+          auto insert_status =
+              token_map.token_group_id_to_unique_token_id_list.insert(
+                  {token_group_id, {}});
+
+          unique_token_id_list_it = insert_status.first;
         }
 
-        auto &token_group = token_group_map_it->second;
-        token_group.push_back(TokenGroupEntry{index_entry.start_position,
-                                              index_entry.end_position,
-                                              index_entry.index});
+        auto &unique_token_id_list = unique_token_id_list_it->second;
+        unique_token_id_list.push_back(unique_token_id);
       }
 
-      d->text_block_index.push_back(std::move(index_entry));
-
-      const auto &index = d->text_block_index.back().index;
+      // Add the token to the document
       auto token_category_var =
-          d->model->Data(index, ICodeModel::TokenCategoryRole);
+          model.Data(model_index, ICodeModel::TokenCategoryRole);
 
-      L_updateTextFormat(text_format, token_category_var);
-      cursor->insertText(token, text_format);
+      QTextCharFormat text_format;
+      ConfigureTextFormatFromTheme(text_format, theme, token_category_var);
+
+      cursor.insertText(token, text_format);
     }
 
-    cursor->insertText("\n");
+    cursor.insertText("\n");
   }
 
-  cursor->endEditBlock();
+  cursor.endEditBlock();
 
-  if (!progress.wasCanceled()) {
-    progress.setValue(100);
+  L_updateProgress(row_count);
+  return document;
+}
+
+std::optional<QColor> CodeView::GetTextColorMapEntryFromTheme(
+    const QVariant &token_category_var,
+    const std::unordered_map<TokenCategory, QColor> &color_map) {
+
+  if (!token_category_var.isValid()) {
+    return std::nullopt;
   }
 
-  d->highest_line_number = highest_line_number;
+  const auto &token_category =
+      static_cast<TokenCategory>(token_category_var.toUInt());
+
+  auto it = color_map.find(token_category);
+  if (it == color_map.end()) {
+    return std::nullopt;
+
+  } else {
+    return it->second;
+  }
+}
+
+std::optional<QColor>
+CodeView::GetTextBackgroundColorFromTheme(const CodeViewTheme &theme,
+                                          const QVariant &token_category_var) {
+
+  return GetTextColorMapEntryFromTheme(token_category_var,
+                                       theme.token_background_color_map);
+}
+
+QColor
+CodeView::GetTextForegroundColorFromTheme(const CodeViewTheme &theme,
+                                          const QVariant &token_category_var) {
+
+  auto opt_color = GetTextColorMapEntryFromTheme(
+      token_category_var, theme.token_foreground_color_map);
+
+  return opt_color.value_or(theme.default_foreground_color);
+}
+
+CodeViewTheme::Style
+CodeView::GetTextStyleFromTheme(const CodeViewTheme &theme,
+                                const QVariant &token_category_var) {
+  if (!token_category_var.isValid()) {
+    return {};
+  }
+
+  const auto &token_category =
+      static_cast<TokenCategory>(token_category_var.toUInt());
+
+  auto it = theme.token_style_map.find(token_category);
+  if (it == theme.token_style_map.end()) {
+    return {};
+
+  } else {
+    return it->second;
+  }
+}
+
+void CodeView::ConfigureTextFormatFromTheme(
+    QTextCharFormat &text_format, const CodeViewTheme &theme,
+    const QVariant &token_category_var) {
+
+  auto opt_background_color =
+      GetTextBackgroundColorFromTheme(theme, token_category_var);
+  if (opt_background_color.has_value()) {
+    text_format.setBackground(opt_background_color.value());
+  }
+
+  auto foreground_color =
+      GetTextForegroundColorFromTheme(theme, token_category_var);
+  text_format.setForeground(foreground_color);
+
+  auto text_style = GetTextStyleFromTheme(theme, token_category_var);
+  text_format.setFontItalic(text_style.italic);
+  text_format.setFontWeight(text_style.bold ? QFont::DemiBold : QFont::Normal);
+
+  text_format.setFontUnderline(text_style.underline);
+  text_format.setFontStrikeOut(text_style.strikeout);
+}
+
+void CodeView::OnModelReset() {
+  d->search_widget->Deactivate();
+
+  QProgressDialog progress(tr("Generating rows..."), tr("Abort"), 0, 100, this);
+  progress.setWindowModality(Qt::WindowModal);
+
+  // clang-format off
+  auto document = CreateTextDocument(
+    d->token_map,
+    *d->model,
+    d->theme,
+
+    [&progress](int current_progress) -> bool {
+      if (progress.wasCanceled()) {
+        return false;
+      }
+
+      progress.setValue(current_progress);
+      return true;
+    }
+  );
+  // clang-format on
+
+  if (progress.wasCanceled()) {
+    return;
+  }
+
+  d->text_edit->setDocument(document);
 
   UpdateGutterWidth();
   UpdateTokenGroupColors();
@@ -793,27 +875,19 @@ void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
 
   int bottom = top + qRound(d->text_edit->blockBoundingRect(block).height());
 
-  CodeModelIndex code_model_index{};
-
   auto right_line_num_margin = d->gutter->width() - (d->gutter->width() / 3);
 
   while (block.isValid() && top <= event->rect().bottom()) {
     if (block.isVisible() && bottom >= event->rect().top()) {
-      auto succeeded = GetCodeModelIndexFromCursorPosition(
-          code_model_index, d->text_block_index, block.position());
+      auto block_number = block.firstLineNumber();
 
-      if (succeeded) {
-        auto line_number_var =
-            d->model->Data(code_model_index, ICodeModel::LineNumberRole);
+      auto opt_line_number =
+          GetLineNumberFromBlockNumber(d->token_map, block_number);
 
-        if (line_number_var.isValid()) {
-          auto line_number =
-              static_cast<std::size_t>(line_number_var.toULongLong());
-
-          painter.drawText(0, top, right_line_num_margin,
-                           fontMetrics().height(), Qt::AlignRight,
-                           QString::number(line_number));
-        }
+      if (opt_line_number.has_value()) {
+        auto line_number = opt_line_number.value();
+        painter.drawText(0, top, right_line_num_margin, fontMetrics().height(),
+                         Qt::AlignRight, QString::number(line_number));
       }
     }
 
