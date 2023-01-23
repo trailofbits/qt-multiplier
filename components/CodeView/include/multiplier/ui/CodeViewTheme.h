@@ -8,9 +8,8 @@
 
 #pragma once
 
-#include <filesystem>
-#include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include <QColor>
 
@@ -41,6 +40,8 @@ struct CodeViewTheme final {
   std::unordered_map<TokenCategory, Style> token_style_map;
   std::unordered_map<TokenCategory, QColor> token_background_color_map;
   std::unordered_map<TokenCategory, QColor> token_foreground_color_map;
+
+  std::vector<QColor> token_group_color_list;
 };
 
 // TODO(alessandro): Implement function that loads a theme from file

@@ -86,7 +86,17 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
     { TokenCategory::TEMPLATE_PARAMETER_TYPE, QColor::fromRgb(198, 117, 29) },
     { TokenCategory::TEMPLATE_PARAMETER_VALUE, QColor::fromRgb(174, 144, 65) },
     { TokenCategory::LABEL, QColor::fromRgb(149, 149, 149) },
+  },
+
+  // token_group_color_list
+  {
+      QColor::fromRgb(0x101119), QColor::fromRgb(0x0F171A),
+      QColor::fromRgb(0x060E0B), QColor::fromRgb(0x1C1A0C),
+      QColor::fromRgb(0x221607), QColor::fromRgb(0x291500),
+      QColor::fromRgb(0x2B1412), QColor::fromRgb(0x2B121D),
+      QColor::fromRgb(0x2C1125), QColor::fromRgb(0x1E0B1E),
   }
+
 };
 // clang-format on
 

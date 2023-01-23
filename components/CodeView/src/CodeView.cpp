@@ -18,7 +18,6 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPlainTextDocumentLayout>
-#include <QPlainTextEdit>
 #include <QTextBlock>
 #include <QTextCharFormat>
 #include <QTextDocument>
@@ -82,7 +81,6 @@ void CodeView::SetTheme(const CodeViewTheme &theme) {
 
 void CodeView::SetTabWidth(std::size_t width) {
   d->tab_width = width;
-
   UpdateTabStopDistance();
 }
 
@@ -304,15 +302,6 @@ void CodeView::InitializeWidgets() {
   SetTabWidth(4);
 }
 
-bool CodeView::IsValidFileToken(RawEntityId file_token_id) const {
-  if (file_token_id == kInvalidEntityId) {
-    return false;
-  }
-
-  const auto &variant_id = EntityId(file_token_id).Unpack();
-  return std::holds_alternative<FileTokenId>(variant_id);
-}
-
 std::optional<CodeModelIndex>
 CodeView::GetCodeModelIndexFromMousePosition(const QPoint &pos) {
   auto text_cursor = d->text_edit->cursorForPosition(pos);
@@ -386,95 +375,21 @@ void CodeView::UpdateTabStopDistance() {
 }
 
 void CodeView::UpdateGutterWidth() {
-  auto required_gutter_width = fontMetrics().horizontalAdvance(
-      QString::number(d->token_map.highest_line_number) + "000");
+  const auto &font_metrics = fontMetrics();
 
-  d->gutter->setMinimumWidth(required_gutter_width);
+  auto gutter_margin = font_metrics.horizontalAdvance("0") * 4;
+  auto required_gutter_width = font_metrics.horizontalAdvance(
+      QString::number(d->token_map.highest_line_number));
+
+  d->gutter->setMinimumWidth(gutter_margin + required_gutter_width);
 }
 
 void CodeView::UpdateTokenGroupColors() {
-  // TODO(alessandro): These should be either derived from the
-  // active palette or taken from the theme.
-  static std::vector<QColor> kColorMap{
-      QColor::fromRgb(0x101119), QColor::fromRgb(0x0F171A),
-      QColor::fromRgb(0x060E0B), QColor::fromRgb(0x1C1A0C),
-      QColor::fromRgb(0x221607), QColor::fromRgb(0x291500),
-      QColor::fromRgb(0x2B1412), QColor::fromRgb(0x2B121D),
-      QColor::fromRgb(0x2C1125), QColor::fromRgb(0x1E0B1E),
-  };
+  auto extra_selection_list =
+      GenerateExtraSelections(d->token_map, *d->text_edit, *d->model, d->theme);
 
-  std::size_t color_map_index{};
-  QList<QTextEdit::ExtraSelection> extra_selection_list;
-  QTextEdit::ExtraSelection selection;
-
-  std::unordered_set<std::uint64_t> visited_model_index_list;
-  std::unordered_set<int> colored_line_list;
-
-  for (const auto &token_group_p :
-       d->token_map.token_group_id_to_unique_token_id_list) {
-    const auto &unique_token_id_list = token_group_p.second;
-
-    const auto &group_color = kColorMap.at(color_map_index);
-    ++color_map_index;
-
-    for (const auto &unique_token_id : unique_token_id_list) {
-      const auto &token_map_entry = d->token_map.data.at(unique_token_id);
-      visited_model_index_list.insert(unique_token_id);
-
-      selection = {};
-      selection.format.setBackground(group_color);
-      selection.cursor = d->text_edit->textCursor();
-      selection.cursor.setPosition(token_map_entry.cursor_start,
-                                   QTextCursor::MoveMode::MoveAnchor);
-
-      selection.cursor.setPosition(token_map_entry.cursor_end,
-                                   QTextCursor::MoveMode::KeepAnchor);
-
-      extra_selection_list.append(std::move(selection));
-
-      auto column_count = d->model->TokenCount(token_map_entry.model_index.row);
-      auto is_last =
-          token_map_entry.model_index.token_index + 1 == column_count;
-
-      if (is_last) {
-        colored_line_list.insert(token_map_entry.model_index.row);
-
-        selection = {};
-        selection.format.setBackground(group_color);
-        selection.format.setProperty(QTextFormat::FullWidthSelection, true);
-        selection.cursor = d->text_edit->textCursor();
-        selection.cursor.setPosition(token_map_entry.cursor_end,
-                                     QTextCursor::MoveMode::MoveAnchor);
-
-        selection.cursor.clearSelection();
-        extra_selection_list.prepend(std::move(selection));
-      }
-    }
-  }
-
-  for (const auto &colored_line : colored_line_list) {
-    auto column_count = d->model->TokenCount(colored_line);
-
-    for (int column = 0; column < column_count; ++column) {
-      auto unique_token_id = GetUniqueTokenIdentifier({colored_line, column});
-      if (visited_model_index_list.count(unique_token_id) > 0) {
-        continue;
-      }
-
-      const auto &token_map_entry = d->token_map.data.at(unique_token_id);
-
-      selection = {};
-      selection.format.setBackground(d->theme.default_background_color);
-      selection.cursor = d->text_edit->textCursor();
-      selection.cursor.setPosition(token_map_entry.cursor_start,
-                                   QTextCursor::MoveMode::MoveAnchor);
-
-      selection.cursor.setPosition(token_map_entry.cursor_end,
-                                   QTextCursor::MoveMode::KeepAnchor);
-
-      extra_selection_list.append(std::move(selection));
-    }
-  }
+  // TODO: Implement here any additional highlighting by appending
+  // into the extra selection list
 
   d->text_edit->setExtraSelections(std::move(extra_selection_list));
 }
@@ -818,6 +733,91 @@ void CodeView::ConfigureTextFormatFromTheme(
 
   text_format.setFontUnderline(text_style.underline);
   text_format.setFontStrikeOut(text_style.strikeout);
+}
+
+QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
+    const TokenMap &token_map, QPlainTextEdit &text_edit,
+    const ICodeModel &model, const CodeViewTheme &theme) {
+
+  QList<QTextEdit::ExtraSelection> extra_selection_list;
+
+  std::size_t color_map_index{};
+  QTextEdit::ExtraSelection selection;
+
+  std::unordered_set<std::uint64_t> visited_model_index_list;
+  std::unordered_set<int> colored_line_list;
+
+  for (const auto &token_group_p :
+       token_map.token_group_id_to_unique_token_id_list) {
+
+    const auto &unique_token_id_list = token_group_p.second;
+
+    const auto &group_color =
+        theme.token_group_color_list[color_map_index %
+                                     theme.token_group_color_list.size()];
+
+    ++color_map_index;
+
+    for (const auto &unique_token_id : unique_token_id_list) {
+      const auto &token_map_entry = token_map.data.at(unique_token_id);
+      visited_model_index_list.insert(unique_token_id);
+
+      selection = {};
+      selection.format.setBackground(group_color);
+      selection.cursor = text_edit.textCursor();
+      selection.cursor.setPosition(token_map_entry.cursor_start,
+                                   QTextCursor::MoveMode::MoveAnchor);
+
+      selection.cursor.setPosition(token_map_entry.cursor_end,
+                                   QTextCursor::MoveMode::KeepAnchor);
+
+      extra_selection_list.append(std::move(selection));
+
+      auto column_count = model.TokenCount(token_map_entry.model_index.row);
+      auto is_last =
+          token_map_entry.model_index.token_index + 1 == column_count;
+
+      if (is_last) {
+        colored_line_list.insert(token_map_entry.model_index.row);
+
+        selection = {};
+        selection.format.setBackground(group_color);
+        selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+        selection.cursor = text_edit.textCursor();
+        selection.cursor.setPosition(token_map_entry.cursor_end,
+                                     QTextCursor::MoveMode::MoveAnchor);
+
+        selection.cursor.clearSelection();
+        extra_selection_list.prepend(std::move(selection));
+      }
+    }
+  }
+
+  for (const auto &colored_line : colored_line_list) {
+    auto column_count = model.TokenCount(colored_line);
+
+    for (int column = 0; column < column_count; ++column) {
+      auto unique_token_id = GetUniqueTokenIdentifier({colored_line, column});
+      if (visited_model_index_list.count(unique_token_id) > 0) {
+        continue;
+      }
+
+      const auto &token_map_entry = token_map.data.at(unique_token_id);
+
+      selection = {};
+      selection.format.setBackground(theme.default_background_color);
+      selection.cursor = text_edit.textCursor();
+      selection.cursor.setPosition(token_map_entry.cursor_start,
+                                   QTextCursor::MoveMode::MoveAnchor);
+
+      selection.cursor.setPosition(token_map_entry.cursor_end,
+                                   QTextCursor::MoveMode::KeepAnchor);
+
+      extra_selection_list.append(std::move(selection));
+    }
+  }
+
+  return extra_selection_list;
 }
 
 void CodeView::OnModelReset() {
