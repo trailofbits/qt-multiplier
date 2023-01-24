@@ -6,5 +6,6 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_subdirectory("qt")
+add_subdirectory("doctest")
 add_subdirectory("multiplier")
+add_subdirectory("qt")

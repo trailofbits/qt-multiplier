@@ -18,6 +18,11 @@ include("cmake/options.cmake")
 include("cmake/build_flags.cmake")
 include("cmake/install.cmake")
 
+if(MXQT_ENABLE_TESTS)
+  include("CTest")
+  enable_testing()
+endif()
+
 add_subdirectory("libraries")
 add_subdirectory("components")
 add_subdirectory("multiplier")

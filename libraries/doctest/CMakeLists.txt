@@ -6,4 +6,7 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-option(MXQT_ENABLE_TESTS "Set to true to enable tests" true)
+add_library("thirdparty_doctest" INTERFACE)
+target_include_directories("thirdparty_doctest" INTERFACE
+  "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)

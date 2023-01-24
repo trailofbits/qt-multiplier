@@ -18,7 +18,6 @@ target_link_libraries("mx_filetreemodel" PRIVATE
   "qtmx_cxx_flags"
   "thirdparty_qt"
   "multiplier::mx-api"
-  "mx_assert"
 )
 
 target_include_directories("mx_filetreemodel" PRIVATE
@@ -30,3 +29,7 @@ target_include_directories("mx_filetreemodel" SYSTEM INTERFACE
 )
 
 enable_qt_properties("mx_filetreemodel")
+
+if(MXQT_ENABLE_TESTS)
+  add_subdirectory("tests")
+endif()
