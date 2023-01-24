@@ -847,10 +847,12 @@ void CodeView::OnModelReset() {
     return;
   }
 
+  document->setDefaultFont(d->text_edit->font());
   d->text_edit->setDocument(document);
 
   UpdateGutterWidth();
   UpdateTokenGroupColors();
+  UpdateTabStopDistance();
 }
 
 void CodeView::OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event) {
