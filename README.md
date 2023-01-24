@@ -1,5 +1,7 @@
 # Graphical user interface for Multiplier
 
+[Code documentation can be found here](https://upgraded-potato-g33zzjm.pages.github.io/).
+
 ## Build Instructions 
 
 ### macOS 
