@@ -20,6 +20,7 @@ enum class TokenCategory : unsigned char;
 
 namespace mx::gui {
 
+//! This structure represents a theme for the ICodeView widget
 struct CodeViewTheme final {
   struct Style final {
     bool bold{false};
