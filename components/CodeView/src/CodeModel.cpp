@@ -205,7 +205,7 @@ void CodeModel::FutureResultStateChanged() {
 
   auto future_result = d->future_result.takeResult();
 
-  if (!future_result.Succeeded()) {
+  if (!std::holds_alternative<IndexedTokenRangeData>(future_result)) {
     emit ModelAboutToBeReset();
 
     d->model_state = ModelState::UpdateFailed;
@@ -217,7 +217,8 @@ void CodeModel::FutureResultStateChanged() {
 
   emit ModelAboutToBeReset();
 
-  IndexedTokenRangeData indexed_token_range_data = future_result.TakeValue();
+  IndexedTokenRangeData indexed_token_range_data =
+      std::move(std::get<IndexedTokenRangeData>(future_result));
   auto token_count = indexed_token_range_data.start_of_token.size() - 1;
 
   TokenRow current_row;

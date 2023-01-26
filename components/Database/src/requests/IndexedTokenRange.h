@@ -12,7 +12,7 @@
 
 #include <QPromise>
 
-#include <unordered_map>
+#include <variant>
 
 namespace mx::gui {
 
@@ -32,7 +32,7 @@ struct EntityRangeRequest final {
 };
 
 using Request = std::variant<SingleEntityRequest, EntityRangeRequest>;
-using IndexedTokenRangeDataResult = Result<IndexedTokenRangeData, RPCErrorCode>;
+using IndexedTokenRangeDataResult = std::variant<IndexedTokenRangeData, RPCErrorCode>;
 using IndexedTokenRangeDataResultPromise =
     QPromise<IndexedTokenRangeDataResult>;
 

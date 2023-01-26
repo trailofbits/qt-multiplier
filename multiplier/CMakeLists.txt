@@ -20,7 +20,7 @@ set_source_files_properties("${multiplier_icon_path}" PROPERTIES
   MACOSX_PACKAGE_LOCATION "Resources"
 )
 
-add_executable("multiplier" MACOSX_BUNDLE
+add_executable("Multiplier" MACOSX_BUNDLE
   src/main.cpp
 
   src/MainWindow.h
@@ -30,13 +30,13 @@ add_executable("multiplier" MACOSX_BUNDLE
   src/meta_types.cpp
 )
 
-target_sources("multiplier" PRIVATE
+target_sources("Multiplier" PRIVATE
   Resources/resources.qrc
   Info.plist
   "${multiplier_icon_path}"
 )
 
-target_link_libraries("multiplier"
+target_link_libraries("Multiplier"
   PUBLIC
     "multiplier::mx-api"
     "thirdparty_qt"
@@ -47,4 +47,4 @@ target_link_libraries("multiplier"
     "mx_filetreemodel"
 )
 
-enable_qt_properties("multiplier")
+enable_qt_properties("Multiplier")

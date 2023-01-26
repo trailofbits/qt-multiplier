@@ -9,6 +9,7 @@
 #include "IndexedTokenRange.h"
 
 #include <iostream>
+#include <unordered_map>
 
 namespace mx::gui {
 
@@ -19,7 +20,7 @@ struct TokenRangeData final {
   std::unordered_map<RawEntityId, std::vector<TokenRange>> fragment_tokens;
 };
 
-Result<TokenRangeData, RPCErrorCode>
+std::variant<TokenRangeData, RPCErrorCode>
 DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
                      const Index &index, DownloadRequestType request_type,
                      RawEntityId entity_id) {
@@ -79,7 +80,7 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
   return output;
 }
 
-Result<TokenRangeData, RPCErrorCode>
+std::variant<TokenRangeData, RPCErrorCode>
 DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
                    const Index &index, RawEntityId start_entity_id,
                    RawEntityId end_entity_id) {
@@ -110,17 +111,17 @@ DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
     auto output_res = DownloadEntityTokens(
         result_promise, index, DownloadRequestType::FileTokens, entity_id);
 
-    if (!output_res.Succeeded()) {
-      return output_res.TakeError();
+    if (std::holds_alternative<RPCErrorCode>(output_res)) {
+      return std::get<RPCErrorCode>(output_res);
     }
 
-    auto output = output_res.TakeValue();
+    TokenRangeData output = std::move(std::get<TokenRangeData>(output_res));
     output.file_tokens =
         output.file_tokens.slice(begin_fid.offset, end_fid.offset + 1u);
 
     return output;
 
-    // Show a range of fragment tokens.
+  // Show a range of fragment tokens.
   } else if (std::holds_alternative<ParsedTokenId>(begin_vid) &&
              std::holds_alternative<ParsedTokenId>(end_vid)) {
 
@@ -139,11 +140,11 @@ DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
     auto output_res = DownloadEntityTokens(
         result_promise, index, DownloadRequestType::FragmentTokens, entity_id);
 
-    if (!output_res.Succeeded()) {
-      return output_res.TakeError();
+    if (std::holds_alternative<RPCErrorCode>(output_res)) {
+      return std::get<RPCErrorCode>(output_res);
     }
 
-    auto output = output_res.TakeValue();
+    TokenRangeData output = std::move(std::get<TokenRangeData>(output_res));
     output.file_tokens =
         output.file_tokens.slice(begin_fid.offset, end_fid.offset + 1u);
 
@@ -160,7 +161,7 @@ void CreateIndexedTokenRangeData(
     IndexedTokenRangeDataResultPromise &result_promise, const Index &index,
     const FileLocationCache &file_location_cache, const Request &request) {
 
-  Result<TokenRangeData, RPCErrorCode> token_range_data_res;
+  std::variant<TokenRangeData, RPCErrorCode> token_range_data_res;
   if (std::holds_alternative<SingleEntityRequest>(request)) {
     const auto &entity_request = std::get<SingleEntityRequest>(request);
     token_range_data_res = DownloadEntityTokens(
@@ -174,12 +175,13 @@ void CreateIndexedTokenRangeData(
         entity_range_request.end_entity_id);
   }
 
-  if (!token_range_data_res.Succeeded()) {
-    result_promise.addResult(token_range_data_res.TakeError());
+  if (std::holds_alternative<RPCErrorCode>(token_range_data_res)) {
+    result_promise.addResult(std::get<RPCErrorCode>(token_range_data_res));
     return;
   }
 
-  auto token_range_data = token_range_data_res.TakeValue();
+  TokenRangeData token_range_data =
+      std::move(std::get<TokenRangeData>(token_range_data_res));
 
   IndexedTokenRangeData output;
   auto token_data_size =

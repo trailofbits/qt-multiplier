@@ -9,11 +9,12 @@
 #include <multiplier/Types.h>
 #include <multiplier/Index.h>
 #include <multiplier/Util.h>
-#include <multiplier/Result.h>
 
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QString>
+
+#include <variant>
 
 namespace mx::gui {
 
@@ -52,7 +53,7 @@ struct IndexedTokenRangeData final {
 class IDatabase {
  public:
   using Ptr = std::unique_ptr<IDatabase>;
-  using Result = Result<IndexedTokenRangeData, RPCErrorCode>;
+  using Result = std::variant<IndexedTokenRangeData, RPCErrorCode>;
   using FutureResult = QFuture<Result>;
 
   IDatabase() = default;
