@@ -25,21 +25,23 @@ add_library("mx_codeview"
   src/DefaultCodeViewThemes.h
   src/DefaultCodeViewThemes.cpp
 
-  src/SearchWidget.h
-  src/SearchWidget.cpp
+  src/InternalSearchWidget.h
+  src/InternalSearchWidget.cpp
 )
 
 target_sources("mx_codeview" INTERFACE
   Resources/Resources.qrc
 )
 
-target_link_libraries("mx_codeview" PRIVATE
-  "qtmx_cxx_flags"
-  "thirdparty_qt"
-  "multiplier::mx-api"
-  "mx_util"
-  "mx_database"
-  "mx_assert"
+target_link_libraries("mx_codeview"
+  PRIVATE
+    "qtmx_cxx_flags"
+
+  PUBLIC
+    "thirdparty_qt"
+    "multiplier::mx-api"
+    "mx_util"
+    "mx_database"
 )
 
 target_include_directories("mx_codeview" PRIVATE

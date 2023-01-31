@@ -20,13 +20,14 @@ add_library("mx_indexview"
   src/FileTreeModel.cpp  
 )
 
-target_link_libraries("mx_indexview" PRIVATE
-  "qtmx_cxx_flags"
-  "thirdparty_qt"
-  "multiplier::mx-api"
-  "mx_util"
-  "mx_database"
-  "mx_assert"
+target_link_libraries("mx_indexview"
+  PRIVATE
+    "qtmx_cxx_flags"
+
+  PUBLIC
+    "thirdparty_qt"
+    "multiplier::mx-api"
+    "mx_searchwidget"
 )
 
 target_include_directories("mx_indexview" PRIVATE

@@ -11,9 +11,12 @@ add_library("mx_assert"
   src/Assert.cpp
 )
 
-target_link_libraries("mx_assert" PRIVATE
-  "qtmx_cxx_flags"
-  "thirdparty_qt"
+target_link_libraries("mx_assert"
+  PRIVATE
+    "qtmx_cxx_flags"
+
+  PUBLIC
+    "thirdparty_qt"
 )
 
 target_include_directories("mx_assert" PRIVATE

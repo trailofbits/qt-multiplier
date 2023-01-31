@@ -7,7 +7,7 @@
 */
 
 #include "CodeView.h"
-#include "SearchWidget.h"
+#include "InternalSearchWidget.h"
 #include "DefaultCodeViewThemes.h"
 
 #include <QFont>
@@ -49,7 +49,7 @@ struct CodeView::PrivateData final {
 
   QPlainTextEditMod *text_edit{nullptr};
   QWidget *gutter{nullptr};
-  SearchWidget *search_widget{nullptr};
+  InternalSearchWidget *search_widget{nullptr};
 
   TokenMap token_map;
 
@@ -57,6 +57,11 @@ struct CodeView::PrivateData final {
   std::size_t tab_width{4};
 
   std::optional<CodeModelIndex> opt_prev_hovered_model_index;
+
+  QShortcut *enable_search_shortcut{nullptr};
+  QShortcut *disable_search_shortcut{nullptr};
+  QShortcut *search_previous_shortcut{nullptr};
+  QShortcut *search_next_shortcut{nullptr};
 };
 
 void CodeView::SetTheme(const CodeViewTheme &theme) {
@@ -257,28 +262,24 @@ void CodeView::InitializeWidgets() {
   d->gutter->installEventFilter(this);
 
   // Search widget
-  d->search_widget = new SearchWidget(this);
+  d->search_widget = new InternalSearchWidget(this);
   d->search_widget->Activate();
 
-  auto enable_search_shortcut = new QShortcut(this);
-  enable_search_shortcut->setKey(QKeySequence("Ctrl+F"));
-  connect(enable_search_shortcut, &QShortcut::activated, d->search_widget,
-          &SearchWidget::Activate);
+  d->enable_search_shortcut = new QShortcut(
+      QKeySequence::Find, this, d->search_widget,
+      &InternalSearchWidget::Activate, Qt::WidgetWithChildrenShortcut);
 
-  auto search_previous_shortcut = new QShortcut(this);
-  search_previous_shortcut->setKey(QKeySequence("Shift+F3"));
-  connect(search_previous_shortcut, &QShortcut::activated, d->search_widget,
-          &SearchWidget::OnShowPrevResult);
+  d->disable_search_shortcut = new QShortcut(
+      QKeySequence::Cancel, this, d->search_widget,
+      &InternalSearchWidget::Deactivate, Qt::WidgetWithChildrenShortcut);
 
-  auto search_next_shortcut = new QShortcut(this);
-  search_next_shortcut->setKey(QKeySequence("F3"));
-  connect(search_next_shortcut, &QShortcut::activated, d->search_widget,
-          &SearchWidget::OnShowNextResult);
+  d->search_previous_shortcut = new QShortcut(
+      QKeySequence::FindPrevious, this, d->search_widget,
+      &InternalSearchWidget::OnShowPrevResult, Qt::WidgetWithChildrenShortcut);
 
-  auto disable_search_shortcut = new QShortcut(this);
-  disable_search_shortcut->setKey(QKeySequence("Escape"));
-  connect(disable_search_shortcut, &QShortcut::activated, d->search_widget,
-          &SearchWidget::Deactivate);
+  d->search_next_shortcut = new QShortcut(
+      QKeySequence::FindNext, this, d->search_widget,
+      &InternalSearchWidget::OnShowNextResult, Qt::WidgetWithChildrenShortcut);
 
   // Layout for the gutter and code view
   auto code_layout = new QHBoxLayout();

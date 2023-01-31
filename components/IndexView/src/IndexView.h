@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/ui/IIndexView.h>
+#include <multiplier/ui/ISearchWidget.h>
 
 namespace mx::gui {
 
@@ -42,6 +43,10 @@ class IndexView final : public IIndexView {
 
   //! Called when an item has been double clicked in the tree view
   void OnFileTreeItemDoubleClicked(const QModelIndex &index);
+
+  //! Called by the ISearchWidget component whenever search options change
+  void OnSearchParametersChange(
+      const ISearchWidget::SearchParameters &search_parameters);
 
   friend class IIndexView;
 };

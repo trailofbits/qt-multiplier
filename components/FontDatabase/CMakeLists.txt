@@ -15,10 +15,13 @@ target_sources("mx_fontdatabase" INTERFACE
   Resources/fontdatabase.qrc
 )
 
-target_link_libraries("mx_fontdatabase" PRIVATE
-  "qtmx_cxx_flags"
-  "thirdparty_qt"
-  "mx_assert"
+target_link_libraries("mx_fontdatabase"
+  PRIVATE
+    "qtmx_cxx_flags"
+
+  PUBLIC
+    "thirdparty_qt"
+    "mx_assert"
 )
 
 target_include_directories("mx_fontdatabase" PRIVATE

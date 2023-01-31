@@ -17,11 +17,14 @@ add_library("mx_database"
   src/requests/IndexedTokenRange.cpp
 )
 
-target_link_libraries("mx_database" PRIVATE
-  "qtmx_cxx_flags"
-  "thirdparty_qt"
-  "multiplier::mx-api"
-  "mx_util"
+target_link_libraries("mx_database"
+  PRIVATE
+    "qtmx_cxx_flags"
+
+  PUBLIC
+    "thirdparty_qt"
+    "multiplier::mx-api"
+    "mx_util"
 )
 
 target_include_directories("mx_database" PRIVATE

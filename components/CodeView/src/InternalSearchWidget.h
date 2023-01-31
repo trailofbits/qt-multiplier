@@ -14,16 +14,16 @@
 
 namespace mx::gui {
 
-class SearchWidget final : public QWidget {
+class InternalSearchWidget final : public QWidget {
   Q_OBJECT
 
  public:
-  SearchWidget(ICodeView *code_view, QWidget *parent = nullptr);
+  InternalSearchWidget(ICodeView *code_view, QWidget *parent = nullptr);
 
-  virtual ~SearchWidget() override;
+  virtual ~InternalSearchWidget() override;
 
-  SearchWidget(const SearchWidget &) = delete;
-  SearchWidget &operator=(const SearchWidget &) = delete;
+  InternalSearchWidget(const InternalSearchWidget &) = delete;
+  InternalSearchWidget &operator=(const InternalSearchWidget &) = delete;
 
  signals:
   void OnSearchForText(const QString &text, bool case_sensitive,

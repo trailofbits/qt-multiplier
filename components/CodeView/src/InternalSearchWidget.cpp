@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "SearchWidget.h"
+#include "InternalSearchWidget.h"
 
 #include <QIcon>
 #include <QLineEdit>
@@ -20,7 +20,7 @@
 
 namespace mx::gui {
 
-struct SearchWidget::PrivateData final {
+struct InternalSearchWidget::PrivateData final {
   ICodeView *code_view{nullptr};
 
   bool case_sensitive{false};
@@ -55,7 +55,8 @@ struct SearchWidget::PrivateData final {
   std::vector<std::pair<int, int>> result_list;
 };
 
-SearchWidget::SearchWidget(ICodeView *code_view, QWidget *parent)
+InternalSearchWidget::InternalSearchWidget(ICodeView *code_view,
+                                           QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
@@ -65,9 +66,9 @@ SearchWidget::SearchWidget(ICodeView *code_view, QWidget *parent)
   InitializeWidgets();
 }
 
-SearchWidget::~SearchWidget() {}
+InternalSearchWidget::~InternalSearchWidget() {}
 
-void SearchWidget::Activate() {
+void InternalSearchWidget::Activate() {
   setVisible(true);
 
   d->search_input->setFocus();
@@ -77,7 +78,7 @@ void SearchWidget::Activate() {
   d->search_input_error_display->setVisible(false);
 }
 
-void SearchWidget::Deactivate() {
+void InternalSearchWidget::Deactivate() {
   setVisible(false);
 
   d->search_input->clear();
@@ -86,7 +87,7 @@ void SearchWidget::Deactivate() {
   d->search_input_error_display->setVisible(false);
 }
 
-void SearchWidget::OnShowPrevResult() {
+void InternalSearchWidget::OnShowPrevResult() {
   if (d->result_list.empty() || !isVisible()) {
     return;
   }
@@ -95,7 +96,7 @@ void SearchWidget::OnShowPrevResult() {
   NavigateToResult(result_index);
 }
 
-void SearchWidget::OnShowNextResult() {
+void InternalSearchWidget::OnShowNextResult() {
   if (d->result_list.empty() || !isVisible()) {
     return;
   }
@@ -104,7 +105,7 @@ void SearchWidget::OnShowNextResult() {
   NavigateToResult(result_index);
 }
 
-void SearchWidget::LoadIcons() {
+void InternalSearchWidget::LoadIcons() {
   d->search_icon = QIcon(":/CodeView/search_icon");
 
   d->enabled_case_sensitive_search =
@@ -124,7 +125,7 @@ void SearchWidget::LoadIcons() {
   d->show_next_result_icon = QIcon(":/CodeView/show_next_result");
 }
 
-void SearchWidget::InitializeWidgets() {
+void InternalSearchWidget::InitializeWidgets() {
   // The search layout contains the input box and all the buttons
   auto search_widget_layout = new QHBoxLayout();
   search_widget_layout->setContentsMargins(0, 0, 0, 0);
@@ -139,7 +140,7 @@ void SearchWidget::InitializeWidgets() {
   d->show_prev_result->setEnabled(false);
 
   connect(d->show_prev_result, &QPushButton::clicked, this,
-          &SearchWidget::OnShowPrevResult);
+          &InternalSearchWidget::OnShowPrevResult);
 
   search_widget_layout->addWidget(d->show_prev_result);
 
@@ -147,7 +148,7 @@ void SearchWidget::InitializeWidgets() {
   d->show_next_result->setEnabled(false);
 
   connect(d->show_next_result, &QPushButton::clicked, this,
-          &SearchWidget::OnShowNextResult);
+          &InternalSearchWidget::OnShowNextResult);
 
   search_widget_layout->addWidget(d->show_next_result);
 
@@ -202,22 +203,23 @@ void SearchWidget::InitializeWidgets() {
 
   // Connect the signals
   connect(d->search_input, &QLineEdit::textChanged, this,
-          &SearchWidget::OnSearchInputTextChanged);
+          &InternalSearchWidget::OnSearchInputTextChanged);
 
   connect(d->case_sensitive_search_action, &QAction::toggled, this,
-          &SearchWidget::OnCaseSensitiveSearchOptionToggled);
+          &InternalSearchWidget::OnCaseSensitiveSearchOptionToggled);
 
   connect(d->whole_word_search_action, &QAction::toggled, this,
-          &SearchWidget::OnWholeWordSearchOptionToggled);
+          &InternalSearchWidget::OnWholeWordSearchOptionToggled);
 
   connect(d->regex_search_action, &QAction::toggled, this,
-          &SearchWidget::OnRegexSearchOptionToggled);
+          &InternalSearchWidget::OnRegexSearchOptionToggled);
 
   connect(&d->signal_timer, &QTimer::timeout, this,
-          &SearchWidget::OnTextSearch);
+          &InternalSearchWidget::OnTextSearch);
 }
 
-void SearchWidget::SetDisplayMessage(bool error, const QString &message) {
+void InternalSearchWidget::SetDisplayMessage(bool error,
+                                             const QString &message) {
   d->search_input_error_display->setText(message);
   d->search_input_error_display->setVisible(true);
 
@@ -228,17 +230,17 @@ void SearchWidget::SetDisplayMessage(bool error, const QString &message) {
   d->search_input_error_display->setPalette(palette);
 }
 
-void SearchWidget::ClearDisplayMessage() {
+void InternalSearchWidget::ClearDisplayMessage() {
   d->search_input_error_display->clear();
   d->search_input_error_display->setVisible(false);
 }
 
-void SearchWidget::EnableNavigation(bool enable) {
+void InternalSearchWidget::EnableNavigation(bool enable) {
   d->show_prev_result->setEnabled(enable);
   d->show_next_result->setEnabled(enable);
 }
 
-void SearchWidget::NavigateToResult(std::size_t result_index) {
+void InternalSearchWidget::NavigateToResult(std::size_t result_index) {
   SetDisplayMessage(false, tr("Showing result ") +
                                QString::number(result_index + 1) + tr(" of ") +
                                QString::number(d->result_list.size()));
@@ -247,7 +249,7 @@ void SearchWidget::NavigateToResult(std::size_t result_index) {
   d->code_view->SetCursorPosition(result.first, result.second);
 }
 
-std::size_t SearchWidget::GetNextResultIndex(bool forward_direction) {
+std::size_t InternalSearchWidget::GetNextResultIndex(bool forward_direction) {
   auto cursor_pos = d->code_view->GetCursorPosition();
   std::optional<std::size_t> opt_next_index;
 
@@ -281,7 +283,7 @@ std::size_t SearchWidget::GetNextResultIndex(bool forward_direction) {
                                                    : d->result_list.size() - 1);
 }
 
-void SearchWidget::OnSearchInputTextChanged(const QString &text) {
+void InternalSearchWidget::OnSearchInputTextChanged(const QString &text) {
   ClearDisplayMessage();
   d->signal_timer.stop();
 
@@ -297,7 +299,7 @@ void SearchWidget::OnSearchInputTextChanged(const QString &text) {
   d->signal_timer.start(std::chrono::milliseconds(500));
 }
 
-void SearchWidget::OnCaseSensitiveSearchOptionToggled(bool checked) {
+void InternalSearchWidget::OnCaseSensitiveSearchOptionToggled(bool checked) {
   d->case_sensitive = checked;
   OnSearchInputTextChanged(d->search_input->text());
 
@@ -307,7 +309,7 @@ void SearchWidget::OnCaseSensitiveSearchOptionToggled(bool checked) {
   d->case_sensitive_search_action->setIcon(icon);
 }
 
-void SearchWidget::OnWholeWordSearchOptionToggled(bool checked) {
+void InternalSearchWidget::OnWholeWordSearchOptionToggled(bool checked) {
   d->whole_word = checked;
   OnSearchInputTextChanged(d->search_input->text());
 
@@ -321,7 +323,7 @@ void SearchWidget::OnWholeWordSearchOptionToggled(bool checked) {
   }
 }
 
-void SearchWidget::OnRegexSearchOptionToggled(bool checked) {
+void InternalSearchWidget::OnRegexSearchOptionToggled(bool checked) {
   d->enable_regex = checked;
   OnSearchInputTextChanged(d->search_input->text());
 
@@ -335,7 +337,7 @@ void SearchWidget::OnRegexSearchOptionToggled(bool checked) {
   }
 }
 
-void SearchWidget::OnTextSearch() {
+void InternalSearchWidget::OnTextSearch() {
   d->signal_timer.stop();
 
   auto search_pattern = d->search_input->text();
