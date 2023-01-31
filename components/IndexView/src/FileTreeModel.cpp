@@ -8,6 +8,10 @@
 
 #include "FileTreeModel.h"
 
+#include <QApplication>
+#include <QFont>
+#include <QPalette>
+
 namespace mx::gui {
 
 namespace {
@@ -380,7 +384,7 @@ int FileTreeModel::columnCount(const QModelIndex &) const {
 }
 
 QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
-  if (!index.isValid() || role != Qt::DisplayRole) {
+  if (!index.isValid()) {
     return QVariant();
   }
 
@@ -396,24 +400,45 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
   if (std::holds_alternative<Node::FolderData>(node.data)) {
     const auto &folder_data = std::get<Node::FolderData>(node.data);
 
-    std::string folder_name;
-    for (auto component_it = folder_data.component_list.begin();
-         component_it != folder_data.component_list.end(); ++component_it) {
+    if (role == Qt::DisplayRole) {
+      std::string folder_name;
+      for (auto component_it = folder_data.component_list.begin();
+           component_it != folder_data.component_list.end(); ++component_it) {
 
-      const auto &component = *component_it;
+        const auto &component = *component_it;
 
-      folder_name += component;
-      if (component != "/" &&
-          std::next(component_it, 1) != folder_data.component_list.end()) {
-        folder_name += "/";
+        folder_name += component;
+        if (component != "/" &&
+            std::next(component_it, 1) != folder_data.component_list.end()) {
+          folder_name += "/";
+        }
       }
-    }
 
-    return QString::fromStdString(folder_name);
+      return QString::fromStdString(folder_name);
+
+    } else if (role == Qt::FontRole) {
+      auto font = qApp->font();
+      font.setBold(true);
+
+      return font;
+
+    } else if (role == Qt::ForegroundRole) {
+      const auto &palette = qApp->palette();
+      return palette.dark();
+
+    } else {
+      return QVariant();
+    }
 
   } else {
     const auto &file_data = std::get<Node::FileData>(node.data);
-    return QString::fromStdString(file_data.file_name);
+
+    if (role == Qt::DisplayRole) {
+      return QString::fromStdString(file_data.file_name);
+
+    } else {
+      return QVariant();
+    }
   }
 }
 

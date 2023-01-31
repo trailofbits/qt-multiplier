@@ -6,6 +6,8 @@
 
 #include <QMainWindow>
 
+#include <multiplier/Index.h>
+
 namespace mx::gui {
 
 class MainWindow final : public QMainWindow {
@@ -27,7 +29,8 @@ class MainWindow final : public QMainWindow {
   void CreateCodeView();
 
  private slots:
-  void OnFileTreeItemClicked(const QModelIndex &index);
+  void OnIndexViewFileClicked(const PackedFileId &file_id,
+                              const std::string &file_name, bool double_click);
   void OnToggleWordWrap(bool checked);
 };
 

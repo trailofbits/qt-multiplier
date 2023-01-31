@@ -44,7 +44,7 @@ target_link_libraries("Multiplier"
     "mx_util"
     "mx_database"
     "mx_fontdatabase"
-    "mx_filetreemodel"
+    "mx_indexview"
 )
 
 enable_qt_properties("Multiplier")

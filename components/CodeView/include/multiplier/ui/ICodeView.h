@@ -69,10 +69,10 @@ class ICodeView : public QWidget {
   //! Scrolls the view to the start of the specified token range
   virtual bool ScrollToTokenRange(const TokenRange &token_range) const = 0;
 
-  //! Constructor
+  //! Disable the copy constructor
   ICodeView(const ICodeView &) = delete;
 
-  //! Destructor
+  //! Disable copy assignment
   ICodeView &operator=(const ICodeView &) = delete;
 
  signals:
