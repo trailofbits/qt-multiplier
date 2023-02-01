@@ -7,8 +7,9 @@
 */
 
 #include "CodeView.h"
-#include "InternalSearchWidget.h"
 #include "DefaultCodeViewThemes.h"
+
+#include <multiplier/ui/Assert.h>
 
 #include <QFont>
 #include <QVBoxLayout>
@@ -23,11 +24,12 @@
 #include <QTextDocument>
 #include <QWidget>
 #include <QProgressDialog>
-#include <QShortcut>
 #include <QFontMetrics>
 #include <QWheelEvent>
+#include <QRegularExpression>
 
 #include <unordered_set>
+#include <vector>
 
 namespace mx::gui {
 
@@ -49,7 +51,9 @@ struct CodeView::PrivateData final {
 
   QPlainTextEditMod *text_edit{nullptr};
   QWidget *gutter{nullptr};
-  InternalSearchWidget *search_widget{nullptr};
+
+  ISearchWidget *search_widget{nullptr};
+  std::vector<std::pair<int, int>> search_result_list;
 
   TokenMap token_map;
 
@@ -57,11 +61,6 @@ struct CodeView::PrivateData final {
   std::size_t tab_width{4};
 
   std::optional<CodeModelIndex> opt_prev_hovered_model_index;
-
-  QShortcut *enable_search_shortcut{nullptr};
-  QShortcut *disable_search_shortcut{nullptr};
-  QShortcut *search_previous_shortcut{nullptr};
-  QShortcut *search_next_shortcut{nullptr};
 };
 
 void CodeView::SetTheme(const CodeViewTheme &theme) {
@@ -247,7 +246,6 @@ void CodeView::InstallModel(ICodeModel *model) {
 
 void CodeView::InitializeWidgets() {
   // Code viewer
-
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setReadOnly(true);
   d->text_edit->setTextInteractionFlags(Qt::TextBrowserInteraction);
@@ -262,24 +260,12 @@ void CodeView::InitializeWidgets() {
   d->gutter->installEventFilter(this);
 
   // Search widget
-  d->search_widget = new InternalSearchWidget(this);
-  d->search_widget->Activate();
+  d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Search, this);
+  connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
+          &CodeView::OnSearchParametersChange);
 
-  d->enable_search_shortcut = new QShortcut(
-      QKeySequence::Find, this, d->search_widget,
-      &InternalSearchWidget::Activate, Qt::WidgetWithChildrenShortcut);
-
-  d->disable_search_shortcut = new QShortcut(
-      QKeySequence::Cancel, this, d->search_widget,
-      &InternalSearchWidget::Deactivate, Qt::WidgetWithChildrenShortcut);
-
-  d->search_previous_shortcut = new QShortcut(
-      QKeySequence::FindPrevious, this, d->search_widget,
-      &InternalSearchWidget::OnShowPrevResult, Qt::WidgetWithChildrenShortcut);
-
-  d->search_next_shortcut = new QShortcut(
-      QKeySequence::FindNext, this, d->search_widget,
-      &InternalSearchWidget::OnShowNextResult, Qt::WidgetWithChildrenShortcut);
+  connect(d->search_widget, &ISearchWidget::ShowSearchResult, this,
+          &CodeView::OnShowSearchResult);
 
   // Layout for the gutter and code view
   auto code_layout = new QHBoxLayout();
@@ -906,6 +892,73 @@ void CodeView::OnTextEditUpdateRequest(const QRect &rect, int dy) {
   } else {
     d->gutter->update(0, rect.y(), d->gutter->width(), rect.height());
   }
+}
+
+void CodeView::OnSearchParametersChange(
+    const ISearchWidget::SearchParameters &search_parameters) {
+
+  d->search_result_list.clear();
+  if (search_parameters.pattern.empty()) {
+    return;
+  }
+
+  QRegularExpression::PatternOptions options{
+      QRegularExpression::NoPatternOption};
+
+  QTextDocument::FindFlags find_flags{};
+
+  if (!search_parameters.case_sensitive) {
+    options |= QRegularExpression::CaseInsensitiveOption;
+  } else {
+    find_flags = QTextDocument::FindCaseSensitively;
+  }
+
+  auto pattern = QString::fromStdString(search_parameters.pattern);
+  if (search_parameters.type == ISearchWidget::SearchParameters::Type::Text) {
+    pattern = QRegularExpression::escape(pattern);
+  }
+
+  if (search_parameters.whole_word) {
+    find_flags |= QTextDocument::FindWholeWords;
+
+    if (search_parameters.type == ISearchWidget::SearchParameters::Type::Text) {
+      pattern = "\\b" + pattern + "\\b";
+    }
+  }
+
+  QRegularExpression regex(pattern, options);
+
+  // The regex is already validated by the search widget
+  Assert(regex.isValid(),
+         "Invalid regex found in CodeView::OnSearchParametersChange");
+
+  const auto &document = *d->text_edit->document();
+
+  int current_position{};
+
+  for (;;) {
+    auto text_cursor = document.find(regex, current_position, find_flags);
+    if (text_cursor.isNull()) {
+      break;
+    }
+
+    current_position = text_cursor.selectionEnd();
+
+    auto result = std::make_pair(text_cursor.selectionStart(),
+                                 text_cursor.selectionEnd());
+    d->search_result_list.push_back(result);
+  }
+
+  d->search_widget->UpdateSearchResultCount(d->search_result_list.size());
+}
+
+void CodeView::OnShowSearchResult(const std::size_t &result_index) {
+  if (result_index >= d->search_result_list.size()) {
+    return;
+  }
+
+  const auto &search_result = d->search_result_list.at(result_index);
+  SetCursorPosition(search_result.first, search_result.second);
 }
 
 }  // namespace mx::gui

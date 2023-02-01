@@ -25,10 +25,6 @@ class FileTreeModel final : public IFileTreeModel {
   //! \copybrief IFileTreeModel::Update
   virtual void Update() override;
 
-  //! \copybrief IFileTreeModel::Update
-  virtual std::optional<PackedFileId>
-  GetFileIdentifier(const QModelIndex &index) const override;
-
   //! Creates a new Qt model index
   virtual QModelIndex index(int row, int column,
                             const QModelIndex &parent) const override;

@@ -227,28 +227,6 @@ void FileTreeModel::Update() {
   emit endResetModel();
 }
 
-std::optional<PackedFileId>
-FileTreeModel::GetFileIdentifier(const QModelIndex &index) const {
-  if (!index.isValid()) {
-    return std::nullopt;
-  }
-
-  auto node_id = static_cast<std::uint64_t>(index.internalId());
-
-  auto node_it = d->node_map.find(node_id);
-  if (node_it == d->node_map.end()) {
-    return std::nullopt;
-  }
-
-  const auto &node = node_it->second;
-  if (!std::holds_alternative<Node::FileData>(node.data)) {
-    return std::nullopt;
-  }
-
-  const auto &file_data = std::get<Node::FileData>(node.data);
-  return file_data.opt_file_id;
-}
-
 QModelIndex FileTreeModel::index(int row, int column,
                                  const QModelIndex &parent) const {
 
@@ -435,6 +413,12 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
 
     if (role == Qt::DisplayRole) {
       return QString::fromStdString(file_data.file_name);
+
+    } else if (role == IFileTreeModel::OptionalPackedFileIdRole) {
+      QVariant value;
+      value.setValue(file_data.opt_file_id);
+
+      return value;
 
     } else {
       return QVariant();

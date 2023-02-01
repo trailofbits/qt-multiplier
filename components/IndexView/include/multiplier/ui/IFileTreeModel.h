@@ -19,16 +19,17 @@ class IFileTreeModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
+  //! Additional item data roles for this model
+  enum ItemDataRole {
+    //! Returns an std::optional<PackedFileId>
+    OptionalPackedFileIdRole = Qt::UserRole + 1,
+  };
+
   //! Factory method
   static IFileTreeModel *Create(mx::Index index, QObject *parent = nullptr);
 
   //! Resets the model by querying the stored mx::Index from scratch
   virtual void Update() = 0;
-
-  //! Returns the PackedFileId for the given model index
-  //! \todo This should be converted to use ::data() with a custom data role
-  virtual std::optional<PackedFileId>
-  GetFileIdentifier(const QModelIndex &index) const = 0;
 
   //! Constructor
   IFileTreeModel(QObject *parent) : QAbstractItemModel(parent) {}

@@ -8,6 +8,8 @@
 
 #include "SearchWidget.h"
 
+#include <multiplier/ui/Assert.h>
+
 #include <QIcon>
 #include <QLineEdit>
 #include <QVBoxLayout>
@@ -16,6 +18,7 @@
 #include <QAction>
 #include <QRegularExpression>
 #include <QPushButton>
+#include <QShortcut>
 
 namespace mx::gui {
 
@@ -25,6 +28,9 @@ struct SearchWidget::PrivateData final {
   bool case_sensitive{false};
   bool whole_word{false};
   bool enable_regex{false};
+
+  std::size_t search_result_count{};
+  std::size_t current_search_result{};
 
   QIcon show_prev_result_icon;
   QPushButton *show_prev_result{nullptr};
@@ -48,23 +54,45 @@ struct SearchWidget::PrivateData final {
 
   QLineEdit *search_input{nullptr};
   QLineEdit *search_input_error_display{nullptr};
+
+  QShortcut *enable_search_shortcut{nullptr};
+  QShortcut *disable_search_shortcut{nullptr};
+  QShortcut *search_previous_shortcut{nullptr};
+  QShortcut *search_next_shortcut{nullptr};
 };
 
 SearchWidget::~SearchWidget() {}
 
 void SearchWidget::UpdateSearchResultCount(
     const std::size_t &search_result_count) {
-  (void) search_result_count;
+  d->search_result_count = search_result_count;
+  d->current_search_result = 0;
+
+  d->show_next_result->setEnabled(d->search_result_count != 0);
+  d->show_prev_result->setEnabled(d->search_result_count != 0);
+
+  if (d->search_result_count == 0) {
+    SetDisplayMessage(false, tr("No result found"));
+    return;
+  }
+
+  ShowResult();
 }
 
 SearchWidget::SearchWidget(Mode mode, QWidget *parent)
     : ISearchWidget(parent),
       d(new PrivateData) {
 
+  // It is important to have a valid parent because that's what
+  // we use to scope the keyboard shortcuts
+  Assert(parent != nullptr,
+         "Invalid parent widget specified in ISearchWidget::Create()");
+
   d->mode = mode;
 
   LoadIcons();
   InitializeWidgets();
+  InitializeKeyboardShortcuts(parent);
 }
 
 void SearchWidget::LoadIcons() {
@@ -103,16 +131,16 @@ void SearchWidget::InitializeWidgets() {
     d->show_prev_result = new QPushButton(d->show_prev_result_icon, "");
     d->show_prev_result->setEnabled(false);
 
-    /*connect(d->show_prev_result, &QPushButton::clicked, this,
-            &SearchWidget::OnShowPrevResult);*/
+    connect(d->show_prev_result, &QPushButton::clicked, this,
+            &SearchWidget::OnShowPreviousResult);
 
     search_widget_layout->addWidget(d->show_prev_result);
 
     d->show_next_result = new QPushButton(d->show_next_result_icon, "");
     d->show_next_result->setEnabled(false);
 
-    /*connect(d->show_next_result, &QPushButton::clicked, this,
-            &SearchWidget::OnShowNextResult);*/
+    connect(d->show_next_result, &QPushButton::clicked, this,
+            &SearchWidget::OnShowNextResult);
 
     search_widget_layout->addWidget(d->show_next_result);
   }
@@ -182,6 +210,26 @@ void SearchWidget::InitializeWidgets() {
   setVisible(false);
 }
 
+void SearchWidget::InitializeKeyboardShortcuts(QWidget *parent) {
+  d->enable_search_shortcut =
+      new QShortcut(QKeySequence::Find, parent, this, &ISearchWidget::Activate,
+                    Qt::WidgetWithChildrenShortcut);
+
+  d->disable_search_shortcut =
+      new QShortcut(QKeySequence::Cancel, parent, this,
+                    &ISearchWidget::Deactivate, Qt::WidgetWithChildrenShortcut);
+
+  if (d->mode == Mode::Search) {
+    d->search_previous_shortcut = new QShortcut(
+        QKeySequence::FindPrevious, parent, this,
+        &SearchWidget::OnShowPreviousResult, Qt::WidgetWithChildrenShortcut);
+
+    d->search_next_shortcut = new QShortcut(
+        QKeySequence::FindNext, parent, this, &SearchWidget::OnShowNextResult,
+        Qt::WidgetWithChildrenShortcut);
+  }
+}
+
 void SearchWidget::SetDisplayMessage(bool error, const QString &message) {
   d->search_input_error_display->setText(message);
   d->search_input_error_display->setVisible(true);
@@ -196,6 +244,15 @@ void SearchWidget::SetDisplayMessage(bool error, const QString &message) {
 void SearchWidget::ClearDisplayMessage() {
   d->search_input_error_display->clear();
   d->search_input_error_display->setVisible(false);
+}
+
+void SearchWidget::ShowResult() {
+  SetDisplayMessage(false, tr("Showing result ") +
+                               QString::number(d->current_search_result + 1) +
+                               tr(" of ") +
+                               QString::number(d->search_result_count));
+
+  emit ShowSearchResult(d->current_search_result);
 }
 
 void SearchWidget::OnSearchInputTextChanged(const QString &text) {
@@ -229,6 +286,9 @@ void SearchWidget::OnSearchInputTextChanged(const QString &text) {
     search_parameters.whole_word = d->whole_word;
     search_parameters.pattern = d->search_input->text().toStdString();
   }
+
+  d->search_result_count = 0;
+  d->current_search_result = 0;
 
   emit SearchParametersChanged(search_parameters);
 }
@@ -271,6 +331,48 @@ void SearchWidget::OnRegexSearchOptionToggled(bool checked) {
   }
 }
 
+void SearchWidget::OnShowPreviousResult() {
+  if (d->mode != Mode::Search) {
+    return;
+  }
+
+  if (!isVisible()) {
+    Activate();
+    return;
+  }
+
+  ClearDisplayMessage();
+
+  if (d->current_search_result == 0) {
+    d->current_search_result = d->search_result_count - 1;
+  } else {
+    d->current_search_result -= 1;
+  }
+
+  ShowResult();
+}
+
+void SearchWidget::OnShowNextResult() {
+  if (d->mode != Mode::Search) {
+    return;
+  }
+
+  if (!isVisible()) {
+    Activate();
+    return;
+  }
+
+  ClearDisplayMessage();
+
+  if (d->current_search_result == d->search_result_count - 1) {
+    d->current_search_result = 0;
+  } else {
+    d->current_search_result += 1;
+  }
+
+  ShowResult();
+}
+
 void SearchWidget::Activate() {
   setVisible(true);
 
@@ -279,6 +381,9 @@ void SearchWidget::Activate() {
 
   d->search_input_error_display->clear();
   d->search_input_error_display->setVisible(false);
+
+  d->search_result_count = 0;
+  d->current_search_result = 0;
 }
 
 void SearchWidget::Deactivate() {
@@ -288,6 +393,9 @@ void SearchWidget::Deactivate() {
 
   d->search_input_error_display->clear();
   d->search_input_error_display->setVisible(false);
+
+  d->search_result_count = 0;
+  d->current_search_result = 0;
 }
 
 

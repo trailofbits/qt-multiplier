@@ -10,6 +10,7 @@
 
 #include <multiplier/Token.h>
 #include <multiplier/ui/ICodeView.h>
+#include <multiplier/ui/ISearchWidget.h>
 
 #include <QTextCursor>
 #include <QTextDocument>
@@ -208,6 +209,13 @@ class CodeView final : public ICodeView {
 
   //! Used to sync the scroll area of the QTextWidget with the gutter's state
   void OnTextEditUpdateRequest(const QRect &rect, int dy);
+
+  //! Called by the ISearchWidget component whenever search options change
+  void OnSearchParametersChange(
+      const ISearchWidget::SearchParameters &search_parameters);
+
+  //! Called by search widget whenever a search result needs to be shown
+  void OnShowSearchResult(const std::size_t &result_index);
 
   friend class ICodeView;
 };

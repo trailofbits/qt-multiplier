@@ -8,10 +8,11 @@
 
 #include "IndexView.h"
 
+#include <multiplier/ui/Assert.h>
+
 #include <QTreeView>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QShortcut>
 #include <QSortFilterProxyModel>
 
 namespace mx::gui {
@@ -21,11 +22,6 @@ struct IndexView::PrivateData final {
   QSortFilterProxyModel *model_proxy{nullptr};
   QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
-
-  QShortcut *enable_search_shortcut{nullptr};
-  QShortcut *disable_search_shortcut{nullptr};
-  QShortcut *search_previous_shortcut{nullptr};
-  QShortcut *search_next_shortcut{nullptr};
 };
 
 IndexView::~IndexView() {}
@@ -49,7 +45,7 @@ void IndexView::InitializeWidgets() {
   auto indent_width = fontMetrics().horizontalAdvance("_");
   d->tree_view->setIndentation(indent_width);
 
-  d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter);
+  d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
   connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
           &IndexView::OnSearchParametersChange);
 
@@ -64,28 +60,30 @@ void IndexView::InitializeWidgets() {
 
   connect(d->tree_view, &QTreeView::doubleClicked, this,
           &IndexView::OnFileTreeItemDoubleClicked);
-
-  d->enable_search_shortcut =
-      new QShortcut(QKeySequence::Find, this, d->search_widget,
-                    &ISearchWidget::Activate, Qt::WidgetWithChildrenShortcut);
-
-  d->disable_search_shortcut =
-      new QShortcut(QKeySequence::Cancel, this, d->search_widget,
-                    &ISearchWidget::Deactivate, Qt::WidgetWithChildrenShortcut);
 }
 
 void IndexView::OnFileTreeItemActivated(const QModelIndex &index,
                                         bool double_click) {
   emit ItemClicked(index, double_click);
 
-  auto opt_file_id = d->model->GetFileIdentifier(index);
-  if (opt_file_id.has_value()) {
-    const auto &file_id = opt_file_id.value();
-    auto file_name_var = d->model->data(index);
-
-    emit FileClicked(file_id, file_name_var.toString().toStdString(),
-                     double_click);
+  auto opt_file_id_var =
+      d->model_proxy->data(index, IFileTreeModel::OptionalPackedFileIdRole);
+  if (!opt_file_id_var.isValid()) {
+    return;
   }
+
+  const auto &opt_file_id =
+      qvariant_cast<std::optional<mx::PackedFileId>>(opt_file_id_var);
+
+  if (!opt_file_id.has_value()) {
+    return;
+  }
+
+  const auto &file_id = opt_file_id.value();
+
+  auto file_name_var = d->model_proxy->data(index);
+  emit FileClicked(file_id, file_name_var.toString().toStdString(),
+                   double_click);
 }
 
 void IndexView::InstallModel(IFileTreeModel *model) {
@@ -127,8 +125,13 @@ void IndexView::OnSearchParametersChange(
     }
   }
 
-  d->model_proxy->setFilterRegularExpression(
-      QRegularExpression(pattern, options));
+  QRegularExpression regex(pattern, options);
+
+  // The regex is already validated by the search widget
+  Assert(regex.isValid(),
+         "Invalid regex found in CodeView::OnSearchParametersChange");
+
+  d->model_proxy->setFilterRegularExpression(regex);
 
   d->tree_view->expandRecursively(QModelIndex());
   d->tree_view->resizeColumnToContents(0);

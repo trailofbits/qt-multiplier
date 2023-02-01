@@ -40,7 +40,7 @@ class ISearchWidget : public QWidget {
   };
 
   //! Factory function
-  static ISearchWidget *Create(Mode mode, QWidget *parent = nullptr);
+  static ISearchWidget *Create(Mode mode, QWidget *parent);
 
   //! Constructor
   ISearchWidget(QWidget *parent) : QWidget(parent) {}
@@ -48,7 +48,7 @@ class ISearchWidget : public QWidget {
   //! Destructor
   virtual ~ISearchWidget() override = default;
 
-  //! Called by the other widget to update the search result count
+  //! Called by the other client widget to update the search result count
   virtual void
   UpdateSearchResultCount(const std::size_t &search_result_count) = 0;
 
@@ -71,6 +71,9 @@ class ISearchWidget : public QWidget {
 
   //! Emitted when the user presses the prev/next buttons
   void SearchResultSelected(const std::size_t &index);
+
+  //! Emitted when a new search result should be made active
+  void ShowSearchResult(const std::size_t &result_index);
 };
 
 }  // namespace mx::gui

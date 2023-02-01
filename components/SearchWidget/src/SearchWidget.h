@@ -37,11 +37,17 @@ class SearchWidget final : public ISearchWidget {
   //! Initializes the internal widgets
   void InitializeWidgets();
 
+  //! Initializes the keyboard shortcuts on the parent widget
+  void InitializeKeyboardShortcuts(QWidget *parent);
+
   //! Shows the given message in the message display
   void SetDisplayMessage(bool error, const QString &message);
 
   //! Clears and hides the message display
   void ClearDisplayMessage();
+
+  //! Helper method for OnShowPreviousResult and OnShowNextResult
+  void ShowResult();
 
  private slots:
   //! Called whenever the search pattern changes
@@ -55,6 +61,12 @@ class SearchWidget final : public ISearchWidget {
 
   //! Toggled when the regex option is toggled
   void OnRegexSearchOptionToggled(bool checked);
+
+  //! Called when the show prev result button is pressed
+  void OnShowPreviousResult();
+
+  //! Called when the show next result button is pressed
+  void OnShowNextResult();
 
  public slots:
   //! \copybrief ISearchWidget::Activate

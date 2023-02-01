@@ -24,9 +24,6 @@ add_library("mx_codeview"
 
   src/DefaultCodeViewThemes.h
   src/DefaultCodeViewThemes.cpp
-
-  src/InternalSearchWidget.h
-  src/InternalSearchWidget.cpp
 )
 
 target_sources("mx_codeview" INTERFACE
@@ -42,6 +39,7 @@ target_link_libraries("mx_codeview"
     "multiplier::mx-api"
     "mx_util"
     "mx_database"
+    "mx_searchwidget"
 )
 
 target_include_directories("mx_codeview" PRIVATE

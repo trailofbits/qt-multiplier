@@ -43,6 +43,8 @@ void RegisterMetaTypes() {
   qRegisterMetaType<std::vector<mx::PackedFragmentId>>(
       "std::vector<PackedFragmentId>");
   qRegisterMetaType<std::vector<mx::PackedFileId>>("std::vector<PackedFileId>");
+  qRegisterMetaType<std::optional<mx::PackedFileId>>(
+      "std::optional<PackedFileId>");
 }
 
 }  // namespace mx::gui
