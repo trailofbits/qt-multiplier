@@ -93,7 +93,7 @@ void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
                                         const std::string &file_name,
                                         bool double_click) {
 
-  if (!double_click) {
+  if (double_click) {
     return;
   }
 
