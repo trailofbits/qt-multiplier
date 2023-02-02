@@ -17,9 +17,6 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
   // Font name
   "Source Code Pro",
 
-  // Line highlight color
-  QColor(Qt::black),
-
   // default_background_color
   QColor::fromRgb(20, 20, 20),
 
@@ -30,7 +27,7 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
   QColor::fromRgb(20, 20, 20),
 
   // default_gutter_foreground
-  QColor::fromRgb(255, 255, 255),
+  QColor::fromRgb(128, 128, 128),
 
   // token_style_map
   {
