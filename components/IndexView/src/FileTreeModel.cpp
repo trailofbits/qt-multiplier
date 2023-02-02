@@ -209,6 +209,26 @@ bool ImportPathHelper(FileTreeModel::NodeMap &node_map,
   return ImportPathHelper(node_map, next_child_node_id, next_path, opt_file_id);
 }
 
+void PopulateParentsHelper(FileTreeModel::NodeMap &node_map,
+                           const std::uint64_t &current_node_id,
+                           const std::uint64_t &parent_node_id) {
+
+  auto &current_node = node_map[current_node_id];
+  current_node.parent = parent_node_id;
+
+  if (!std::holds_alternative<FileTreeModel::Node::FolderData>(
+          current_node.data)) {
+    return;
+  }
+
+  const auto &current_node_folder_data =
+      std::get<FileTreeModel::Node::FolderData>(current_node.data);
+
+  for (const auto &child_node_id : current_node_folder_data.child_set) {
+    PopulateParentsHelper(node_map, child_node_id, current_node_id);
+  }
+}
+
 }  // namespace
 
 struct FileTreeModel::PrivateData final {
@@ -373,6 +393,10 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
     return QVariant();
   }
 
+  if (role == AbsolutePathRole) {
+    return GetNodeAbsolutePath(d->node_map, node_id);
+  }
+
   const auto &node = node_it->second;
 
   if (std::holds_alternative<Node::FolderData>(node.data)) {
@@ -508,28 +532,54 @@ bool FileTreeModel::ImportPath(
   return ImportPathHelper(node_map, 1, std::move(component_list), opt_file_id);
 }
 
-void PopulateParentsHelper(FileTreeModel::NodeMap &node_map,
-                           const std::uint64_t &current_node_id,
-                           const std::uint64_t &parent_node_id) {
-
-  auto &current_node = node_map[current_node_id];
-  current_node.parent = parent_node_id;
-
-  if (!std::holds_alternative<FileTreeModel::Node::FolderData>(
-          current_node.data)) {
-    return;
-  }
-
-  const auto &current_node_folder_data =
-      std::get<FileTreeModel::Node::FolderData>(current_node.data);
-
-  for (const auto &child_node_id : current_node_folder_data.child_set) {
-    PopulateParentsHelper(node_map, child_node_id, current_node_id);
-  }
-}
-
 void FileTreeModel::PopulateParents(NodeMap &node_map) {
   PopulateParentsHelper(node_map, 1, 0);
+}
+
+QString FileTreeModel::GetNodeAbsolutePath(const NodeMap &node_map,
+                                           const std::uint64_t &node_id) {
+
+  std::vector<std::string> component_list;
+  auto current_node_id = node_id;
+
+  while (current_node_id != 0) {
+    const auto &current_node = node_map.at(current_node_id);
+    if (std::holds_alternative<Node::FolderData>(current_node.data)) {
+      const auto &current_node_data =
+          std::get<Node::FolderData>(current_node.data);
+
+      for (auto component_it = current_node_data.component_list.rbegin();
+           component_it != current_node_data.component_list.rend();
+           ++component_it) {
+
+        const auto &component = *component_it;
+        component_list.push_back(component);
+      }
+
+    } else {
+      const auto &current_node_data =
+          std::get<Node::FileData>(current_node.data);
+      component_list.push_back(current_node_data.file_name);
+    }
+
+    current_node_id = current_node.parent;
+  }
+
+  QString output;
+
+  for (auto component_it = component_list.rbegin();
+       component_it != component_list.rend(); ++component_it) {
+
+    const auto &component = *component_it;
+    output += QString::fromStdString(component);
+
+    if (component_it != component_list.rbegin() &&
+        std::next(component_it, 1) != component_list.rend()) {
+      output += "/";
+    }
+  }
+
+  return output;
 }
 
 }  // namespace mx::gui

@@ -90,6 +90,10 @@ class FileTreeModel final : public IFileTreeModel {
   //! Visits the node map populating the parent values (required by Qt)
   static void PopulateParents(NodeMap &node_map);
 
+  //! Returns the absolute path for the given node
+  static QString GetNodeAbsolutePath(const NodeMap &node_map,
+                                     const std::uint64_t &node_id);
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;

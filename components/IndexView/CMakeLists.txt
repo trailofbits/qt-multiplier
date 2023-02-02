@@ -39,3 +39,7 @@ target_include_directories("mx_indexview" SYSTEM INTERFACE
 )
 
 enable_qt_properties("mx_indexview")
+
+if(MXQT_ENABLE_TESTS)
+  add_subdirectory("tests")
+endif()

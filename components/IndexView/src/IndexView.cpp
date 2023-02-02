@@ -92,6 +92,7 @@ void IndexView::InstallModel(IFileTreeModel *model) {
   d->model_proxy = new QSortFilterProxyModel(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);
+  d->model_proxy->setFilterRole(IFileTreeModel::AbsolutePathRole);
 
   d->tree_view->setModel(d->model_proxy);
   d->tree_view->expandRecursively(QModelIndex());

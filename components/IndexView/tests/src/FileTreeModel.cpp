@@ -193,6 +193,10 @@ TEST_CASE("FileTreeModel::ImportPath") {
   REQUIRE(VerifyFolderNode(node_map, 10, {"folder5", "folder6"}, 7));
   REQUIRE(VerifyFolderNode(node_map, 11, {"folder7"}, 7));
   REQUIRE(VerifyFileNode(node_map, 12, "file6.h", 11));
+
+  auto file6_path =
+      FileTreeModel::GetNodeAbsolutePath(node_map, 12).toStdString();
+  REQUIRE(file6_path == "/folder3/folder4/folder7/file6.h");
 }
 
 }  // namespace mx::gui

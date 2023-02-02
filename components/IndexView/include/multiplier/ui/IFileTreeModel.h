@@ -23,6 +23,9 @@ class IFileTreeModel : public QAbstractItemModel {
   enum ItemDataRole {
     //! Returns an std::optional<PackedFileId>
     OptionalPackedFileIdRole = Qt::UserRole + 1,
+
+    //! Returns a QString containing the absolute path
+    AbsolutePathRole,
   };
 
   //! Factory method
