@@ -22,12 +22,12 @@ namespace mx::gui {
 // given raw entity id.
 EntityBaseOffsetPair GetFragmentOffset(RawEntityId id) {
   VariantId vid = EntityId(id).Unpack();
-  if (std::holds_alternative<DeclarationId>(vid)) {
-    auto eid = std::get<DeclarationId>(vid);
+  if (std::holds_alternative<DeclId>(vid)) {
+    auto eid = std::get<DeclId>(vid);
     return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
-  } else if (std::holds_alternative<StatementId>(vid)) {
-    auto eid = std::get<StatementId>(vid);
+  } else if (std::holds_alternative<StmtId>(vid)) {
+    auto eid = std::get<StmtId>(vid);
     return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
   } else if (std::holds_alternative<TypeId>(vid)) {
@@ -42,8 +42,8 @@ EntityBaseOffsetPair GetFragmentOffset(RawEntityId id) {
     auto eid = std::get<MacroId>(vid);
     return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
-  } else if (std::holds_alternative<AttributeId>(vid)) {
-    auto eid = std::get<AttributeId>(vid);
+  } else if (std::holds_alternative<AttrId>(vid)) {
+    auto eid = std::get<AttrId>(vid);
     return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
 
   } else if (std::holds_alternative<ParsedTokenId>(vid)) {
@@ -83,7 +83,7 @@ Decl CanonicalDecl(const Decl &decl) {
 
 // Return the "canonical" ID of a declaration. This tries to get us the
 // definition when possible.
-PackedDeclarationId CanonicalId(const Decl &decl) {
+PackedDeclId CanonicalId(const Decl &decl) {
   return CanonicalDecl(decl).id();
 }
 
