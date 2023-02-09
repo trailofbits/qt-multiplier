@@ -12,7 +12,6 @@
 #include <multiplier/Index.h>
 #include <multiplier/Iterator.h>
 #include <multiplier/Token.h>
-#include <multiplier/Use.h>
 
 #include <iostream>
 
