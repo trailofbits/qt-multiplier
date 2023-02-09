@@ -121,10 +121,10 @@ DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
 
     return output;
 
-  // Show a range of fragment tokens.
   } else if (std::holds_alternative<ParsedTokenId>(begin_vid) &&
              std::holds_alternative<ParsedTokenId>(end_vid)) {
 
+    // Show a range of fragment tokens.
     ParsedTokenId begin_fid = std::get<ParsedTokenId>(begin_vid);
     ParsedTokenId end_fid = std::get<ParsedTokenId>(end_vid);
 
@@ -312,7 +312,8 @@ void CreateIndexedTokenRangeData(
         category = frag_tok.category();
 
         // If this token has a related entity id, then keep track of it.
-        if (auto related_entity_id = frag_tok.related_entity_id()) {
+        auto related_entity_id = frag_tok.related_entity_id();
+        if (related_entity_id != kInvalidEntityId) {
           tok_entities.push_back(related_entity_id.Pack());
         }
       }
