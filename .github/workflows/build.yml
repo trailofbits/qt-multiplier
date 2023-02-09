@@ -16,6 +16,10 @@ on:
     branches:
       - '*'
 
+  push:
+    branches:
+      - 'next'
+
 concurrency:
   group: next-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
