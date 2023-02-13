@@ -4,9 +4,11 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <QMainWindow>
-
 #include <multiplier/Index.h>
+
+#include <multiplier/ui/ICodeModel.h>
+
+#include <QMainWindow>
 
 namespace mx::gui {
 
@@ -26,11 +28,21 @@ class MainWindow final : public QMainWindow {
 
   void InitializeWidgets();
   void CreateFileTreeDock();
+  void CreateReferenceExplorerDock();
   void CreateCodeView();
+  void OpenTokenContextMenu(const CodeModelIndex &index);
+  void OpenTokenReferenceExplorer(const CodeModelIndex &index);
 
  private slots:
   void OnIndexViewFileClicked(const PackedFileId &file_id,
                               const std::string &file_name, bool double_click);
+
+  void OnTokenClicked(const CodeModelIndex &index,
+                      const Qt::MouseButton &mouse_button,
+                      const Qt::KeyboardModifiers &modifiers,
+                      bool double_click);
+
+  void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
 };
 

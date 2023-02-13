@@ -16,10 +16,11 @@ namespace mx {
 class FileLocationCache;
 class Index;
 }  // namespace mx
+
 namespace mx::gui {
 
 //! A model index used to reference a single token
-struct CodeModelIndex {
+struct CodeModelIndex final {
   int row{};
   int token_index{};
 };
@@ -85,3 +86,6 @@ class ICodeModel : public QObject {
 };
 
 }  // namespace mx::gui
+
+//! Allows mx::gui::CodeModelIndex values to fit inside QVariant objects
+Q_DECLARE_METATYPE(mx::gui::CodeModelIndex);
