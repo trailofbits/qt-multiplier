@@ -77,8 +77,9 @@ class ICodeView : public QWidget {
 
  signals:
   //! This signal is emitted when a token is clicked
-  void TokenClicked(const CodeModelIndex &index, Qt::MouseButtons mouse_buttons,
-                    bool double_click);
+  void TokenClicked(const CodeModelIndex &index,
+                    const Qt::MouseButton &mouse_button,
+                    const Qt::KeyboardModifiers &modifiers, bool double_click);
 
   //! This signal is emitted whenever the mouse cursor is hovering on a token
   void TokenHovered(const CodeModelIndex &index);

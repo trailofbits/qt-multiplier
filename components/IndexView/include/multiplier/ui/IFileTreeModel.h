@@ -40,7 +40,10 @@ class IFileTreeModel : public QAbstractItemModel {
   //! Destructor
   virtual ~IFileTreeModel() override = default;
 
+  //! Disabled copy constructor
   IFileTreeModel(const IFileTreeModel &) = delete;
+
+  //! Disabled copy assignment operator
   IFileTreeModel &operator=(const IFileTreeModel &) = delete;
 };
 

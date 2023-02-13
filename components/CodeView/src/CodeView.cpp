@@ -248,6 +248,7 @@ void CodeView::InitializeWidgets() {
   // Code viewer
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setReadOnly(true);
+  d->text_edit->setContextMenuPolicy(Qt::NoContextMenu);
   d->text_edit->setTextInteractionFlags(Qt::TextBrowserInteraction);
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
@@ -330,7 +331,8 @@ void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
   }
 
   const auto &model_index = opt_model_index.value();
-  emit TokenClicked(model_index, event->buttons(), double_click);
+  emit TokenClicked(model_index, event->button(), event->modifiers(),
+                    double_click);
 }
 
 void CodeView::OnTextEditTextZoom(QWheelEvent *event) {
@@ -393,6 +395,7 @@ CodeView::GetLineNumberFromBlockNumber(const TokenMap &token_map,
 
   auto line_number_it =
       token_map.block_number_to_line_number.find(block_number);
+
   if (line_number_it == token_map.block_number_to_line_number.end()) {
     return std::nullopt;
   }
@@ -420,9 +423,6 @@ CodeView::GetCodeModelIndexFromTextCursor(const TokenMap &token_map,
   auto cursor_position = cursor.position();
   for (const auto &token_unique_id : token_unique_id_list) {
     const auto &token_map_entry = token_map.data.at(token_unique_id);
-    if (cursor_position > token_map_entry.cursor_end) {
-      break;
-    }
 
     if (cursor_position >= token_map_entry.cursor_start &&
         cursor_position <= token_map_entry.cursor_end) {

@@ -195,9 +195,7 @@ void CodeModel::FutureResultStateChanged() {
 
   if (d->future_result.isCanceled()) {
     emit ModelAboutToBeReset();
-
     d->model_state = ModelState::UpdateCancelled;
-
     emit ModelReset();
 
     return;
@@ -207,9 +205,7 @@ void CodeModel::FutureResultStateChanged() {
 
   if (!std::holds_alternative<IndexedTokenRangeData>(future_result)) {
     emit ModelAboutToBeReset();
-
     d->model_state = ModelState::UpdateFailed;
-
     emit ModelReset();
 
     return;
