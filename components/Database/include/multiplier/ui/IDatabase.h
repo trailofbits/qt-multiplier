@@ -15,6 +15,7 @@
 #include <QString>
 
 #include <variant>
+#include <vector>
 
 namespace mx::gui {
 
@@ -32,22 +33,43 @@ enum class RPCErrorCode {
   InvalidFileTokenSorting,
 };
 
+struct LineNumberInfo final {
+  unsigned first_line{};
+  unsigned last_line{};
+};
+
 struct IndexedTokenRangeData final {
-  struct LineNumberInfo final {
-    std::uint64_t first_line{};
-    std::uint64_t last_line{};
-  };
 
   using OptionalLineNumberInfo = std::optional<LineNumberInfo>;
 
+  // The data of all of the tokens.
   QString data;
+
+  // The starting index in `data` of the Nth token. There is one extra entry in
+  // here to enable quickselect-based searches to map byte offset to token.
   std::vector<int> start_of_token;
 
-  std::vector<RawEntityId> file_token_ids;
-  std::vector<std::uint64_t> entity_ids_begin;
-  std::vector<RawEntityId> entity_ids;
-  std::vector<TokenCategory> token_category_list;
-  OptionalLineNumberInfo opt_line_number_info;
+  // List of fragment IDs in this token range, and then a compressed mapping
+  // of token to fragment ID.
+  std::vector<RawEntityId> fragment_ids;
+  std::vector<unsigned> fragment_id_index;
+
+  // The line number of a the Nth token.
+  std::vector<unsigned> line_number;
+
+  // Token IDs for each of the tokens in `data`. Token IDs might repeat if a
+  // given token has more than one line in it. If a token has data a line break
+  // in it, then it is split at the line break. E.g. `foo\nbar\nbaz` results in
+  // three token chunks: `foo\n`, `bar\n`, and `baz`.
+  std::vector<RawEntityId> token_ids;
+
+  // The related entity ID for the Nth token. This is often declaration ID or a
+  // macro ID.
+  std::vector<RawEntityId> related_entity_ids;
+
+  // The category of the Nth token. The category informs things like syntax
+  // coloring.
+  std::vector<TokenCategory> token_categories;
 };
 
 class IDatabase {
@@ -64,8 +86,6 @@ class IDatabase {
 
   virtual FutureResult DownloadFile(PackedFileId file_id) = 0;
   virtual FutureResult DownloadFragment(PackedFragmentId fragment_id) = 0;
-  virtual FutureResult DownloadTokenRange(const RawEntityId &start_entity_id,
-                                          const RawEntityId &end_entity_id) = 0;
 
   IDatabase(const IDatabase &) = delete;
   IDatabase &operator=(const IDatabase &) = delete;

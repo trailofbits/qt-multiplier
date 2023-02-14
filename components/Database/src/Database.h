@@ -18,10 +18,6 @@ class Database final : public IDatabase {
 
   virtual FutureResult DownloadFragment(PackedFragmentId fragment_id) override;
 
-  virtual FutureResult
-  DownloadTokenRange(const RawEntityId &start_entity_id,
-                     const RawEntityId &end_entity_id) override;
-
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;

@@ -26,12 +26,7 @@ struct SingleEntityRequest final {
   RawEntityId entity_id;
 };
 
-struct EntityRangeRequest final {
-  RawEntityId start_entity_id;
-  RawEntityId end_entity_id;
-};
-
-using Request = std::variant<SingleEntityRequest, EntityRangeRequest>;
+using Request = std::variant<SingleEntityRequest>;
 using IndexedTokenRangeDataResult = std::variant<IndexedTokenRangeData, RPCErrorCode>;
 using IndexedTokenRangeDataResultPromise =
     QPromise<IndexedTokenRangeDataResult>;

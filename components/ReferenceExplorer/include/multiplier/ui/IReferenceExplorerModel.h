@@ -49,9 +49,9 @@ class IReferenceExplorerModel : public QAbstractItemModel {
 
   //! Adds a new entity object under the given parent
   virtual bool AppendEntityObject(
-      const RawEntityId &entity_id, const EntityObjectType &type,
+      RawEntityId entity_id, EntityObjectType type,
       const QModelIndex &parent,
-      const std::optional<std::size_t> &opt_ttl = std::nullopt) = 0;
+      std::optional<std::size_t> opt_ttl = std::nullopt) = 0;
 
   //! Constructor
   IReferenceExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}

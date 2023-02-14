@@ -18,7 +18,7 @@ class QuickReferenceExplorer final : public QDialog {
  public:
   QuickReferenceExplorer(mx::Index index,
                          mx::FileLocationCache file_location_cache,
-                         const RawEntityId &entity_id,
+                         RawEntityId entity_id,
                          QWidget *parent = nullptr);
 
   virtual ~QuickReferenceExplorer() override;
@@ -35,7 +35,7 @@ class QuickReferenceExplorer final : public QDialog {
 
   void InitializeWidgets(mx::Index index,
                          mx::FileLocationCache file_location_cache,
-                         const RawEntityId &entity_id);
+                         RawEntityId entity_id);
 };
 
 }  // namespace mx::gui
