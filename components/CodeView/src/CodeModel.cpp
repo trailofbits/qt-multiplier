@@ -240,9 +240,10 @@ void CodeModel::FutureResultStateChanged() {
     col.token_category =
         indexed_token_range_data.token_categories[i];
 
-    if (auto frag_id_index = indexed_token_range_data.fragment_id_index[i]) {
-      col.opt_token_group_id.emplace(
-          indexed_token_range_data.fragment_ids[frag_id_index]);
+    auto frag_id_index = indexed_token_range_data.fragment_id_index[i];
+    if (auto frag_id = indexed_token_range_data.fragment_ids[frag_id_index];
+        frag_id != kInvalidEntityId) {
+      col.opt_token_group_id.emplace(frag_id);
     }
 
     row.line_number = indexed_token_range_data.line_number[i];
