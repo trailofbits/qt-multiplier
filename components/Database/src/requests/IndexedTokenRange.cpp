@@ -156,8 +156,8 @@ static void RenderToken(
     RawEntityId related_entity_id, unsigned &line_number,
     unsigned fragment_index, IndexedTokenRangeData &output) {
 
-  int num_utf8_bytes = static_cast<int>(utf8_tok.size());
-  int tok_start = static_cast<int>(output.data.size());
+  unsigned num_utf8_bytes = static_cast<unsigned>(utf8_tok.size());
+  unsigned tok_start = static_cast<unsigned>(output.data.size());
 
   bool is_empty = true;
   for (const QChar ch : QString::fromUtf8(utf8_tok.data(), num_utf8_bytes)) {
@@ -180,11 +180,11 @@ static void RenderToken(
         output.line_number.push_back(line_number++);
         output.related_entity_ids.push_back(related_entity_id);
         output.token_ids.push_back(fid);
-        output.start_of_token.push_back(static_cast<int>(tok_start));
+        output.start_of_token.push_back(static_cast<unsigned>(tok_start));
         output.token_categories.push_back(category);
         output.fragment_id_index.push_back(fragment_index);
 
-        tok_start = static_cast<int>(output.data.size());
+        tok_start = static_cast<unsigned>(output.data.size());
         is_empty = true;
         break;
 
@@ -207,7 +207,7 @@ static void RenderToken(
   output.line_number.push_back(line_number);
   output.related_entity_ids.push_back(related_entity_id);
   output.token_ids.push_back(fid);
-  output.start_of_token.push_back(static_cast<int>(tok_start));
+  output.start_of_token.push_back(static_cast<unsigned>(tok_start));
   output.token_categories.push_back(category);
   output.fragment_id_index.push_back(fragment_index);
 }
@@ -330,7 +330,36 @@ static IndexedTokenRangeDataOrError IndexTokenRange(
     // Hard case: we need to render the fragments out, one after another.
     auto old_line_number = line_number;
     auto old_tok_index = tok_index;
-    for (; fragment_tokens_it != fragment_tokens_end; ++fragment_tokens_it) {
+    auto last_tok_index = output.line_number.size();
+    for (auto repeat = false; fragment_tokens_it != fragment_tokens_end;
+         ++fragment_tokens_it) {
+
+      if (repeat) {
+
+        // Force a newline between overlapping fragments.
+        if (!output.data.endsWith(QChar::LineSeparator)) {
+          output.data.push_back(QChar::LineSeparator);
+        }
+
+        // Back-fill the original tokens from the same line.
+        auto j = 0u;
+        for (auto i = last_tok_index;
+             i-- > 0u && output.line_number[i] == old_line_number; ++j) {}
+
+        for (auto i = 0u; i < j; ++i) {
+          auto k = last_tok_index - i;
+          output.fragment_id_index.push_back(output.fragment_id_index[k]);
+          output.token_ids.push_back(output.token_ids[k]);
+          output.related_entity_ids.push_back(output.related_entity_ids[k]);
+          output.line_number.push_back(output.line_number[k]);
+          output.token_categories.push_back(output.token_categories[k]);
+          auto start = static_cast<unsigned>(output.data.size());
+          output.start_of_token.push_back(start);
+          auto len = output.start_of_token[k + 1u] - output.start_of_token[k];
+          output.data.append(output.data.mid(start, len));
+        }
+      }
+
       std::vector<Token> fragment_tokens = std::move(
           fragment_tokens_it->second);
 
@@ -350,10 +379,12 @@ static IndexedTokenRangeDataOrError IndexTokenRange(
           return RPCErrorCode::Interrupted;
         }
       }
+
+      repeat = true;
     }
   }
 
-  output.start_of_token.push_back(static_cast<int>(output.data.size()));
+  output.start_of_token.push_back(static_cast<unsigned>(output.data.size()));
 
   return output;
 }
