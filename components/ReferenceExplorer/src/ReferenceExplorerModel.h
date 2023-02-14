@@ -81,8 +81,6 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
       //! Multiplier-specific identifiers
       Identifiers identifiers;
 
-      //! Decl kind
-      mx::DeclKind decl_kind{};
 
       //! An optional name for this entity
       std::optional<std::string> opt_name;
@@ -122,13 +120,37 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   //!
   static void ImportDeclEntity(NodeTree &node_tree, const IndexData &index_data,
                                const std::uint64_t &parent_node_id,
-                               mx::Decl decl_entity,
+                               mx::Decl entity,
                                std::optional<std::size_t> opt_ttl);
 
   //!
   static void ImportStmtEntity(NodeTree &node_tree, const IndexData &index_data,
                                const std::uint64_t &parent_node_id,
-                               mx::Stmt stmt_entity,
+                               mx::Stmt entity,
+                               std::optional<std::size_t> opt_ttl);
+
+  //!
+  static void ImportAttrEntity(NodeTree &node_tree, const IndexData &index_data,
+                               const std::uint64_t &parent_node_id,
+                               mx::Attr entity,
+                               std::optional<std::size_t> opt_ttl);
+
+  //!
+  static void ImportMacroEntity(NodeTree &node_tree, const IndexData &index_data,
+                               const std::uint64_t &parent_node_id,
+                               mx::Macro entity,
+                               std::optional<std::size_t> opt_ttl);
+
+  //!
+  static void ImportDesignatorEntity(
+      NodeTree &node_tree, const IndexData &index_data,
+      const std::uint64_t &parent_node_id, mx::Designator entity,
+      std::optional<std::size_t> opt_ttl);
+
+  //!
+  static void ImportFileEntity(NodeTree &node_tree, const IndexData &index_data,
+                               const std::uint64_t &parent_node_id,
+                               mx::File entity,
                                std::optional<std::size_t> opt_ttl);
 
   friend class IReferenceExplorerModel;

@@ -8,6 +8,8 @@
 
 #include "ReferenceExplorerModel.h"
 
+#include <multiplier/Entities/DefineMacroDirective.h>
+#include <multiplier/Entities/IncludeLikeMacroDirective.h>
 #include <multiplier/ui/Assert.h>
 
 #include <iostream>
@@ -210,20 +212,47 @@ void ReferenceExplorerModel::ImportEntityById(
   auto entity_var = index_data.index.entity(entity_id);
   bool succeeded{false};
 
-  if (std::holds_alternative<mx::Decl>(entity_var)) {
-    const auto &entity = std::get<mx::Decl>(entity_var);
+  if (std::holds_alternative<Decl>(entity_var)) {
+    const auto &entity = std::get<Decl>(entity_var);
     ImportDeclEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
 
     succeeded = true;
 
-  } else if (std::holds_alternative<mx::Stmt>(entity_var)) {
-    const auto &entity = std::get<mx::Stmt>(entity_var);
+  } else if (std::holds_alternative<Stmt>(entity_var)) {
+    const auto &entity = std::get<Stmt>(entity_var);
     ImportStmtEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
 
     succeeded = true;
 
-  } else if (std::holds_alternative<mx::Token>(entity_var)) {
-    const auto &entity = std::get<mx::Token>(entity_var);
+  } else if (std::holds_alternative<Macro>(entity_var)) {
+    const auto &entity = std::get<Macro>(entity_var);
+    ImportMacroEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
+
+    succeeded = true;
+
+  } else if (std::holds_alternative<Attr>(entity_var)) {
+    const auto &entity = std::get<Attr>(entity_var);
+    ImportAttrEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
+
+    succeeded = true;
+
+  } else if (std::holds_alternative<Designator>(entity_var)) {
+    const auto &entity = std::get<Designator>(entity_var);
+    ImportDesignatorEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
+
+    succeeded = true;
+
+  } else if (std::holds_alternative<File>(entity_var)) {
+    const auto &entity = std::get<File>(entity_var);
+    ImportFileEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
+
+    succeeded = true;
+
+  // TODO(pag): Type, CXXBaseSpecifier, CXXTemplateArgument,
+  //            CXXTemplateParameterList.
+
+  } else if (std::holds_alternative<Token>(entity_var)) {
+    const auto &entity = std::get<Token>(entity_var);
 
     auto statement_list = mx::Stmt::containing(entity);
     auto statement_list_it = statement_list.begin();
@@ -284,7 +313,6 @@ void ReferenceExplorerModel::ImportDeclEntity(
   auto fragment = mx::Fragment::containing(decl_entity);
   current_node.identifiers.fragment_id = fragment.id().Pack();
   current_node.identifiers.entity_id = decl_entity_id;
-  current_node.decl_kind = decl_entity.kind();
 
   const auto file = mx::File::containing(fragment);
   if (file) {
@@ -356,6 +384,134 @@ void ReferenceExplorerModel::ImportStmtEntity(
 
   ImportDeclEntity(node_tree, index_data, parent_node_id, *declaration_list_it,
                    opt_ttl);
+}
+
+void ReferenceExplorerModel::ImportAttrEntity(
+    NodeTree &node_tree, const IndexData &index_data,
+    const std::uint64_t &parent_node_id, mx::Attr entity,
+    std::optional<std::size_t> opt_ttl) {
+
+  if (opt_ttl.has_value()) {
+    auto ttl = opt_ttl.value();
+    if (ttl == 0) {
+      return;
+    }
+
+    opt_ttl = ttl - 1;
+  }
+
+
+  for (Token tok : entity.tokens()) {
+    auto declaration_list = mx::Decl::containing(tok);
+    auto declaration_list_it = declaration_list.begin();
+    if (declaration_list_it == declaration_list.end()) {
+      continue;
+    }
+
+    ImportDeclEntity(node_tree, index_data, parent_node_id,
+                     *declaration_list_it, opt_ttl);
+    return;
+  }
+
+  Assert(false, "Failed to import the attribute entity");
+}
+
+void ReferenceExplorerModel::ImportDesignatorEntity(
+    NodeTree &node_tree, const IndexData &index_data,
+    const std::uint64_t &parent_node_id, mx::Designator entity,
+    std::optional<std::size_t> opt_ttl) {
+
+  if (opt_ttl.has_value()) {
+    auto ttl = opt_ttl.value();
+    if (ttl == 0) {
+      return;
+    }
+
+    opt_ttl = ttl - 1;
+  }
+
+  for (Token tok : entity.tokens()) {
+    auto declaration_list = mx::Decl::containing(tok);
+    auto declaration_list_it = declaration_list.begin();
+    if (declaration_list_it == declaration_list.end()) {
+      continue;
+    }
+
+    ImportDeclEntity(node_tree, index_data, parent_node_id,
+                     *declaration_list_it, opt_ttl);
+    return;
+  }
+
+  Assert(false, "Failed to import the designator entity");
+}
+
+void ReferenceExplorerModel::ImportMacroEntity(
+    NodeTree &node_tree, const IndexData &index_data,
+    const std::uint64_t &parent_node_id, mx::Macro entity,
+    std::optional<std::size_t> opt_ttl) {
+
+  (void) index_data;
+
+  if (node_tree.node_map.count(0) == 0) {
+    node_tree.node_map.insert({0, NodeTree::Node{}});
+  }
+
+  auto entity_id = entity.id().Pack();
+  if (node_tree.visited_entity_id_set.count(entity_id) > 0) {
+    return;
+  }
+
+  node_tree.visited_entity_id_set.insert(entity_id);
+
+  if (opt_ttl.has_value()) {
+    auto ttl = opt_ttl.value();
+    if (ttl == 0) {
+      return;
+    }
+
+    opt_ttl = ttl - 1;
+  }
+
+  auto current_node_id = node_tree.node_map.size();
+
+  NodeTree::Node current_node;
+  current_node.node_id = current_node_id;
+  current_node.parent_node_id = parent_node_id;
+
+
+  auto fragment = mx::Fragment::containing(entity);
+  current_node.identifiers.fragment_id = fragment.id().Pack();
+  current_node.identifiers.entity_id = entity_id;
+
+  if (auto named = mx::DefineMacroDirective::from(entity)) {
+    current_node.opt_name = named->name().data();
+
+    // Find uses of this macro.
+
+  } else if (auto inc = mx::IncludeLikeMacroDirective::from(entity)) {
+    current_node.opt_name = "<invalid file>";
+    if (auto file = inc->included_file()) {
+      // TODO(pag,alessandro): File path.
+    }
+
+    // Show the included file.
+
+  } else {
+    return;
+  }
+}
+
+void ReferenceExplorerModel::ImportFileEntity(
+    NodeTree &node_tree, const IndexData &index_data,
+    const std::uint64_t &parent_node_id, mx::File entity,
+    std::optional<std::size_t> opt_ttl) {
+  // TODO(pag): Show all includes that include this file.
+  (void) node_tree;
+  (void) index_data;
+  (void) parent_node_id;
+  (void) entity;
+  (void) opt_ttl;
+
 }
 
 }  // namespace mx::gui
