@@ -47,7 +47,7 @@ struct IndexedTokenRangeData final {
 
   // The starting index in `data` of the Nth token. There is one extra entry in
   // here to enable quickselect-based searches to map byte offset to token.
-  std::vector<int> start_of_token;
+  std::vector<unsigned> start_of_token;
 
   // List of fragment IDs in this token range, and then a compressed mapping
   // of token to fragment ID.
