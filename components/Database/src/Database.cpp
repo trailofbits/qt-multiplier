@@ -62,19 +62,6 @@ Database::DownloadFragment(PackedFragmentId fragment_id) {
                            d->file_location_cache, std::move(request));
 }
 
-Database::FutureResult
-Database::DownloadTokenRange(const RawEntityId &start_entity_id,
-                             const RawEntityId &end_entity_id) {
-
-  Request request{EntityRangeRequest{
-      start_entity_id,
-      end_entity_id,
-  }};
-
-  return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
-                           d->file_location_cache, std::move(request));
-}
-
 Database::Database(const Index &index,
                    const FileLocationCache &file_location_cache)
     : d(new PrivateData(index, file_location_cache)) {

@@ -129,6 +129,8 @@ void MainWindow::CreateCodeView() {
   // Also create the custom context menu
   d->code_view_context_menu.menu = new QMenu(tr("Token menu"));
 
+  // TODO(alessandro): Only show this when there is a related entity.
+
   connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
           &MainWindow::OnCodeViewContextMenuActionTriggered);
 
@@ -151,17 +153,16 @@ void MainWindow::OpenTokenContextMenu(const CodeModelIndex &index) {
 }
 
 void MainWindow::OpenTokenReferenceExplorer(const CodeModelIndex &index) {
-  auto entity_id_var =
-      d->code_model->Data(index, ICodeModel::TokenRawEntityIdRole);
+  auto related_entity_id_var =
+      d->code_model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
 
-  if (!entity_id_var.isValid()) {
+  if (!related_entity_id_var.isValid()) {
     return;
   }
 
-  auto entity_id = static_cast<RawEntityId>(entity_id_var.toULongLong());
-
-  QuickReferenceExplorer quick_ref_explorer(d->index, d->file_location_cache,
-                                            entity_id);
+  QuickReferenceExplorer quick_ref_explorer(
+      d->index, d->file_location_cache,
+      static_cast<RawEntityId>(related_entity_id_var.toULongLong()));
 
   auto dialog_pos = QCursor::pos();
 

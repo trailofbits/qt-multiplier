@@ -43,6 +43,9 @@ class ICodeModel : public QObject {
 
     //! Returns the group id (if any) of the specified model index
     TokenGroupIdRole,
+
+    //! The RawEntityId value associated with the "related entity" of this token.
+    TokenRelatedEntityIdRole,
   };
 
   //! Factory function

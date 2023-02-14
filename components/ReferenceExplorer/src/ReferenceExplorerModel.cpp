@@ -20,8 +20,8 @@ struct ReferenceExplorerModel::PrivateData final {
 };
 
 bool ReferenceExplorerModel::AppendEntityObject(
-    const RawEntityId &entity_id, const EntityObjectType &type,
-    const QModelIndex &parent, const std::optional<std::size_t> &opt_ttl) {
+    RawEntityId entity_id, EntityObjectType type,
+    const QModelIndex &parent, std::optional<std::size_t> opt_ttl) {
 
   static_cast<void>(type);
 
@@ -32,9 +32,7 @@ bool ReferenceExplorerModel::AppendEntityObject(
 
   emit beginResetModel();
 
-  static_cast<void>(entity_id);
-  RawEntityId alt_entity_id{9223372243281641499ULL};
-  ImportEntityById(d->node_tree, d->index_data, parent_node_id, alt_entity_id,
+  ImportEntityById(d->node_tree, d->index_data, parent_node_id, entity_id,
                    opt_ttl);
 
   emit endResetModel();

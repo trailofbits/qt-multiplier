@@ -23,9 +23,9 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
  public:
   //! \copybrief IReferenceExplorerModel::AppendEntityObject
   virtual bool
-  AppendEntityObject(const RawEntityId &entity_id, const EntityObjectType &type,
+  AppendEntityObject(RawEntityId entity_id, EntityObjectType type,
                      const QModelIndex &parent,
-                     const std::optional<std::size_t> &opt_ttl) override;
+                     std::optional<std::size_t> opt_ttl) override;
 
   //! Destructor
   virtual ~ReferenceExplorerModel() override;

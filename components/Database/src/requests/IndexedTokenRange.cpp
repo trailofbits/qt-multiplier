@@ -9,7 +9,8 @@
 #include "IndexedTokenRange.h"
 
 #include <iostream>
-#include <unordered_map>
+#include <map>
+#include <multiplier/ui/Assert.h>
 
 namespace mx::gui {
 
@@ -17,16 +18,81 @@ namespace {
 
 struct TokenRangeData final {
   TokenRange file_tokens;
-  std::unordered_map<RawEntityId, std::vector<TokenRange>> fragment_tokens;
+
+  // This is a mapping of the file token IDs to fragment tokens. The file token
+  // IDs are the "left corners" of the fragments: the first token from the
+  // fragment than can be directly tied to a file token. The fragment tokens
+  // are tokens from the fragment that have
+  std::multimap<RawEntityId, std::vector<Token>> fragment_tokens;
 };
 
-std::variant<TokenRangeData, RPCErrorCode>
+static void PrefetchMacrosFromMacro(
+    const IndexedTokenRangeDataResultPromise &result_promise,
+    std::vector<Token> &output, const Macro &macro,
+    RawEntityId &first_fid);
+
+static void PrefetchMacrosFromNode(
+    const IndexedTokenRangeDataResultPromise &result_promise,
+    std::vector<Token> &output, MacroOrToken macro_or_tok,
+    RawEntityId &first_fid) {
+
+  if (std::holds_alternative<Macro>(macro_or_tok)) {
+    Macro macro = std::move(std::get<Macro>(macro_or_tok));
+    PrefetchMacrosFromMacro(result_promise, output, macro, first_fid);
+
+  } else if (std::holds_alternative<Token>(macro_or_tok)) {
+    Token parsed_tok = std::move(std::get<Token>(macro_or_tok));
+    Token ftok = parsed_tok.file_token();
+    Assert(ftok, "Parsed tokens in the usage of a macro should "
+                 "have associated file tokens");
+
+    // We've found the "left corner" of the macro expansion. This is the first
+    // token of the top-level macro usage.
+    if (first_fid == kInvalidEntityId) {
+      first_fid = ftok.id().Pack();
+    }
+
+    output.emplace_back(std::move(parsed_tok));
+  }
+}
+
+void PrefetchMacrosFromMacro(
+    const IndexedTokenRangeDataResultPromise &result_promise,
+    std::vector<Token> &output, const Macro &macro, RawEntityId &first_fid) {
+  for (MacroOrToken macro_or_tok : macro.children()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+    PrefetchMacrosFromNode(result_promise, output, std::move(macro_or_tok),
+                           first_fid);
+  }
+}
+
+// Go fetch all of the macros. We don't actually read these, but we want to
+// fetch all the macros here where we can check the status of the promise.
+static void PrefetchMacrosFromFragment(
+    const IndexedTokenRangeDataResultPromise &result_promise,
+    std::vector<Token> &output, const Fragment &frag, RawEntityId &first_fid) {
+  for (MacroOrToken macro_or_tok : frag.preprocessed_code()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+    PrefetchMacrosFromNode(result_promise, output, std::move(macro_or_tok),
+                           first_fid);
+  }
+}
+
+using TokenRangeDataOrError = std::variant<TokenRangeData, RPCErrorCode>;
+
+static TokenRangeDataOrError
 DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
                      const Index &index, DownloadRequestType request_type,
                      RawEntityId entity_id) {
 
   TokenRangeData output;
+  std::vector<Token> frag_tokens;
 
+  // Download all tokens from a file. This pulls in all of the file's fragments.
   if (request_type == DownloadRequestType::FileTokens) {
     auto file = index.file(entity_id);
     if (!file) {
@@ -34,125 +100,262 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
     }
 
     output.file_tokens = file->tokens();
-    if (output.file_tokens.size() == 0) {
-      return RPCErrorCode::NoDataReceived;
-    }
 
     for (Fragment fragment : file->fragments()) {
-      for (const Token &tok : fragment.file_tokens()) {
-        if (result_promise.isCanceled()) {
-          return RPCErrorCode::Interrupted;
-        }
+      RawEntityId first_fid = kInvalidEntityId;
 
-        RawEntityId raw_tok_id = tok.id().Pack();
-        output.fragment_tokens[raw_tok_id].emplace_back(
-            fragment.parsed_tokens());
-        break;
+      PrefetchMacrosFromFragment(result_promise, frag_tokens, fragment, first_fid);
+      if (result_promise.isCanceled()) {
+        return RPCErrorCode::Interrupted;
       }
+
+      if (first_fid == kInvalidEntityId || frag_tokens.empty()) {
+        return RPCErrorCode::NoDataReceived;
+      }
+
+      output.fragment_tokens.emplace(first_fid, std::move(frag_tokens));
     }
 
+  // Download all tokens from a fragment.
   } else if (request_type == DownloadRequestType::FragmentTokens) {
-    auto fragment = index.fragment(entity_id);
+    std::optional<Fragment> fragment = index.fragment(entity_id);
     if (!fragment) {
       return RPCErrorCode::InvalidEntityID;
     }
 
     output.file_tokens = fragment->file_tokens();
-    if (output.file_tokens.size() == 0) {
+
+    RawEntityId first_fid = kInvalidEntityId;
+    PrefetchMacrosFromFragment(result_promise, frag_tokens, *fragment,
+                               first_fid);
+    if (result_promise.isCanceled()) {
+      return RPCErrorCode::Interrupted;
+    }
+
+    if (first_fid == kInvalidEntityId || frag_tokens.empty()) {
       return RPCErrorCode::NoDataReceived;
     }
 
-    for (const Token &tok : output.file_tokens) {
-      if (result_promise.isCanceled()) {
-        return RPCErrorCode::Interrupted;
-      }
-
-      RawEntityId raw_tok_id = tok.id().Pack();
-      output.fragment_tokens[raw_tok_id].emplace_back(
-          fragment->parsed_tokens());
-      break;
-    }
+    output.fragment_tokens.emplace(first_fid, std::move(frag_tokens));
 
   } else {
     return RPCErrorCode::InvalidDownloadRequestType;
   }
 
+  if (output.file_tokens.empty()) {
+    return RPCErrorCode::NoDataReceived;
+  }
+
   return output;
 }
 
-std::variant<TokenRangeData, RPCErrorCode>
-DownloadTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
-                   const Index &index, RawEntityId start_entity_id,
-                   RawEntityId end_entity_id) {
+using IndexedTokenRangeDataOrError = std::variant<IndexedTokenRangeData, RPCErrorCode>;
 
-  VariantId begin_vid = EntityId(start_entity_id).Unpack();
-  VariantId end_vid = EntityId(end_entity_id).Unpack();
+static void RenderToken(
+    std::string_view utf8_tok, TokenCategory category, RawEntityId fid,
+    RawEntityId related_entity_id, unsigned &line_number,
+    unsigned fragment_index, IndexedTokenRangeData &output) {
 
-  if (begin_vid.index() != end_vid.index()) {
-    return RPCErrorCode::IndexMismatch;
+  int num_utf8_bytes = static_cast<int>(utf8_tok.size());
+  int tok_start = static_cast<int>(output.data.size());
+
+  bool is_empty = true;
+  for (const QChar ch : QString::fromUtf8(utf8_tok.data(), num_utf8_bytes)) {
+    switch (ch.unicode()) {
+      case QChar::Tabulation:
+        is_empty = false;
+        output.data.append(QChar::Tabulation);
+        break;
+
+      case QChar::Space:
+      case QChar::Nbsp:
+        is_empty = false;
+        output.data.append(QChar::Space);
+        break;
+
+      case QChar::ParagraphSeparator:
+      case QChar::LineFeed:
+      case QChar::LineSeparator:
+        output.data.append(QChar::LineSeparator);
+        output.line_number.push_back(line_number++);
+        output.related_entity_ids.push_back(related_entity_id);
+        output.token_ids.push_back(fid);
+        output.start_of_token.push_back(static_cast<int>(tok_start));
+        output.token_categories.push_back(category);
+        output.fragment_id_index.push_back(fragment_index);
+
+        tok_start = static_cast<int>(output.data.size());
+        is_empty = true;
+        break;
+
+      case QChar::CarriageReturn:
+        continue;
+
+      // TODO(pag): Consult with QFontMetrics or something else to determine
+      //            if this character is visible?
+      default:
+        output.data.append(ch);
+        is_empty = false;
+        break;
+    }
   }
 
-  // Show a range of file tokens.
-  if (std::holds_alternative<FileTokenId>(begin_vid) &&
-      std::holds_alternative<FileTokenId>(end_vid)) {
-
-    const auto &begin_fid = std::get<FileTokenId>(begin_vid);
-    const auto &end_fid = std::get<FileTokenId>(end_vid);
-
-    if (begin_fid.file_id != end_fid.file_id) {
-      return RPCErrorCode::FileMismatch;
-    }
-
-    if (begin_fid.offset > end_fid.offset) {
-      return RPCErrorCode::InvalidFileOffsetRange;
-    }
-
-    RawEntityId entity_id{EntityId(FragmentId(begin_fid.file_id)).Pack()};
-    auto output_res = DownloadEntityTokens(
-        result_promise, index, DownloadRequestType::FileTokens, entity_id);
-
-    if (std::holds_alternative<RPCErrorCode>(output_res)) {
-      return std::get<RPCErrorCode>(output_res);
-    }
-
-    TokenRangeData output = std::move(std::get<TokenRangeData>(output_res));
-    output.file_tokens =
-        output.file_tokens.slice(begin_fid.offset, end_fid.offset + 1u);
-
-    return output;
-
-  } else if (std::holds_alternative<ParsedTokenId>(begin_vid) &&
-             std::holds_alternative<ParsedTokenId>(end_vid)) {
-
-    // Show a range of fragment tokens.
-    ParsedTokenId begin_fid = std::get<ParsedTokenId>(begin_vid);
-    ParsedTokenId end_fid = std::get<ParsedTokenId>(end_vid);
-
-    if (begin_fid.fragment_id != end_fid.fragment_id) {
-      return RPCErrorCode::FragmentMismatch;
-    }
-
-    if (begin_fid.offset > end_fid.offset) {
-      return RPCErrorCode::InvalidFragmentOffsetRange;
-    }
-
-    RawEntityId entity_id{EntityId(FragmentId(begin_fid.fragment_id)).Pack()};
-    auto output_res = DownloadEntityTokens(
-        result_promise, index, DownloadRequestType::FragmentTokens, entity_id);
-
-    if (std::holds_alternative<RPCErrorCode>(output_res)) {
-      return std::get<RPCErrorCode>(output_res);
-    }
-
-    TokenRangeData output = std::move(std::get<TokenRangeData>(output_res));
-    output.file_tokens =
-        output.file_tokens.slice(begin_fid.offset, end_fid.offset + 1u);
-
-    return output;
-
-  } else {
-    return RPCErrorCode::InvalidTokenRangeRequest;
+  if (is_empty) {
+    return;
   }
+
+  output.line_number.push_back(line_number);
+  output.related_entity_ids.push_back(related_entity_id);
+  output.token_ids.push_back(fid);
+  output.start_of_token.push_back(static_cast<int>(tok_start));
+  output.token_categories.push_back(category);
+  output.fragment_id_index.push_back(fragment_index);
+}
+
+
+// Render a file token and update `loc` with an approximation of the effect. If
+// the token spans more than one line then we split it into multiple tokens, and
+// end the internal tokens with newline characters.
+static void RenderFileToken(const Token &tok, unsigned &line_number,
+                            unsigned fragment_index,
+                            IndexedTokenRangeData &output) {
+
+  RenderToken(tok.data(), tok.category(), tok.id().Pack(),
+              tok.related_entity_id().Pack(), line_number, fragment_index,
+              output);
+}
+
+static bool RenderFragmentToken(const TokenRange &input_toks,
+                                unsigned file_tok_index,
+                                std::vector<Token> &frag_toks,
+                                unsigned &line_number,
+                                unsigned fragment_index,
+                                IndexedTokenRangeData &output) {
+  if (frag_toks.empty()) {
+    return false;  // Done with the fragment.
+  }
+
+  Token file_tok = input_toks[file_tok_index];
+  if (!file_tok) {
+    return false;
+  }
+
+  const Token &frag_tok = frag_toks.back();
+  Token frag_file_tok = frag_tok.file_token();
+  RawEntityId frag_file_tok_id = frag_file_tok.id().Pack();
+  RawEntityId file_tok_id = file_tok.id().Pack();
+
+  // There isn't a corresponding fragment token, so render the file token,
+  // leaving the fragment token in place.
+  if (frag_file_tok_id == kInvalidEntityId ||
+      frag_file_tok_id > file_tok_id) {
+    RenderFileToken(file_tok, line_number, fragment_index, output);
+    return true;
+  }
+
+  // If the fragment token's file token ID is less than the current file token
+  // ID, then somehow we've gone too far or gone out-of-sync.
+  Assert(frag_file_tok_id == file_tok_id,
+         "File and fragment token ids are out-of-sync.");
+
+  // Render out the file token data, annotated with fragment token info.
+  RenderToken(file_tok.data(), frag_tok.category(), frag_tok.id().Pack(),
+              frag_tok.related_entity_id().Pack(), line_number, fragment_index,
+              output);
+
+  frag_toks.pop_back();
+  return true;
+}
+
+// Get the fragment ID from the tokens.
+static RawEntityId FragmentIdFromTokens(const std::vector<Token> &frag_toks) {
+  RawEntityId fragment_id = kInvalidEntityId;
+  for (const Token &ftok : frag_toks) {
+    VariantId vid = ftok.id().Unpack();
+    if (std::holds_alternative<ParsedTokenId>(vid)) {
+      return EntityId(
+          FragmentId(std::get<ParsedTokenId>(vid).fragment_id)).Pack();
+    } else if (std::holds_alternative<MacroTokenId>(vid)) {
+      return EntityId(
+          FragmentId(std::get<MacroTokenId>(vid).fragment_id)).Pack();
+
+    } else {
+      Assert(false, "Unexpected token in fragmnet token list");
+    }
+  }
+  Assert(fragment_id != kInvalidEntityId, "Could not find fragment id");
+  return kInvalidEntityId;
+}
+
+// Create an indexed version of some token range data. This means going and
+// finding the
+static IndexedTokenRangeDataOrError IndexTokenRange(
+    const IndexedTokenRangeDataResultPromise &result_promise,
+    const FileLocationCache &file_location_cache,
+    TokenRangeData input) {
+
+  IndexedTokenRangeData output;
+  output.fragment_ids.push_back(kInvalidEntityId);
+
+  unsigned line_number = 0u;
+
+  size_t num_file_tokens = input.file_tokens.size();
+  for (unsigned tok_index = 0u; tok_index < num_file_tokens;) {
+    Token file_tok = input.file_tokens[tok_index];
+
+    if (result_promise.isCanceled()) {
+      return RPCErrorCode::Interrupted;
+    }
+
+    const RawEntityId file_tok_id = file_tok.id().Pack();
+
+    if (!line_number) {
+      auto line_col = file_tok.location(file_location_cache);
+      if (line_col) {
+        line_number = line_col->first;
+      }
+    }
+
+    // Find the set of fragment tokens associated with this file token id.
+    auto [fragment_tokens_it, fragment_tokens_end] =
+        input.fragment_tokens.equal_range(file_tok_id);
+
+    // Easy case: no fragment overlaps with this token.
+    if (fragment_tokens_it == fragment_tokens_end) {
+      RenderFileToken(file_tok, line_number, 0u, output);
+      ++tok_index;
+      continue;
+    }
+
+    // Hard case: we need to render the fragments out, one after another.
+    auto old_line_number = line_number;
+    auto old_tok_index = tok_index;
+    for (; fragment_tokens_it != fragment_tokens_end; ++fragment_tokens_it) {
+      std::vector<Token> fragment_tokens = std::move(
+          fragment_tokens_it->second);
+
+      auto frag_index = static_cast<unsigned>(output.fragment_ids.size());
+      output.fragment_ids.push_back(FragmentIdFromTokens(fragment_tokens));
+      line_number = old_line_number;
+      tok_index = old_tok_index;
+
+      // Reverse these so that we can pop them off the end to consume them.
+      std::reverse(fragment_tokens.begin(), fragment_tokens.end());
+
+      // Output the file and fragment tokens.
+      for (; RenderFragmentToken(input.file_tokens, tok_index, fragment_tokens,
+                                 line_number, frag_index, output);
+           ++tok_index) {
+        if (result_promise.isCanceled()) {
+          return RPCErrorCode::Interrupted;
+        }
+      }
+    }
+  }
+
+  output.start_of_token.push_back(static_cast<int>(output.data.size()));
+
+  return output;
 }
 
 }  // namespace
@@ -161,18 +364,17 @@ void CreateIndexedTokenRangeData(
     IndexedTokenRangeDataResultPromise &result_promise, const Index &index,
     const FileLocationCache &file_location_cache, const Request &request) {
 
-  std::variant<TokenRangeData, RPCErrorCode> token_range_data_res;
+  TokenRangeDataOrError token_range_data_res;
   if (std::holds_alternative<SingleEntityRequest>(request)) {
-    const auto &entity_request = std::get<SingleEntityRequest>(request);
+    const SingleEntityRequest &entity_request =
+        std::get<SingleEntityRequest>(request);
     token_range_data_res = DownloadEntityTokens(
         result_promise, index, entity_request.download_request_type,
         entity_request.entity_id);
 
   } else {
-    const auto &entity_range_request = std::get<EntityRangeRequest>(request);
-    token_range_data_res = DownloadTokenRange(
-        result_promise, index, entity_range_request.start_entity_id,
-        entity_range_request.end_entity_id);
+    result_promise.addResult(RPCErrorCode::InvalidDownloadRequestType);
+    return;
   }
 
   if (std::holds_alternative<RPCErrorCode>(token_range_data_res)) {
@@ -183,167 +385,16 @@ void CreateIndexedTokenRangeData(
   TokenRangeData token_range_data =
       std::move(std::get<TokenRangeData>(token_range_data_res));
 
-  IndexedTokenRangeData output;
-  auto token_data_size =
-      static_cast<int>(token_range_data.file_tokens.data().size());
+  IndexedTokenRangeDataOrError indexed_tokens_res = IndexTokenRange(
+      result_promise, file_location_cache, std::move(token_range_data));
 
-  output.data.reserve(token_data_size);
-
-  auto num_file_tokens = token_range_data.file_tokens.size();
-  output.start_of_token.reserve(num_file_tokens + 1);
-  output.file_token_ids.reserve(num_file_tokens);
-  output.entity_ids_begin.reserve(num_file_tokens + 1);
-  output.token_category_list.reserve(num_file_tokens);
-
-  if (token_range_data.file_tokens) {
-    const auto &first_loc =
-        token_range_data.file_tokens.front().location(file_location_cache);
-    const auto &last_loc =
-        token_range_data.file_tokens.back().next_location(file_location_cache);
-
-    if (first_loc && last_loc) {
-      output.opt_line_number_info = IndexedTokenRangeData::LineNumberInfo{
-          first_loc->first, last_loc->first};
-    }
+  if (std::holds_alternative<RPCErrorCode>(indexed_tokens_res)) {
+    result_promise.addResult(std::get<RPCErrorCode>(token_range_data_res));
+    return;
   }
 
-  std::unordered_map<RawEntityId, std::vector<Token>> file_to_frag_toks;
-  std::vector<RawEntityId> tok_entities;
-
-  RawEntityId opt_last_file_tok_id = kInvalidEntityId;
-
-  for (const Token &file_tok : token_range_data.file_tokens) {
-    if (result_promise.isCanceled()) {
-      result_promise.addResult(RPCErrorCode::Interrupted);
-      return;
-    }
-
-    const RawEntityId file_tok_id = file_tok.id().Pack();
-
-    if (file_tok_id >= opt_last_file_tok_id) {
-      std::cerr << "Invalid precondition in " __FILE__ << ':' << __LINE__
-                << "\nLast file toke id was " << opt_last_file_tok_id
-                << " and current is " << file_tok_id << "\n\n";
-    }
-
-    opt_last_file_tok_id = file_tok_id;
-
-    // This token corresponds to the beginning of a fragment. We might have a
-    // one-to-many mapping of file tokens to fragment tokens. So when we come
-    // across the first token
-    auto fragment_tokens_it =
-        token_range_data.fragment_tokens.find(file_tok_id);
-    if (fragment_tokens_it != token_range_data.fragment_tokens.end()) {
-      const auto &parsed_token_list = fragment_tokens_it->second;
-
-      for (const TokenRange &parsed_toks : parsed_token_list) {
-        for (const Token &parsed_tok : parsed_toks) {
-          if (result_promise.isCanceled()) {
-            result_promise.addResult(RPCErrorCode::Interrupted);
-            return;
-          }
-
-          const auto &file_tok_of_parsed_tok = parsed_tok.file_token();
-
-          if (file_tok_of_parsed_tok) {
-            const RawEntityId id = file_tok_of_parsed_tok.id().Pack();
-            file_to_frag_toks[id].push_back(parsed_tok);
-          }
-        }
-      }
-    }
-
-    std::string_view utf8_tok = file_tok.data();
-    int num_utf8_bytes = static_cast<int>(utf8_tok.size());
-    int tok_start = static_cast<int>(output.data.size());
-
-    bool is_empty = true;
-    for (const QChar ch : QString::fromUtf8(utf8_tok.data(), num_utf8_bytes)) {
-      switch (ch.unicode()) {
-        case QChar::Tabulation:
-          is_empty = false;
-          output.data.append(QChar::Tabulation);
-          break;
-
-        case QChar::Space:
-        case QChar::Nbsp:
-          is_empty = false;
-          output.data.append(QChar::Space);
-          break;
-
-        case QChar::ParagraphSeparator:
-        case QChar::LineFeed:
-        case QChar::LineSeparator:
-          is_empty = false;
-          output.data.append(QChar::LineSeparator);
-          break;
-
-        case QChar::CarriageReturn: continue;
-        default:
-          output.data.append(ch);
-          is_empty = false;
-          break;
-      }
-    }
-
-    if (is_empty) {
-      continue;
-    }
-
-    TokenCategory category = file_tok.category();
-
-    tok_entities.clear();
-
-    // Try to find all declarations associated with this token. There could be
-    // multiple if there are multiple fragments overlapping this specific piece
-    // of code. However, just because there are multiple fragments, doesn't mean
-    // the related declarations are unique.
-    if (auto frag_tok_it = file_to_frag_toks.find(file_tok_id);
-        frag_tok_it != file_to_frag_toks.end()) {
-
-      for (const Token &frag_tok : frag_tok_it->second) {
-        if (result_promise.isCanceled()) {
-          result_promise.addResult(RPCErrorCode::Interrupted);
-          return;
-        }
-
-        // Try to make a better default classification of this token (for syntax
-        // coloring in the absence of declaration info).
-        category = frag_tok.category();
-
-        // If this token has a related entity id, then keep track of it.
-        auto related_entity_id = frag_tok.related_entity_id();
-        if (related_entity_id != kInvalidEntityId) {
-          tok_entities.push_back(related_entity_id.Pack());
-        }
-      }
-
-      file_to_frag_toks.erase(file_tok_id);  // Garbage collect.
-    }
-
-    // This is a template of sorts for this location.
-    output.file_token_ids.push_back(file_tok_id);
-    output.entity_ids_begin.push_back(
-        static_cast<std::uint64_t>(output.entity_ids.size()));
-
-    // Add in the related entity IDs.
-    if (!tok_entities.empty()) {
-      std::sort(tok_entities.begin(), tok_entities.end());
-      auto end = std::unique(tok_entities.begin(), tok_entities.end());
-      for (auto it = tok_entities.begin(); it != end; ++it) {
-        output.entity_ids.push_back(*it);
-      }
-    }
-
-    output.start_of_token.push_back(static_cast<int>(tok_start));
-    output.token_category_list.push_back(category);
-  }
-
-  output.start_of_token.push_back(static_cast<int>(output.data.size()));
-  output.entity_ids_begin.push_back(
-      static_cast<unsigned>(output.entity_ids.size()));
-
-  result_promise.addResult(std::move(output));
+  result_promise.addResult(
+      std::move(std::get<IndexedTokenRangeData>(indexed_tokens_res)));
 }
 
 }  // namespace mx::gui

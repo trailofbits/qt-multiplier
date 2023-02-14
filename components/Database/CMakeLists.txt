@@ -25,6 +25,7 @@ target_link_libraries("mx_database"
     "thirdparty_qt"
     "multiplier::mx-api"
     "mx_util"
+    "mx_assert"
 )
 
 target_include_directories("mx_database" PRIVATE
