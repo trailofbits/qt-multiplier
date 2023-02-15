@@ -90,6 +90,7 @@ void MainWindow::CreateFileTreeDock() {
 void MainWindow::CreateReferenceExplorerDock() {
   d->reference_explorer_model =
       IReferenceExplorerModel::Create(d->index, d->file_location_cache, this);
+
   auto reference_explorer =
       IReferenceExplorer::Create(d->reference_explorer_model, this);
 
@@ -160,15 +161,24 @@ void MainWindow::OpenTokenReferenceExplorer(const CodeModelIndex &index) {
     return;
   }
 
-  QuickReferenceExplorer quick_ref_explorer(
+  auto quick_ref_explorer = new QuickReferenceExplorer(
       d->index, d->file_location_cache,
-      static_cast<RawEntityId>(related_entity_id_var.toULongLong()));
+      static_cast<RawEntityId>(related_entity_id_var.toULongLong()), this);
 
   auto dialog_pos = QCursor::pos();
 
-  quick_ref_explorer.move(dialog_pos.x() - 20, dialog_pos.y() - 20);
-  quick_ref_explorer.resize(width() / 3, height() / 3);
-  quick_ref_explorer.exec();
+  quick_ref_explorer->move(dialog_pos.x() - 20, dialog_pos.y() - 20);
+
+  auto margin = fontMetrics().height();
+  auto max_width = margin + (width() / 3);
+  auto max_height = margin + (height() / 3);
+
+  auto size_hint = quick_ref_explorer->sizeHint();
+  auto width = std::min(max_width, size_hint.width());
+  auto height = std::min(max_height, size_hint.height());
+
+  quick_ref_explorer->resize(width, height);
+  quick_ref_explorer->show();
 }
 
 void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,

@@ -22,10 +22,9 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
 
  public:
   //! \copybrief IReferenceExplorerModel::AppendEntityObject
-  virtual bool
-  AppendEntityObject(RawEntityId entity_id, EntityObjectType type,
-                     const QModelIndex &parent,
-                     std::optional<std::size_t> opt_ttl) override;
+  virtual bool AppendEntityObject(RawEntityId entity_id, EntityObjectType type,
+                                  const QModelIndex &parent,
+                                  std::optional<std::size_t> opt_ttl) override;
 
   //! Destructor
   virtual ~ReferenceExplorerModel() override;
@@ -46,6 +45,20 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
 
   //! Returns the index data for the specified role
   virtual QVariant data(const QModelIndex &index, int role) const override;
+
+  //! Returns the specified model items as a mime data object
+  virtual QMimeData *mimeData(const QModelIndexList &indexes) const override;
+
+  //! Returns the specified model items as a mime data object
+  virtual bool dropMimeData(const QMimeData *data, Qt::DropAction action,
+                            int row, int column,
+                            const QModelIndex &parent) override;
+
+  //! Returns the item flags for the specified index
+  virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
+
+  //! Defines the mime types supported by this model
+  virtual QStringList mimeTypes() const override;
 
  private:
   struct PrivateData;
@@ -81,7 +94,6 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
       //! Multiplier-specific identifiers
       Identifiers identifiers;
 
-
       //! An optional name for this entity
       std::optional<std::string> opt_name;
 
@@ -111,6 +123,9 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
     std::unordered_map<mx::PackedFileId, std::filesystem::path> file_path_map;
   };
 
+  //! Initializes the node tree object
+  static void InitializeNodeTree(NodeTree &node_tree);
+
   //!
   static void ImportEntityById(NodeTree &node_tree, const IndexData &index_data,
                                const std::uint64_t &parent_node_id,
@@ -136,22 +151,29 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
                                std::optional<std::size_t> opt_ttl);
 
   //!
-  static void ImportMacroEntity(NodeTree &node_tree, const IndexData &index_data,
-                               const std::uint64_t &parent_node_id,
-                               mx::Macro entity,
-                               std::optional<std::size_t> opt_ttl);
+  static void
+  ImportMacroEntity(NodeTree &node_tree, const IndexData &index_data,
+                    const std::uint64_t &parent_node_id, mx::Macro entity,
+                    std::optional<std::size_t> opt_ttl);
 
   //!
-  static void ImportDesignatorEntity(
-      NodeTree &node_tree, const IndexData &index_data,
-      const std::uint64_t &parent_node_id, mx::Designator entity,
-      std::optional<std::size_t> opt_ttl);
+  static void ImportDesignatorEntity(NodeTree &node_tree,
+                                     const IndexData &index_data,
+                                     const std::uint64_t &parent_node_id,
+                                     mx::Designator entity,
+                                     std::optional<std::size_t> opt_ttl);
 
   //!
   static void ImportFileEntity(NodeTree &node_tree, const IndexData &index_data,
                                const std::uint64_t &parent_node_id,
                                mx::File entity,
                                std::optional<std::size_t> opt_ttl);
+
+  //! Serializes the given node
+  static void SerializeNode(QDataStream &stream, const NodeTree::Node &node);
+
+  //! Deserializes a node from the given data stream
+  static std::optional<NodeTree::Node> DeserializeNode(QDataStream &stream);
 
   friend class IReferenceExplorerModel;
 };
