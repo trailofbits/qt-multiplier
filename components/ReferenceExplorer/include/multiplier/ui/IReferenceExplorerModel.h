@@ -21,8 +21,11 @@ class IReferenceExplorerModel : public QAbstractItemModel {
  public:
   //! Additional item data roles for this model
   enum ItemDataRole {
-    //! Returns an Location object
+    //! Returns a Location object
     LocationRole = Qt::UserRole + 1,
+
+    //! Returns the internal node identifier
+    InternalIdentifierRole,
   };
 
   //! Location information, containing path + line and column
@@ -31,10 +34,10 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     std::string path;
 
     //! An optional line number
-    std::optional<std::size_t> opt_line{};
+    std::optional<std::uint64_t> opt_line{};
 
     //! An optional column number
-    std::optional<std::size_t> opt_column{};
+    std::optional<std::uint64_t> opt_column{};
   };
 
   //! Factory method
@@ -48,10 +51,10 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   };
 
   //! Adds a new entity object under the given parent
-  virtual bool AppendEntityObject(
-      RawEntityId entity_id, EntityObjectType type,
-      const QModelIndex &parent,
-      std::optional<std::size_t> opt_ttl = std::nullopt) = 0;
+  virtual bool
+  AppendEntityObject(RawEntityId entity_id, EntityObjectType type,
+                     const QModelIndex &parent,
+                     std::optional<std::size_t> opt_ttl = std::nullopt) = 0;
 
   //! Constructor
   IReferenceExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}

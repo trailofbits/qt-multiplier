@@ -8,18 +8,17 @@
 
 #include <multiplier/Index.h>
 
-#include <QDialog>
+#include <QWidget>
 
 namespace mx::gui {
 
-class QuickReferenceExplorer final : public QDialog {
+class QuickReferenceExplorer final : public QWidget {
   Q_OBJECT
 
  public:
   QuickReferenceExplorer(mx::Index index,
                          mx::FileLocationCache file_location_cache,
-                         RawEntityId entity_id,
-                         QWidget *parent = nullptr);
+                         RawEntityId entity_id, QWidget *parent = nullptr);
 
   virtual ~QuickReferenceExplorer() override;
 

@@ -20,7 +20,7 @@ struct QuickReferenceExplorer::PrivateData final {
 QuickReferenceExplorer::QuickReferenceExplorer(
     mx::Index index, mx::FileLocationCache file_location_cache,
     RawEntityId entity_id, QWidget *parent)
-    : QDialog(parent),
+    : QWidget(parent),
       d(new PrivateData) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
@@ -30,13 +30,15 @@ QuickReferenceExplorer::QuickReferenceExplorer(
 QuickReferenceExplorer::~QuickReferenceExplorer() {}
 
 void QuickReferenceExplorer::leaveEvent(QEvent *) {
-  accept();
+  close();
 }
 
 void QuickReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
     RawEntityId entity_id) {
+
   setContentsMargins(0, 0, 0, 0);
+  setAttribute(Qt::WA_DeleteOnClose);
 
   d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
   d->model->AppendEntityObject(

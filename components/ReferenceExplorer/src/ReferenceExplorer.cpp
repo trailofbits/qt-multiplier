@@ -38,11 +38,18 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setSortingEnabled(true);
   d->tree_view->setAlternatingRowColors(true);
   d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);
+  d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
+
+  d->tree_view->setDragEnabled(true);
+  d->tree_view->setAcceptDrops(true);
+  d->tree_view->setDropIndicatorShown(true);
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->tree_view);
   setLayout(layout);
+
+  setAcceptDrops(true);
 }
 
 void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
