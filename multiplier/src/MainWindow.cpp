@@ -20,6 +20,9 @@
 #include <QMenuBar>
 #include <QSortFilterProxyModel>
 #include <QCursor>
+#include <QHBoxLayout>
+
+#include <iostream>
 
 namespace mx::gui {
 
@@ -37,10 +40,12 @@ struct MainWindow::PrivateData final {
   mx::FileLocationCache file_location_cache;
 
   IIndexView *index_view{nullptr};
-  ICodeModel *code_model{nullptr};
+  ICodeModel *main_code_model{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
   IReferenceExplorerModel *reference_explorer_model{nullptr};
+  ICodeModel *ref_explorer_code_model{nullptr};
+  ICodeView *ref_explorer_code_view{nullptr};
   IReferenceExplorer *reference_explorer{nullptr};
 
   QMenu *view_menu{nullptr};
@@ -94,6 +99,22 @@ void MainWindow::CreateReferenceExplorerDock() {
   auto reference_explorer =
       IReferenceExplorer::Create(d->reference_explorer_model, this);
 
+  d->ref_explorer_code_model =
+      ICodeModel::Create(d->file_location_cache, d->index, this);
+
+  d->ref_explorer_code_view = ICodeView::Create(d->ref_explorer_code_model);
+  d->ref_explorer_code_view->SetWordWrapping(false);
+
+  connect(reference_explorer, &IReferenceExplorer::ItemClicked, this,
+          &MainWindow::OnReferenceExplorerItemClicked);
+
+  auto layout = new QHBoxLayout();
+  layout->addWidget(reference_explorer);
+  layout->addWidget(d->ref_explorer_code_view);
+
+  auto ref_explorer_container = new QWidget();
+  ref_explorer_container->setLayout(layout);
+
   auto reference_explorer_dock =
       new QDockWidget(tr("Reference Explorer"), this);
 
@@ -101,7 +122,7 @@ void MainWindow::CreateReferenceExplorerDock() {
       Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea |
       Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
 
-  reference_explorer_dock->setWidget(reference_explorer);
+  reference_explorer_dock->setWidget(ref_explorer_container);
   addDockWidget(Qt::BottomDockWidgetArea, reference_explorer_dock);
 }
 
@@ -109,8 +130,9 @@ void MainWindow::CreateCodeView() {
   auto tab_widget = new QTabWidget();
   setCentralWidget(tab_widget);
 
-  d->code_model = ICodeModel::Create(d->file_location_cache, d->index, this);
-  auto code_view = ICodeView::Create(d->code_model);
+  d->main_code_model =
+      ICodeModel::Create(d->file_location_cache, d->index, this);
+  auto code_view = ICodeView::Create(d->main_code_model);
   code_view->SetWordWrapping(false);
 
   tab_widget->addTab(code_view, tr("Empty"));
@@ -131,7 +153,6 @@ void MainWindow::CreateCodeView() {
   d->code_view_context_menu.menu = new QMenu(tr("Token menu"));
 
   // TODO(alessandro): Only show this when there is a related entity.
-
   connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
           &MainWindow::OnCodeViewContextMenuActionTriggered);
 
@@ -155,7 +176,7 @@ void MainWindow::OpenTokenContextMenu(const CodeModelIndex &index) {
 
 void MainWindow::OpenTokenReferenceExplorer(const CodeModelIndex &index) {
   auto related_entity_id_var =
-      d->code_model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+      d->main_code_model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     return;
@@ -192,7 +213,7 @@ void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
   auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
   tab_widget.setTabText(0, QString::fromStdString(file_name));
 
-  d->code_model->SetFile(file_id);
+  d->main_code_model->SetFile(file_id);
 }
 
 void MainWindow::OnTokenClicked(const CodeModelIndex &index,
@@ -224,6 +245,31 @@ void MainWindow::OnToggleWordWrap(bool checked) {
   auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
   auto &code_view = *static_cast<ICodeView *>(tab_widget.widget(0));
   code_view.SetWordWrapping(checked);
+}
+
+void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
+  auto file_raw_entity_id_var = index.data(IReferenceExplorerModel::FileIdRole);
+  if (!file_raw_entity_id_var.isValid()) {
+    return;
+  }
+
+  auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
+
+  auto opt_packed_file_id = EntityId(file_raw_entity_id).Extract<FileId>();
+  if (!opt_packed_file_id.has_value()) {
+    return;
+  }
+
+  const auto &packed_file_id = opt_packed_file_id.value();
+  d->ref_explorer_code_model->SetFile(packed_file_id);
+
+  auto entity_id_var = index.data(IReferenceExplorerModel::EntityIdRole);
+  if (!entity_id_var.isValid()) {
+    return;
+  }
+
+  auto raw_entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  d->ref_explorer_code_view->ScrollToEntityId(raw_entity_id);
 }
 
 }  // namespace mx::gui

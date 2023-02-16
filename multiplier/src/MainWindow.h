@@ -44,6 +44,7 @@ class MainWindow final : public QMainWindow {
 
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
+  void OnReferenceExplorerItemClicked(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

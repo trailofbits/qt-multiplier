@@ -26,6 +26,12 @@ class IReferenceExplorerModel : public QAbstractItemModel {
 
     //! Returns the internal node identifier
     InternalIdentifierRole,
+
+    //! Returns the file id as a RawEntityId value
+    FileIdRole,
+
+    //! Returns the entity id as a RawEntityId value
+    EntityIdRole,
   };
 
   //! Location information, containing path + line and column
