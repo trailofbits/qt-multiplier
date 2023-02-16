@@ -34,6 +34,10 @@ class IReferenceExplorer : public QWidget {
 
   //! Disabled copy assignment operator
   IReferenceExplorer &operator=(const IReferenceExplorer &) = delete;
+
+ signals:
+  //! Emitted when an item has been clicked
+  void ItemClicked(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

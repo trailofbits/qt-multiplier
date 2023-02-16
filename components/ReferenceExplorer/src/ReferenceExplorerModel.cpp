@@ -181,9 +181,33 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
       value = tr("Unnamed: ") + QString::number(node.identifiers.entity_id);
     }
 
-  } else if (role == IReferenceExplorerModel::LocationRole &&
-             node.opt_location.has_value()) {
-    value.setValue(node.opt_location.value());
+  } else if (role == Qt::ToolTipRole) {
+    auto buffer =
+        tr("Entity ID: ") + QString::number(node.identifiers.entity_id) + "\n";
+    buffer +=
+        tr("Fragment ID: ") + QString::number(node.identifiers.fragment_id);
+
+    if (node.identifiers.opt_file_id.has_value()) {
+      buffer += "\n";
+
+      buffer += tr("File ID: ") +
+                QString::number(node.identifiers.opt_file_id.value());
+    }
+
+    value = std::move(buffer);
+
+  } else if (role == IReferenceExplorerModel::FileIdRole) {
+    if (node.identifiers.opt_file_id.has_value()) {
+      value.setValue(node.identifiers.opt_file_id.value());
+    }
+
+  } else if (role == IReferenceExplorerModel::EntityIdRole) {
+    value = node.identifiers.entity_id;
+
+  } else if (role == IReferenceExplorerModel::LocationRole) {
+    if (node.opt_location.has_value()) {
+      value.setValue(node.opt_location.value());
+    }
 
   } else if (role == IReferenceExplorerModel::InternalIdentifierRole) {
     value.setValue(node_id);

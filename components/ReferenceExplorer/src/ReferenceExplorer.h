@@ -37,6 +37,9 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Used to expand and resize the items after a model reset
   void OnModelReset();
 
+  //! Called when the user clicks on one item
+  void OnItemClick(const QModelIndex &index);
+
   friend class IReferenceExplorer;
 };
 

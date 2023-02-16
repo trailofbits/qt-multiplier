@@ -40,6 +40,9 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);
   d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
 
+  connect(d->tree_view, &QTreeView::clicked, this,
+          &ReferenceExplorer::OnItemClick);
+
   d->tree_view->setDragEnabled(true);
   d->tree_view->setAcceptDrops(true);
   d->tree_view->setDropIndicatorShown(true);
@@ -65,6 +68,10 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
 void ReferenceExplorer::OnModelReset() {
   d->tree_view->expandRecursively(QModelIndex());
   d->tree_view->resizeColumnToContents(0);
+}
+
+void ReferenceExplorer::OnItemClick(const QModelIndex &index) {
+  emit ItemClicked(index);
 }
 
 }  // namespace mx::gui
