@@ -63,16 +63,12 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   Create(mx::Index index, mx::FileLocationCache file_location_cache,
          QObject *parent = nullptr);
 
-  //! Entity object type, see IReferenceExplorerModel::AppendEntityObject
-  enum class EntityObjectType {
-    CallHierarchy,
-  };
-
   //! Adds a new entity object under the given parent
-  virtual bool
-  AppendEntityObject(RawEntityId entity_id, EntityObjectType type,
-                     const QModelIndex &parent,
-                     std::optional<std::size_t> opt_ttl = std::nullopt) = 0;
+  virtual bool AppendEntityObject(RawEntityId entity_id,
+                                  const QModelIndex &parent) = 0;
+
+  //! Expands the specified entity
+  virtual void ExpandEntity(const QModelIndex &index) = 0;
 
   //! Constructor
   IReferenceExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}

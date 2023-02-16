@@ -7,6 +7,7 @@
 */
 
 #include "ReferenceExplorerModel.h"
+#include "NodeImporter.h"
 
 #include <multiplier/Entities/DefineMacroDirective.h>
 #include <multiplier/Entities/FieldDecl.h>
@@ -29,28 +30,52 @@ const QString kMimeTypeName{"application/mx-reference-explorer"};
 }
 
 struct ReferenceExplorerModel::PrivateData final {
-  IndexData index_data;
+  PrivateData(mx::Index index_, mx::FileLocationCache file_location_cache_)
+      : index(index_),
+        file_location_cache(file_location_cache_),
+        node_importer(index, file_location_cache, node_tree) {}
+
+  mx::Index index;
+  mx::FileLocationCache file_location_cache;
   NodeTree node_tree;
+  NodeImporter node_importer;
 };
 
-bool ReferenceExplorerModel::AppendEntityObject(
-    RawEntityId entity_id, EntityObjectType type, const QModelIndex &parent,
-    std::optional<std::size_t> opt_ttl) {
-
-  static_cast<void>(type);
+bool ReferenceExplorerModel::AppendEntityObject(RawEntityId entity_id,
+                                                const QModelIndex &parent) {
 
   std::uint64_t parent_node_id{};
   if (parent.isValid()) {
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
 
-  emit beginResetModel();
+  auto succeeded = d->node_importer.ImportEntity(
+      entity_id, NodeTree::Node::ImportMode::CallHierarchy, parent_node_id, 2);
 
-  ImportEntityById(d->node_tree, d->index_data, parent_node_id, entity_id,
-                   opt_ttl);
+  if (succeeded) {
+    auto parent_node = d->node_tree.node_map.at(parent_node_id);
+    auto row_number =
+        static_cast<int>(parent_node.child_node_id_list.size() - 1);
 
-  emit endResetModel();
+    emit beginInsertRows(parent, row_number, row_number);
+    emit endInsertRows();
+  }
+
   return true;
+}
+
+void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
+  if (!index.isValid()) {
+    return;
+  }
+
+  const auto &node_id = static_cast<std::uint64_t>(index.internalId());
+
+  auto succeeded = d->node_importer.ExpandEntity(node_id, 2);
+  Assert(succeeded, "Node expansion has failed");
+
+  emit beginResetModel();
+  emit endResetModel();
 }
 
 ReferenceExplorerModel::~ReferenceExplorerModel() {}
@@ -185,8 +210,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     }
 
   } else if (role == Qt::ToolTipRole) {
-    auto buffer =
-        tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
+    auto buffer = tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
 
     if (std::optional<FragmentId> frag_id = FragmentId::From(node.entity_id)) {
       buffer += tr("Fragment ID: ") +
@@ -195,8 +219,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
     if (node.opt_location.has_value()) {
       buffer += "\n";
-      buffer += tr("File ID: ") +
-                QString::number(node.opt_location->file_id);
+      buffer += tr("File ID: ") + QString::number(node.opt_location->file_id);
     }
 
     value = std::move(buffer);
@@ -242,28 +265,55 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
     return nullptr;
   }
 
+  const auto &root_index = indexes[0];
+
+  QModelIndexList index_queue;
+  if (root_index.isValid()) {
+    index_queue << root_index;
+
+  } else {
+    auto row_count = rowCount(QModelIndex());
+
+    for (int i = 0; i < row_count; ++i) {
+      auto child_index = index(i, 0, QModelIndex());
+      index_queue << child_index;
+    }
+  }
+
   std::vector<std::uint64_t> next_node_id_queue;
 
-  for (const auto &index : indexes) {
+  for (const auto &index : index_queue) {
     if (!index.isValid()) {
       continue;
     }
 
     auto node_id_var =
         index.data(IReferenceExplorerModel::InternalIdentifierRole);
-    if (!node_id_var.isValid()) {
-      continue;
-    }
+
+    Assert(node_id_var.isValid(), "Invalid InternalIdentifierRole value");
 
     auto node_id = static_cast<std::uint64_t>(node_id_var.toULongLong());
-
     next_node_id_queue.push_back(node_id);
+  }
+
+  if (next_node_id_queue.empty()) {
+    return nullptr;
   }
 
   std::unordered_set<std::uint64_t> visited_entity_id_set;
 
   QByteArray encoded_data;
   QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
+
+  std::uint64_t instance_identifier{};
+
+  {
+    auto this_pointer = this;
+    std::memcpy(&instance_identifier, &this_pointer,
+                sizeof(instance_identifier));
+  }
+
+  encoded_data_stream << instance_identifier;
 
   while (!next_node_id_queue.empty()) {
     auto node_id_queue = std::move(next_node_id_queue);
@@ -308,6 +358,21 @@ bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
   auto encoded_data = data->data(kMimeTypeName);
   QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
 
+  std::uint64_t instance_identifier{};
+
+  {
+    auto this_pointer = this;
+    std::memcpy(&instance_identifier, &this_pointer,
+                sizeof(instance_identifier));
+  }
+
+  std::uint64_t incoming_instance_identifier{};
+  encoded_data_stream >> incoming_instance_identifier;
+
+  if (instance_identifier == incoming_instance_identifier) {
+    return false;
+  }
+
   std::vector<NodeTree::Node> incoming_node_list;
 
   while (!encoded_data_stream.atEnd()) {
@@ -338,7 +403,6 @@ bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
   auto first_node{true};
 
   for (auto &node : incoming_node_list) {
-
     Assert(node_id_mapping.count(node.node_id) == 1,
            "The generated node id is not valid");
 
@@ -367,8 +431,13 @@ bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
 }
 
 Qt::ItemFlags ReferenceExplorerModel::flags(const QModelIndex &index) const {
-  return QAbstractItemModel::flags(index) | Qt::ItemIsDragEnabled |
-         Qt::ItemIsDropEnabled;
+  auto item_flags{QAbstractItemModel::flags(index) | Qt::ItemIsDropEnabled};
+
+  if (index.isValid()) {
+    item_flags |= Qt::ItemIsDragEnabled;
+  }
+
+  return item_flags;
 }
 
 QStringList ReferenceExplorerModel::mimeTypes() const {
@@ -378,358 +447,7 @@ QStringList ReferenceExplorerModel::mimeTypes() const {
 ReferenceExplorerModel::ReferenceExplorerModel(
     mx::Index index, mx::FileLocationCache file_location_cache, QObject *parent)
     : IReferenceExplorerModel(parent),
-      d(new PrivateData) {
-
-  d->index_data.index = index;
-  d->index_data.file_location_cache = file_location_cache;
-
-  for (auto [path, id] : index.file_paths()) {
-    d->index_data.file_path_map.emplace(id, std::move(path));
-  }
-
-  InitializeNodeTree(d->node_tree);
-}
-
-void ReferenceExplorerModel::InitializeNodeTree(NodeTree &node_tree) {
-  node_tree.node_map.insert({0, NodeTree::Node{}});
-}
-
-void ReferenceExplorerModel::ImportEntityById(
-    NodeTree &node_tree, const IndexData &index_data,
-    std::uint64_t parent_node_id, RawEntityId entity_id,
-    std::optional<std::size_t> opt_ttl) {
-
-  if (opt_ttl.has_value()) {
-    auto ttl = opt_ttl.value();
-    if (ttl == 0) {
-      return;
-    }
-
-    opt_ttl = ttl - 1;
-  }
-
-  auto entity_var = index_data.index.entity(entity_id);
-  bool succeeded{false};
-
-  if (std::holds_alternative<Decl>(entity_var)) {
-    const auto &entity = std::get<Decl>(entity_var);
-    ImportDeclEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
-
-    succeeded = true;
-
-  } else if (std::holds_alternative<Stmt>(entity_var)) {
-    const auto &entity = std::get<Stmt>(entity_var);
-    ImportStmtEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
-
-    succeeded = true;
-
-  } else if (std::holds_alternative<Macro>(entity_var)) {
-    const auto &entity = std::get<Macro>(entity_var);
-    ImportMacroEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
-
-    succeeded = true;
-
-  } else if (std::holds_alternative<Attr>(entity_var)) {
-    const auto &entity = std::get<Attr>(entity_var);
-    ImportAttrEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
-
-    succeeded = true;
-
-  } else if (std::holds_alternative<Designator>(entity_var)) {
-    const auto &entity = std::get<Designator>(entity_var);
-    ImportDesignatorEntity(node_tree, index_data, parent_node_id, entity,
-                           opt_ttl);
-
-    succeeded = true;
-
-  } else if (std::holds_alternative<File>(entity_var)) {
-    const auto &entity = std::get<File>(entity_var);
-    ImportFileEntity(node_tree, index_data, parent_node_id, entity, opt_ttl);
-
-    succeeded = true;
-
-    // TODO(pag): Type, CXXBaseSpecifier, CXXTemplateArgument,
-    //            CXXTemplateParameterList.
-
-  } else if (std::holds_alternative<Token>(entity_var)) {
-    const auto &entity = std::get<Token>(entity_var);
-
-    auto statement_list = mx::Stmt::containing(entity);
-    auto statement_list_it = statement_list.begin();
-
-    auto declaration_list = mx::Decl::containing(entity);
-    auto declaration_list_it = declaration_list.begin();
-
-    if (statement_list_it != statement_list.end()) {
-      ImportStmtEntity(node_tree, index_data, parent_node_id,
-                       *statement_list_it, opt_ttl);
-      succeeded = true;
-
-    } else if (declaration_list_it != declaration_list.end()) {
-      ImportDeclEntity(node_tree, index_data, parent_node_id,
-                       *declaration_list_it, opt_ttl);
-      succeeded = true;
-    }
-  }
-
-  Assert(succeeded, "Failed to import the token entity");
-}
-
-void ReferenceExplorerModel::ImportDeclEntity(
-    NodeTree &node_tree, const IndexData &index_data,
-    const std::uint64_t &parent_node_id, mx::Decl decl_entity,
-    std::optional<std::size_t> opt_ttl) {
-
-  if (node_tree.node_map.count(0) == 0) {
-    node_tree.node_map.insert({0, NodeTree::Node{}});
-  }
-
-  auto decl_entity_id = decl_entity.id().Pack();
-  if (node_tree.visited_entity_id_set.count(decl_entity_id) > 0) {
-    return;
-  }
-
-  node_tree.visited_entity_id_set.insert(decl_entity_id);
-
-  if (opt_ttl.has_value()) {
-    auto ttl = opt_ttl.value();
-    if (ttl == 0) {
-      return;
-    }
-
-    opt_ttl = ttl - 1;
-  }
-
-  auto current_node_id = node_tree.node_map.size();
-
-  NodeTree::Node current_node;
-  current_node.node_id = current_node_id;
-  current_node.parent_node_id = parent_node_id;
-
-  if (auto named = mx::NamedDecl::from(decl_entity)) {
-    current_node.opt_name = named->name();
-  }
-
-  current_node.entity_id = decl_entity_id;
-
-  if (auto file = mx::File::containing(decl_entity)) {
-    Location location;
-    location.file_id = file->id().Pack();
-
-    auto file_path_map_it = index_data.file_path_map.find(file->id());
-    Assert(file_path_map_it != index_data.file_path_map.end(),
-           "Invalid path id");
-
-    location.path = file_path_map_it->second;
-    for (Token tok : decl_entity.tokens().file_tokens()) {
-      if (auto line_col = tok.location(index_data.file_location_cache)) {
-        location.line = line_col->first;
-        location.column = line_col->second;
-        break;
-      }
-    }
-
-    current_node.opt_location = std::move(location);
-  }
-
-  auto &parent_node = node_tree.node_map.at(parent_node_id);
-  parent_node.child_node_id_list.push_back(current_node_id);
-
-  node_tree.node_map.insert({current_node_id, std::move(current_node)});
-
-  auto declaration_list = mx::Decl::containing(decl_entity);
-  auto declaration_list_it = declaration_list.begin();
-  if (declaration_list_it != declaration_list.end()) {
-    ImportDeclEntity(node_tree, index_data, current_node_id,
-                     *declaration_list_it, opt_ttl);
-
-  } else {
-    for (mx::Reference ref : decl_entity.references()) {
-      if (auto ref_stmt = ref.as_statement()) {
-        ImportStmtEntity(node_tree, index_data, current_node_id, *ref_stmt,
-                         opt_ttl);
-
-      } else if (auto ref_decl = ref.as_declaration()) {
-        ImportDeclEntity(node_tree, index_data, current_node_id, *ref_decl,
-                         opt_ttl);
-      }
-    }
-  }
-}
-
-void ReferenceExplorerModel::ImportStmtEntity(
-    NodeTree &node_tree, const IndexData &index_data,
-    const std::uint64_t &parent_node_id, mx::Stmt stmt_entity,
-    std::optional<std::size_t> opt_ttl) {
-
-  if (opt_ttl.has_value()) {
-    auto ttl = opt_ttl.value();
-    if (ttl == 0) {
-      return;
-    }
-
-    opt_ttl = ttl - 1;
-  }
-
-  auto declaration_list = mx::Decl::containing(stmt_entity);
-
-  auto declaration_list_it = declaration_list.begin();
-  Assert(declaration_list_it != declaration_list.end(),
-         "Failed to import the statement entity");
-
-  ImportDeclEntity(node_tree, index_data, parent_node_id, *declaration_list_it,
-                   opt_ttl);
-}
-
-void ReferenceExplorerModel::ImportAttrEntity(
-    NodeTree &node_tree, const IndexData &index_data,
-    const std::uint64_t &parent_node_id, mx::Attr entity,
-    std::optional<std::size_t> opt_ttl) {
-
-  if (opt_ttl.has_value()) {
-    auto ttl = opt_ttl.value();
-    if (ttl == 0) {
-      return;
-    }
-
-    opt_ttl = ttl - 1;
-  }
-
-  for (Token tok : entity.tokens()) {
-    auto declaration_list = mx::Decl::containing(tok);
-    auto declaration_list_it = declaration_list.begin();
-    if (declaration_list_it == declaration_list.end()) {
-      continue;
-    }
-
-    ImportDeclEntity(node_tree, index_data, parent_node_id,
-                     *declaration_list_it, opt_ttl);
-    return;
-  }
-
-  Assert(false, "Failed to import the attribute entity");
-}
-
-void ReferenceExplorerModel::ImportDesignatorEntity(
-    NodeTree &node_tree, const IndexData &index_data,
-    const std::uint64_t &parent_node_id, mx::Designator entity,
-    std::optional<std::size_t> opt_ttl) {
-
-  if (opt_ttl.has_value()) {
-    auto ttl = opt_ttl.value();
-    if (ttl == 0) {
-      return;
-    }
-
-    opt_ttl = ttl - 1;
-  }
-
-  for (Token tok : entity.tokens()) {
-    auto declaration_list = mx::Decl::containing(tok);
-    auto declaration_list_it = declaration_list.begin();
-    if (declaration_list_it == declaration_list.end()) {
-      continue;
-    }
-
-    ImportDeclEntity(node_tree, index_data, parent_node_id,
-                     *declaration_list_it, opt_ttl);
-    return;
-  }
-
-  Assert(false, "Failed to import the designator entity");
-}
-
-void ReferenceExplorerModel::ImportMacroEntity(
-    NodeTree &node_tree, const IndexData &index_data,
-    const std::uint64_t &parent_node_id,
-    mx::Macro entity, std::optional<std::size_t> opt_ttl) {
-
-  if (node_tree.node_map.count(0) == 0) {
-    node_tree.node_map.insert({0, NodeTree::Node{}});
-  }
-
-  auto entity_id = entity.id().Pack();
-  if (node_tree.visited_entity_id_set.count(entity_id) > 0) {
-    return;
-  }
-
-  node_tree.visited_entity_id_set.insert(entity_id);
-
-  if (opt_ttl.has_value()) {
-    auto ttl = opt_ttl.value();
-    if (ttl == 0) {
-      return;
-    }
-
-    opt_ttl = ttl - 1;
-  }
-
-  auto current_node_id = node_tree.node_map.size();
-
-  NodeTree::Node current_node;
-  current_node.node_id = current_node_id;
-  current_node.parent_node_id = parent_node_id;
-  current_node.entity_id = entity_id;
-
-  for (Token tok : entity.tokens_covering_use()) {
-    auto file_tok = tok.file_token();
-    if (!file_tok) {
-      continue;
-    }
-
-    auto file = mx::File::containing(entity);
-    if (!file) {
-      continue;
-    }
-
-    auto line_col = file_tok.location(index_data.file_location_cache);
-    if (!line_col) {
-      continue;
-    }
-
-    Location location;
-    location.file_id = file->id().Pack();
-    location.line = line_col->first;
-    location.column = line_col->second;
-
-    auto file_path_map_it = index_data.file_path_map.find(file->id());
-    Assert(file_path_map_it != index_data.file_path_map.end(),
-           "Invalid path id");
-
-    location.path = file_path_map_it->second;
-    current_node.opt_location = std::move(location);
-    break;
-  }
-
-  if (auto named = mx::DefineMacroDirective::from(entity)) {
-    current_node.opt_name = named->name().data();
-
-    // Find uses of this macro.
-
-  } else if (auto inc = mx::IncludeLikeMacroDirective::from(entity)) {
-    current_node.opt_name = "<invalid file>";
-    if (auto file = inc->included_file()) {
-      // TODO(pag,alessandro): File path.
-    }
-
-    // Show the included file.
-
-  } else {
-    return;
-  }
-}
-
-void ReferenceExplorerModel::ImportFileEntity(
-    NodeTree &node_tree, const IndexData &index_data,
-    const std::uint64_t &parent_node_id, mx::File entity,
-    std::optional<std::size_t> opt_ttl) {
-  // TODO(pag): Show all includes that include this file.
-  (void) node_tree;
-  (void) index_data;
-  (void) parent_node_id;
-  (void) entity;
-  (void) opt_ttl;
-}
+      d(new PrivateData(index, file_location_cache)) {}
 
 void ReferenceExplorerModel::SerializeNode(QDataStream &stream,
                                            const NodeTree::Node &node) {
@@ -767,7 +485,7 @@ void ReferenceExplorerModel::SerializeNode(QDataStream &stream,
   }
 }
 
-std::optional<ReferenceExplorerModel::NodeTree::Node>
+std::optional<NodeTree::Node>
 ReferenceExplorerModel::DeserializeNode(QDataStream &stream) {
   try {
     NodeTree::Node node;

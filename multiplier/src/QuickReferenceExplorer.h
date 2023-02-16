@@ -9,6 +9,7 @@
 #include <multiplier/Index.h>
 
 #include <QWidget>
+#include <QMimeData>
 
 namespace mx::gui {
 
@@ -25,8 +26,12 @@ class QuickReferenceExplorer final : public QWidget {
   QuickReferenceExplorer(const QuickReferenceExplorer &) = delete;
   QuickReferenceExplorer &operator=(const QuickReferenceExplorer &) = delete;
 
+ signals:
+  void SaveAll(QMimeData *mime_data);
+
  protected:
-  virtual void leaveEvent(QEvent *event) override;
+  virtual void keyPressEvent(QKeyEvent *event) override;
+  virtual void resizeEvent(QResizeEvent *event) override;
 
  private:
   struct PrivateData;
@@ -35,6 +40,12 @@ class QuickReferenceExplorer final : public QWidget {
   void InitializeWidgets(mx::Index index,
                          mx::FileLocationCache file_location_cache,
                          RawEntityId entity_id);
+
+  void UpdateSaveAllButtonPosition();
+
+ private slots:
+  void OnApplicationStateChange(Qt::ApplicationState state);
+  void OnSaveAllButtonPress();
 };
 
 }  // namespace mx::gui

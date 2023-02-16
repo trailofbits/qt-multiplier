@@ -45,6 +45,7 @@ struct MainWindow::PrivateData final {
   ICodeModel *ref_explorer_code_model{nullptr};
   ICodeView *ref_explorer_code_view{nullptr};
   IReferenceExplorer *reference_explorer{nullptr};
+  std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
 
   QMenu *view_menu{nullptr};
 };
@@ -178,24 +179,36 @@ void MainWindow::OpenTokenReferenceExplorer(const CodeModelIndex &index) {
     return;
   }
 
-  auto quick_ref_explorer = new QuickReferenceExplorer(
+  CloseTokenReferenceExplorer();
+
+  d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache,
       qvariant_cast<RawEntityId>(related_entity_id_var), this);
 
+  connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
+          &MainWindow::OnQuickRefExplorerSaveAllClicked);
+
   auto dialog_pos = QCursor::pos();
 
-  quick_ref_explorer->move(dialog_pos.x() - 20, dialog_pos.y() - 20);
+  d->quick_ref_explorer->move(dialog_pos.x() - 20, dialog_pos.y() - 20);
 
   auto margin = fontMetrics().height();
   auto max_width = margin + (width() / 3);
   auto max_height = margin + (height() / 3);
 
-  auto size_hint = quick_ref_explorer->sizeHint();
+  auto size_hint = d->quick_ref_explorer->sizeHint();
   auto width = std::min(max_width, size_hint.width());
   auto height = std::min(max_height, size_hint.height());
 
-  quick_ref_explorer->resize(width, height);
-  quick_ref_explorer->show();
+  d->quick_ref_explorer->resize(width, height);
+  d->quick_ref_explorer->show();
+}
+
+void MainWindow::CloseTokenReferenceExplorer() {
+  if (d->quick_ref_explorer != nullptr) {
+    d->quick_ref_explorer->close();
+    d->quick_ref_explorer.reset();
+  }
 }
 
 void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
@@ -210,6 +223,7 @@ void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
   tab_widget.setTabText(0, QString::fromStdString(file_name));
 
   d->main_code_model->SetEntity(file_id.Pack());
+  CloseTokenReferenceExplorer();
 }
 
 void MainWindow::OnTokenClicked(const CodeModelIndex &index,
@@ -260,6 +274,11 @@ void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
 
   auto raw_entity_id = qvariant_cast<RawEntityId>(entity_id_var);
   d->ref_explorer_code_view->ScrollToEntityId(raw_entity_id);
+}
+
+void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data) {
+  d->reference_explorer_model->dropMimeData(mime_data, Qt::CopyAction, 0, 0,
+                                            QModelIndex());
 }
 
 }  // namespace mx::gui
