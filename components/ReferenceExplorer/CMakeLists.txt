@@ -21,6 +21,11 @@ add_library("mx_referenceexplorer"
 
   src/ReferenceExplorerItemDelegate.h
   src/ReferenceExplorerItemDelegate.cpp
+
+  src/Types.h
+
+  src/NodeImporter.h
+  src/NodeImporter.cpp
 )
 
 target_link_libraries("mx_referenceexplorer"

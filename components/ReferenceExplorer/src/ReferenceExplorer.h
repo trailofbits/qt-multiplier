@@ -33,12 +33,24 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Installs the given model
   void InstallModel(IReferenceExplorerModel *model);
 
+  //! Called when copying the details of a reference explorer item
+  void CopyRefExplorerItemDetails(const QModelIndex &index);
+
+  //! Called when attempt to expand a reference explorer item
+  void ExpandRefExplorerItem(const QModelIndex &index);
+
  private slots:
   //! Used to expand and resize the items after a model reset
   void OnModelReset();
 
-  //! Called when the user clicks on one item
-  void OnItemClick(const QModelIndex &index);
+  //! Called when the user left-clicks on one item
+  void OnItemLeftClick(const QModelIndex &index);
+
+  //! Custom context menu for the tree view items
+  void OnOpenItemContextMenu(const QPoint &point);
+
+  //! Called when an action in the context menu is triggered
+  void OnContextMenuActionTriggered(QAction *action);
 
   friend class IReferenceExplorer;
 };

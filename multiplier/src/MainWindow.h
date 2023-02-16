@@ -9,6 +9,7 @@
 #include <multiplier/ui/ICodeModel.h>
 
 #include <QMainWindow>
+#include <QMimeData>
 
 namespace mx::gui {
 
@@ -32,6 +33,7 @@ class MainWindow final : public QMainWindow {
   void CreateCodeView();
   void OpenTokenContextMenu(const CodeModelIndex &index);
   void OpenTokenReferenceExplorer(const CodeModelIndex &index);
+  void CloseTokenReferenceExplorer();
 
  private slots:
   void OnIndexViewFileClicked(const PackedFileId &file_id,
@@ -45,6 +47,7 @@ class MainWindow final : public QMainWindow {
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
   void OnReferenceExplorerItemClicked(const QModelIndex &index);
+  void OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data);
 };
 
 }  // namespace mx::gui

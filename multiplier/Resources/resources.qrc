@@ -2,4 +2,8 @@
     <qresource prefix="/Icons">
         <file alias="Multiplier">Icons/Multiplier.icns</file>
     </qresource>
+
+    <qresource prefix="/Icons/QuickReferenceExplorer">
+        <file alias="SaveAll">Icons/quick_ref_explorer_save_all.png</file>
+    </qresource>
 </RCC>
