@@ -20,9 +20,7 @@
 #include <QMenuBar>
 #include <QSortFilterProxyModel>
 #include <QCursor>
-#include <QHBoxLayout>
-
-#include <iostream>
+#include <QSplitter>
 
 namespace mx::gui {
 
@@ -108,12 +106,10 @@ void MainWindow::CreateReferenceExplorerDock() {
   connect(reference_explorer, &IReferenceExplorer::ItemClicked, this,
           &MainWindow::OnReferenceExplorerItemClicked);
 
-  auto layout = new QHBoxLayout();
-  layout->addWidget(reference_explorer);
-  layout->addWidget(d->ref_explorer_code_view);
-
-  auto ref_explorer_container = new QWidget();
-  ref_explorer_container->setLayout(layout);
+  auto splitter = new QSplitter();
+  splitter->setContentsMargins(0, 0, 0, 0);
+  splitter->addWidget(reference_explorer);
+  splitter->addWidget(d->ref_explorer_code_view);
 
   auto reference_explorer_dock =
       new QDockWidget(tr("Reference Explorer"), this);
@@ -122,7 +118,7 @@ void MainWindow::CreateReferenceExplorerDock() {
       Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea |
       Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
 
-  reference_explorer_dock->setWidget(ref_explorer_container);
+  reference_explorer_dock->setWidget(splitter);
   addDockWidget(Qt::BottomDockWidgetArea, reference_explorer_dock);
 }
 
@@ -248,8 +244,8 @@ void MainWindow::OnToggleWordWrap(bool checked) {
 }
 
 void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
-  auto file_raw_entity_id_var = index.data(
-      IReferenceExplorerModel::EntityIdRole);
+  auto file_raw_entity_id_var =
+      index.data(IReferenceExplorerModel::EntityIdRole);
   if (!file_raw_entity_id_var.isValid()) {
     return;
   }
