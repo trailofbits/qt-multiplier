@@ -560,7 +560,7 @@ QTextDocument *CodeView::CreateTextDocument(
           model.Data(model_index, ICodeModel::TokenRawEntityIdRole);
 
       if (entity_id_var.isValid()) {
-        auto entity_id = static_cast<RawEntityId>(entity_id_var.toULongLong());
+        auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
         if (entity_id != kInvalidEntityId) {
           auto unique_token_id_list_it =
               token_map.entity_id_to_unique_token_id_list.find(entity_id);

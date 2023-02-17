@@ -8,6 +8,7 @@
 
 #include "CodeModel.h"
 
+#include <multiplier/ui/Assert.h>
 #include <multiplier/ui/IDatabase.h>
 #include <multiplier/Entities/TokenCategory.h>
 
@@ -73,19 +74,39 @@ Index &CodeModel::GetIndex() {
   return d->index;
 }
 
-void CodeModel::SetFile(PackedFileId file_id) {
+void CodeModel::SetEntity(RawEntityId raw_id) {
   emit ModelAboutToBeReset();
 
   if (d->future_result.isRunning()) {
     d->future_result.cancel();
   }
 
-  d->future_result = d->database->DownloadFile(file_id);
+  EntityId eid(raw_id);
+  VariantId vid = eid.Unpack();
+  ModelState new_state = ModelState::UpdateInProgress;
+
+  if (std::holds_alternative<FileId>(vid)) {
+    FileId fid = std::get<FileId>(vid);
+    d->future_result = d->database->DownloadFile(fid);
+
+  } else if (std::holds_alternative<FileTokenId>(vid)) {
+    FileId fid(std::get<FileTokenId>(vid).file_id);
+    d->future_result = d->database->DownloadFile(fid);
+
+  } else if (std::optional<FragmentId> frag_id = FragmentId::From(eid)) {
+    FragmentId fid = frag_id.value();
+    d->future_result = d->database->DownloadFragment(fid);
+
+  } else {
+    // TODO(pag): What to do here??
+    Assert(false, "Entity id not associated with a file or fragment.");
+    new_state = ModelState::UpdateCancelled;
+    d->future_result = {};
+  }
+
   d->future_watcher.setFuture(d->future_result);
-
   d->token_row_list.clear();
-
-  d->model_state = ModelState::UpdateInProgress;
+  d->model_state = new_state;
 
   emit ModelReset();
 }
@@ -260,6 +281,11 @@ void CodeModel::FutureResultStateChanged() {
     if (line_number_adjust) {
       d->token_row_list.push_back(std::move(row));
     }
+  }
+
+  // Flush the last row.
+  if (!row.column_list.empty()) {
+    d->token_row_list.push_back(std::move(row));
   }
 
   d->model_state = ModelState::Ready;

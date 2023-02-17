@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <multiplier/Index.h>
 
 #include <QAbstractItemModel>
@@ -27,23 +28,34 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     //! Returns the internal node identifier
     InternalIdentifierRole,
 
+    //! Returns the entity id as a RawEntityId value
+    EntityIdRole,
+
+    //! Returns the fragment id as a RawEntityId value
+    FragmentIdRole,
+
     //! Returns the file id as a RawEntityId value
     FileIdRole,
 
-    //! Returns the entity id as a RawEntityId value
-    EntityIdRole,
+    //! Returns the line number id as an unsigned value
+    LineNumberRole,
+
+    //! Returns the column number id as an unsigned value
+    ColumnNumberRole,
   };
 
   //! Location information, containing path + line and column
   struct Location final {
+    RawEntityId file_id{kInvalidEntityId};
+
     //! File path
-    std::string path;
+    std::filesystem::path path;
 
     //! An optional line number
-    std::optional<std::uint64_t> opt_line{};
+    unsigned line{0};
 
     //! An optional column number
-    std::optional<std::uint64_t> opt_column{};
+    unsigned column{0};
   };
 
   //! Factory method

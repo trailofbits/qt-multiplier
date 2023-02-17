@@ -14,6 +14,10 @@
 
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
+namespace mx {
+class TokenRange;
+class Macro;
+}  // namespace mx
 namespace mx::gui {
 
 //! Implements the IReferenceExplorerModel interface
@@ -73,17 +77,6 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   struct NodeTree final {
     //! A single node in the model
     struct Node final {
-      //! Multiplier-specific identifiers
-      struct Identifiers final {
-        //! An optional file id
-        std::optional<RawEntityId> opt_file_id;
-
-        //! Fragment identifier
-        RawEntityId fragment_id{};
-
-        //! Entity identifier
-        RawEntityId entity_id{};
-      };
 
       //! The id for this node
       std::uint64_t node_id{};
@@ -92,7 +85,7 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
       std::uint64_t parent_node_id{};
 
       //! Multiplier-specific identifiers
-      Identifiers identifiers;
+      RawEntityId entity_id{kInvalidEntityId};
 
       //! An optional name for this entity
       std::optional<std::string> opt_name;
@@ -128,8 +121,8 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
 
   //!
   static void ImportEntityById(NodeTree &node_tree, const IndexData &index_data,
-                               const std::uint64_t &parent_node_id,
-                               const RawEntityId &entity_id,
+                               std::uint64_t parent_node_id,
+                               RawEntityId entity_id,
                                std::optional<std::size_t> opt_ttl);
 
   //!

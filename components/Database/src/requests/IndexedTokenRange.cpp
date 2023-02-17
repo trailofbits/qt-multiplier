@@ -226,7 +226,7 @@ static void RenderFileToken(const Token &tok, unsigned &line_number,
 }
 
 static bool RenderFragmentToken(const TokenRange &input_toks,
-                                unsigned file_tok_index,
+                                unsigned &file_tok_index,
                                 std::vector<Token> &frag_toks,
                                 unsigned &line_number,
                                 unsigned fragment_index,
@@ -244,6 +244,8 @@ static bool RenderFragmentToken(const TokenRange &input_toks,
   Token frag_file_tok = frag_tok.file_token();
   RawEntityId frag_file_tok_id = frag_file_tok.id().Pack();
   RawEntityId file_tok_id = file_tok.id().Pack();
+
+  ++file_tok_index;
 
   // There isn't a corresponding fragment token, so render the file token,
   // leaving the fragment token in place.
@@ -372,9 +374,8 @@ static IndexedTokenRangeDataOrError IndexTokenRange(
       std::reverse(fragment_tokens.begin(), fragment_tokens.end());
 
       // Output the file and fragment tokens.
-      for (; RenderFragmentToken(input.file_tokens, tok_index, fragment_tokens,
-                                 line_number, frag_index, output);
-           ++tok_index) {
+      while (RenderFragmentToken(input.file_tokens, tok_index, fragment_tokens,
+                                 line_number, frag_index, output)) {
         if (result_promise.isCanceled()) {
           return RPCErrorCode::Interrupted;
         }

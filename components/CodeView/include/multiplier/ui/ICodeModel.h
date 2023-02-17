@@ -58,8 +58,8 @@ class ICodeModel : public QObject {
   //! Returns the internal mx::Index object
   virtual Index &GetIndex() = 0;
 
-  //! Asks the model to fetch the specified file
-  virtual void SetFile(PackedFileId file_id) = 0;
+  //! Asks the model to fetch the specified entity.
+  virtual void SetEntity(RawEntityId id) = 0;
 
   //! How many rows are accessible from this model
   virtual int RowCount() const = 0;
