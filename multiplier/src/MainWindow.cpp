@@ -184,7 +184,7 @@ void MainWindow::OpenTokenReferenceExplorer(const CodeModelIndex &index) {
 
   auto quick_ref_explorer = new QuickReferenceExplorer(
       d->index, d->file_location_cache,
-      static_cast<RawEntityId>(related_entity_id_var.toULongLong()), this);
+      qvariant_cast<RawEntityId>(related_entity_id_var), this);
 
   auto dialog_pos = QCursor::pos();
 
@@ -213,7 +213,7 @@ void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
   auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
   tab_widget.setTabText(0, QString::fromStdString(file_name));
 
-  d->main_code_model->SetFile(file_id);
+  d->main_code_model->SetEntity(file_id.Pack());
 }
 
 void MainWindow::OnTokenClicked(const CodeModelIndex &index,
@@ -248,20 +248,14 @@ void MainWindow::OnToggleWordWrap(bool checked) {
 }
 
 void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
-  auto file_raw_entity_id_var = index.data(IReferenceExplorerModel::FileIdRole);
+  auto file_raw_entity_id_var = index.data(
+      IReferenceExplorerModel::EntityIdRole);
   if (!file_raw_entity_id_var.isValid()) {
     return;
   }
 
   auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
-
-  auto opt_packed_file_id = EntityId(file_raw_entity_id).Extract<FileId>();
-  if (!opt_packed_file_id.has_value()) {
-    return;
-  }
-
-  const auto &packed_file_id = opt_packed_file_id.value();
-  d->ref_explorer_code_model->SetFile(packed_file_id);
+  d->ref_explorer_code_model->SetEntity(file_raw_entity_id);
 
   auto entity_id_var = index.data(IReferenceExplorerModel::EntityIdRole);
   if (!entity_id_var.isValid()) {

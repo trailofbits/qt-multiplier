@@ -13,6 +13,7 @@
 #include <QFontMetrics>
 #include <QPainter>
 
+#include <filesystem>
 #include <iostream>
 
 namespace mx::gui {
@@ -64,14 +65,14 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
     auto location_info =
         qvariant_cast<IReferenceExplorerModel::Location>(location_info_var);
 
-    std::filesystem::path path(location_info.path);
+    const std::filesystem::path &path = location_info.path;
     location = QString::fromStdString(path.filename().string());
 
-    if (location_info.opt_line.has_value()) {
-      location += "@" + QString::number(location_info.opt_line.value());
+    if (0u < location_info.line) {
+      location += ":" + QString::number(location_info.line);
 
-      if (location_info.opt_column.has_value()) {
-        location += ":" + QString::number(location_info.opt_column.value());
+      if (0u < location_info.column) {
+        location += ":" + QString::number(location_info.column);
       }
     }
   }

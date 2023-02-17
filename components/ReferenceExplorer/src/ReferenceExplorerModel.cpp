@@ -9,7 +9,10 @@
 #include "ReferenceExplorerModel.h"
 
 #include <multiplier/Entities/DefineMacroDirective.h>
+#include <multiplier/Entities/FieldDecl.h>
+#include <multiplier/Entities/FunctionDecl.h>
 #include <multiplier/Entities/IncludeLikeMacroDirective.h>
+#include <multiplier/Entities/VarDecl.h>
 #include <multiplier/ui/Assert.h>
 
 #include <QMimeData>
@@ -178,31 +181,48 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
       value = QString::fromStdString(node.opt_name.value());
 
     } else {
-      value = tr("Unnamed: ") + QString::number(node.identifiers.entity_id);
+      value = tr("Unnamed: ") + QString::number(node.entity_id);
     }
 
   } else if (role == Qt::ToolTipRole) {
     auto buffer =
-        tr("Entity ID: ") + QString::number(node.identifiers.entity_id) + "\n";
-    buffer +=
-        tr("Fragment ID: ") + QString::number(node.identifiers.fragment_id);
+        tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
 
-    if (node.identifiers.opt_file_id.has_value()) {
+    if (std::optional<FragmentId> frag_id = FragmentId::From(node.entity_id)) {
+      buffer += tr("Fragment ID: ") +
+                QString::number(EntityId(frag_id.value()).Pack());
+    }
+
+    if (node.opt_location.has_value()) {
       buffer += "\n";
-
       buffer += tr("File ID: ") +
-                QString::number(node.identifiers.opt_file_id.value());
+                QString::number(node.opt_location->file_id);
     }
 
     value = std::move(buffer);
 
-  } else if (role == IReferenceExplorerModel::FileIdRole) {
-    if (node.identifiers.opt_file_id.has_value()) {
-      value.setValue(node.identifiers.opt_file_id.value());
+  } else if (role == IReferenceExplorerModel::EntityIdRole) {
+    value = node.entity_id;
+
+  } else if (role == IReferenceExplorerModel::FragmentIdRole) {
+    if (std::optional<FragmentId> frag_id = FragmentId::From(node.entity_id)) {
+      value.setValue(EntityId(frag_id.value()).Pack());
     }
 
-  } else if (role == IReferenceExplorerModel::EntityIdRole) {
-    value = node.identifiers.entity_id;
+  } else if (role == IReferenceExplorerModel::FileIdRole) {
+    if (node.opt_location.has_value()) {
+      value.setValue(node.opt_location->file_id);
+    }
+
+  } else if (role == IReferenceExplorerModel::LineNumberRole) {
+    if (node.opt_location.has_value() && 0u < node.opt_location->line) {
+      value.setValue(node.opt_location->line);
+    }
+
+  } else if (role == IReferenceExplorerModel::ColumnNumberRole) {
+    if (node.opt_location.has_value() && 0u < node.opt_location->column) {
+      value.setValue(node.opt_location->column);
+    }
 
   } else if (role == IReferenceExplorerModel::LocationRole) {
     if (node.opt_location.has_value()) {
@@ -376,7 +396,7 @@ void ReferenceExplorerModel::InitializeNodeTree(NodeTree &node_tree) {
 
 void ReferenceExplorerModel::ImportEntityById(
     NodeTree &node_tree, const IndexData &index_data,
-    const std::uint64_t &parent_node_id, const RawEntityId &entity_id,
+    std::uint64_t parent_node_id, RawEntityId entity_id,
     std::optional<std::size_t> opt_ttl) {
 
   if (opt_ttl.has_value()) {
@@ -490,27 +510,22 @@ void ReferenceExplorerModel::ImportDeclEntity(
     current_node.opt_name = named->name();
   }
 
-  auto fragment = mx::Fragment::containing(decl_entity);
-  current_node.identifiers.fragment_id = fragment.id().Pack();
-  current_node.identifiers.entity_id = decl_entity_id;
+  current_node.entity_id = decl_entity_id;
 
-  const auto file = mx::File::containing(fragment);
-  if (file) {
-    current_node.identifiers.opt_file_id = file->id().Pack();
+  if (auto file = mx::File::containing(decl_entity)) {
+    Location location;
+    location.file_id = file->id().Pack();
 
     auto file_path_map_it = index_data.file_path_map.find(file->id());
     Assert(file_path_map_it != index_data.file_path_map.end(),
            "Invalid path id");
 
-    const auto &file_path = file_path_map_it->second;
-
-    Location location;
-    location.path = file_path.generic_string();
-
-    if (auto tok = decl_entity.token()) {
+    location.path = file_path_map_it->second;
+    for (Token tok : decl_entity.tokens().file_tokens()) {
       if (auto line_col = tok.location(index_data.file_location_cache)) {
-        location.opt_line = static_cast<std::size_t>(line_col->first);
-        location.opt_column = static_cast<std::size_t>(line_col->second);
+        location.line = line_col->first;
+        location.column = line_col->second;
+        break;
       }
     }
 
@@ -625,7 +640,8 @@ void ReferenceExplorerModel::ImportDesignatorEntity(
 }
 
 void ReferenceExplorerModel::ImportMacroEntity(
-    NodeTree &node_tree, const IndexData &, const std::uint64_t &parent_node_id,
+    NodeTree &node_tree, const IndexData &index_data,
+    const std::uint64_t &parent_node_id,
     mx::Macro entity, std::optional<std::size_t> opt_ttl) {
 
   if (node_tree.node_map.count(0) == 0) {
@@ -653,10 +669,37 @@ void ReferenceExplorerModel::ImportMacroEntity(
   NodeTree::Node current_node;
   current_node.node_id = current_node_id;
   current_node.parent_node_id = parent_node_id;
+  current_node.entity_id = entity_id;
 
-  auto fragment = mx::Fragment::containing(entity);
-  current_node.identifiers.fragment_id = fragment.id().Pack();
-  current_node.identifiers.entity_id = entity_id;
+  for (Token tok : entity.tokens_covering_use()) {
+    auto file_tok = tok.file_token();
+    if (!file_tok) {
+      continue;
+    }
+
+    auto file = mx::File::containing(entity);
+    if (!file) {
+      continue;
+    }
+
+    auto line_col = file_tok.location(index_data.file_location_cache);
+    if (!line_col) {
+      continue;
+    }
+
+    Location location;
+    location.file_id = file->id().Pack();
+    location.line = line_col->first;
+    location.column = line_col->second;
+
+    auto file_path_map_it = index_data.file_path_map.find(file->id());
+    Assert(file_path_map_it != index_data.file_path_map.end(),
+           "Invalid path id");
+
+    location.path = file_path_map_it->second;
+    current_node.opt_location = std::move(location);
+    break;
+  }
 
   if (auto named = mx::DefineMacroDirective::from(entity)) {
     current_node.opt_name = named->name().data();
@@ -692,16 +735,7 @@ void ReferenceExplorerModel::SerializeNode(QDataStream &stream,
                                            const NodeTree::Node &node) {
   stream << node.node_id;
   stream << node.parent_node_id;
-
-  if (node.identifiers.opt_file_id.has_value()) {
-    stream << true;
-    stream << node.identifiers.opt_file_id.value();
-  } else {
-    stream << false;
-  }
-
-  stream << static_cast<std::uint64_t>(node.identifiers.fragment_id);
-  stream << static_cast<std::uint64_t>(node.identifiers.entity_id);
+  stream << node.entity_id;
 
   if (node.opt_name.has_value()) {
     stream << true;
@@ -714,23 +748,10 @@ void ReferenceExplorerModel::SerializeNode(QDataStream &stream,
     stream << true;
 
     const auto &location = node.opt_location.value();
-    stream << QString::fromStdString(location.path);
-
-    if (location.opt_line.has_value()) {
-      stream << true;
-      stream << location.opt_line.value();
-
-    } else {
-      stream << false;
-    }
-
-    if (location.opt_column.has_value()) {
-      stream << true;
-      stream << location.opt_column.value();
-
-    } else {
-      stream << false;
-    }
+    stream << QString::fromStdString(location.path.generic_string());
+    stream << location.file_id;
+    stream << location.line;
+    stream << location.column;
 
   } else {
     stream << false;
@@ -753,57 +774,27 @@ ReferenceExplorerModel::DeserializeNode(QDataStream &stream) {
 
     stream >> node.node_id;
     stream >> node.parent_node_id;
+    stream >> node.entity_id;
 
-    bool has_optional_field{};
+    bool has_optional_field = false;
+
+    // Read the name.
     stream >> has_optional_field;
-
-    std::uint64_t raw_entity_id_value{};
-    if (has_optional_field) {
-      stream >> raw_entity_id_value;
-
-      node.identifiers.opt_file_id =
-          static_cast<RawEntityId>(raw_entity_id_value);
-    }
-
-    stream >> raw_entity_id_value;
-    node.identifiers.fragment_id =
-        static_cast<RawEntityId>(raw_entity_id_value);
-
-    stream >> raw_entity_id_value;
-    node.identifiers.entity_id = static_cast<RawEntityId>(raw_entity_id_value);
-
-    stream >> has_optional_field;
-
     QString string_value;
     if (has_optional_field) {
       stream >> string_value;
       node.opt_name = string_value.toStdString();
     }
 
+    // Read the location.
     stream >> has_optional_field;
-
     if (has_optional_field) {
-      stream >> string_value;
-
       Location location;
+      stream >> string_value;
       location.path = string_value.toStdString();
-
-      stream >> has_optional_field;
-      if (has_optional_field) {
-        std::uint64_t line_number{};
-        stream >> line_number;
-
-        location.opt_line = line_number;
-      }
-
-      stream >> has_optional_field;
-      if (has_optional_field) {
-        std::uint64_t column_number{};
-        stream >> column_number;
-
-        location.opt_column = column_number;
-      }
-
+      stream >> location.file_id;
+      stream >> location.line;
+      stream >> location.column;
       node.opt_location = std::move(location);
     }
 
