@@ -30,6 +30,7 @@ class MainWindow final : public QMainWindow {
   void InitializeWidgets();
   void CreateFileTreeDock();
   void CreateReferenceExplorerDock();
+  void CreateNewReferenceExplorer();
   void CreateCodeView();
   void OpenTokenContextMenu(const CodeModelIndex &index);
   void OpenTokenReferenceExplorer(const CodeModelIndex &index);
@@ -47,7 +48,9 @@ class MainWindow final : public QMainWindow {
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
   void OnReferenceExplorerItemClicked(const QModelIndex &index);
-  void OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data);
+  void OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
+                                        const bool &as_new_tab);
+  void OnReferenceExplorerTabBarClose(int index);
 };
 
 }  // namespace mx::gui

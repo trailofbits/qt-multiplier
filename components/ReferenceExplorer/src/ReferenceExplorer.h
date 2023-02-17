@@ -20,6 +20,9 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Destructor
   virtual ~ReferenceExplorer() override;
 
+  //! \copybrief IReferenceExplorer::Model
+  virtual IReferenceExplorerModel *Model() override;
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
