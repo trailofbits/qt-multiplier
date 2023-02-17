@@ -37,6 +37,10 @@ struct ReferenceExplorer::PrivateData final {
 
 ReferenceExplorer::~ReferenceExplorer() {}
 
+IReferenceExplorerModel *ReferenceExplorer::Model() {
+  return d->model;
+}
+
 ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
                                      QWidget *parent)
     : IReferenceExplorer(parent),

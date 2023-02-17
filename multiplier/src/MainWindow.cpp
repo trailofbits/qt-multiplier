@@ -21,6 +21,9 @@
 #include <QSortFilterProxyModel>
 #include <QCursor>
 #include <QSplitter>
+#include <QTabBar>
+
+#include <iostream>
 
 namespace mx::gui {
 
@@ -41,11 +44,12 @@ struct MainWindow::PrivateData final {
   ICodeModel *main_code_model{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
-  IReferenceExplorerModel *reference_explorer_model{nullptr};
+  std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
+
   ICodeModel *ref_explorer_code_model{nullptr};
   ICodeView *ref_explorer_code_view{nullptr};
-  IReferenceExplorer *reference_explorer{nullptr};
-  std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
+  QTabWidget *ref_explorer_tab_widget{nullptr};
+  QDockWidget *reference_explorer_dock{nullptr};
 
   QMenu *view_menu{nullptr};
 };
@@ -86,41 +90,63 @@ void MainWindow::CreateFileTreeDock() {
   file_tree_dock->setAllowedAreas(Qt::LeftDockWidgetArea |
                                   Qt::RightDockWidgetArea);
 
+  d->view_menu->addAction(file_tree_dock->toggleViewAction());
+
   file_tree_dock->setWidget(d->index_view);
 
   addDockWidget(Qt::LeftDockWidgetArea, file_tree_dock);
 }
 
 void MainWindow::CreateReferenceExplorerDock() {
-  d->reference_explorer_model =
-      IReferenceExplorerModel::Create(d->index, d->file_location_cache, this);
-
-  auto reference_explorer =
-      IReferenceExplorer::Create(d->reference_explorer_model, this);
-
   d->ref_explorer_code_model =
       ICodeModel::Create(d->file_location_cache, d->index, this);
 
   d->ref_explorer_code_view = ICodeView::Create(d->ref_explorer_code_model);
   d->ref_explorer_code_view->SetWordWrapping(false);
 
-  connect(reference_explorer, &IReferenceExplorer::ItemClicked, this,
-          &MainWindow::OnReferenceExplorerItemClicked);
+  d->ref_explorer_tab_widget = new QTabWidget(this);
+  d->ref_explorer_tab_widget->setTabsClosable(true);
+
+  connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabCloseRequested,
+          this, &MainWindow::OnReferenceExplorerTabBarClose);
 
   auto splitter = new QSplitter();
   splitter->setContentsMargins(0, 0, 0, 0);
-  splitter->addWidget(reference_explorer);
+  splitter->addWidget(d->ref_explorer_tab_widget);
   splitter->addWidget(d->ref_explorer_code_view);
 
-  auto reference_explorer_dock =
-      new QDockWidget(tr("Reference Explorer"), this);
+  d->reference_explorer_dock = new QDockWidget(tr("Reference Explorer"), this);
+  d->view_menu->addAction(d->reference_explorer_dock->toggleViewAction());
+  d->reference_explorer_dock->toggleViewAction()->setEnabled(false);
 
-  reference_explorer_dock->setAllowedAreas(
+  d->reference_explorer_dock->setAllowedAreas(
       Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea |
       Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
 
-  reference_explorer_dock->setWidget(splitter);
-  addDockWidget(Qt::BottomDockWidgetArea, reference_explorer_dock);
+  d->reference_explorer_dock->setWidget(splitter);
+  addDockWidget(Qt::BottomDockWidgetArea, d->reference_explorer_dock);
+
+  d->reference_explorer_dock->hide();
+}
+
+void MainWindow::CreateNewReferenceExplorer() {
+  auto ref_explorer_model =
+      IReferenceExplorerModel::Create(d->index, d->file_location_cache, this);
+
+  auto ref_explorer = IReferenceExplorer::Create(ref_explorer_model, this);
+  ref_explorer->setAttribute(Qt::WA_DeleteOnClose);
+
+  connect(ref_explorer, &IReferenceExplorer::ItemClicked, this,
+          &MainWindow::OnReferenceExplorerItemClicked);
+
+  auto new_tab_index = d->ref_explorer_tab_widget->count();
+  auto name = tr("Reference Explorer #") + QString::number(new_tab_index + 1);
+
+  d->ref_explorer_tab_widget->addTab(ref_explorer, name);
+  d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
+
+  d->reference_explorer_dock->toggleViewAction()->setEnabled(true);
+  d->reference_explorer_dock->show();
 }
 
 void MainWindow::CreateCodeView() {
@@ -129,6 +155,7 @@ void MainWindow::CreateCodeView() {
 
   d->main_code_model =
       ICodeModel::Create(d->file_location_cache, d->index, this);
+
   auto code_view = ICodeView::Create(d->main_code_model);
   code_view->SetWordWrapping(false);
 
@@ -260,6 +287,7 @@ void MainWindow::OnToggleWordWrap(bool checked) {
 void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
   auto file_raw_entity_id_var =
       index.data(IReferenceExplorerModel::EntityIdRole);
+
   if (!file_raw_entity_id_var.isValid()) {
     return;
   }
@@ -276,9 +304,30 @@ void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
   d->ref_explorer_code_view->ScrollToEntityId(raw_entity_id);
 }
 
-void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data) {
-  d->reference_explorer_model->dropMimeData(mime_data, Qt::CopyAction, 0, 0,
-                                            QModelIndex());
+void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
+                                                  const bool &as_new_tab) {
+  if (d->ref_explorer_tab_widget->count() == 0 || as_new_tab) {
+    CreateNewReferenceExplorer();
+  }
+
+  auto current_tab = d->ref_explorer_tab_widget->currentIndex();
+  auto reference_explorer = static_cast<IReferenceExplorer *>(
+      d->ref_explorer_tab_widget->widget(current_tab));
+
+  auto reference_explorer_model = reference_explorer->Model();
+  reference_explorer_model->dropMimeData(mime_data, Qt::CopyAction, 0, 0,
+                                         QModelIndex());
+}
+
+void MainWindow::OnReferenceExplorerTabBarClose(int index) {
+  auto widget = d->ref_explorer_tab_widget->widget(index);
+  d->ref_explorer_tab_widget->removeTab(index);
+
+  widget->close();
+
+  auto widget_visible = d->ref_explorer_tab_widget->count() != 0;
+  d->reference_explorer_dock->setVisible(widget_visible);
+  d->reference_explorer_dock->toggleViewAction()->setEnabled(widget_visible);
 }
 
 }  // namespace mx::gui

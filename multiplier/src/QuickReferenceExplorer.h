@@ -27,7 +27,7 @@ class QuickReferenceExplorer final : public QWidget {
   QuickReferenceExplorer &operator=(const QuickReferenceExplorer &) = delete;
 
  signals:
-  void SaveAll(QMimeData *mime_data);
+  void SaveAll(QMimeData *mime_data, const bool &as_new_tab);
 
  protected:
   virtual void keyPressEvent(QKeyEvent *event) override;
@@ -41,11 +41,13 @@ class QuickReferenceExplorer final : public QWidget {
                          mx::FileLocationCache file_location_cache,
                          RawEntityId entity_id);
 
-  void UpdateSaveAllButtonPosition();
+  void UpdateButtonPositions();
+  void EmitSaveSignal(const bool &as_new_tab);
 
  private slots:
   void OnApplicationStateChange(Qt::ApplicationState state);
-  void OnSaveAllButtonPress();
+  void OnSaveAllToActiveRefExplorerButtonPress();
+  void OnSaveAllToNewRefExplorerButtonPress();
 };
 
 }  // namespace mx::gui

@@ -29,6 +29,9 @@ class IReferenceExplorer : public QWidget {
   //! Destructor
   virtual ~IReferenceExplorer() override = default;
 
+  //! Returns the active model
+  virtual IReferenceExplorerModel *Model() = 0;
+
   //! Disabled copy constructor
   IReferenceExplorer(const IReferenceExplorer &) = delete;
 

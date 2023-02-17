@@ -4,6 +4,7 @@
     </qresource>
 
     <qresource prefix="/Icons/QuickReferenceExplorer">
-        <file alias="SaveAll">Icons/quick_ref_explorer_save_all.png</file>
+        <file alias="SaveToActiveTab">Icons/quick_ref_explorer_save_all.png</file>
+        <file alias="SaveToNewTab">Icons/quick_ref_explorer_as_new_tab.png</file>
     </qresource>
 </RCC>

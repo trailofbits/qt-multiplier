@@ -18,7 +18,8 @@ namespace mx::gui {
 struct QuickReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   IReferenceExplorer *reference_explorer{nullptr};
-  QPushButton *save_all_button{nullptr};
+  QPushButton *save_to_active_ref_explorer_button{nullptr};
+  QPushButton *save_to_new_ref_explorer_button{nullptr};
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
@@ -45,7 +46,7 @@ void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
 }
 
 void QuickReferenceExplorer::resizeEvent(QResizeEvent *event) {
-  UpdateSaveAllButtonPosition();
+  UpdateButtonPositions();
   QWidget::resizeEvent(event);
 }
 
@@ -68,22 +69,43 @@ void QuickReferenceExplorer::InitializeWidgets(
   connect(qApp, &QGuiApplication::applicationStateChanged, this,
           &QuickReferenceExplorer::OnApplicationStateChange);
 
-  d->save_all_button = new QPushButton(
-      QIcon(":/Icons/QuickReferenceExplorer/SaveAll"), "", this);
+  d->save_to_active_ref_explorer_button = new QPushButton(
+      QIcon(":/Icons/QuickReferenceExplorer/SaveToActiveTab"), "", this);
 
-  d->save_all_button->resize(20, 20);
-  UpdateSaveAllButtonPosition();
+  d->save_to_active_ref_explorer_button->resize(20, 20);
 
-  connect(d->save_all_button, &QPushButton::clicked, this,
-          &QuickReferenceExplorer::OnSaveAllButtonPress);
+  d->save_to_new_ref_explorer_button = new QPushButton(
+      QIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"), "", this);
+
+  d->save_to_new_ref_explorer_button->resize(20, 20);
+
+  UpdateButtonPositions();
+
+  connect(d->save_to_active_ref_explorer_button, &QPushButton::clicked, this,
+          &QuickReferenceExplorer::OnSaveAllToActiveRefExplorerButtonPress);
+
+  connect(d->save_to_new_ref_explorer_button, &QPushButton::clicked, this,
+          &QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress);
 }
 
-void QuickReferenceExplorer::UpdateSaveAllButtonPosition() {
-  auto button_width = d->save_all_button->width();
+void QuickReferenceExplorer::UpdateButtonPositions() {
+  auto button_width = d->save_to_active_ref_explorer_button->width();
 
   auto x = width() - button_width;
-  d->save_all_button->move(x, 0);
-  d->save_all_button->raise();
+  d->save_to_active_ref_explorer_button->move(x, 0);
+  d->save_to_active_ref_explorer_button->raise();
+
+  x -= button_width;
+  d->save_to_new_ref_explorer_button->move(x, 0);
+  d->save_to_new_ref_explorer_button->raise();
+}
+
+void QuickReferenceExplorer::EmitSaveSignal(const bool &as_new_tab) {
+  auto mime_data = d->model->mimeData({QModelIndex()});
+  mime_data->setParent(this);
+
+  emit SaveAll(mime_data, as_new_tab);
+  close();
 }
 
 void QuickReferenceExplorer::OnApplicationStateChange(
@@ -93,12 +115,12 @@ void QuickReferenceExplorer::OnApplicationStateChange(
   setVisible(window_is_visible);
 }
 
-void QuickReferenceExplorer::OnSaveAllButtonPress() {
-  auto mime_data = d->model->mimeData({QModelIndex()});
-  mime_data->setParent(this);
+void QuickReferenceExplorer::OnSaveAllToActiveRefExplorerButtonPress() {
+  EmitSaveSignal(false);
+}
 
-  emit SaveAll(mime_data);
-  close();
+void QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress() {
+  EmitSaveSignal(true);
 }
 
 }  // namespace mx::gui
