@@ -22,12 +22,11 @@
 #include <QIODevice>
 
 namespace mx::gui {
-
 namespace {
 
 const QString kMimeTypeName{"application/mx-reference-explorer"};
 
-}
+}  // namespace
 
 struct ReferenceExplorerModel::PrivateData final {
   PrivateData(mx::Index index_, mx::FileLocationCache file_location_cache_)

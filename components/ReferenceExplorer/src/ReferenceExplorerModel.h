@@ -10,9 +10,12 @@
 
 #include "Types.h"
 
+#include <gap/core/generator.hpp>
 #include <multiplier/ui/IReferenceExplorerModel.h>
+#include <multiplier/Reference.h>
 
 namespace mx {
+class Decl;
 class TokenRange;
 class Macro;
 }  // namespace mx
