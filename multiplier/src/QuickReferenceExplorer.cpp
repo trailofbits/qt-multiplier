@@ -12,6 +12,8 @@
 #include <QKeyEvent>
 #include <QApplication>
 #include <QPushButton>
+#include <QCloseEvent>
+#include <QShowEvent>
 
 namespace mx::gui {
 
@@ -20,6 +22,7 @@ struct QuickReferenceExplorer::PrivateData final {
   IReferenceExplorer *reference_explorer{nullptr};
   QPushButton *save_to_active_ref_explorer_button{nullptr};
   QPushButton *save_to_new_ref_explorer_button{nullptr};
+  bool closed{false};
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
@@ -48,6 +51,16 @@ void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
 void QuickReferenceExplorer::resizeEvent(QResizeEvent *event) {
   UpdateButtonPositions();
   QWidget::resizeEvent(event);
+}
+
+void QuickReferenceExplorer::showEvent(QShowEvent *event) {
+  event->accept();
+  d->closed = false;
+}
+
+void QuickReferenceExplorer::closeEvent(QCloseEvent *event) {
+  event->accept();
+  d->closed = true;
 }
 
 void QuickReferenceExplorer::InitializeWidgets(
@@ -110,6 +123,10 @@ void QuickReferenceExplorer::EmitSaveSignal(const bool &as_new_tab) {
 
 void QuickReferenceExplorer::OnApplicationStateChange(
     Qt::ApplicationState state) {
+
+  if (d->closed) {
+    return;
+  }
 
   auto window_is_visible = state == Qt::ApplicationActive;
   setVisible(window_is_visible);
