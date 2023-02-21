@@ -513,8 +513,7 @@ QTextDocument *CodeView::CreateTextDocument(
           model.Data(model_index, ICodeModel::LineNumberRole);
 
       if (line_number_var.isValid()) {
-        auto line_number =
-            static_cast<std::size_t>(line_number_var.toULongLong());
+        auto line_number = qvariant_cast<unsigned>(line_number_var);
 
         token_map.highest_line_number =
             std::max(line_number, token_map.highest_line_number);
@@ -603,8 +602,7 @@ QTextDocument *CodeView::CreateTextDocument(
           model.Data(model_index, ICodeModel::TokenGroupIdRole);
 
       if (token_group_id_var.isValid()) {
-        auto token_group_id =
-            static_cast<std::uint64_t>(token_group_id_var.toULongLong());
+        auto token_group_id = qvariant_cast<std::uint64_t>(token_group_id_var);
 
         auto unique_token_id_list_it =
             token_map.token_group_id_to_unique_token_id_list.find(
