@@ -26,6 +26,9 @@ add_library("mx_referenceexplorer"
 
   src/NodeImporter.h
   src/NodeImporter.cpp
+
+  src/Utils.h
+  src/Utils.cpp
 )
 
 target_link_libraries("mx_referenceexplorer"
