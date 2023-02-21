@@ -85,10 +85,14 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->save_to_active_ref_explorer_button = new QPushButton(
       QIcon(":/Icons/QuickReferenceExplorer/SaveToActiveTab"), "", this);
 
+  d->save_to_active_ref_explorer_button->setToolTip(tr("Save to active tab"));
+
   d->save_to_active_ref_explorer_button->resize(20, 20);
 
   d->save_to_new_ref_explorer_button = new QPushButton(
       QIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"), "", this);
+
+  d->save_to_new_ref_explorer_button->setToolTip(tr("Save to new tab"));
 
   d->save_to_new_ref_explorer_button->resize(20, 20);
 
