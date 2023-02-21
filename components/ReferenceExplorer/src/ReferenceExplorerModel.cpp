@@ -291,7 +291,7 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
 
     Assert(node_id_var.isValid(), "Invalid InternalIdentifierRole value");
 
-    auto node_id = static_cast<std::uint64_t>(node_id_var.toULongLong());
+    auto node_id = qvariant_cast<std::uint64_t>(node_id_var);
     next_node_id_queue.push_back(node_id);
   }
 

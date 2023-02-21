@@ -134,7 +134,7 @@ class CodeView final : public ICodeView {
         token_group_id_to_unique_token_id_list;
 
     //! The highest line number that we have encountered
-    std::size_t highest_line_number{};
+    unsigned highest_line_number{};
   };
 
   //! Creates a unique token identifier from the given code model index
