@@ -65,8 +65,7 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
     auto location_info =
         qvariant_cast<IReferenceExplorerModel::Location>(location_info_var);
 
-    const std::filesystem::path &path = location_info.path;
-    location = QString::fromStdString(path.filename().string());
+    location = location_info.path;
 
     if (0u < location_info.line) {
       location += ":" + QString::number(location_info.line);

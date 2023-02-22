@@ -16,23 +16,23 @@
 
 namespace mx::gui {
 
-std::optional<NamedEntity> NamedEntityContaining(VariantEntity entity);
+RawEntityId NamedEntityContaining(VariantEntity entity);
 
 //! Generate references to the entity with `entity`. The references
 //! pairs of named entities and the referenced entity. Sometimes the
 //! referenced entity will match the named entity, other times the named
 //! entity will contain the reference (e.g. a function containing a call).
-gap::generator<std::pair<std::optional<NamedEntity>, Reference>>
+gap::generator<std::pair<RawEntityId, Reference>>
 References(VariantEntity entity);
 
 template <typename T>
-static std::optional<NamedDecl> NamedDeclContaining(const T &thing) {
+static RawEntityId NamedDeclContaining(const T &thing) {
   for (FunctionDecl func : FunctionDecl::containing(thing)) {
-    return func;
+    return func.id().Pack();
   }
 
   for (FieldDecl field : FieldDecl::containing(thing)) {
-    return field;
+    return field.id().Pack();
   }
 
   for (VarDecl var : VarDecl::containing(thing)) {
@@ -40,15 +40,15 @@ static std::optional<NamedDecl> NamedDeclContaining(const T &thing) {
       return NamedDeclContaining<Decl>(var);
 
     } else {
-      return var;
+      return var.id().Pack();
     }
   }
 
   for (NamedDecl nd : NamedDecl::containing(thing)) {
-    return nd;
+    return nd.id().Pack();
   }
 
-  return std::nullopt;
+  return kInvalidEntityId;
 }
 
 template <typename... Ts>

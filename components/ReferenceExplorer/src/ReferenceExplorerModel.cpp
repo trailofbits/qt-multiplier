@@ -49,7 +49,8 @@ bool ReferenceExplorerModel::AppendEntityObject(RawEntityId entity_id,
   }
 
   auto succeeded = d->node_importer.ImportEntity(
-      entity_id, NodeTree::Node::ImportMode::CallHierarchy, parent_node_id, 2);
+      entity_id, entity_id, NodeTree::Node::ImportMode::CallHierarchy,
+      parent_node_id, 2);
 
   if (succeeded) {
     auto parent_node = d->node_tree.node_map.at(parent_node_id);
@@ -201,7 +202,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   QVariant value;
   if (role == Qt::DisplayRole) {
     if (node.opt_name.has_value()) {
-      value = QString::fromStdString(node.opt_name.value());
+      value = node.opt_name.value();
 
     } else {
       value = tr("Unnamed: ") + QString::number(node.entity_id);
@@ -455,7 +456,7 @@ void ReferenceExplorerModel::SerializeNode(QDataStream &stream,
 
   if (node.opt_name.has_value()) {
     stream << true;
-    stream << QString::fromStdString(node.opt_name.value());
+    stream << node.opt_name.value();
   } else {
     stream << false;
   }
@@ -464,7 +465,7 @@ void ReferenceExplorerModel::SerializeNode(QDataStream &stream,
     stream << true;
 
     const auto &location = node.opt_location.value();
-    stream << QString::fromStdString(location.path.generic_string());
+    stream << location.path;
     stream << location.file_id;
     stream << location.line;
     stream << location.column;
@@ -499,15 +500,14 @@ ReferenceExplorerModel::DeserializeNode(QDataStream &stream) {
     QString string_value;
     if (has_optional_field) {
       stream >> string_value;
-      node.opt_name = string_value.toStdString();
+      node.opt_name = string_value;
     }
 
     // Read the location.
     stream >> has_optional_field;
     if (has_optional_field) {
       Location location;
-      stream >> string_value;
-      location.path = string_value.toStdString();
+      stream >> location.path;
       stream >> location.file_id;
       stream >> location.line;
       stream >> location.column;

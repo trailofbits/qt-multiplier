@@ -10,37 +10,39 @@
 
 #include <multiplier/Entities/DefineMacroDirective.h>
 #include <multiplier/Entities/IncludeLikeMacroDirective.h>
+#include <utility>
 
 namespace mx::gui {
 
-std::optional<NamedEntity> NamedEntityContaining(VariantEntity entity) {
+RawEntityId NamedEntityContaining(VariantEntity entity) {
   if (std::holds_alternative<Decl>(entity)) {
-    if (auto cd = NamedDeclContaining(std::get<Decl>(entity))) {
-      return cd.value();
+    if (auto cd = NamedDeclContaining(std::get<Decl>(entity));
+        cd != kInvalidEntityId) {
+      return cd;
     }
 
     if (auto nd = NamedDecl::from(std::get<Decl>(entity))) {
-      return nd.value();
+      return nd->canonical_declaration().id().Pack();
     }
 
     // TODO(pag): Do token-based lookup?
 
   } else if (std::holds_alternative<Stmt>(entity)) {
     const Stmt &stmt = std::get<Stmt>(entity);
-    if (auto nd = NamedDeclContaining(stmt)) {
-      return nd.value();
+    if (auto nd = NamedDeclContaining(stmt); nd != kInvalidEntityId) {
+      return nd;
     }
 
     // TODO(pag): Do token-based lookup?
 
     if (auto file = File::containing(stmt)) {
-      return file.value();
+      return file->id().Pack();
     }
 
   } else if (std::holds_alternative<Macro>(entity)) {
     Macro macro = std::move(std::get<Macro>(entity));
     if (auto dd = DefineMacroDirective::from(macro)) {
-      return dd.value();
+      return dd->id().Pack();
     }
 
     if (std::optional<Macro> parent = macro.parent()) {
@@ -48,33 +50,33 @@ std::optional<NamedEntity> NamedEntityContaining(VariantEntity entity) {
     }
 
     if (auto file = File::containing(macro)) {
-      return file.value();
+      return file->id().Pack();
     }
 
   } else if (std::holds_alternative<File>(entity)) {
-    return std::get<File>(entity);
+    return std::get<File>(entity).id().Pack();
 
   } else if (std::holds_alternative<Fragment>(entity)) {
     if (auto file = File::containing(std::get<Fragment>(entity))) {
-      return file.value();
+      return file->id().Pack();
     }
 
   } else if (std::holds_alternative<Designator>(entity)) {
     const Designator &d = std::get<Designator>(entity);
     if (auto field = d.field()) {
-      return field.value();
+      return field->id().Pack();
     }
 
   } else if (std::holds_alternative<Token>(entity)) {
     const Token &tok = std::get<Token>(entity);
-    if (auto nd = NamedDeclContaining(tok)) {
-      return nd.value();
+    if (auto nd = NamedDeclContaining(tok); nd != kInvalidEntityId) {
+      return nd;
     }
 
     if (std::optional<Fragment> frag = Fragment::containing(tok)) {
       for (NamedDecl nd : NamedDecl::in(*frag)) {
         if (nd.tokens().index_of(tok)) {
-          return nd;
+          return nd.id().Pack();
         }
       }
     }
@@ -82,7 +84,7 @@ std::optional<NamedEntity> NamedEntityContaining(VariantEntity entity) {
 
   // TODO(pag): CXXBaseSpecifier, CXXTemplateArgument, CXXTemplateParameterList.
 
-  return std::nullopt;
+  return kInvalidEntityId;
 }
 
 
@@ -90,7 +92,7 @@ std::optional<NamedEntity> NamedEntityContaining(VariantEntity entity) {
 //! pairs of named entities and the referenced entity. Sometimes the
 //! referenced entity will match the named entity, other times the named
 //! entity will contain the reference (e.g. a function containing a call).
-gap::generator<std::pair<std::optional<NamedEntity>, Reference>>
+gap::generator<std::pair<RawEntityId, Reference>>
 References(VariantEntity entity) {
 
   if (std::holds_alternative<NotAnEntity>(entity)) {
@@ -100,9 +102,10 @@ References(VariantEntity entity) {
   } \
   else if (std::holds_alternative<type_name>(entity)) { \
     for (Reference ref : std::get<type_name>(entity).references()) { \
-      std::optional<NamedEntity> ne = NamedEntityContaining(ref.as_variant()); \
-      co_yield std::make_pair<std::optional<NamedEntity>, Reference>( \
-          std::move(ne), std::move(ref)); \
+      RawEntityId eid = NamedEntityContaining(ref.as_variant()); \
+      if (eid != kInvalidEntityId) { \
+        co_yield std::pair<RawEntityId, Reference>(eid, std::move(ref)); \
+      } \
     }
 
     MX_FOR_EACH_ENTITY_CATEGORY(REFERENCES_TO_CATEGORY, REFERENCES_TO_CATEGORY,

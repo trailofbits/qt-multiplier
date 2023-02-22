@@ -49,7 +49,7 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     RawEntityId file_id{kInvalidEntityId};
 
     //! File path
-    std::filesystem::path path;
+    QString path;
 
     //! An optional line number
     unsigned line{0};
