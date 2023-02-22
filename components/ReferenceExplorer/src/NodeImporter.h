@@ -22,14 +22,16 @@ class NodeImporter final {
   //! Destructor
   ~NodeImporter();
 
-  //! Imports a new node
-  bool ImportEntity(RawEntityId entity_id,
-                    const NodeTree::Node::ImportMode &import_mode,
-                    const std::optional<std::uint64_t> opt_parent_node_id,
+  //! Imports a new node. Here, `entity_id` contains a reference, and the
+  //! entity ID corresponding to the location of the reference is associated
+  //! with `referenced_entity_id`.
+  bool ImportEntity(RawEntityId entity_id, RawEntityId referenced_entity_id,
+                    NodeTree::Node::ImportMode import_mode,
+                    std::optional<std::uint64_t> opt_parent_node_id,
                     std::optional<std::size_t> opt_max_depth);
 
   //! Expands the specified node a new node
-  void ExpandNode(const std::uint64_t &node_id,
+  void ExpandNode(std::uint64_t node_id,
                   std::optional<std::size_t> opt_max_depth);
 
   //! Disabled copy constructor
@@ -52,23 +54,18 @@ class NodeImporter final {
     mx::FileLocationCache file_location_cache;
 
     //! The path map from mx::Index, keyed by id
-    std::unordered_map<mx::PackedFileId, std::filesystem::path> file_path_map;
+    std::unordered_map<PackedFileId, QString> file_path_map;
   };
 
   //! Imports an entity by id
   static void ImportEntity(NodeTree &node_tree, const IndexData &index_data,
-                           const std::uint64_t &parent_node_id,
-                           const RawEntityId &entity_id,
-                           std::optional<std::size_t> opt_max_depth);
-
-  //! Imports a Decl entity
-  static void ImportEntity(NodeTree &node_tree, const IndexData &index_data,
-                           const std::uint64_t &parent_node_id, mx::Decl decl,
+                           std::uint64_t parent_node_id, RawEntityId entity_id,
+                           RawEntityId referenced_entity_id,
                            std::optional<std::size_t> opt_max_depth);
 
   //! Expands the specified node id
   static void ExpandNode(NodeTree &node_tree, const IndexData &index_data,
-                         const std::uint64_t &node_id,
+                         std::uint64_t node_id,
                          std::optional<std::size_t> opt_max_depth);
 };
 

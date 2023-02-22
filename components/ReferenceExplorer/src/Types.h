@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <QString>
+
 #include <unordered_set>
 #include <unordered_map>
 #include <vector>
@@ -38,7 +40,7 @@ struct NodeTree final {
     RawEntityId entity_id{kInvalidEntityId};
 
     //! An optional name for this entity
-    std::optional<std::string> opt_name;
+    std::optional<QString> opt_name;
 
     //! Optional file location information (path + line + column)
     std::optional<IReferenceExplorerModel::Location> opt_location;
