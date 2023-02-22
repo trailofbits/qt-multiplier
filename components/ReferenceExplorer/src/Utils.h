@@ -51,4 +51,12 @@ static std::optional<NamedDecl> NamedDeclContaining(const T &thing) {
   return std::nullopt;
 }
 
+template <typename... Ts>
+struct Overload final : Ts... {
+  using Ts::operator()...;
+};
+
+template <typename... Ts>
+Overload(Ts...) -> Overload<Ts...>;
+
 }  // namespace mx::gui

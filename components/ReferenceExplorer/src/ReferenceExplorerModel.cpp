@@ -70,8 +70,7 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
 
   const auto &node_id = static_cast<std::uint64_t>(index.internalId());
 
-  auto succeeded = d->node_importer.ExpandEntity(node_id, 2);
-  Assert(succeeded, "Node expansion has failed");
+  d->node_importer.ExpandNode(node_id, 2);
 
   emit beginResetModel();
   emit endResetModel();

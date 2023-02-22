@@ -26,11 +26,11 @@ class NodeImporter final {
   bool ImportEntity(RawEntityId entity_id,
                     const NodeTree::Node::ImportMode &import_mode,
                     const std::optional<std::uint64_t> opt_parent_node_id,
-                    std::optional<std::size_t> opt_ttl);
+                    std::optional<std::size_t> opt_max_depth);
 
   //! Expands the specified node a new node
-  bool ExpandEntity(const std::uint64_t &node_id,
-                    std::optional<std::size_t> opt_ttl);
+  void ExpandNode(const std::uint64_t &node_id,
+                  std::optional<std::size_t> opt_max_depth);
 
   //! Disabled copy constructor
   NodeImporter(const NodeImporter &) = delete;
@@ -56,47 +56,20 @@ class NodeImporter final {
   };
 
   //! Imports an entity by id
-  static void ImportEntityById(NodeTree &node_tree, const IndexData &index_data,
-                               const std::uint64_t &parent_node_id,
-                               const RawEntityId &entity_id,
-                               std::optional<std::size_t> opt_ttl);
+  static void ImportEntity(NodeTree &node_tree, const IndexData &index_data,
+                           const std::uint64_t &parent_node_id,
+                           const RawEntityId &entity_id,
+                           std::optional<std::size_t> opt_max_depth);
 
-  //! Imports a decl entity
-  static void ImportDeclEntity(NodeTree &node_tree, const IndexData &index_data,
-                               const std::uint64_t &parent_node_id,
-                               mx::Decl entity,
-                               std::optional<std::size_t> opt_ttl);
+  //! Imports a Decl entity
+  static void ImportEntity(NodeTree &node_tree, const IndexData &index_data,
+                           const std::uint64_t &parent_node_id, mx::Decl decl,
+                           std::optional<std::size_t> opt_max_depth);
 
-  //! Imports a stmt entity
-  static void ImportStmtEntity(NodeTree &node_tree, const IndexData &index_data,
-                               const std::uint64_t &parent_node_id,
-                               mx::Stmt entity,
-                               std::optional<std::size_t> opt_ttl);
-
-  //! Imports an attr entity
-  static void ImportAttrEntity(NodeTree &node_tree, const IndexData &index_data,
-                               const std::uint64_t &parent_node_id,
-                               mx::Attr entity,
-                               std::optional<std::size_t> opt_ttl);
-
-  //! Imports a macro entity
-  static void
-  ImportMacroEntity(NodeTree &node_tree, const IndexData &index_data,
-                    const std::uint64_t &parent_node_id, mx::Macro entity,
-                    std::optional<std::size_t> opt_ttl);
-
-  //! Imports a designator entity
-  static void ImportDesignatorEntity(NodeTree &node_tree,
-                                     const IndexData &index_data,
-                                     const std::uint64_t &parent_node_id,
-                                     mx::Designator entity,
-                                     std::optional<std::size_t> opt_ttl);
-
-  //! Imports a file entity
-  static void ImportFileEntity(NodeTree &node_tree, const IndexData &index_data,
-                               const std::uint64_t &parent_node_id,
-                               mx::File entity,
-                               std::optional<std::size_t> opt_ttl);
+  //! Expands the specified node id
+  static void ExpandNode(NodeTree &node_tree, const IndexData &index_data,
+                         const std::uint64_t &node_id,
+                         std::optional<std::size_t> opt_max_depth);
 };
 
 }  // namespace mx::gui
