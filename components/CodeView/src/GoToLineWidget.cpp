@@ -81,6 +81,8 @@ void GoToLineWidget::UpdateWidgetPlacement() {
 void GoToLineWidget::OnLineNumberInputChanged() {
   auto line_number = static_cast<unsigned>(d->line_number_edit->text().toInt());
   emit LineNumberChanged(line_number);
+
+  Deactivate();
 }
 
 void GoToLineWidget::Activate(unsigned max_line_number) {
