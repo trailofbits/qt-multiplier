@@ -8,6 +8,7 @@
 
 #include "CodeView.h"
 #include "DefaultCodeViewThemes.h"
+#include "GoToLineWidget.h"
 
 #include <multiplier/ui/Assert.h>
 
@@ -27,6 +28,7 @@
 #include <QFontMetrics>
 #include <QWheelEvent>
 #include <QRegularExpression>
+#include <QShortcut>
 
 #include <unordered_set>
 #include <vector>
@@ -61,6 +63,9 @@ struct CodeView::PrivateData final {
   std::size_t tab_width{4};
 
   std::optional<CodeModelIndex> opt_prev_hovered_model_index;
+
+  QShortcut *go_to_line_shortcut{nullptr};
+  GoToLineWidget *go_to_line_widget{nullptr};
 };
 
 void CodeView::SetTheme(const CodeViewTheme &theme) {
@@ -145,15 +150,22 @@ void CodeView::SetWordWrapping(bool enabled) {
                                         : QTextOption::NoWrap);
 }
 
-//! Scrolls the view to the specified entity id
 bool CodeView::ScrollToLineNumber(unsigned line) const {
-  auto block_it = d->token_map.line_number_to_block_number.find(line);
-  if (block_it == d->token_map.line_number_to_block_number.end()) {
+  auto opt_block_number = GetBlockNumberFromLineNumber(d->token_map, line);
+  if (!opt_block_number.has_value()) {
     return false;
   }
 
-  // TODO(pag,alessandro): How to do this???
-  return false;
+  const auto &block_number = opt_block_number.value();
+
+  const auto &document = *d->text_edit->document();
+  auto text_block = document.findBlockByNumber(static_cast<int>(block_number));
+  if (!text_block.isValid()) {
+    return false;
+  }
+
+  auto end_position = text_block.position() + text_block.length();
+  return SetCursorPosition(text_block.position(), end_position);
 }
 
 bool CodeView::ScrollToEntityId(RawEntityId entity_id) const {
@@ -294,11 +306,20 @@ void CodeView::InitializeWidgets() {
   main_layout->addWidget(d->search_widget);
   setLayout(main_layout);
 
+  // Apply the default tab stop distance
+  SetTabWidth(d->tab_width);
+
+  // Initialize the go-to-line widget
+  d->go_to_line_widget = new GoToLineWidget(this);
+  d->go_to_line_shortcut = new QShortcut(
+      QKeySequence(Qt::CTRL | Qt::Key_L), this, this,
+      &CodeView::OnGoToLineTriggered, Qt::WidgetWithChildrenShortcut);
+
+  connect(d->go_to_line_widget, &GoToLineWidget::LineNumberChanged, this,
+          &CodeView::OnGoToLine);
+
   // This will also cause a model reset update
   SetTheme(kDefaultDarkCodeViewTheme);
-
-  // Apply the default tab stop distance
-  SetTabWidth(4);
 }
 
 std::optional<CodeModelIndex>
@@ -412,6 +433,20 @@ CodeView::GetLineNumberFromBlockNumber(const TokenMap &token_map,
   }
 
   return line_number_it->second;
+}
+
+std::optional<std::size_t>
+CodeView::GetBlockNumberFromLineNumber(const TokenMap &token_map,
+                                       unsigned line_number) {
+
+  auto block_number_it =
+      token_map.line_number_to_block_number.find(line_number);
+
+  if (block_number_it == token_map.line_number_to_block_number.end()) {
+    return std::nullopt;
+  }
+
+  return block_number_it->second;
 }
 
 std::optional<CodeModelIndex>
@@ -818,6 +853,7 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
 
 void CodeView::OnModelReset() {
   d->search_widget->Deactivate();
+  d->go_to_line_widget->Deactivate();
 
   QProgressDialog progress(tr("Generating rows..."), tr("Abort"), 0, 100, this);
   progress.setWindowModality(Qt::WindowModal);
@@ -968,6 +1004,14 @@ void CodeView::OnShowSearchResult(const std::size_t &result_index) {
 
   const auto &search_result = d->search_result_list.at(result_index);
   SetCursorPosition(search_result.first, search_result.second);
+}
+
+void CodeView::OnGoToLineTriggered() {
+  d->go_to_line_widget->Activate(d->token_map.highest_line_number);
+}
+
+void CodeView::OnGoToLine(unsigned line_number) {
+  ScrollToLineNumber(line_number);
 }
 
 }  // namespace mx::gui

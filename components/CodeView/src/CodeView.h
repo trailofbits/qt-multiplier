@@ -75,7 +75,7 @@ class CodeView final : public ICodeView {
   std::unique_ptr<PrivateData> d;
 
   //! Used to capture certain events from the gutter/text edit viewport
-  virtual bool eventFilter(QObject *, QEvent *) override;
+  virtual bool eventFilter(QObject *obj, QEvent *event) override;
 
   //! Installs the given module, updating its parent
   void InstallModel(ICodeModel *model);
@@ -103,6 +103,7 @@ class CodeView final : public ICodeView {
   //! Updates the gutter's minimum width based on the highest line number
   void UpdateGutterWidth();
 
+  // Reapplies token group colors using the QPlainTextEdit extra selections
   void UpdateTokenGroupColors();
 
  public:
@@ -146,6 +147,10 @@ class CodeView final : public ICodeView {
   //! Returns the line number for the specified block number
   static std::optional<std::size_t>
   GetLineNumberFromBlockNumber(const TokenMap &token_map, int block_number);
+
+  //! Returns the block number for the specified line number
+  static std::optional<std::size_t>
+  GetBlockNumberFromLineNumber(const TokenMap &token_map, unsigned line_number);
 
   //! Returns a code model index from the specified text cursor
   static std::optional<CodeModelIndex>
@@ -219,6 +224,12 @@ class CodeView final : public ICodeView {
 
   //! Called by search widget whenever a search result needs to be shown
   void OnShowSearchResult(const std::size_t &result_index);
+
+  //! Called by the go-to-line QShortcut
+  void OnGoToLineTriggered();
+
+  //! Called by GoToLineWIdget when a valid line number has been requested
+  void OnGoToLine(unsigned line_number);
 
   friend class ICodeView;
 };

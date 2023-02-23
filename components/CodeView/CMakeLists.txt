@@ -24,6 +24,9 @@ add_library("mx_codeview"
 
   src/DefaultCodeViewThemes.h
   src/DefaultCodeViewThemes.cpp
+
+  src/GoToLineWidget.h
+  src/GoToLineWidget.cpp
 )
 
 target_sources("mx_codeview" INTERFACE
