@@ -286,7 +286,7 @@ void MainWindow::OnToggleWordWrap(bool checked) {
 
 void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
   auto file_raw_entity_id_var =
-      index.data(IReferenceExplorerModel::EntityIdRole);
+      index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
 
   if (!file_raw_entity_id_var.isValid()) {
     return;
@@ -295,13 +295,13 @@ void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
   auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
   d->ref_explorer_code_model->SetEntity(file_raw_entity_id);
 
-  auto entity_id_var = index.data(IReferenceExplorerModel::EntityIdRole);
-  if (!entity_id_var.isValid()) {
+  auto line_number_var = index.data(IReferenceExplorerModel::LineNumberRole);
+  if (!line_number_var.isValid()) {
     return;
   }
 
-  auto raw_entity_id = qvariant_cast<RawEntityId>(entity_id_var);
-  d->ref_explorer_code_view->ScrollToEntityId(raw_entity_id);
+  auto line_number = qvariant_cast<unsigned>(line_number_var);
+  d->ref_explorer_code_view->ScrollToLineNumber(line_number);
 }
 
 void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,

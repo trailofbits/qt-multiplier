@@ -211,7 +211,8 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   } else if (role == Qt::ToolTipRole) {
     auto buffer = tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
 
-    if (std::optional<FragmentId> frag_id = FragmentId::From(node.entity_id)) {
+    if (std::optional<FragmentId> frag_id =
+        FragmentId::from(node.referenced_entity_id)) {
       buffer += tr("Fragment ID: ") +
                 QString::number(EntityId(frag_id.value()).Pack());
     }
@@ -226,8 +227,12 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   } else if (role == IReferenceExplorerModel::EntityIdRole) {
     value = node.entity_id;
 
+  } else if (role == IReferenceExplorerModel::ReferencedEntityIdRole) {
+    value = node.referenced_entity_id;
+
   } else if (role == IReferenceExplorerModel::FragmentIdRole) {
-    if (std::optional<FragmentId> frag_id = FragmentId::From(node.entity_id)) {
+    if (std::optional<FragmentId> frag_id =
+            FragmentId::from(node.referenced_entity_id)) {
       value.setValue(EntityId(frag_id.value()).Pack());
     }
 
@@ -453,6 +458,7 @@ void ReferenceExplorerModel::SerializeNode(QDataStream &stream,
   stream << node.node_id;
   stream << node.parent_node_id;
   stream << node.entity_id;
+  stream << node.referenced_entity_id;
 
   if (node.opt_name.has_value()) {
     stream << true;
@@ -492,6 +498,7 @@ ReferenceExplorerModel::DeserializeNode(QDataStream &stream) {
     stream >> node.node_id;
     stream >> node.parent_node_id;
     stream >> node.entity_id;
+    stream >> node.referenced_entity_id;
 
     bool has_optional_field = false;
 

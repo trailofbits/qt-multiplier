@@ -93,7 +93,7 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
     FileId fid(std::get<FileTokenId>(vid).file_id);
     d->future_result = d->database->DownloadFile(fid);
 
-  } else if (std::optional<FragmentId> frag_id = FragmentId::From(eid)) {
+  } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
     FragmentId fid = frag_id.value();
     d->future_result = d->database->DownloadFragment(fid);
 

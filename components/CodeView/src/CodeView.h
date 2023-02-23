@@ -54,6 +54,9 @@ class CodeView final : public ICodeView {
   //! \copybrief ICodeView::SetWordWrapping
   virtual void SetWordWrapping(bool enabled) override;
 
+  //! Scrolls the view to the specified entity id
+  virtual bool ScrollToLineNumber(unsigned line) const override;
+
   //! \copybrief ICodeView::ScrollToEntityId
   virtual bool ScrollToEntityId(RawEntityId entity_id) const override;
 

@@ -278,6 +278,7 @@ void NodeImporter::ImportEntity(NodeTree &node_tree,
   cn.node_id = current_node_id;
   cn.parent_node_id = parent_node_id;
   cn.entity_id = entity_id;
+  cn.referenced_entity_id = referenced_entity_id;
   cn.opt_name = NameOfEntity(entity, index_data.file_path_map);
 
   // Get us the location of the referenced entity.
