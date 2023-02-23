@@ -212,7 +212,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     auto buffer = tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
 
     if (std::optional<FragmentId> frag_id =
-        FragmentId::from(node.referenced_entity_id)) {
+            FragmentId::From(node.referenced_entity_id)) {
       buffer += tr("Fragment ID: ") +
                 QString::number(EntityId(frag_id.value()).Pack());
     }
@@ -232,7 +232,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
   } else if (role == IReferenceExplorerModel::FragmentIdRole) {
     if (std::optional<FragmentId> frag_id =
-            FragmentId::from(node.referenced_entity_id)) {
+            FragmentId::From(node.referenced_entity_id)) {
       value.setValue(EntityId(frag_id.value()).Pack());
     }
 
