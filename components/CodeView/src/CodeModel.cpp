@@ -93,7 +93,7 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
     FileId fid(std::get<FileTokenId>(vid).file_id);
     d->future_result = d->database->DownloadFile(fid);
 
-  } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
+  } else if (std::optional<FragmentId> frag_id = FragmentId::From(eid)) {
     FragmentId fid = frag_id.value();
     d->future_result = d->database->DownloadFragment(fid);
 
@@ -256,10 +256,8 @@ void CodeModel::FutureResultStateChanged() {
     auto token_length = token_end - token_start;
 
     col.token_id = indexed_token_range_data.token_ids[i];
-    col.related_entity_id =
-        indexed_token_range_data.related_entity_ids[i];
-    col.token_category =
-        indexed_token_range_data.token_categories[i];
+    col.related_entity_id = indexed_token_range_data.related_entity_ids[i];
+    col.token_category = indexed_token_range_data.token_categories[i];
 
     auto frag_id_index = indexed_token_range_data.fragment_id_index[i];
     if (auto frag_id = indexed_token_range_data.fragment_ids[frag_id_index];
