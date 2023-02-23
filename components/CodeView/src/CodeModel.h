@@ -42,8 +42,22 @@ class CodeModel final : public ICodeModel {
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
+  enum class ModelState {
+    UpdateInProgress,
+    UpdateFailed,
+    UpdateCancelled,
+    Ready,
+  };
+
  private slots:
+  void OnBeginResetModel();
+  void OnEndResetModel(const ModelState &model_state);
+
   void FutureResultStateChanged();
+
+ signals:
+  void BeginResetModel();
+  void EndResetModel(const ModelState &model_state);
 
   friend class ICodeModel;
 };

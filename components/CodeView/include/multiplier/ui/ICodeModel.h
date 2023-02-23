@@ -81,9 +81,6 @@ class ICodeModel : public QObject {
   ICodeModel &operator=(const ICodeModel &) = delete;
 
  signals:
-  //! This signal is emitted before a model is reset
-  void ModelAboutToBeReset();
-
   //! This signal is emitted at the end of the model reset process
   void ModelReset();
 };

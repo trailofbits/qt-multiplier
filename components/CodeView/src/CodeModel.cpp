@@ -15,18 +15,10 @@
 #include <QString>
 
 #include <vector>
-#include <iostream>
 
 namespace mx::gui {
 
 namespace {
-
-enum class ModelState {
-  UpdateInProgress,
-  UpdateFailed,
-  UpdateCancelled,
-  Ready,
-};
 
 struct TokenColumn final {
   RawEntityId token_id;
@@ -75,15 +67,16 @@ Index &CodeModel::GetIndex() {
 }
 
 void CodeModel::SetEntity(RawEntityId raw_id) {
-  emit ModelAboutToBeReset();
-
   if (d->future_result.isRunning()) {
     d->future_result.cancel();
   }
 
+  d->future_result = {};
+
+  emit BeginResetModel();
+
   EntityId eid(raw_id);
   VariantId vid = eid.Unpack();
-  ModelState new_state = ModelState::UpdateInProgress;
 
   if (std::holds_alternative<FileId>(vid)) {
     FileId fid = std::get<FileId>(vid);
@@ -98,17 +91,10 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
     d->future_result = d->database->DownloadFragment(fid);
 
   } else {
-    // TODO(pag): What to do here??
-    Assert(false, "Entity id not associated with a file or fragment.");
-    new_state = ModelState::UpdateCancelled;
-    d->future_result = {};
+    emit EndResetModel(ModelState::UpdateFailed);
   }
 
   d->future_watcher.setFuture(d->future_result);
-  d->token_row_list.clear();
-  d->model_state = new_state;
-
-  emit ModelReset();
 }
 
 int CodeModel::RowCount() const {
@@ -217,40 +203,43 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache,
   d->database = IDatabase::Create(index, file_location_cache);
   connect(&d->future_watcher, &QFutureWatcher<IDatabase::Result>::finished,
           this, &CodeModel::FutureResultStateChanged);
+
+  connect(this, &CodeModel::BeginResetModel, this,
+          &CodeModel::OnBeginResetModel);
+  connect(this, &CodeModel::EndResetModel, this, &CodeModel::OnEndResetModel);
+}
+
+void CodeModel::OnBeginResetModel() {
+  d->model_state = ModelState::UpdateInProgress;
+  d->token_row_list.clear();
+}
+
+void CodeModel::OnEndResetModel(const ModelState &model_state) {
+  d->model_state = model_state;
+  emit ModelReset();
 }
 
 void CodeModel::FutureResultStateChanged() {
-  d->token_row_list.clear();
-
   if (d->future_result.isCanceled()) {
-    emit ModelAboutToBeReset();
-    d->model_state = ModelState::UpdateCancelled;
-    emit ModelReset();
-
+    emit EndResetModel(ModelState::UpdateCancelled);
     return;
   }
 
   auto future_result = d->future_result.takeResult();
-
   if (!std::holds_alternative<IndexedTokenRangeData>(future_result)) {
-    emit ModelAboutToBeReset();
-    d->model_state = ModelState::UpdateFailed;
-    emit ModelReset();
-
+    emit EndResetModel(ModelState::UpdateFailed);
     return;
   }
 
-  emit ModelAboutToBeReset();
-
   IndexedTokenRangeData indexed_token_range_data =
       std::move(std::get<IndexedTokenRangeData>(future_result));
+
   auto token_count = indexed_token_range_data.start_of_token.size() - 1;
 
   TokenRow row;
   TokenColumn col;
 
   for (std::size_t i = 0; i < token_count; ++i) {
-
     auto token_start = indexed_token_range_data.start_of_token[i];
     auto token_end = indexed_token_range_data.start_of_token[i + 1];
     auto token_length = token_end - token_start;
@@ -286,9 +275,7 @@ void CodeModel::FutureResultStateChanged() {
     d->token_row_list.push_back(std::move(row));
   }
 
-  d->model_state = ModelState::Ready;
-
-  emit ModelReset();
+  emit EndResetModel(ModelState::Ready);
 }
 
 }  // namespace mx::gui
