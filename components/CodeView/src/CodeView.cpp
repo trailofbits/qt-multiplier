@@ -145,6 +145,17 @@ void CodeView::SetWordWrapping(bool enabled) {
                                         : QTextOption::NoWrap);
 }
 
+//! Scrolls the view to the specified entity id
+bool CodeView::ScrollToLineNumber(unsigned line) const {
+  auto block_it = d->token_map.line_number_to_block_number.find(line);
+  if (block_it == d->token_map.line_number_to_block_number.end()) {
+    return false;
+  }
+
+  // TODO(pag,alessandro): How to do this???
+  return false;
+}
+
 bool CodeView::ScrollToEntityId(RawEntityId entity_id) const {
   auto opt_token_pos = GetEntityCursorPosition(entity_id);
   if (!opt_token_pos.has_value()) {

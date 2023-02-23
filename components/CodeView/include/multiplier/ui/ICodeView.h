@@ -61,6 +61,9 @@ class ICodeView : public QWidget {
   virtual void SetWordWrapping(bool enabled) = 0;
 
   //! Scrolls the view to the specified entity id
+  virtual bool ScrollToLineNumber(unsigned line) const = 0;
+
+  //! Scrolls the view to the specified entity id
   virtual bool ScrollToEntityId(RawEntityId entity_id) const = 0;
 
   //! Scrolls the view to the specified token

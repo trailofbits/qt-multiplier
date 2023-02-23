@@ -31,6 +31,9 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     //! Returns the entity id as a RawEntityId value
     EntityIdRole,
 
+    //! Returns the referenced entity id as a RawEntityId value
+    ReferencedEntityIdRole,
+
     //! Returns the fragment id as a RawEntityId value
     FragmentIdRole,
 

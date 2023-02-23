@@ -38,6 +38,7 @@ struct NodeTree final {
 
     //! Multiplier-specific identifiers
     RawEntityId entity_id{kInvalidEntityId};
+    RawEntityId referenced_entity_id{kInvalidEntityId};
 
     //! An optional name for this entity
     std::optional<QString> opt_name;
