@@ -23,8 +23,6 @@
 #include <QSplitter>
 #include <QTabBar>
 
-#include <iostream>
-
 namespace mx::gui {
 
 namespace {
@@ -48,6 +46,7 @@ struct MainWindow::PrivateData final {
 
   ICodeModel *ref_explorer_code_model{nullptr};
   ICodeView *ref_explorer_code_view{nullptr};
+  std::optional<unsigned> opt_scroll_to_line;
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
 
@@ -103,6 +102,9 @@ void MainWindow::CreateReferenceExplorerDock() {
 
   d->ref_explorer_code_view = ICodeView::Create(d->ref_explorer_code_model);
   d->ref_explorer_code_view->SetWordWrapping(false);
+
+  connect(d->ref_explorer_code_view, &ICodeView::DocumentChanged, this,
+          &MainWindow::OnCodeModelUpdate);
 
   d->ref_explorer_tab_widget = new QTabWidget(this);
   d->ref_explorer_tab_widget->setTabsClosable(true);
@@ -238,6 +240,17 @@ void MainWindow::CloseTokenReferenceExplorer() {
   }
 }
 
+void MainWindow::SchedulePostUpdateLineScrollCommand(unsigned line_number) {
+  d->opt_scroll_to_line = line_number;
+}
+
+std::optional<unsigned> MainWindow::GetScheduledPostUpdateLineScrollCommand() {
+  auto opt_scroll_to_line = std::move(d->opt_scroll_to_line);
+  d->opt_scroll_to_line = std::nullopt;
+
+  return opt_scroll_to_line;
+}
+
 void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
                                         const std::string &file_name,
                                         bool double_click) {
@@ -292,16 +305,16 @@ void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
     return;
   }
 
-  auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
-  d->ref_explorer_code_model->SetEntity(file_raw_entity_id);
-
   auto line_number_var = index.data(IReferenceExplorerModel::LineNumberRole);
   if (!line_number_var.isValid()) {
     return;
   }
 
   auto line_number = qvariant_cast<unsigned>(line_number_var);
-  d->ref_explorer_code_view->ScrollToLineNumber(line_number);
+  SchedulePostUpdateLineScrollCommand(line_number);
+
+  auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
+  d->ref_explorer_code_model->SetEntity(file_raw_entity_id);
 }
 
 void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
@@ -328,6 +341,15 @@ void MainWindow::OnReferenceExplorerTabBarClose(int index) {
   auto widget_visible = d->ref_explorer_tab_widget->count() != 0;
   d->reference_explorer_dock->setVisible(widget_visible);
   d->reference_explorer_dock->toggleViewAction()->setEnabled(widget_visible);
+}
+
+void MainWindow::OnCodeModelUpdate() {
+  if (auto opt_scroll_to_line = GetScheduledPostUpdateLineScrollCommand();
+      opt_scroll_to_line.has_value()) {
+
+    const auto &line_number = opt_scroll_to_line.value();
+    d->ref_explorer_code_view->ScrollToLineNumber(line_number);
+  }
 }
 
 }  // namespace mx::gui

@@ -35,6 +35,8 @@ class MainWindow final : public QMainWindow {
   void OpenTokenContextMenu(const CodeModelIndex &index);
   void OpenTokenReferenceExplorer(const CodeModelIndex &index);
   void CloseTokenReferenceExplorer();
+  void SchedulePostUpdateLineScrollCommand(unsigned line_number);
+  std::optional<unsigned> GetScheduledPostUpdateLineScrollCommand();
 
  private slots:
   void OnIndexViewFileClicked(const PackedFileId &file_id,
@@ -51,6 +53,7 @@ class MainWindow final : public QMainWindow {
   void OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
                                         const bool &as_new_tab);
   void OnReferenceExplorerTabBarClose(int index);
+  void OnCodeModelUpdate();
 };
 
 }  // namespace mx::gui
