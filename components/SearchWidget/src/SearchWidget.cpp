@@ -216,7 +216,7 @@ void SearchWidget::InitializeKeyboardShortcuts(QWidget *parent) {
                     Qt::WidgetWithChildrenShortcut);
 
   d->disable_search_shortcut =
-      new QShortcut(QKeySequence::Cancel, parent, this,
+      new QShortcut(QKeySequence::Cancel, this, this,
                     &ISearchWidget::Deactivate, Qt::WidgetWithChildrenShortcut);
 
   if (d->mode == Mode::Search) {
