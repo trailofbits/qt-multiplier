@@ -885,6 +885,8 @@ void CodeView::OnModelReset() {
   UpdateGutterWidth();
   UpdateTokenGroupColors();
   UpdateTabStopDistance();
+
+  emit DocumentChanged();
 }
 
 void CodeView::OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event) {

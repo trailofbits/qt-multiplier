@@ -86,6 +86,9 @@ class ICodeView : public QWidget {
 
   //! This signal is emitted whenever the mouse cursor is hovering on a token
   void TokenHovered(const CodeModelIndex &index);
+
+  //! Emitted when the document is changed in response to a model reset
+  void DocumentChanged();
 };
 
 }  // namespace mx::gui
