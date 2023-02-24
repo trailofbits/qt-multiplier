@@ -50,7 +50,7 @@ bool ReferenceExplorerModel::AppendEntityObject(RawEntityId entity_id,
 
   auto succeeded = d->node_importer.ImportEntity(
       entity_id, entity_id, NodeTree::Node::ImportMode::CallHierarchy,
-      parent_node_id, 2);
+      parent_node_id, 5);
 
   if (succeeded) {
     auto parent_node = d->node_tree.node_map.at(parent_node_id);

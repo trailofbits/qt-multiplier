@@ -29,6 +29,7 @@ RawEntityId NamedEntityContaining(VariantEntity entity) {
 
   } else if (std::holds_alternative<Stmt>(entity)) {
     const Stmt &stmt = std::get<Stmt>(entity);
+
     if (auto nd = NamedDeclContaining(stmt); nd != kInvalidEntityId) {
       return nd;
     }
@@ -98,39 +99,8 @@ References(VariantEntity entity) {
   if (std::holds_alternative<NotAnEntity>(entity)) {
     co_return;
 
-  // Custom handling for local vars.
-  } else if (std::holds_alternative<Decl>(entity)) {
-    Decl decl = std::get<Decl>(entity);
-    for (auto prev_id = kInvalidEntityId; decl.id().Pack() != prev_id; ) {
-      prev_id = decl.id().Pack();
-
-      if (FunctionDecl::from(decl) || FieldDecl::from(decl)) {
-        break;
-
-      } else if (auto var = VarDecl::from(decl)) {
-        if (!var->is_local_variable_declaration()) {
-          break;
-        }
-      }
-
-      auto parent = decl.parent_declaration();
-      if (!parent) {
-        break;
-      }
-
-      decl = std::move(parent.value());
-    }
-
-    for (Reference ref : decl.references()) {
-      RawEntityId eid = NamedEntityContaining(ref.as_variant());
-      if (eid != kInvalidEntityId) {
-        co_yield std::pair<RawEntityId, Reference>(eid, std::move(ref));
-      }
-    }
-
 #define REFERENCES_TO_CATEGORY(type_name, lower_name, enum_name, category) \
-  } \
-  else if (std::holds_alternative<type_name>(entity)) { \
+  } else if (std::holds_alternative<type_name>(entity)) { \
     for (Reference ref : std::get<type_name>(entity).references()) { \
       RawEntityId eid = NamedEntityContaining(ref.as_variant()); \
       if (eid != kInvalidEntityId) { \

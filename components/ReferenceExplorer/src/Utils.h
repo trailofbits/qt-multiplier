@@ -36,8 +36,11 @@ static RawEntityId NamedDeclContaining(const T &thing) {
   }
 
   for (VarDecl var : VarDecl::containing(thing)) {
-    if (var.is_local_variable_declaration()) {
-      return NamedDeclContaining<Decl>(var);
+    if (var.is_local_variable_declaration_or_parm()) {
+      if (RawEntityId eid = NamedDeclContaining<Decl>(var);
+          eid != kInvalidEntityId) {
+        return eid;
+      }
 
     } else {
       return var.id().Pack();

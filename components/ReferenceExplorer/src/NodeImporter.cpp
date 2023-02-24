@@ -257,9 +257,11 @@ void NodeImporter::ImportEntity(NodeTree &node_tree,
                                 RawEntityId referenced_entity_id,
                                 std::optional<std::size_t> opt_max_depth) {
 
-  auto insert_status = node_tree.visited_entity_id_set.insert(entity_id);
-  if (!insert_status.second) {
-    // TODO(alessandro): Some kind of thing to show that we have a repeat?
+
+  // TODO(alessandro): Some kind of thing to show that we have a repeat? This
+  //                   should maybe be a custom row that points to the old
+  //                   entry with a button of some kind.
+  if (!node_tree.visited_entity_id_set.insert(referenced_entity_id).second) {
     return;
   }
 
@@ -334,9 +336,10 @@ void NodeImporter::ExpandNode(NodeTree &node_tree, const IndexData &index_data,
 
   const NodeTree::Node &node = node_it->second;
   for (const auto &p : References(index_data.index.entity(node.entity_id))) {
-    RawEntityId named_entity_id = p.first;
-    const Reference ref = p.second;
-    if (named_entity_id == kInvalidEntityId) {
+    RawEntityId entity_id = p.first;
+    RawEntityId referenced_entity_id = p.second.referenced_entity_id().Pack();
+    if (entity_id == kInvalidEntityId ||
+        referenced_entity_id == kInvalidEntityId) {
       continue;
     }
 
@@ -344,16 +347,17 @@ void NodeImporter::ExpandNode(NodeTree &node_tree, const IndexData &index_data,
         node.child_node_id_list.begin(), node.child_node_id_list.end(),
 
         [=, &node_tree](const std::uint64_t &child_node_id) -> bool {
-          const auto &child_node = node_tree.node_map.at(child_node_id);
-          return (child_node.entity_id == named_entity_id);
+          const NodeTree::Node &child_node =
+              node_tree.node_map.at(child_node_id);
+          return (child_node.referenced_entity_id == referenced_entity_id);
         });
 
     if (child_node_id_it != node.child_node_id_list.end()) {
       continue;
     }
 
-    ImportEntity(node_tree, index_data, node_id, named_entity_id,
-                 ref.referenced_entity_id().Pack(), opt_max_depth);
+    ImportEntity(node_tree, index_data, node_id, entity_id,
+                 referenced_entity_id, opt_max_depth);
   }
 }
 
