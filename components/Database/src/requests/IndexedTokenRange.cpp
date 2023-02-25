@@ -231,7 +231,7 @@ static bool RenderFragmentToken(const TokenRange &input_toks,
                                 unsigned &line_number,
                                 unsigned fragment_index,
                                 IndexedTokenRangeData &output) {
-  if (frag_toks.empty()) {
+  if (frag_toks.empty() || file_tok_index >= input_toks.size()) {
     return false;  // Done with the fragment.
   }
 
