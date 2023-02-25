@@ -41,17 +41,23 @@ RawEntityId NamedEntityContaining(VariantEntity entity) {
     }
 
   } else if (std::holds_alternative<Macro>(entity)) {
+
     Macro macro = std::move(std::get<Macro>(entity));
+
+    for (Token tok : macro.expansion_tokens()) {
+      if (auto nd = NamedDeclContaining(tok); nd != kInvalidEntityId) {
+        return nd;
+      }
+    }
+
+    // If the macro wasn't used inside of a decl/statement, then go try to
+    // find the macro definition containing this macro.
+    for (auto parent = macro.parent(); parent; parent = macro.parent()) {
+      macro = std::move(parent.value());
+    }
+
     if (auto dd = DefineMacroDirective::from(macro)) {
       return dd->id().Pack();
-    }
-
-    if (std::optional<Macro> parent = macro.parent()) {
-      return NamedEntityContaining(std::move(parent.value()));
-    }
-
-    if (auto file = File::containing(macro)) {
-      return file->id().Pack();
     }
 
   } else if (std::holds_alternative<File>(entity)) {
@@ -94,7 +100,7 @@ RawEntityId NamedEntityContaining(VariantEntity entity) {
 //! referenced entity will match the named entity, other times the named
 //! entity will contain the reference (e.g. a function containing a call).
 gap::generator<std::pair<RawEntityId, Reference>>
-References(VariantEntity entity) {
+References(const VariantEntity &entity) {
 
   if (std::holds_alternative<NotAnEntity>(entity)) {
     co_return;
@@ -116,5 +122,104 @@ References(VariantEntity entity) {
   }
 }
 
+//! Return the file containing an entity.
+std::optional<File> FileOfEntity(VariantEntity ent) {
+  const auto VariantEntityVisitor = Overload{
+    [] (const Decl &entity) { return File::containing(entity); },
+    [] (const Stmt &entity) { return File::containing(entity); },
+    [] (const Type &entity) { return File::containing(entity); },
+    [] (const Token &entity) { return File::containing(entity); },
+    [] (const Macro &entity) { return File::containing(entity); },
+    [] (const Designator &entity) { return File::containing(entity); },
+    [] (const CXXBaseSpecifier &entity) { return File::containing(entity); },
+    [] (const TemplateArgument &entity) { return File::containing(entity); },
+    [] (const TemplateParameterList &entity) { return File::containing(entity); },
+    [] (const Fragment &entity) { return File::containing(entity); },
+    [] (const File &entity) { return entity; },
+    [](auto) -> std::optional<File> { return std::nullopt; }
+  };
+  return std::visit<std::optional<File>>(VariantEntityVisitor, ent);
+}
+
+//! Get the first file token associated with an entity.
+//!
+//! NOTE(pag): We prefer `TokenRange::file_tokens` as that walks up macros.
+Token FirstFileToken(const VariantEntity &ent) {
+  const auto VariantEntityVisitor = Overload{
+    [] (const Decl &entity) { return entity.tokens().file_tokens().front(); },
+    [] (const Stmt &entity) { return entity.tokens().file_tokens().front(); },
+    [] (const Type &) { return Token(); },
+
+    // Find the containing file usage of this, not necessarily the derived filed
+    // token.
+    [] (const Token &entity) {
+      return TokenRange(entity).file_tokens().front();
+    },
+
+    [] (const Macro &entity) {
+      for (Token tok : entity.use_tokens()) {
+        return tok.file_token();
+      }
+      return Token();
+    },
+    [] (const Designator &entity) {
+      return entity.tokens().file_tokens().front();
+    },
+    [] (const CXXBaseSpecifier &entity) {
+      return entity.tokens().file_tokens().front();
+    },
+    [] (const TemplateArgument &) {
+      return Token();
+    },
+    [] (const TemplateParameterList &entity) {
+      return entity.tokens().file_tokens().front();
+    },
+
+    // NOTE(pag): We don't do `entity.parsed_tokens().file_tokens()` because
+    //            if it's a pure macro fragment, then it might not have any
+    //            parsed tokens.
+    [] (const Fragment &entity) {
+      return entity.file_tokens().front();
+    },
+    [] (const File &entity) { return entity.tokens().front(); },
+    [](auto) { return Token(); }
+  };
+  return std::visit<Token>(VariantEntityVisitor, ent);
+}
+
+//! Return the name of an entity.
+std::optional<QString> NameOfEntity(
+    const VariantEntity &ent,
+    const std::unordered_map<PackedFileId, QString> &file_paths) {
+
+  const auto VariantEntityVisitor = Overload{
+    [] (const Decl &decl) -> std::optional<QString> {
+      if (auto named = NamedDecl::from(decl)) {
+        auto name = named->name();
+        return QString::fromUtf8(
+            name.data(), static_cast<qsizetype>(name.size()));
+      }
+      return std::nullopt;
+    },
+
+    [] (const Macro &macro) -> std::optional<QString> {
+      if (auto named = DefineMacroDirective::from(macro)) {
+        auto name = named->name().data();
+        return QString::fromUtf8(
+            name.data(), static_cast<qsizetype>(name.size()));
+      }
+      return std::nullopt;
+    },
+    [&file_paths] (const File &file) -> std::optional<QString> {
+      if (auto it = file_paths.find(file.id()); it != file_paths.end()) {
+        return it->second;
+      }
+      return std::nullopt;
+    },
+
+    [] (auto) -> std::optional<QString> { return std::nullopt; }
+  };
+  return std::visit<std::optional<QString>>(VariantEntityVisitor, ent);
+}
 
 }  // namespace mx::gui
