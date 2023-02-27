@@ -11,7 +11,7 @@
 #include <multiplier/Entities/DefineMacroDirective.h>
 #include <multiplier/Entities/IncludeLikeMacroDirective.h>
 #include <utility>
-
+#include <iostream>
 namespace mx::gui {
 
 RawEntityId NamedEntityContaining(VariantEntity entity) {
@@ -45,6 +45,7 @@ RawEntityId NamedEntityContaining(VariantEntity entity) {
     Macro macro = std::move(std::get<Macro>(entity));
 
     for (Token tok : macro.expansion_tokens()) {
+      std::cerr << tok.id() << '\n';
       if (auto nd = NamedDeclContaining(tok); nd != kInvalidEntityId) {
         return nd;
       }
@@ -76,8 +77,24 @@ RawEntityId NamedEntityContaining(VariantEntity entity) {
 
   } else if (std::holds_alternative<Token>(entity)) {
     const Token &tok = std::get<Token>(entity);
-    if (auto nd = NamedDeclContaining(tok); nd != kInvalidEntityId) {
-      return nd;
+
+    if (auto pt = tok.parsed_token()) {
+      if (auto nd = NamedDeclContaining(pt); nd != kInvalidEntityId) {
+        return nd;
+      }
+    }
+
+    for (Macro m : Macro::containing(tok)) {
+      if (auto ne = NamedEntityContaining(std::move(m));
+          ne != kInvalidEntityId) {
+        return ne;
+      }
+    }
+
+    if (auto dt = tok.derived_token()) {
+      if (auto nd = NamedDeclContaining(dt); nd != kInvalidEntityId) {
+        return nd;
+      }
     }
 
     if (std::optional<Fragment> frag = Fragment::containing(tok)) {
@@ -93,7 +110,6 @@ RawEntityId NamedEntityContaining(VariantEntity entity) {
 
   return kInvalidEntityId;
 }
-
 
 //! Generate references to the entity with `entity`. The references
 //! pairs of named entities and the referenced entity. Sometimes the
