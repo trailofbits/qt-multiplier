@@ -5,8 +5,7 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "QuickReferenceExplorer.h"
-
-#include <multiplier/ui/IReferenceExplorer.h>
+#include "PreviewableReferenceExplorer.h"
 
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -19,7 +18,6 @@ namespace mx::gui {
 
 struct QuickReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
-  IReferenceExplorer *reference_explorer{nullptr};
   QPushButton *save_to_active_ref_explorer_button{nullptr};
   QPushButton *save_to_new_ref_explorer_button{nullptr};
   bool closed{false};
@@ -72,11 +70,12 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
   d->model->AppendEntityObject(entity_id, QModelIndex());
 
-  d->reference_explorer = IReferenceExplorer::Create(d->model);
+  auto reference_explorer = new PreviewableReferenceExplorer(
+      index, file_location_cache, d->model, this);
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(d->reference_explorer);
+  layout->addWidget(reference_explorer);
   setLayout(layout);
 
   connect(qApp, &QGuiApplication::applicationStateChanged, this,

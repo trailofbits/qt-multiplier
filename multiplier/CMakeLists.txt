@@ -28,9 +28,6 @@ add_executable("Multiplier" MACOSX_BUNDLE
 
   src/meta_types.h
   src/meta_types.cpp
-
-  src/QuickReferenceExplorer.h
-  src/QuickReferenceExplorer.cpp
 )
 
 target_sources("Multiplier" PRIVATE
@@ -38,6 +35,8 @@ target_sources("Multiplier" PRIVATE
   Info.plist
   "${multiplier_icon_path}"
 )
+
+add_subdirectory("widgets")
 
 target_link_libraries("Multiplier"
   PRIVATE
@@ -52,6 +51,7 @@ target_link_libraries("Multiplier"
     "mx_fontdatabase"
     "mx_indexview"
     "mx_referenceexplorer"
+    "mx_widgets"
 )
 
 enable_qt_properties("Multiplier")

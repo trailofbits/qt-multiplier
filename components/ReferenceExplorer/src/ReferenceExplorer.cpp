@@ -91,6 +91,8 @@ void ReferenceExplorer::InitializeWidgets() {
 
 void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
   d->model = model;
+  d->model->setParent(this);
+
   d->tree_view->setModel(d->model);
 
   connect(d->model, &QAbstractItemModel::modelReset, this,

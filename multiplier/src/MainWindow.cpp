@@ -6,6 +6,7 @@
 
 #include "MainWindow.h"
 #include "QuickReferenceExplorer.h"
+#include "PreviewableReferenceExplorer.h"
 
 #include <multiplier/ui/IIndexView.h>
 #include <multiplier/ui/ICodeView.h>
@@ -44,9 +45,6 @@ struct MainWindow::PrivateData final {
 
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
 
-  ICodeModel *ref_explorer_code_model{nullptr};
-  ICodeView *ref_explorer_code_view{nullptr};
-  std::optional<unsigned> opt_scroll_to_line;
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
 
@@ -97,25 +95,11 @@ void MainWindow::CreateFileTreeDock() {
 }
 
 void MainWindow::CreateReferenceExplorerDock() {
-  d->ref_explorer_code_model =
-      ICodeModel::Create(d->file_location_cache, d->index, this);
-
-  d->ref_explorer_code_view = ICodeView::Create(d->ref_explorer_code_model);
-  d->ref_explorer_code_view->SetWordWrapping(false);
-
-  connect(d->ref_explorer_code_view, &ICodeView::DocumentChanged, this,
-          &MainWindow::OnCodeModelUpdate);
-
   d->ref_explorer_tab_widget = new QTabWidget(this);
   d->ref_explorer_tab_widget->setTabsClosable(true);
 
   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabCloseRequested,
           this, &MainWindow::OnReferenceExplorerTabBarClose);
-
-  auto splitter = new QSplitter();
-  splitter->setContentsMargins(0, 0, 0, 0);
-  splitter->addWidget(d->ref_explorer_tab_widget);
-  splitter->addWidget(d->ref_explorer_code_view);
 
   d->reference_explorer_dock = new QDockWidget(tr("Reference Explorer"), this);
   d->view_menu->addAction(d->reference_explorer_dock->toggleViewAction());
@@ -125,7 +109,7 @@ void MainWindow::CreateReferenceExplorerDock() {
       Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea |
       Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
 
-  d->reference_explorer_dock->setWidget(splitter);
+  d->reference_explorer_dock->setWidget(d->ref_explorer_tab_widget);
   addDockWidget(Qt::BottomDockWidgetArea, d->reference_explorer_dock);
 
   d->reference_explorer_dock->hide();
@@ -135,16 +119,15 @@ void MainWindow::CreateNewReferenceExplorer() {
   auto ref_explorer_model =
       IReferenceExplorerModel::Create(d->index, d->file_location_cache, this);
 
-  auto ref_explorer = IReferenceExplorer::Create(ref_explorer_model, this);
-  ref_explorer->setAttribute(Qt::WA_DeleteOnClose);
+  auto reference_explorer = new PreviewableReferenceExplorer(
+      d->index, d->file_location_cache, ref_explorer_model, this);
 
-  connect(ref_explorer, &IReferenceExplorer::ItemClicked, this,
-          &MainWindow::OnReferenceExplorerItemClicked);
+  reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
 
   auto new_tab_index = d->ref_explorer_tab_widget->count();
   auto name = tr("Reference Explorer #") + QString::number(new_tab_index + 1);
 
-  d->ref_explorer_tab_widget->addTab(ref_explorer, name);
+  d->ref_explorer_tab_widget->addTab(reference_explorer, name);
   d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
 
   d->reference_explorer_dock->toggleViewAction()->setEnabled(true);
@@ -240,17 +223,6 @@ void MainWindow::CloseTokenReferenceExplorer() {
   }
 }
 
-void MainWindow::SchedulePostUpdateLineScrollCommand(unsigned line_number) {
-  d->opt_scroll_to_line = line_number;
-}
-
-std::optional<unsigned> MainWindow::GetScheduledPostUpdateLineScrollCommand() {
-  auto opt_scroll_to_line = std::move(d->opt_scroll_to_line);
-  d->opt_scroll_to_line = std::nullopt;
-
-  return opt_scroll_to_line;
-}
-
 void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
                                         const std::string &file_name,
                                         bool double_click) {
@@ -297,26 +269,6 @@ void MainWindow::OnToggleWordWrap(bool checked) {
   code_view.SetWordWrapping(checked);
 }
 
-void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index) {
-  auto file_raw_entity_id_var =
-      index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
-
-  if (!file_raw_entity_id_var.isValid()) {
-    return;
-  }
-
-  auto line_number_var = index.data(IReferenceExplorerModel::LineNumberRole);
-  if (!line_number_var.isValid()) {
-    return;
-  }
-
-  auto line_number = qvariant_cast<unsigned>(line_number_var);
-  SchedulePostUpdateLineScrollCommand(line_number);
-
-  auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
-  d->ref_explorer_code_model->SetEntity(file_raw_entity_id);
-}
-
 void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
                                                   const bool &as_new_tab) {
   if (d->ref_explorer_tab_widget->count() == 0 || as_new_tab) {
@@ -324,7 +276,7 @@ void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
   }
 
   auto current_tab = d->ref_explorer_tab_widget->currentIndex();
-  auto reference_explorer = static_cast<IReferenceExplorer *>(
+  auto reference_explorer = static_cast<PreviewableReferenceExplorer *>(
       d->ref_explorer_tab_widget->widget(current_tab));
 
   auto reference_explorer_model = reference_explorer->Model();
@@ -341,15 +293,6 @@ void MainWindow::OnReferenceExplorerTabBarClose(int index) {
   auto widget_visible = d->ref_explorer_tab_widget->count() != 0;
   d->reference_explorer_dock->setVisible(widget_visible);
   d->reference_explorer_dock->toggleViewAction()->setEnabled(widget_visible);
-}
-
-void MainWindow::OnCodeModelUpdate() {
-  if (auto opt_scroll_to_line = GetScheduledPostUpdateLineScrollCommand();
-      opt_scroll_to_line.has_value()) {
-
-    const auto &line_number = opt_scroll_to_line.value();
-    d->ref_explorer_code_view->ScrollToLineNumber(line_number);
-  }
 }
 
 }  // namespace mx::gui
