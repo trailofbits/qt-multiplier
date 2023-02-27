@@ -11,7 +11,7 @@
 #include <multiplier/Entities/DefineMacroDirective.h>
 #include <multiplier/Entities/IncludeLikeMacroDirective.h>
 #include <utility>
-#include <iostream>
+
 namespace mx::gui {
 
 RawEntityId NamedEntityContaining(VariantEntity entity) {
@@ -45,7 +45,6 @@ RawEntityId NamedEntityContaining(VariantEntity entity) {
     Macro macro = std::move(std::get<Macro>(entity));
 
     for (Token tok : macro.expansion_tokens()) {
-      std::cerr << tok.id() << '\n';
       if (auto nd = NamedDeclContaining(tok); nd != kInvalidEntityId) {
         return nd;
       }
