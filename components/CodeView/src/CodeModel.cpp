@@ -92,6 +92,7 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
 
   } else {
     emit EndResetModel(ModelState::UpdateFailed);
+    return;
   }
 
   d->future_watcher.setFuture(d->future_result);
