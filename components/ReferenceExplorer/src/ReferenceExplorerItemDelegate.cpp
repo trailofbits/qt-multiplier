@@ -14,7 +14,6 @@
 #include <QPainter>
 
 #include <filesystem>
-#include <iostream>
 
 namespace mx::gui {
 
@@ -65,7 +64,9 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
     auto location_info =
         qvariant_cast<IReferenceExplorerModel::Location>(location_info_var);
 
-    location = location_info.path;
+    auto filename =
+        std::filesystem::path(location_info.path.toStdString()).filename();
+    location = QString::fromStdString(filename);
 
     if (0u < location_info.line) {
       location += ":" + QString::number(location_info.line);

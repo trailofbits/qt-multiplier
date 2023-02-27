@@ -40,14 +40,14 @@ class QuickReferenceExplorer final : public QWidget {
   //! Closes the widget when the escape key is pressed
   virtual void keyPressEvent(QKeyEvent *event) override;
 
-  //! Used to update floating widgets
-  virtual void resizeEvent(QResizeEvent *event) override;
-
   //! Helps determine if the widget should be restored on focus
   virtual void showEvent(QShowEvent *event) override;
 
   //! Helps determine if the widget should be restored on focus
   virtual void closeEvent(QCloseEvent *event) override;
+
+  //! Used to handle window movements
+  virtual bool eventFilter(QObject *obj, QEvent *event) override;
 
  private:
   struct PrivateData;
@@ -58,11 +58,17 @@ class QuickReferenceExplorer final : public QWidget {
                          mx::FileLocationCache file_location_cache,
                          RawEntityId entity_id);
 
-  //! Updates the save button positions
-  void UpdateButtonPositions();
-
   //! Used to emit the SaveAll signal
   void EmitSaveSignal(const bool &as_new_tab);
+
+  //! Used to start window dragging
+  void OnTitleFrameMousePress(QMouseEvent *event);
+
+  //! Used to move the window by moving the title frame
+  void OnTitleFrameMouseMove(QMouseEvent *event);
+
+  //! Used to stop window dragging
+  void OnTitleFrameMouseRelease(QMouseEvent *event);
 
  private slots:
   //! Restores the widget visibility when the application gains focus

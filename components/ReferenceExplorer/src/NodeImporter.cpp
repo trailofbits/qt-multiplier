@@ -129,11 +129,11 @@ NodeImporter::NodeImporter(mx::Index index,
 
 NodeImporter::~NodeImporter() {}
 
-bool NodeImporter::ImportEntity(
-    RawEntityId entity_id, RawEntityId referenced_entity_id,
-    NodeTree::Node::ImportMode import_mode,
-    std::optional<std::uint64_t> opt_parent_node_id,
-    std::optional<std::size_t> opt_max_depth) {
+bool NodeImporter::ImportEntity(RawEntityId entity_id,
+                                RawEntityId referenced_entity_id,
+                                NodeTree::Node::ImportMode import_mode,
+                                std::optional<std::uint64_t> opt_parent_node_id,
+                                std::optional<std::size_t> opt_max_depth) {
 
   Assert(import_mode == NodeTree::Node::ImportMode::CallHierarchy,
          "Invalid import mode");
@@ -162,6 +162,13 @@ void NodeImporter::ImportEntity(NodeTree &node_tree,
   // TODO(alessandro): Some kind of thing to show that we have a repeat? This
   //                   should maybe be a custom row that points to the old
   //                   entry with a button of some kind.
+
+  // The user has right-clicked and selected "Expand" on a parent
+  // item even though it was already expanded.
+  //
+  // Ignore the command on this node for now. We could also just substract
+  // one from opt_max_depth and forward the request by just inserting a call
+  // to ExpandNode before the return
   if (!node_tree.visited_entity_id_set.insert(referenced_entity_id).second) {
     return;
   }

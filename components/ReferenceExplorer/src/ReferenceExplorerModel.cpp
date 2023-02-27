@@ -213,6 +213,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
     if (std::optional<FragmentId> frag_id =
             FragmentId::from(node.referenced_entity_id)) {
+
       buffer += tr("Fragment ID: ") +
                 QString::number(EntityId(frag_id.value()).Pack());
     }
@@ -220,6 +221,13 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     if (node.opt_location.has_value()) {
       buffer += "\n";
       buffer += tr("File ID: ") + QString::number(node.opt_location->file_id);
+    }
+
+    if (node.opt_location.has_value()) {
+      const auto &location = node.opt_location.value();
+
+      buffer += "\n";
+      buffer += tr("Path: ") + location.path;
     }
 
     value = std::move(buffer);

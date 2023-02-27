@@ -13,14 +13,20 @@
 #include <QPushButton>
 #include <QCloseEvent>
 #include <QShowEvent>
+#include <QLabel>
+#include <QHBoxLayout>
+#include <QMouseEvent>
+#include <QPoint>
+
+#include <optional>
 
 namespace mx::gui {
 
 struct QuickReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
-  QPushButton *save_to_active_ref_explorer_button{nullptr};
-  QPushButton *save_to_new_ref_explorer_button{nullptr};
   bool closed{false};
+
+  std::optional<QPoint> opt_previous_drag_pos;
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
@@ -28,9 +34,6 @@ QuickReferenceExplorer::QuickReferenceExplorer(
     RawEntityId entity_id, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
-
-  setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
-                 Qt::WindowStaysOnTopHint);
 
   InitializeWidgets(index, file_location_cache, entity_id);
 }
@@ -46,11 +49,6 @@ void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
   }
 }
 
-void QuickReferenceExplorer::resizeEvent(QResizeEvent *event) {
-  UpdateButtonPositions();
-  QWidget::resizeEvent(event);
-}
-
 void QuickReferenceExplorer::showEvent(QShowEvent *event) {
   event->accept();
   d->closed = false;
@@ -61,11 +59,98 @@ void QuickReferenceExplorer::closeEvent(QCloseEvent *event) {
   d->closed = true;
 }
 
+bool QuickReferenceExplorer::eventFilter(QObject *, QEvent *event) {
+  if (event->type() == QEvent::MouseButtonPress) {
+    auto mouse_event = static_cast<QMouseEvent *>(event);
+    OnTitleFrameMousePress(mouse_event);
+
+    return true;
+
+  } else if (event->type() == QEvent::MouseMove) {
+    auto mouse_event = static_cast<QMouseEvent *>(event);
+    OnTitleFrameMouseMove(mouse_event);
+
+    return true;
+
+  } else if (event->type() == QEvent::MouseButtonRelease) {
+    auto mouse_event = static_cast<QMouseEvent *>(event);
+    OnTitleFrameMouseRelease(mouse_event);
+
+    return true;
+  }
+
+  return false;
+}
+
 void QuickReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
     RawEntityId entity_id) {
 
-  setContentsMargins(0, 0, 0, 0);
+  setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
+                 Qt::WindowStaysOnTopHint);
+
+  setContentsMargins(5, 5, 5, 5);
+
+  connect(qApp, &QGuiApplication::applicationStateChanged, this,
+          &QuickReferenceExplorer::OnApplicationStateChange);
+
+  //
+  // Title bar
+  //
+
+  // TODO: Title
+  auto window_name = tr("References to entity ") + QString::number(entity_id);
+  auto window_title = new QLabel(window_name);
+
+  // Save to active button
+  auto save_to_active_ref_explorer_button = new QPushButton(
+      QIcon(":/Icons/QuickReferenceExplorer/SaveToActiveTab"), "", this);
+
+  save_to_active_ref_explorer_button->setToolTip(tr("Save to active tab"));
+  save_to_active_ref_explorer_button->setSizePolicy(QSizePolicy::Minimum,
+                                                    QSizePolicy::Minimum);
+
+  connect(save_to_active_ref_explorer_button, &QPushButton::clicked, this,
+          &QuickReferenceExplorer::OnSaveAllToActiveRefExplorerButtonPress);
+
+  // Save as new button
+  auto save_to_new_ref_explorer_button = new QPushButton(
+      QIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"), "", this);
+
+  save_to_new_ref_explorer_button->setToolTip(tr("Save to new tab"));
+  save_to_new_ref_explorer_button->setSizePolicy(QSizePolicy::Minimum,
+                                                 QSizePolicy::Minimum);
+
+  connect(save_to_new_ref_explorer_button, &QPushButton::clicked, this,
+          &QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress);
+
+  // Close button
+  auto close_button =
+      new QPushButton(QIcon(":/Icons/QuickReferenceExplorer/Close"), "", this);
+
+  close_button->setToolTip(tr("Close"));
+  close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+
+  connect(close_button, &QPushButton::clicked, this,
+          &QuickReferenceExplorer::close);
+
+  // Setup the layout
+  auto title_frame_layout = new QHBoxLayout();
+  title_frame_layout->setContentsMargins(0, 0, 0, 0);
+  title_frame_layout->addWidget(window_title);
+  title_frame_layout->addStretch();
+  title_frame_layout->addWidget(save_to_active_ref_explorer_button);
+  title_frame_layout->addWidget(save_to_new_ref_explorer_button);
+  title_frame_layout->addWidget(close_button);
+
+  auto title_frame = new QWidget(this);
+  title_frame->installEventFilter(this);
+  title_frame->setContentsMargins(0, 0, 0, 0);
+  title_frame->setLayout(title_frame_layout);
+
+  //
+  // Contents
+  //
 
   d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
   d->model->AppendEntityObject(entity_id, QModelIndex());
@@ -73,47 +158,23 @@ void QuickReferenceExplorer::InitializeWidgets(
   auto reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, this);
 
-  auto layout = new QVBoxLayout();
-  layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(reference_explorer);
-  setLayout(layout);
+  reference_explorer->setSizePolicy(QSizePolicy::Expanding,
+                                    QSizePolicy::Expanding);
 
-  connect(qApp, &QGuiApplication::applicationStateChanged, this,
-          &QuickReferenceExplorer::OnApplicationStateChange);
+  auto contents_layout = new QVBoxLayout();
+  contents_layout->setContentsMargins(0, 0, 0, 0);
+  contents_layout->addWidget(reference_explorer);
 
-  d->save_to_active_ref_explorer_button = new QPushButton(
-      QIcon(":/Icons/QuickReferenceExplorer/SaveToActiveTab"), "", this);
+  //
+  // Main layout
+  //
 
-  d->save_to_active_ref_explorer_button->setToolTip(tr("Save to active tab"));
+  auto main_layout = new QVBoxLayout();
+  main_layout->setContentsMargins(0, 0, 0, 0);
+  main_layout->addWidget(title_frame);
+  main_layout->addLayout(contents_layout);
 
-  d->save_to_active_ref_explorer_button->resize(20, 20);
-
-  d->save_to_new_ref_explorer_button = new QPushButton(
-      QIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"), "", this);
-
-  d->save_to_new_ref_explorer_button->setToolTip(tr("Save to new tab"));
-
-  d->save_to_new_ref_explorer_button->resize(20, 20);
-
-  UpdateButtonPositions();
-
-  connect(d->save_to_active_ref_explorer_button, &QPushButton::clicked, this,
-          &QuickReferenceExplorer::OnSaveAllToActiveRefExplorerButtonPress);
-
-  connect(d->save_to_new_ref_explorer_button, &QPushButton::clicked, this,
-          &QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress);
-}
-
-void QuickReferenceExplorer::UpdateButtonPositions() {
-  auto button_width = d->save_to_active_ref_explorer_button->width();
-
-  auto x = width() - button_width;
-  d->save_to_active_ref_explorer_button->move(x, 0);
-  d->save_to_active_ref_explorer_button->raise();
-
-  x -= button_width;
-  d->save_to_new_ref_explorer_button->move(x, 0);
-  d->save_to_new_ref_explorer_button->raise();
+  setLayout(main_layout);
 }
 
 void QuickReferenceExplorer::EmitSaveSignal(const bool &as_new_tab) {
@@ -122,6 +183,27 @@ void QuickReferenceExplorer::EmitSaveSignal(const bool &as_new_tab) {
 
   emit SaveAll(mime_data, as_new_tab);
   close();
+}
+
+void QuickReferenceExplorer::OnTitleFrameMousePress(QMouseEvent *event) {
+  d->opt_previous_drag_pos = event->globalPosition().toPoint();
+}
+
+void QuickReferenceExplorer::OnTitleFrameMouseMove(QMouseEvent *event) {
+  if (!d->opt_previous_drag_pos.has_value()) {
+    return;
+  }
+
+  auto &previous_drag_pos = d->opt_previous_drag_pos.value();
+
+  auto diff = event->globalPosition().toPoint() - previous_drag_pos;
+  previous_drag_pos = event->globalPosition().toPoint();
+
+  move(x() + diff.x(), y() + diff.y());
+}
+
+void QuickReferenceExplorer::OnTitleFrameMouseRelease(QMouseEvent *) {
+  d->opt_previous_drag_pos = std::nullopt;
 }
 
 void QuickReferenceExplorer::OnApplicationStateChange(
