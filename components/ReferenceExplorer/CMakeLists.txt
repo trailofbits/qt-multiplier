@@ -29,6 +29,12 @@ add_library("mx_referenceexplorer"
 
   src/Utils.h
   src/Utils.cpp
+
+  src/FilterSettingsWidget.h
+  src/FilterSettingsWidget.cpp
+
+  src/SearchFilterModelProxy.h
+  src/SearchFilterModelProxy.cpp
 )
 
 target_link_libraries("mx_referenceexplorer"
@@ -39,6 +45,7 @@ target_link_libraries("mx_referenceexplorer"
     "thirdparty_qt"
     "multiplier::mx-api"
     "mx_assert"
+    "mx_searchwidget"
 )
 
 target_include_directories("mx_referenceexplorer" PRIVATE

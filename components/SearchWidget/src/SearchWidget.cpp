@@ -384,6 +384,8 @@ void SearchWidget::Activate() {
 
   d->search_result_count = 0;
   d->current_search_result = 0;
+
+  emit Activated();
 }
 
 void SearchWidget::Deactivate() {
@@ -396,6 +398,8 @@ void SearchWidget::Deactivate() {
 
   d->search_result_count = 0;
   d->current_search_result = 0;
+
+  emit Deactivated();
 }
 
 

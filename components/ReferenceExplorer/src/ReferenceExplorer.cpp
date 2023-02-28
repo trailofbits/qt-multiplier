@@ -8,14 +8,19 @@
 
 #include "ReferenceExplorer.h"
 #include "ReferenceExplorerItemDelegate.h"
+#include "FilterSettingsWidget.h"
+#include "SearchFilterModelProxy.h"
 
 #include <QTreeView>
 #include <QVBoxLayout>
 #include <QMenu>
 #include <QApplication>
 #include <QClipboard>
+#include <QCheckBox>
+#include <QLabel>
+#include <QRadioButton>
 
-#include <iostream>
+#include <multiplier/ui/Assert.h>
 
 namespace mx::gui {
 
@@ -31,7 +36,10 @@ struct ContextMenu final {
 
 struct ReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
+  SearchFilterModelProxy *model_proxy{nullptr};
   QTreeView *tree_view{nullptr};
+  ISearchWidget *search_widget{nullptr};
+  FilterSettingsWidget *filter_settings_widget{nullptr};
   ContextMenu context_menu;
 };
 
@@ -48,10 +56,14 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
 
   InitializeWidgets();
   InstallModel(model);
+
+  // Synchronize the search widget and its addon
+  d->search_widget->Deactivate();
 }
 
 void ReferenceExplorer::InitializeWidgets() {
-  setContentsMargins(0, 0, 0, 0);
+  // Initialize the tree view
+  setAcceptDrops(true);
 
   d->tree_view = new QTreeView();
   d->tree_view->setHeaderHidden(true);
@@ -71,13 +83,35 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setAcceptDrops(true);
   d->tree_view->setDropIndicatorShown(true);
 
+  // Create the search widget
+  d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
+  connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
+          &ReferenceExplorer::OnSearchParametersChange);
+
+  // Create the search widget addon
+  d->filter_settings_widget = new FilterSettingsWidget(this);
+
+  connect(d->filter_settings_widget,
+          &FilterSettingsWidget::FilterParametersChanged, this,
+          &ReferenceExplorer::OnFilterParametersChange);
+
+  connect(d->search_widget, &ISearchWidget::Activated,
+          d->filter_settings_widget, &FilterSettingsWidget::Activate);
+
+  connect(d->search_widget, &ISearchWidget::Deactivated,
+          d->filter_settings_widget, &FilterSettingsWidget::Deactivate);
+
+  // Setup the main layout
+  setContentsMargins(0, 0, 0, 0);
+
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->tree_view);
+  layout->addWidget(d->filter_settings_widget);
+  layout->addWidget(d->search_widget);
   setLayout(layout);
 
-  setAcceptDrops(true);
-
+  // Setup che custom context menu
   d->context_menu.menu = new QMenu(tr("Reference Explorer menu"));
   d->context_menu.copy_details_action = new QAction(tr("Copy details"));
   d->context_menu.expand_item_action = new QAction(tr("Expand"));
@@ -93,9 +127,13 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
   d->model = model;
   d->model->setParent(this);
 
-  d->tree_view->setModel(d->model);
+  d->model_proxy = new SearchFilterModelProxy(this);
+  d->model_proxy->setRecursiveFilteringEnabled(true);
+  d->model_proxy->setSourceModel(d->model);
 
-  connect(d->model, &QAbstractItemModel::modelReset, this,
+  d->tree_view->setModel(d->model_proxy);
+
+  connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
           &ReferenceExplorer::OnModelReset);
 
   OnModelReset();
@@ -114,7 +152,7 @@ void ReferenceExplorer::CopyRefExplorerItemDetails(const QModelIndex &index) {
 }
 
 void ReferenceExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
-  d->model->ExpandEntity(index);
+  d->model->ExpandEntity(d->model_proxy->mapToSource(index));
 }
 
 void ReferenceExplorer::OnModelReset() {
@@ -160,6 +198,48 @@ void ReferenceExplorer::OnContextMenuActionTriggered(QAction *action) {
   } else if (action == d->context_menu.expand_item_action) {
     ExpandRefExplorerItem(index);
   }
+}
+
+void ReferenceExplorer::OnSearchParametersChange(
+    const ISearchWidget::SearchParameters &search_parameters) {
+
+  QRegularExpression::PatternOptions options{
+      QRegularExpression::NoPatternOption};
+
+  if (!search_parameters.case_sensitive) {
+    options |= QRegularExpression::CaseInsensitiveOption;
+  }
+
+  auto pattern = QString::fromStdString(search_parameters.pattern);
+
+  if (search_parameters.type == ISearchWidget::SearchParameters::Type::Text) {
+    pattern = QRegularExpression::escape(pattern);
+    if (search_parameters.whole_word) {
+      pattern = "\\b" + pattern + "\\b";
+    }
+  }
+
+  QRegularExpression regex(pattern, options);
+
+  // The regex is already validated by the search widget
+  Assert(regex.isValid(),
+         "Invalid regex found in CodeView::OnSearchParametersChange");
+
+  d->model_proxy->setFilterRegularExpression(regex);
+
+  d->tree_view->expandRecursively(QModelIndex());
+  d->tree_view->resizeColumnToContents(0);
+}
+
+void ReferenceExplorer::OnFilterParametersChange() {
+  d->model_proxy->SetPathFilterType(
+      d->filter_settings_widget->GetPathFilterType());
+
+  d->model_proxy->EnableEntityNameFilter(
+      d->filter_settings_widget->FilterByEntityName());
+
+  d->model_proxy->EnableEntityIDFilter(
+      d->filter_settings_widget->FilterByEntityID());
 }
 
 }  // namespace mx::gui

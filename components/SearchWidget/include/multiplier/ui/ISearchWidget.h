@@ -66,6 +66,12 @@ class ISearchWidget : public QWidget {
   virtual void Deactivate() = 0;
 
  signals:
+  //! Emitted when the widget has been activated
+  void Activated();
+
+  //! Emitted when the widget has been deactivated
+  void Deactivated();
+
   //! Emitted when search parameters have been changed
   void SearchParametersChanged(const SearchParameters &search_parameters);
 

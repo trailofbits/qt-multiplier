@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/ui/IReferenceExplorer.h>
+#include <multiplier/ui/ISearchWidget.h>
 
 namespace mx::gui {
 
@@ -54,6 +55,13 @@ class ReferenceExplorer final : public IReferenceExplorer {
 
   //! Called when an action in the context menu is triggered
   void OnContextMenuActionTriggered(QAction *action);
+
+  //! Called by the ISearchWidget component whenever search options change
+  void OnSearchParametersChange(
+      const ISearchWidget::SearchParameters &search_parameters);
+
+  //! Called when the FilterSettingsWidget options are changed
+  void OnFilterParametersChange();
 
   friend class IReferenceExplorer;
 };
