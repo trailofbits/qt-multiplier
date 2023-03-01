@@ -12,11 +12,7 @@ set(qt_component_list
   "Concurrent"
 )
 
-if(MX_QT_VERSION GREATER "5")
-  list(APPEND qt_component_list "Core5Compat")
-endif()
-
-find_package("Qt${MX_QT_VERSION}"
+find_package("Qt6"
   COMPONENTS ${qt_component_list}
   REQUIRED
   GLOBAL
@@ -26,6 +22,6 @@ add_library("thirdparty_qt" INTERFACE)
 
 foreach(qt_component ${qt_component_list})
   target_link_libraries("thirdparty_qt" INTERFACE
-    "Qt${MX_QT_VERSION}::${qt_component}"
+    "Qt6::${qt_component}"
   )
 endforeach()

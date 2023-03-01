@@ -34,8 +34,7 @@ function(enable_postbuild_steps target_name)
   )
 
   if(NOT macdeployqt_path)
-    message(WARNING "qt-multiplier: Failed to locate the macdeployqt executable")
-    return()
+    message(FATAL_ERROR "qt-multiplier: Failed to locate the macdeployqt executable")
   endif()
 
   get_target_property(binary_dir "${target_name}" BINARY_DIR)
