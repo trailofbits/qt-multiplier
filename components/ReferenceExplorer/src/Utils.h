@@ -25,7 +25,7 @@ RawEntityId NamedEntityContaining(VariantEntity entity);
 //! referenced entity will match the named entity, other times the named
 //! entity will contain the reference (e.g. a function containing a call).
 gap::generator<std::pair<RawEntityId, Reference>>
-References(const VariantEntity &entity);
+References(VariantEntity entity);
 
 //! Return the file containing an entity.
 std::optional<File> FileOfEntity(const VariantEntity &ent);
