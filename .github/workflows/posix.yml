@@ -214,3 +214,14 @@ jobs:
           cmake \
             --build build_qtmultiplier \
             -j $(sysctl -n hw.ncpu)
+
+      - name: Create the .tar.gz package
+        run: |
+          cd "build_qtmultiplier/multiplier"
+          tar pcvzf Multiplier.app.tar.gz Multiplier.app
+
+      - name: Upload the .tar.gz package
+        uses: actions/upload-artifact@v3
+        with:
+          name: Multiplier.app.tar.gz
+          path: "build_qtmultiplier/multiplier/Multiplier.app.tar.gz"

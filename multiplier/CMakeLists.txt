@@ -55,3 +55,4 @@ target_link_libraries("Multiplier"
 )
 
 enable_qt_properties("Multiplier")
+enable_postbuild_steps("Multiplier")

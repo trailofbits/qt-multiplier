@@ -18,3 +18,51 @@ function(enable_qt_properties target_name)
       AUTORCC true
   )
 endfunction()
+
+function(enable_postbuild_steps target_name)
+  get_target_property(is_macos_bundle "${target_name}" MACOSX_BUNDLE)
+  if(NOT is_macos_bundle)
+    return()
+  endif()
+
+  find_program(macdeployqt_path
+    NAME
+      "macdeployqt"
+
+    HINTS
+      "/usr/local/bin"
+  )
+
+  if(NOT macdeployqt_path)
+    message(WARNING "qt-multiplier: Failed to locate the macdeployqt executable")
+    return()
+  endif()
+
+  get_target_property(binary_dir "${target_name}" BINARY_DIR)
+  if(NOT binary_dir)
+    message(FATAL_ERROR "qt-multiplier: Failed to obtain the BINARY_DIR property for target ${target_name}")
+  endif()
+
+  get_target_property(binary_suffix "${target_name}" SUFFIX)
+  if(NOT binary_suffix)
+    set(binary_suffix "app")
+  endif()
+
+  set(binary_path "${binary_dir}/${target_name}.${binary_suffix}")
+
+  add_custom_command(
+    TARGET
+      "${target_name}"
+
+    POST_BUILD
+
+    COMMAND
+      "${macdeployqt_path}" "${binary_path}"
+    
+    WORKING_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}"
+
+    COMMENT
+      "qt-multiplier: Processing target ${target_name} with macdeployqt"
+  )
+endfunction()
