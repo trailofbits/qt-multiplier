@@ -16,7 +16,6 @@ include("cmake/ccache.cmake")
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
 include("cmake/build_flags.cmake")
-include("cmake/install.cmake")
 
 if(MXQT_ENABLE_TESTS)
   include("CTest")
