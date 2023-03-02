@@ -35,12 +35,9 @@ class IIndexView : public QWidget {
   IIndexView &operator=(const IIndexView &) = delete;
 
  signals:
-  //! Emitted when an item has been clicked or double clicked
-  void ItemClicked(const QModelIndex &model_index, bool double_click);
-
-  //! Emitted when a file has been clicked or double clicked
+  //! Emitted when a file has been clicked
   void FileClicked(const PackedFileId &file_id, const std::string &file_name,
-                   bool double_click);
+                   const bool &middle_button);
 };
 
 }  // namespace mx::gui

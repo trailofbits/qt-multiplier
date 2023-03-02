@@ -40,7 +40,7 @@ class IReferenceExplorer : public QWidget {
 
  signals:
   //! Emitted when an item has been clicked
-  void ItemClicked(const QModelIndex &index);
+  void ItemClicked(const QModelIndex &index, const bool &middle_button);
 };
 
 }  // namespace mx::gui

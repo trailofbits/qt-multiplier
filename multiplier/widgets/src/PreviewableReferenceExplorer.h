@@ -60,14 +60,15 @@ class PreviewableReferenceExplorer final : public QWidget {
 
  private slots:
   //! Schedules a code model update whenever a reference is clicked
-  void OnReferenceExplorerItemClicked(const QModelIndex &index);
+  void OnReferenceExplorerItemClicked(const QModelIndex &index,
+                                      const bool &middle_button);
 
   //! Handles scheduled scroll-to-line operations for the code view
   void OnCodeViewDocumentChange();
 
  signals:
   //! The forwarded IReferenceExplorer::ItemClicked signal
-  void ItemClicked(const QModelIndex &index);
+  void ItemClicked(const QModelIndex &index, const bool &middle_button);
 };
 
 }  // namespace mx::gui

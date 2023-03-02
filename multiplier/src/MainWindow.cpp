@@ -24,6 +24,8 @@
 #include <QSplitter>
 #include <QTabBar>
 
+#include <iostream>
+
 namespace mx::gui {
 
 namespace {
@@ -40,7 +42,6 @@ struct MainWindow::PrivateData final {
   mx::FileLocationCache file_location_cache;
 
   IIndexView *index_view{nullptr};
-  ICodeModel *main_code_model{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
@@ -124,6 +125,9 @@ void MainWindow::CreateNewReferenceExplorer() {
 
   reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
 
+  connect(reference_explorer, &PreviewableReferenceExplorer::ItemClicked, this,
+          &MainWindow::OnReferenceExplorerItemClicked);
+
   auto new_tab_index = d->ref_explorer_tab_widget->count();
   auto name = tr("Reference Explorer #") + QString::number(new_tab_index + 1);
 
@@ -136,18 +140,11 @@ void MainWindow::CreateNewReferenceExplorer() {
 
 void MainWindow::CreateCodeView() {
   auto tab_widget = new QTabWidget();
+  tab_widget->setTabsClosable(true);
   setCentralWidget(tab_widget);
 
-  d->main_code_model =
-      ICodeModel::Create(d->file_location_cache, d->index, this);
-
-  auto code_view = ICodeView::Create(d->main_code_model);
-  code_view->SetWordWrapping(false);
-
-  tab_widget->addTab(code_view, tr("Empty"));
-
-  connect(code_view, &ICodeView::TokenClicked, this,
-          &MainWindow::OnTokenClicked);
+  connect(tab_widget->tabBar(), &QTabBar::tabCloseRequested, this,
+          &MainWindow::OnCodeViewTabBarClose);
 
   auto toggle_word_wrap_action = new QAction(tr("Enable word wrap"));
   toggle_word_wrap_action->setCheckable(true);
@@ -185,7 +182,7 @@ void MainWindow::OpenTokenContextMenu(const CodeModelIndex &index) {
 
 void MainWindow::OpenTokenReferenceExplorer(const CodeModelIndex &index) {
   auto related_entity_id_var =
-      d->main_code_model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     return;
@@ -223,18 +220,48 @@ void MainWindow::CloseTokenReferenceExplorer() {
   }
 }
 
+void MainWindow::CreateNewCodeView(const RawEntityId &file_entity_id,
+                                   const QString &tab_name) {
+  auto model = ICodeModel::Create(d->file_location_cache, d->index, this);
+  auto code_view = ICodeView::Create(model);
+
+  code_view->SetWordWrapping(false);
+  code_view->setAttribute(Qt::WA_DeleteOnClose);
+
+  auto &central_tab_widget = *static_cast<QTabWidget *>(centralWidget());
+  central_tab_widget.addTab(code_view, tab_name);
+
+  auto tab_count = central_tab_widget.count();
+  central_tab_widget.setCurrentIndex(tab_count - 1);
+
+  connect(code_view, &ICodeView::TokenClicked, this,
+          &MainWindow::OnTokenClicked);
+
+  model->SetEntity(file_entity_id);
+}
+
 void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
                                         const std::string &file_name,
-                                        bool double_click) {
-
-  if (double_click) {
-    return;
-  }
+                                        const bool &middle_button) {
 
   auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
-  tab_widget.setTabText(0, QString::fromStdString(file_name));
 
-  d->main_code_model->SetEntity(file_id.Pack());
+  auto should_create_tab = tab_widget.count() == 0 || middle_button;
+  auto tab_name = QString::fromStdString(file_name);
+
+  if (should_create_tab) {
+    CreateNewCodeView(file_id.Pack(), tab_name);
+
+  } else {
+    auto &current_code_view =
+        *static_cast<ICodeView *>(tab_widget.currentWidget());
+    auto &current_code_model = *current_code_view.Model();
+    current_code_model.SetEntity(file_id.Pack());
+
+    auto current_index = tab_widget.currentIndex();
+    tab_widget.setTabText(current_index, tab_name);
+  }
+
   CloseTokenReferenceExplorer();
 }
 
@@ -247,6 +274,36 @@ void MainWindow::OnTokenClicked(const CodeModelIndex &index,
       mouse_button == Qt::RightButton) {
     OpenTokenContextMenu(index);
   }
+}
+
+void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index,
+                                                const bool &middle_button) {
+  if (!middle_button) {
+    return;
+  }
+
+  auto file_id_role_var = index.data(IReferenceExplorerModel::FileIdRole);
+  if (!file_id_role_var.isValid()) {
+    return;
+  }
+
+  auto file_id_role = qvariant_cast<RawEntityId>(file_id_role_var);
+
+  QString tab_name;
+  auto location_role_var = index.data(IReferenceExplorerModel::LocationRole);
+  if (location_role_var.isValid()) {
+    auto location_role =
+        qvariant_cast<IReferenceExplorerModel::Location>(location_role_var);
+
+    std::filesystem::path path{location_role.path.toStdString()};
+    tab_name = QString::fromStdString(path.filename());
+
+  } else {
+    tab_name = tr("Unnamed file id #") +
+               QString::number(static_cast<std::uint64_t>(file_id_role));
+  }
+
+  CreateNewCodeView(file_id_role, tab_name);
 }
 
 void MainWindow::OnCodeViewContextMenuActionTriggered(QAction *action) {
@@ -293,6 +350,15 @@ void MainWindow::OnReferenceExplorerTabBarClose(int index) {
   auto widget_visible = d->ref_explorer_tab_widget->count() != 0;
   d->reference_explorer_dock->setVisible(widget_visible);
   d->reference_explorer_dock->toggleViewAction()->setEnabled(widget_visible);
+}
+
+void MainWindow::OnCodeViewTabBarClose(int index) {
+  auto &central_tab_widget = *static_cast<QTabWidget *>(centralWidget());
+
+  auto widget = central_tab_widget.widget(index);
+  central_tab_widget.removeTab(index);
+
+  widget->close();
 }
 
 }  // namespace mx::gui

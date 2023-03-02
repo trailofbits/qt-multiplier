@@ -158,6 +158,9 @@ void QuickReferenceExplorer::InitializeWidgets(
   auto reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, this);
 
+  connect(reference_explorer, &PreviewableReferenceExplorer::ItemClicked, this,
+          &QuickReferenceExplorer::ItemClicked);
+
   reference_explorer->setSizePolicy(QSizePolicy::Expanding,
                                     QSizePolicy::Expanding);
 

@@ -50,8 +50,8 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Like OnModelReset, but for row insertion
   void OnRowsInserted(const QModelIndex &parent, int first, int last);
 
-  //! Called when the user left-clicks on one item
-  void OnItemLeftClick(const QModelIndex &index);
+  //! Called when the user clicks an item
+  void OnItemClick(const QModelIndex &index);
 
   //! Custom context menu for the tree view items
   void OnOpenItemContextMenu(const QPoint &point);
