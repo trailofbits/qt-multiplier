@@ -13,21 +13,30 @@
 #include <QSortFilterProxyModel>
 
 namespace mx::gui {
+
+//! A custom model proxy used by the ref explorer to sort and filter items
 class SearchFilterModelProxy final : public QSortFilterProxyModel {
   Q_OBJECT
 
  public:
+  //! Constructor
   SearchFilterModelProxy(QObject *parent);
+
+  //! Destructor
   virtual ~SearchFilterModelProxy() override;
 
+  //! Sets the path filtering type
   void SetPathFilterType(
       const FilterSettingsWidget::PathFilterType &path_filter_type);
 
+  //! Enables or disables entity name-based filtering
   void EnableEntityNameFilter(const bool &enable);
 
+  //! Enables or disables entity ID-based filtering
   void EnableEntityIDFilter(const bool &enable);
 
  protected:
+  //! Returns true if the specified row should be included in the view
   virtual bool
   filterAcceptsRow(int source_row,
                    const QModelIndex &source_parent) const override;
