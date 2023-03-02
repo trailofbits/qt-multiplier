@@ -28,6 +28,9 @@ class CodeView final : public ICodeView {
   Q_OBJECT
 
  public:
+  //! \copybrief ICodeView::Model
+  virtual ICodeModel *Model() override;
+
   //! \copybrief ICodeView::SetTheme
   virtual void SetTheme(const CodeViewTheme &theme) override;
 

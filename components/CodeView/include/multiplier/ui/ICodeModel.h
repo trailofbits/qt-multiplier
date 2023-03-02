@@ -19,8 +19,11 @@ class Index;
 
 namespace mx::gui {
 
+class ICodeModel;
+
 //! A model index used to reference a single token
 struct CodeModelIndex final {
+  const ICodeModel *model{nullptr};
   int row{};
   int token_index{};
 };

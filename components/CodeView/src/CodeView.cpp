@@ -68,6 +68,10 @@ struct CodeView::PrivateData final {
   GoToLineWidget *go_to_line_widget{nullptr};
 };
 
+ICodeModel *CodeView::Model() {
+  return d->model;
+}
+
 void CodeView::SetTheme(const CodeViewTheme &theme) {
   d->theme = theme;
 
@@ -549,7 +553,7 @@ QTextDocument *CodeView::CreateTextDocument(
       break;
     }
 
-    CodeModelIndex model_index = {row_index, 0};
+    CodeModelIndex model_index = {&model, row_index, 0};
     auto line_mappings_need_update{true};
     auto token_count = model.TokenCount(row_index);
 
@@ -828,7 +832,8 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
     auto column_count = model.TokenCount(colored_line);
 
     for (int column = 0; column < column_count; ++column) {
-      auto unique_token_id = GetUniqueTokenIdentifier({colored_line, column});
+      auto unique_token_id =
+          GetUniqueTokenIdentifier({&model, colored_line, column});
       if (visited_model_index_list.count(unique_token_id) > 0) {
         continue;
       }

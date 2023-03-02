@@ -30,6 +30,9 @@ class ICodeView : public QWidget {
   //! Factory function
   static ICodeView *Create(ICodeModel *model, QWidget *parent = nullptr);
 
+  //! Returns the internal code model
+  virtual ICodeModel *Model() = 0;
+
   //! Sets the specified theme, refreshing the view
   virtual void SetTheme(const CodeViewTheme &theme) = 0;
 

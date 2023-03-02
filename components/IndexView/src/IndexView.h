@@ -34,15 +34,9 @@ class IndexView final : public IIndexView {
   //! Installs the model, updating the UI state
   void InstallModel(IFileTreeModel *model);
 
-  //! Handler for clicks and double clicks
-  void OnFileTreeItemActivated(const QModelIndex &index, bool double_click);
-
  private slots:
   //! Called when an item has been clicked in the tree view
   void OnFileTreeItemClicked(const QModelIndex &index);
-
-  //! Called when an item has been double clicked in the tree view
-  void OnFileTreeItemDoubleClicked(const QModelIndex &index);
 
   //! Called by the ISearchWidget component whenever search options change
   void OnSearchParametersChange(

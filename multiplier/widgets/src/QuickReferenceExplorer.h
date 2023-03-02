@@ -36,6 +36,9 @@ class QuickReferenceExplorer final : public QWidget {
   //! Emitted when the references should be saved by the parent widget
   void SaveAll(QMimeData *mime_data, const bool &as_new_tab);
 
+  //! The forwarded PreviewableReferenceExplorer::ItemClicked signal
+  void ItemClicked(const QModelIndex &index, const bool &middle_button);
+
  protected:
   //! Closes the widget when the escape key is pressed
   virtual void keyPressEvent(QKeyEvent *event) override;

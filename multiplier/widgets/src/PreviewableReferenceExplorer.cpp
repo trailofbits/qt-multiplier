@@ -113,7 +113,11 @@ PreviewableReferenceExplorer::GetScheduledPostUpdateLineScrollCommand() {
 }
 
 void PreviewableReferenceExplorer::OnReferenceExplorerItemClicked(
-    const QModelIndex &index) {
+    const QModelIndex &index, const bool &middle_button) {
+
+  if (middle_button) {
+    return;
+  }
 
   auto file_raw_entity_id_var =
       index.data(IReferenceExplorerModel::ReferencedEntityIdRole);

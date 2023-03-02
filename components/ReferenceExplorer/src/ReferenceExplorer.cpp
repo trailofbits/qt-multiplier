@@ -19,6 +19,7 @@
 #include <QCheckBox>
 #include <QLabel>
 #include <QRadioButton>
+#include <QMouseEvent>
 
 #include <multiplier/ui/Assert.h>
 
@@ -73,9 +74,10 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);
   d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
+  d->tree_view->setExpandsOnDoubleClick(false);
 
-  connect(d->tree_view, &QTreeView::clicked, this,
-          &ReferenceExplorer::OnItemLeftClick);
+  connect(d->tree_view, &QTreeView::pressed, this,
+          &ReferenceExplorer::OnItemClick);
 
   connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
           &ReferenceExplorer::OnOpenItemContextMenu);
@@ -170,8 +172,17 @@ void ReferenceExplorer::OnRowsInserted(const QModelIndex &, int, int) {
   OnModelReset();
 }
 
-void ReferenceExplorer::OnItemLeftClick(const QModelIndex &index) {
-  emit ItemClicked(index);
+void ReferenceExplorer::OnItemClick(const QModelIndex &index) {
+  auto mouse_button = qApp->mouseButtons();
+  if (mouse_button == Qt::MiddleButton) {
+    emit ItemClicked(index, true);
+
+  } else if (mouse_button == Qt::LeftButton) {
+    emit ItemClicked(index, false);
+
+  } else {
+    return;
+  }
 }
 
 void ReferenceExplorer::OnOpenItemContextMenu(const QPoint &point) {

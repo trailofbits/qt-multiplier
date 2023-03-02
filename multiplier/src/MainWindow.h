@@ -35,21 +35,28 @@ class MainWindow final : public QMainWindow {
   void OpenTokenContextMenu(const CodeModelIndex &index);
   void OpenTokenReferenceExplorer(const CodeModelIndex &index);
   void CloseTokenReferenceExplorer();
+  void CreateNewCodeView(const RawEntityId &file_entity_id,
+                         const QString &tab_name);
 
  private slots:
   void OnIndexViewFileClicked(const PackedFileId &file_id,
-                              const std::string &file_name, bool double_click);
+                              const std::string &file_name,
+                              const bool &middle_button);
 
   void OnTokenClicked(const CodeModelIndex &index,
                       const Qt::MouseButton &mouse_button,
                       const Qt::KeyboardModifiers &modifiers,
                       bool double_click);
 
+  void OnReferenceExplorerItemClicked(const QModelIndex &index,
+                                      const bool &middle_button);
+
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
   void OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
                                         const bool &as_new_tab);
   void OnReferenceExplorerTabBarClose(int index);
+  void OnCodeViewTabBarClose(int index);
 };
 
 }  // namespace mx::gui

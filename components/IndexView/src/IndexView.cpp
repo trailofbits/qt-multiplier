@@ -14,6 +14,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSortFilterProxyModel>
+#include <QApplication>
 
 namespace mx::gui {
 
@@ -55,35 +56,8 @@ void IndexView::InitializeWidgets() {
   layout->addWidget(d->search_widget);
   setLayout(layout);
 
-  connect(d->tree_view, &QTreeView::clicked, this,
+  connect(d->tree_view, &QTreeView::pressed, this,
           &IndexView::OnFileTreeItemClicked);
-
-  connect(d->tree_view, &QTreeView::doubleClicked, this,
-          &IndexView::OnFileTreeItemDoubleClicked);
-}
-
-void IndexView::OnFileTreeItemActivated(const QModelIndex &index,
-                                        bool double_click) {
-  emit ItemClicked(index, double_click);
-
-  auto opt_file_id_var =
-      d->model_proxy->data(index, IFileTreeModel::OptionalPackedFileIdRole);
-  if (!opt_file_id_var.isValid()) {
-    return;
-  }
-
-  const auto &opt_file_id =
-      qvariant_cast<std::optional<mx::PackedFileId>>(opt_file_id_var);
-
-  if (!opt_file_id.has_value()) {
-    return;
-  }
-
-  const auto &file_id = opt_file_id.value();
-
-  auto file_name_var = d->model_proxy->data(index);
-  emit FileClicked(file_id, file_name_var.toString().toStdString(),
-                   double_click);
 }
 
 void IndexView::InstallModel(IFileTreeModel *model) {
@@ -100,11 +74,38 @@ void IndexView::InstallModel(IFileTreeModel *model) {
 }
 
 void IndexView::OnFileTreeItemClicked(const QModelIndex &index) {
-  OnFileTreeItemActivated(index, false);
-}
+  bool middle_button{};
 
-void IndexView::OnFileTreeItemDoubleClicked(const QModelIndex &index) {
-  OnFileTreeItemActivated(index, true);
+  auto mouse_button = qApp->mouseButtons();
+  if (mouse_button == Qt::MiddleButton) {
+    middle_button = true;
+
+  } else if (mouse_button == Qt::LeftButton) {
+    middle_button = false;
+
+  } else {
+    return;
+  }
+
+  auto opt_file_id_var =
+      d->model_proxy->data(index, IFileTreeModel::OptionalPackedFileIdRole);
+
+  if (!opt_file_id_var.isValid()) {
+    return;
+  }
+
+  const auto &opt_file_id =
+      qvariant_cast<std::optional<mx::PackedFileId>>(opt_file_id_var);
+
+  if (!opt_file_id.has_value()) {
+    return;
+  }
+
+  const auto &file_id = opt_file_id.value();
+
+  auto file_name_var = d->model_proxy->data(index);
+  emit FileClicked(file_id, file_name_var.toString().toStdString(),
+                   middle_button);
 }
 
 void IndexView::OnSearchParametersChange(
