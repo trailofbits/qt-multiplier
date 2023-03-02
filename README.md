@@ -1,62 +1,26 @@
 # Graphical user interface for Multiplier
 
-[Code documentation can be found here](https://upgraded-potato-g33zzjm.pages.github.io/).
+## Documentation
 
-## Build Instructions 
+ * [Code documentation](https://upgraded-potato-g33zzjm.pages.github.io/)
 
-### macOS 
+## Build Instructions
 
-Going forward, we assume the environment variable `WORKSPACE_DIR` dir represents
-the directory where everything goes.
+For the time being, refer to the [GitHub Actions workflow](https://github.com/trailofbits/qt-multiplier/blob/next/.github/workflows/posix.yml) which goes through the installation of each dependency from scratch.
 
-#### Prerequisites 
+## Pre-built binaries
 
-Install [Multiplier](https://github.com/trailofbits/multiplier) and it's dependencies to `WORKSPACE_DIR`.
+The CI workflow automatically uploads build artifacts. To download a pre-built binary:
 
-Install [SQlite Multiplier](https://github.com/trailofbits/sqlite-multiplier) and it's dependencies to `WORKSPACE_DIR`.
+ * Open the repository home page
+ * Click on the green checkmark of the last commit (or use the commit history)
+ * Open the `details` link of the macOS build entry
+ * Select `Summary` in the top left corner of the page
+ * Scroll down and click on the `Multiplier.app.tar.gz` link under `Artifacts`
 
-Install [Python bindings for Multiplier](https://github.com/trailofbits/py-multiplier) and it's dependencies to `WORKSPACE_DIR`.
+## Running qt-multiplier
 
-Install QT5
+**NOTE: A sample database created by indexing the uBPF library from IO Visor can be found in the build artifacts (see the `Pre-build binaries` section).**
 
-```shell
-brew install qt@5
-```
-
-#### Build QT Multiplier
-
-
-As qt-multiplier uses submodules, make sure to pass `--recursive` when cloning the repository. If the source code has already been cloned you can initialize them with the following command: `git submodule update --init --recursive`
-
-
-```shell
-cmake \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH="/usr/local/opt;${WORKSPACE_DIR}/install"
-  -DCMAKE_INSTALL_PREFIX="${WORKSPACE_DIR}/install/qt-multiplier" \
-  -DVCPKG_ROOT="${VCPKG_ROOT}" \
-  -DVCPKG_TARGET_TRIPLET="${VCPKG_TARGET_TRIPLET}" \
-  -DCMAKE_CXX_COMPILER=`which clang++` \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH="/usr/local/opt;${WORKSPACE_DIR}/install"
-  -S . -B ~/build/qt-multiplier
-  
-cmake --build ${WORKSPACE_DIR}/build/qt-multiplier
-
-```
-
-## Run QT Multiplier
-
-Within `${WORKSPACE_DIR}/build/qt-multiplier` there should be a file called `Multipier.app`. Open this file to launch the GUI.
-
-On macOS this can be done via `open ${WORKSPACE_DIR}/build/qt-multiplier/Multipier.app`
-
-## Example Workflow
-
-- Select "Launch new indexer" from the "File" menu
-
-- Create os select a directory (e.g. /tmp/ws)
-
-- Use the default options for host and port. Wait from approximately 3 seconds
-
-- Select "Import Build" from the "File" menu and choose compile_commands.json of interest. Wait again. Larger files will require longer wait time.
+1. Generate a new database using `mx-index` from the `multiplier` repository: `mx-index --target compile_commands.json --db database.mx`
+2. Open the `Multiplier.app` application and select the database file
