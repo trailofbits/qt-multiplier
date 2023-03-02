@@ -81,12 +81,17 @@ jobs:
       - name: Install system dependencies
         run: |
           if [[ "$OSTYPE" == "darwin"* ]]; then
+            sudo chown -R $(whoami) $(brew --prefix)/*
+
             brew install \
               ccache \
               cmake \
               flex \
               bison \
               qt@6
+
+            brew unlink qt@6
+            brew link qt@6
 
           else
             echo "Platform is not yet supported"
@@ -193,9 +198,6 @@ jobs:
 
       - name: Build qt-multiplier
         run: |
-          qt_folder_name="$(ls '/usr/local/Cellar/qt' | head -n 1)"
-          qt_cmake_prefix="/usr/local/Cellar/qt/${qt_folder_name}/lib/cmake"
-
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -204,10 +206,8 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
             -DVCPKG_HOST_TRIPLET=x64-osx-rel \
-            -DCMAKE_PREFIX_PATH="${qt_cmake_prefix}" \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
-            -DMX_QT_VERSION=6 \
             -S . \
             -B build_qtmultiplier
 
