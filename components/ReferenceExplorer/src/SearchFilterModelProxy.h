@@ -41,6 +41,16 @@ class SearchFilterModelProxy final : public QSortFilterProxyModel {
   filterAcceptsRow(int source_row,
                    const QModelIndex &source_parent) const override;
 
+  //! Used to sort the items based on the value of a single column
+  virtual bool lessThan(const QModelIndex &left,
+                        const QModelIndex &right) const override;
+
+  //! Disabled copy constructor
+  SearchFilterModelProxy(const SearchFilterModelProxy &) = delete;
+
+  //! Disabled copy assignment operator
+  SearchFilterModelProxy &operator=(const SearchFilterModelProxy &) = delete;
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
