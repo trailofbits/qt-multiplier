@@ -7,3 +7,4 @@
 #
 
 option(MXQT_ENABLE_TESTS "Set to true to enable tests" true)
+option(MXQT_ENABLE_MACDEPLOYQT "Set to true to build portable binaries" true)
