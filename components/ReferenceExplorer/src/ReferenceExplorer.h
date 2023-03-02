@@ -47,6 +47,9 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Used to expand and resize the items after a model reset
   void OnModelReset();
 
+  //! Like OnModelReset, but for row insertion
+  void OnRowsInserted(const QModelIndex &parent, int first, int last);
+
   //! Called when the user left-clicks on one item
   void OnItemLeftClick(const QModelIndex &index);
 

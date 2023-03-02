@@ -136,6 +136,9 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
   connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
           &ReferenceExplorer::OnModelReset);
 
+  connect(d->model_proxy, &QAbstractItemModel::rowsInserted, this,
+          &ReferenceExplorer::OnRowsInserted);
+
   OnModelReset();
 }
 
@@ -158,6 +161,12 @@ void ReferenceExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
 void ReferenceExplorer::OnModelReset() {
   d->tree_view->expandRecursively(QModelIndex());
   d->tree_view->resizeColumnToContents(0);
+}
+
+void ReferenceExplorer::OnRowsInserted(const QModelIndex &, int, int) {
+  // TODO: Switch to beginInsertRows/endInsertRows in order to preserve
+  // the view state
+  OnModelReset();
 }
 
 void ReferenceExplorer::OnItemLeftClick(const QModelIndex &index) {
