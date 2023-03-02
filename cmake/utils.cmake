@@ -25,6 +25,11 @@ function(enable_appbundle_postbuild_steps target_name)
     message(FATAL_ERROR "qt-multiplier: Target ${target_name} is not a macOS app bundle")
   endif()
 
+  if(NOT MXQT_ENABLE_MACDEPLOYQT)
+    message(WARNING "qt-multiplier: Skipping the macdeployqt post-build steps for target ${target_name}. The binary will not be portable!")
+    return()
+  endif()
+
   find_program(macdeployqt_path
     NAME
       "macdeployqt"
