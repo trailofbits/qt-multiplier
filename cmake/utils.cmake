@@ -19,10 +19,10 @@ function(enable_qt_properties target_name)
   )
 endfunction()
 
-function(enable_postbuild_steps target_name)
+function(enable_appbundle_postbuild_steps target_name)
   get_target_property(is_macos_bundle "${target_name}" MACOSX_BUNDLE)
   if(NOT is_macos_bundle)
-    return()
+    message(FATAL_ERROR "qt-multiplier: Target ${target_name} is not a macOS app bundle")
   endif()
 
   find_program(macdeployqt_path
@@ -55,9 +55,13 @@ function(enable_postbuild_steps target_name)
 
     POST_BUILD
 
+    # Required to get macdeployqt from homebrew to work correctly
     COMMAND
-      "${macdeployqt_path}" "${binary_path}"
-    
+      "${CMAKE_COMMAND}" -E create_symlink "/usr/local/opt/qt/lib" "${CMAKE_CURRENT_BINARY_DIR}/lib"
+
+    COMMAND
+      "${macdeployqt_path}" "${binary_path}" -no-strip -always-overwrite
+
     WORKING_DIRECTORY
       "${CMAKE_CURRENT_BINARY_DIR}"
 
