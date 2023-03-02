@@ -215,6 +215,25 @@ jobs:
             --build build_qtmultiplier \
             -j $(sysctl -n hw.ncpu)
 
+      - name: Generate the sample database file
+        run: |
+          git clone "https://github.com/iovisor/ubpf"
+          ( cd ubpf && git checkout -b sample_branch 0262957 )
+
+          cmake \
+            -S ubpf \
+            -B build_ubpf \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=true
+
+          "${INSTALL_DIRECTORY}/bin/mx-index" \
+            --target "build_ubpf/compile_commands.json" \
+            --db /tmp/iovisor_ubpf.mx
+
+          mv \
+            /tmp/iovisor_ubpf.mx \
+            .
+
       - name: Create the .tar.gz package
         run: |
           cd "build_qtmultiplier/multiplier"
@@ -225,3 +244,16 @@ jobs:
         with:
           name: Multiplier.app.tar.gz
           path: "build_qtmultiplier/multiplier/Multiplier.app.tar.gz"
+
+      - name: Package the sample database
+        run: |
+          zip \
+            -r9 \
+            iovisor_ubpf.mx.zip \
+            iovisor_ubpf.mx
+
+      - name: Upload the sample database
+        uses: actions/upload-artifact@v3
+        with:
+          name: iovisor_ubpf.mx.zip
+          path: "iovisor_ubpf.mx.zip"
