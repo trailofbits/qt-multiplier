@@ -48,17 +48,15 @@ bool ReferenceExplorerModel::AppendEntityObject(RawEntityId entity_id,
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
 
+  // TODO: Switch to beginInsertRows/endInsertRows in order to preserve
+  // the view state
   auto succeeded = d->node_importer.ImportEntity(
       entity_id, entity_id, NodeTree::Node::ImportMode::CallHierarchy,
       parent_node_id, 5);
 
   if (succeeded) {
-    auto parent_node = d->node_tree.node_map.at(parent_node_id);
-    auto row_number =
-        static_cast<int>(parent_node.child_node_id_list.size() - 1);
-
-    emit beginInsertRows(parent, row_number, row_number);
-    emit endInsertRows();
+    emit beginResetModel();
+    emit endResetModel();
   }
 
   return true;
@@ -71,6 +69,8 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
 
   const auto &node_id = static_cast<std::uint64_t>(index.internalId());
 
+  // TODO: Switch to beginInsertRows/endInsertRows in order to preserve
+  // the view state
   d->node_importer.ExpandNode(node_id, 2);
 
   emit beginResetModel();
