@@ -97,4 +97,68 @@ bool SearchFilterModelProxy::filterAcceptsRow(
   return accept_row;
 }
 
+bool SearchFilterModelProxy::lessThan(const QModelIndex &left,
+                                      const QModelIndex &right) const {
+  auto left_location_role_var =
+      sourceModel()->data(left, IReferenceExplorerModel::LocationRole);
+
+  auto right_location_role_var =
+      sourceModel()->data(right, IReferenceExplorerModel::LocationRole);
+
+  std::optional<bool> opt_line_cmp_result;
+  std::optional<bool> opt_column_cmp_result;
+
+  if (left_location_role_var.isValid() && right_location_role_var.isValid()) {
+    auto left_location_role = qvariant_cast<IReferenceExplorerModel::Location>(
+        left_location_role_var);
+
+    auto right_location_role = qvariant_cast<IReferenceExplorerModel::Location>(
+        right_location_role_var);
+
+    if (left_location_role.path != right_location_role.path) {
+      return left_location_role.path < right_location_role.path;
+    }
+
+    if (left_location_role.line != right_location_role.line) {
+      opt_line_cmp_result = left_location_role.line < right_location_role.line;
+    }
+
+    if (left_location_role.column != right_location_role.column) {
+      opt_column_cmp_result =
+          left_location_role.column < right_location_role.column;
+    }
+  }
+
+  auto left_display_role_var = sourceModel()->data(left);
+  auto right_display_role_var = sourceModel()->data(right);
+
+  if (left_display_role_var.isValid() && right_display_role_var.isValid()) {
+    auto left_display_role = left_display_role_var.toString();
+    auto right_display_role = right_display_role_var.toString();
+
+    if (left_display_role != right_display_role) {
+      return left_display_role < right_display_role;
+    }
+  }
+
+  if (opt_line_cmp_result.has_value()) {
+    return opt_line_cmp_result.value();
+  }
+
+  if (opt_column_cmp_result.has_value()) {
+    return opt_column_cmp_result.value();
+  }
+
+  auto left_entity_id_role_var =
+      sourceModel()->data(left, IReferenceExplorerModel::EntityIdRole);
+
+  auto right_entity_id_role_var =
+      sourceModel()->data(right, IReferenceExplorerModel::EntityIdRole);
+
+  auto left_entity_id_role = left_entity_id_role_var.toULongLong();
+  auto right_entity_id_role = right_entity_id_role_var.toULongLong();
+
+  return left_entity_id_role < right_entity_id_role;
+}
+
 }  // namespace mx::gui

@@ -68,6 +68,7 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view = new QTreeView();
   d->tree_view->setHeaderHidden(true);
   d->tree_view->setSortingEnabled(true);
+  d->tree_view->sortByColumn(0, Qt::AscendingOrder);
   d->tree_view->setAlternatingRowColors(true);
   d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);
   d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
