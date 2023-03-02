@@ -14,6 +14,7 @@
 
 namespace mx::gui {
 
+//! A search widget addon used to select additional filter parameters
 class FilterSettingsWidget final : public QWidget {
   Q_OBJECT
 
