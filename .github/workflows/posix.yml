@@ -208,12 +208,19 @@ jobs:
             -DVCPKG_HOST_TRIPLET=x64-osx-rel \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
+            -DMXQT_ENABLE_TESTS=true \
             -S . \
             -B build_qtmultiplier
 
           cmake \
             --build build_qtmultiplier \
             -j $(sysctl -n hw.ncpu)
+
+      - name: Run the qt-multiplier tests
+        run: |
+          cmake \
+            --build build_qtmultiplier \
+            --target test
 
       - name: Generate the sample database file
         run: |

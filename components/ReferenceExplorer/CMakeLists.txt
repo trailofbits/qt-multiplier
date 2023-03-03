@@ -58,3 +58,7 @@ target_include_directories("mx_referenceexplorer" SYSTEM INTERFACE
 )
 
 enable_qt_properties("mx_referenceexplorer")
+
+if(MXQT_ENABLE_TESTS)
+  add_subdirectory("tests")
+endif()
