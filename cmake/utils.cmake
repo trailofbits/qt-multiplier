@@ -74,3 +74,9 @@ function(enable_appbundle_postbuild_steps target_name)
       "qt-multiplier: Processing target ${target_name} with macdeployqt"
   )
 endfunction()
+
+function(enable_test_definitions target_name)
+  target_compile_definitions("${target_name}" PRIVATE
+    "MXQT_CI_DATA_PATH=\"${CMAKE_SOURCE_DIR}/ci/data\""
+  )
+endfunction()
