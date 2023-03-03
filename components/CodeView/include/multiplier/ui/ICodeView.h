@@ -45,10 +45,6 @@ class ICodeView : public QWidget {
   //! Destructor
   virtual ~ICodeView() override = default;
 
-  //! Returns the cursor position list for the specified entity id
-  virtual std::optional<int>
-  GetEntityCursorPosition(RawEntityId entity_id) const = 0;
-
   //! Returns the current cursor position
   virtual int GetCursorPosition() const = 0;
 
@@ -65,15 +61,6 @@ class ICodeView : public QWidget {
 
   //! Scrolls the view to the specified entity id
   virtual bool ScrollToLineNumber(unsigned line) const = 0;
-
-  //! Scrolls the view to the specified entity id
-  virtual bool ScrollToEntityId(RawEntityId entity_id) const = 0;
-
-  //! Scrolls the view to the specified token
-  virtual bool ScrollToToken(const Token &token) const = 0;
-
-  //! Scrolls the view to the start of the specified token range
-  virtual bool ScrollToTokenRange(const TokenRange &token_range) const = 0;
 
   //! Disable the copy constructor
   ICodeView(const ICodeView &) = delete;

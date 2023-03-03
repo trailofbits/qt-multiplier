@@ -32,6 +32,7 @@ class CodeModel final : public ICodeModel {
 
   virtual int RowCount() const override;
   virtual int TokenCount(int row) const override;
+  virtual bool IsReady() const override;
 
   virtual QVariant Data(const CodeModelIndex &index,
                         int role = Qt::DisplayRole) const override;

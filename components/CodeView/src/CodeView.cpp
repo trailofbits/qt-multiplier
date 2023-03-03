@@ -66,6 +66,8 @@ struct CodeView::PrivateData final {
 
   QShortcut *go_to_line_shortcut{nullptr};
   GoToLineWidget *go_to_line_widget{nullptr};
+
+  std::optional<unsigned> deferred_scroll_to_line;
 };
 
 ICodeModel *CodeView::Model() {
@@ -98,23 +100,6 @@ void CodeView::SetTabWidth(std::size_t width) {
 }
 
 CodeView::~CodeView() {}
-
-std::optional<int>
-CodeView::GetEntityCursorPosition(RawEntityId entity_id) const {
-  if (entity_id == kInvalidEntityId) {
-    return std::nullopt;
-  }
-
-  auto unique_token_id_list_it =
-      d->token_map.entity_id_to_unique_token_id_list.find(entity_id);
-  if (unique_token_id_list_it ==
-      d->token_map.entity_id_to_unique_token_id_list.end()) {
-    return std::nullopt;
-  }
-
-  const auto &unique_token_id_list = unique_token_id_list_it->second;
-  return unique_token_id_list.front();
-}
 
 int CodeView::GetCursorPosition() const {
   auto text_cursor = d->text_edit->textCursor();
@@ -155,6 +140,11 @@ void CodeView::SetWordWrapping(bool enabled) {
 }
 
 bool CodeView::ScrollToLineNumber(unsigned line) const {
+  if (!d->model->IsReady()) {
+    d->deferred_scroll_to_line = line;
+    return false;
+  }
+
   auto opt_block_number = GetBlockNumberFromLineNumber(d->token_map, line);
   if (!opt_block_number.has_value()) {
     return false;
@@ -170,32 +160,6 @@ bool CodeView::ScrollToLineNumber(unsigned line) const {
 
   auto end_position = text_block.position() + text_block.length();
   return SetCursorPosition(text_block.position(), end_position);
-}
-
-bool CodeView::ScrollToEntityId(RawEntityId entity_id) const {
-  auto opt_token_pos = GetEntityCursorPosition(entity_id);
-  if (!opt_token_pos.has_value()) {
-    return false;
-  }
-
-  const auto &token_pos = opt_token_pos.value();
-  return SetCursorPosition(token_pos, std::nullopt);
-}
-
-bool CodeView::ScrollToToken(const Token &token) const {
-  if (!token) {
-    return false;
-  }
-
-  return ScrollToEntityId(token.id().Pack());
-}
-
-bool CodeView::ScrollToTokenRange(const TokenRange &token_range) const {
-  if (!token_range) {
-    return false;
-  }
-
-  return ScrollToEntityId(token_range[0].id().Pack());
 }
 
 CodeView::CodeView(ICodeModel *model, QWidget *parent)
@@ -268,7 +232,11 @@ void CodeView::InstallModel(ICodeModel *model) {
   d->model = model;
   d->model->setParent(this);
 
-  connect(d->model, &ICodeModel::ModelReset, this, &CodeView::OnModelReset);
+  connect(d->model, &ICodeModel::ModelReset,
+          this, &CodeView::OnModelReset);
+
+  connect(d->model, &ICodeModel::ModelResetSkipped,
+          this, &CodeView::OnModelResetDone);
 }
 
 void CodeView::InitializeWidgets() {
@@ -328,7 +296,7 @@ void CodeView::InitializeWidgets() {
 
 std::optional<CodeModelIndex>
 CodeView::GetCodeModelIndexFromMousePosition(const QPoint &pos) {
-  auto text_cursor = d->text_edit->cursorForPosition(pos);
+  QTextCursor text_cursor = d->text_edit->cursorForPosition(pos);
   return GetCodeModelIndexFromTextCursor(d->token_map, text_cursor);
 }
 
@@ -484,30 +452,6 @@ CodeView::GetCodeModelIndexFromTextCursor(const TokenMap &token_map,
   return std::nullopt;
 }
 
-std::vector<int>
-CodeView::GetTextCursorListFromRawEntityId(const TokenMap &token_map,
-                                           const RawEntityId &entity_id) {
-
-  auto token_unique_id_list_it =
-      token_map.entity_id_to_unique_token_id_list.find(entity_id);
-
-  if (token_unique_id_list_it ==
-      token_map.entity_id_to_unique_token_id_list.end()) {
-    return {};
-  }
-
-  const auto &token_unique_id_list = token_unique_id_list_it->second;
-
-  std::vector<int> cursor_list;
-
-  for (const auto &token_unique_id : token_unique_id_list) {
-    const auto &token_map_entry = token_map.data.at(token_unique_id);
-    cursor_list.push_back(token_map_entry.cursor_start);
-  }
-
-  return cursor_list;
-}
-
 QTextDocument *CodeView::CreateTextDocument(
     CodeView::TokenMap &token_map, const ICodeModel &model,
     const CodeViewTheme &theme,
@@ -520,8 +464,8 @@ QTextDocument *CodeView::CreateTextDocument(
   auto document_layout = new QPlainTextDocumentLayout(document);
   document->setDocumentLayout(document_layout);
 
-  auto row_count = model.RowCount();
-  if (row_count == 0) {
+  int row_count = model.RowCount();
+  if (!row_count) {
     return document;
   }
 
@@ -603,28 +547,6 @@ QTextDocument *CodeView::CreateTextDocument(
       entry.model_index = model_index;
 
       token_map.data.insert({unique_token_id, std::move(entry)});
-
-      // Add the entry to the RawEntityId index
-      const auto &entity_id_var =
-          model.Data(model_index, ICodeModel::TokenRawEntityIdRole);
-
-      if (entity_id_var.isValid()) {
-        auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
-        if (entity_id != kInvalidEntityId) {
-          auto unique_token_id_list_it =
-              token_map.entity_id_to_unique_token_id_list.find(entity_id);
-          if (unique_token_id_list_it ==
-              token_map.entity_id_to_unique_token_id_list.end()) {
-            auto insert_status =
-                token_map.entity_id_to_unique_token_id_list.insert(
-                    {entity_id, {}});
-            unique_token_id_list_it = insert_status.first;
-          }
-
-          auto &unique_token_id_list = unique_token_id_list_it->second;
-          unique_token_id_list.push_back(unique_token_id);
-        }
-      }
 
       // Add the entry to the block number index
       {
@@ -890,6 +812,17 @@ void CodeView::OnModelReset() {
   UpdateGutterWidth();
   UpdateTokenGroupColors();
   UpdateTabStopDistance();
+  OnModelResetDone();
+}
+
+void CodeView::OnModelResetDone() {
+
+  // If there was a request to scroll to a line, but the document wasn't ready
+  // at the time of the request, then enact the scroll now.
+  if (d->deferred_scroll_to_line.has_value()) {
+    ScrollToLineNumber(d->deferred_scroll_to_line.value());
+    d->deferred_scroll_to_line.reset();
+  }
 
   emit DocumentChanged();
 }

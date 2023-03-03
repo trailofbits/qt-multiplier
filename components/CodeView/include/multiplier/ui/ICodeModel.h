@@ -78,6 +78,9 @@ class ICodeModel : public QObject {
   virtual QVariant Data(const CodeModelIndex &index,
                         int role = Qt::DisplayRole) const = 0;
 
+  //! Returns true if this model is ready.
+  virtual bool IsReady() const = 0;
+
   //! Constructor
   ICodeModel(QObject *parent) : QObject(parent) {}
 
@@ -90,6 +93,10 @@ class ICodeModel : public QObject {
  signals:
   //! This signal is emitted at the end of the model reset process
   void ModelReset();
+
+  //! This signal is emitted if we ask to set the model to the same thing it
+  //! was set to before.
+  void ModelResetSkipped();
 };
 
 }  // namespace mx::gui

@@ -79,9 +79,17 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   }
 
   d->future_result = {};
-  d->entity_id.reset();
+
+  // Try to skip resetting this model if we don't need to.
+  if (d->entity_id.has_value() &&
+      d->entity_id.value() == raw_id &&
+      d->model_state == ModelState::Ready) {
+    emit ModelResetSkipped();
+    return;
+  }
 
   emit BeginResetModel();
+  d->entity_id.reset();
 
   EntityId eid(raw_id);
   VariantId vid = eid.Unpack();
@@ -126,8 +134,12 @@ int CodeModel::TokenCount(int row) const {
   return static_cast<int>(token_row.column_list.size());
 }
 
+bool CodeModel::IsReady() const {
+  return d->model_state == ModelState::Ready;
+}
+
 QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
-  if (d->model_state != ModelState::Ready) {
+  if (!IsReady()) {
     if (index.row != 0 || index.token_index != 0) {
       return QVariant();
     }
