@@ -126,6 +126,41 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
   return std::visit<std::optional<File>>(VariantEntityVisitor, ent);
 }
 
+//! Return the name of an entity.
+std::optional<QString> NameOfEntity(
+    const VariantEntity &ent,
+    const std::unordered_map<RawEntityId, QString> &file_paths) {
+
+  const auto VariantEntityVisitor = Overload{
+    [] (const Decl &decl) -> std::optional<QString> {
+      if (auto named = NamedDecl::from(decl)) {
+        auto name = named->name();
+        return QString::fromUtf8(
+            name.data(), static_cast<qsizetype>(name.size()));
+      }
+      return std::nullopt;
+    },
+
+    [] (const Macro &macro) -> std::optional<QString> {
+      if (auto named = DefineMacroDirective::from(macro)) {
+        auto name = named->name().data();
+        return QString::fromUtf8(
+            name.data(), static_cast<qsizetype>(name.size()));
+      }
+      return std::nullopt;
+    },
+    [&file_paths] (const File &file) -> std::optional<QString> {
+      if (auto it = file_paths.find(file.id().Pack()); it != file_paths.end()) {
+        return it->second;
+      }
+      return std::nullopt;
+    },
+
+    [] (auto) -> std::optional<QString> { return std::nullopt; }
+  };
+  return std::visit<std::optional<QString>>(VariantEntityVisitor, ent);
+}
+
 //// Returns a pair of `(fragment_id, offset)` or `(kInvalidEntityId, 0)` for a
 //// given raw entity id.
 //EntityBaseOffsetPair GetFragmentOffset(RawEntityId id) {

@@ -9,6 +9,7 @@
 #include <multiplier/Entity.h>
 #include <optional>
 #include <QString>
+#include <unordered_map>
 #include <utility>
 
 namespace mx {
@@ -27,7 +28,11 @@ std::optional<File> FileOfEntity(const VariantEntity &ent);
 //! NOTE(pag): We prefer `TokenRange::file_tokens` as that walks up macros.
 Token FirstFileToken(const VariantEntity &ent);
 
-//
+//! Return the name of an entity.
+std::optional<QString> NameOfEntity(
+    const VariantEntity &ent,
+    const std::unordered_map<RawEntityId, QString> &file_paths);
+
 //// Try to determine the declarations associated with this token.
 //std::optional<Decl> DeclForToken(const Token &token);
 //

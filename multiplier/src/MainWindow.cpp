@@ -170,7 +170,7 @@ void MainWindow::CreateCodeView() {
       d->code_view_context_menu.show_ref_explorer_action);
 }
 
-void MainWindow::OpenTokenContextMenu(const CodeModelIndex &index) {
+void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
   QVariant action_data;
   action_data.setValue(index);
 
@@ -178,22 +178,22 @@ void MainWindow::OpenTokenContextMenu(const CodeModelIndex &index) {
     action->setData(action_data);
   }
 
+  QVariant related_entity_id_var = index.model->Data(
+      index, ICodeModel::TokenRelatedEntityIdRole);
+
+  // Only enable the references browser if the token is related to an entity.
+  d->code_view_context_menu.show_ref_explorer_action->setEnabled(
+      related_entity_id_var.isValid());
+
   d->code_view_context_menu.menu->exec(QCursor::pos());
 }
 
-void MainWindow::OpenTokenReferenceExplorer(const CodeModelIndex &index) {
-  auto related_entity_id_var =
-      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
-
-  if (!related_entity_id_var.isValid()) {
-    return;
-  }
-
+void MainWindow::OpenTokenReferenceExplorer(RawEntityId entity_id) {
   CloseTokenReferenceExplorer();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache,
-      qvariant_cast<RawEntityId>(related_entity_id_var), this);
+      entity_id, this);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
           &MainWindow::OnQuickRefExplorerSaveAllClicked);
@@ -212,6 +212,19 @@ void MainWindow::OpenTokenReferenceExplorer(const CodeModelIndex &index) {
 
   d->quick_ref_explorer->resize(width, height);
   d->quick_ref_explorer->show();
+}
+
+void MainWindow::OpenTokenReferenceExplorer(CodeModelIndex index) {
+
+  QVariant related_entity_id_var =
+      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+
+  if (!related_entity_id_var.isValid()) {
+    CloseTokenReferenceExplorer();
+    return;
+  }
+
+  OpenTokenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var));
 }
 
 void MainWindow::CloseTokenReferenceExplorer() {
@@ -286,7 +299,7 @@ ICodeView *MainWindow::GetOrCreateFileCodeView(
   return nullptr;
 }
 
-void MainWindow::OpenEntityRelatedToToken(const CodeModelIndex &index) {
+void MainWindow::OpenEntityRelatedToToken(CodeModelIndex index) {
   QVariant entity_id_var = index.model->Data(
       index, ICodeModel::TokenRelatedEntityIdRole);
   if (!entity_id_var.isValid()) {
@@ -294,6 +307,8 @@ void MainWindow::OpenEntityRelatedToToken(const CodeModelIndex &index) {
   }
 
   RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+
+  // TODO(pag): Make this fetch the entity via a QFuture or something like that.
   VariantEntity entity = d->index.entity(entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     return;
@@ -338,7 +353,7 @@ void MainWindow::OnIndexViewFileClicked(RawEntityId file_id,
   (void) GetOrCreateFileCodeView(file_id, tab_name);
 }
 
-void MainWindow::OnTokenClicked(const CodeModelIndex &index,
+void MainWindow::OnTokenClicked(CodeModelIndex index,
                                 Qt::MouseButtons mouse_button,
                                 Qt::KeyboardModifiers /* modifiers */,
                                 bool /* double_click */) {
@@ -381,12 +396,12 @@ void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index,
 }
 
 void MainWindow::OnCodeViewContextMenuActionTriggered(QAction *action) {
-  auto code_model_index_var = action->data();
+  QVariant code_model_index_var = action->data();
   if (!code_model_index_var.isValid()) {
     return;
   }
 
-  const auto &code_model_index =
+  CodeModelIndex code_model_index =
       qvariant_cast<CodeModelIndex>(code_model_index_var);
 
   if (action == d->code_view_context_menu.show_ref_explorer_action) {

@@ -34,9 +34,10 @@ class MainWindow final : public QMainWindow {
   void CreateReferenceExplorerDock();
   void CreateNewReferenceExplorer();
   void CreateCodeView();
-  void OpenEntityRelatedToToken(const CodeModelIndex &index);
-  void OpenTokenContextMenu(const CodeModelIndex &index);
-  void OpenTokenReferenceExplorer(const CodeModelIndex &index);
+  void OpenEntityRelatedToToken(CodeModelIndex index);
+  void OpenTokenContextMenu(CodeModelIndex index);
+  void OpenTokenReferenceExplorer(CodeModelIndex index);
+  void OpenTokenReferenceExplorer(RawEntityId entity_id);
   void CloseTokenReferenceExplorer();
   ICodeView *CreateNewCodeView(RawEntityId file_entity_id,
                                QString tab_name);
@@ -50,7 +51,7 @@ class MainWindow final : public QMainWindow {
                               Qt::KeyboardModifiers modifiers,
                               Qt::MouseButtons buttons);
 
-  void OnTokenClicked(const CodeModelIndex &index,
+  void OnTokenClicked(CodeModelIndex index,
                       Qt::MouseButtons mouse_button,
                       Qt::KeyboardModifiers modifiers,
                       bool double_click);

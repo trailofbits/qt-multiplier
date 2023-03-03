@@ -29,11 +29,6 @@ RawEntityId NamedEntityContaining(VariantEntity entity);
 gap::generator<std::pair<RawEntityId, Reference>>
 References(VariantEntity entity);
 
-//! Return the name of an entity.
-std::optional<QString> NameOfEntity(
-    const VariantEntity &ent,
-    const std::unordered_map<RawEntityId, QString> &file_paths);
-
 template <typename T>
 static RawEntityId NamedDeclContaining(const T &thing) {
   for (FunctionDecl func : FunctionDecl::containing(thing)) {
@@ -62,13 +57,5 @@ static RawEntityId NamedDeclContaining(const T &thing) {
 
   return kInvalidEntityId;
 }
-
-template <typename... Ts>
-struct Overload final : Ts... {
-  using Ts::operator()...;
-};
-
-template <typename... Ts>
-Overload(Ts...) -> Overload<Ts...>;
 
 }  // namespace mx::gui
