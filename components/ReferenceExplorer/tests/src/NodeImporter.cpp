@@ -7,6 +7,7 @@
 */
 
 #include "NodeImporter.h"
+#include "Utils.h"
 
 #include <multiplier/Index.h>
 
@@ -16,11 +17,9 @@ namespace mx::gui {
 
 namespace {
 
-NodeImporter::IndexData OpenTestDatabase() {
+NodeImporter::IndexData GetIndexData() {
   NodeImporter::IndexData index_data;
-  index_data.index =
-      mx::EntityProvider::in_memory_cache(mx::EntityProvider::from_database(
-          MXQT_CI_DATA_PATH "/sample_database01/database.mx"));
+  index_data.index = OpenTestDatabase("sample_database01");
 
   for (auto [path, id] : index_data.index.file_paths()) {
     index_data.file_path_map.emplace(
@@ -33,7 +32,7 @@ NodeImporter::IndexData OpenTestDatabase() {
 }  // namespace
 
 TEST_CASE("NodeImporter") {
-  auto index_data = OpenTestDatabase();
+  auto index_data = GetIndexData();
   REQUIRE(index_data.file_path_map.size() > 0);
 
   NodeTree node_tree;
