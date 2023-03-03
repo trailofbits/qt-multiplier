@@ -17,12 +17,56 @@
 
 namespace mx::gui {
 
+//! Return the optional nearest fragment token associated with this declaration.
+std::optional<Token> DeclFragmentToken(const Decl &decl) {
+
+  // Structs and enums and such can often be defined inside of a typedef so we
+  // want to go to the beginning of them.
+  if (TypeDecl::from(decl)) {
+    goto skip_name_match;
+  }
+
+  if (auto nd = NamedDecl::from(decl)) {
+    if (auto tok = nd->token()) {
+      if (tok.data() == nd->name()) {
+        return tok;
+      }
+    }
+  }
+
+skip_name_match:
+  for (Token decl_tok : decl.tokens()) {
+    return decl_tok;
+  }
+
+  for (Token parsed_tok : Fragment::containing(decl).parsed_tokens()) {
+    return parsed_tok;
+  }
+
+  return std::nullopt;
+}
+
+//! Return the optional nearest file token associated with this declaration.
+std::optional<Token> DeclFileToken(const Decl &decl) {
+  if (auto frag_tok = DeclFragmentToken(decl)) {
+    return TokenRange(frag_tok.value()).file_tokens().front();
+  } else {
+    return std::nullopt;
+  }
+}
+
 //! Get the first file token associated with an entity.
 //!
 //! NOTE(pag): We prefer `TokenRange::file_tokens` as that walks up macros.
 Token FirstFileToken(const VariantEntity &ent) {
   const auto VariantEntityVisitor = Overload{
-    [] (const Decl &entity) { return entity.tokens().file_tokens().front(); },
+    [] (const Decl &entity) {
+      if (auto ftok = DeclFileToken(entity)) {
+        return ftok.value();
+      } else {
+        return entity.tokens().file_tokens().front();
+      }
+    },
     [] (const Stmt &entity) { return entity.tokens().file_tokens().front(); },
     [] (const Type &) { return Token(); },
 
