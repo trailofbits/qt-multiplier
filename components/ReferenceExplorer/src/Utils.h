@@ -13,11 +13,13 @@
 #include <multiplier/Entities/FunctionDecl.h>
 #include <multiplier/Entities/FieldDecl.h>
 #include <multiplier/Entities/VarDecl.h>
+#include <multiplier/ui/Util.h>
 #include <QString>
 #include <unordered_map>
 
 namespace mx::gui {
 
+// Return the ID of the entity with a name that contains `entity`.
 RawEntityId NamedEntityContaining(VariantEntity entity);
 
 //! Generate references to the entity with `entity`. The references
@@ -27,18 +29,10 @@ RawEntityId NamedEntityContaining(VariantEntity entity);
 gap::generator<std::pair<RawEntityId, Reference>>
 References(VariantEntity entity);
 
-//! Return the file containing an entity.
-std::optional<File> FileOfEntity(const VariantEntity &ent);
-
-//! Get the first file token associated with an entity.
-//!
-//! NOTE(pag): We prefer `TokenRange::file_tokens` as that walks up macros.
-Token FirstFileToken(const VariantEntity &ent);
-
 //! Return the name of an entity.
 std::optional<QString> NameOfEntity(
     const VariantEntity &ent,
-    const std::unordered_map<PackedFileId, QString> &file_paths);
+    const std::unordered_map<RawEntityId, QString> &file_paths);
 
 template <typename T>
 static RawEntityId NamedDeclContaining(const T &thing) {

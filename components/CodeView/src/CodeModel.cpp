@@ -54,6 +54,7 @@ struct CodeModel::PrivateData final {
 
   ModelState model_state{ModelState::Ready};
   TokenRowList token_row_list;
+  std::optional<RawEntityId> entity_id;
 };
 
 CodeModel::~CodeModel() {}
@@ -66,12 +67,19 @@ Index &CodeModel::GetIndex() {
   return d->index;
 }
 
+//! Asks the model for the currently showing entity. This is usually a file
+//! id or a fragment id.
+std::optional<RawEntityId> CodeModel::GetEntity(void) const {
+  return d->entity_id;
+}
+
 void CodeModel::SetEntity(RawEntityId raw_id) {
   if (d->future_result.isRunning()) {
     d->future_result.cancel();
   }
 
   d->future_result = {};
+  d->entity_id.reset();
 
   emit BeginResetModel();
 
@@ -79,16 +87,14 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   VariantId vid = eid.Unpack();
 
   if (std::holds_alternative<FileId>(vid)) {
-    FileId fid = std::get<FileId>(vid);
-    d->future_result = d->database->DownloadFile(fid);
+    d->future_result = d->database->DownloadFile(raw_id);
 
   } else if (std::holds_alternative<FileTokenId>(vid)) {
-    FileId fid(std::get<FileTokenId>(vid).file_id);
-    d->future_result = d->database->DownloadFile(fid);
+    d->future_result = d->database->DownloadFile(raw_id);
 
   } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
-    FragmentId fid = frag_id.value();
-    d->future_result = d->database->DownloadFragment(fid);
+    d->future_result = d->database->DownloadFragment(
+        EntityId(frag_id.value()).Pack());
 
   } else {
     emit EndResetModel(ModelState::UpdateFailed);
@@ -234,6 +240,8 @@ void CodeModel::FutureResultStateChanged() {
 
   IndexedTokenRangeData indexed_token_range_data =
       std::move(std::get<IndexedTokenRangeData>(future_result));
+
+  d->entity_id = indexed_token_range_data.requested_id;
 
   auto token_count = indexed_token_range_data.start_of_token.size() - 1;
 

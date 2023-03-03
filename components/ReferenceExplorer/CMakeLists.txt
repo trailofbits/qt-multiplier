@@ -46,6 +46,7 @@ target_link_libraries("mx_referenceexplorer"
     "multiplier::mx-api"
     "mx_assert"
     "mx_searchwidget"
+    "mx_util"
 )
 
 target_include_directories("mx_referenceexplorer" PRIVATE

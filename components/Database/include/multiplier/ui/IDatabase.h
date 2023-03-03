@@ -8,7 +8,6 @@
 
 #include <multiplier/Types.h>
 #include <multiplier/Index.h>
-#include <multiplier/Util.h>
 
 #include <QFuture>
 #include <QFutureWatcher>
@@ -41,6 +40,9 @@ struct LineNumberInfo final {
 struct IndexedTokenRangeData final {
 
   using OptionalLineNumberInfo = std::optional<LineNumberInfo>;
+
+  // Entity ID associated with the request.
+  RawEntityId requested_id;
 
   // The data of all of the tokens.
   QString data;
@@ -84,8 +86,8 @@ class IDatabase {
   static Ptr Create(const Index &index,
                     const FileLocationCache &file_location_cache);
 
-  virtual FutureResult DownloadFile(PackedFileId file_id) = 0;
-  virtual FutureResult DownloadFragment(PackedFragmentId fragment_id) = 0;
+  virtual FutureResult DownloadFile(RawEntityId file_id) = 0;
+  virtual FutureResult DownloadFragment(RawEntityId fragment_id) = 0;
 
   IDatabase(const IDatabase &) = delete;
   IDatabase &operator=(const IDatabase &) = delete;

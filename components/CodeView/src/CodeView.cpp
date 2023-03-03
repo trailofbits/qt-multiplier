@@ -229,7 +229,7 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
 
     return false;
 
-  } else if (event->type() == QEvent::MouseButtonRelease) {
+  } else if (event->type() == QEvent::MouseButtonPress) {
     auto mouse_event = static_cast<QMouseEvent *>(event);
 
     if (obj == d->text_edit->viewport()) {
@@ -366,8 +366,8 @@ void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
     return;
   }
 
-  const auto &model_index = opt_model_index.value();
-  emit TokenClicked(model_index, event->button(), event->modifiers(),
+  const CodeModelIndex &model_index = opt_model_index.value();
+  emit TokenClicked(model_index, event->buttons(), event->modifiers(),
                     double_click);
 }
 

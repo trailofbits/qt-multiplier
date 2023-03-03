@@ -10,6 +10,7 @@
 
 #include <QThreadPool>
 #include <QtConcurrent>
+#include <thread>
 
 namespace mx::gui {
 
@@ -39,11 +40,11 @@ struct Database::PrivateData {
 
 Database::~Database() {}
 
-Database::FutureResult Database::DownloadFile(PackedFileId file_id) {
+Database::FutureResult Database::DownloadFile(RawEntityId file_id) {
 
   Request request{SingleEntityRequest{
       DownloadRequestType::FileTokens,
-      file_id.Pack(),
+      file_id,
   }};
 
   return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
@@ -51,11 +52,11 @@ Database::FutureResult Database::DownloadFile(PackedFileId file_id) {
 }
 
 Database::FutureResult
-Database::DownloadFragment(PackedFragmentId fragment_id) {
+Database::DownloadFragment(RawEntityId fragment_id) {
 
   Request request{SingleEntityRequest{
       DownloadRequestType::FragmentTokens,
-      fragment_id.Pack(),
+      fragment_id,
   }};
 
   return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
@@ -66,7 +67,8 @@ Database::Database(const Index &index,
                    const FileLocationCache &file_location_cache)
     : d(new PrivateData(index, file_location_cache)) {
 
-  d->thread_pool.setMaxThreadCount(4);
+  d->thread_pool.setMaxThreadCount(
+      static_cast<int>(std::thread::hardware_concurrency()));
 }
 
 }  // namespace mx::gui

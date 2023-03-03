@@ -13,6 +13,8 @@
 
 namespace mx::gui {
 
+class ICodeView;
+
 class MainWindow final : public QMainWindow {
   Q_OBJECT
 
@@ -32,20 +34,25 @@ class MainWindow final : public QMainWindow {
   void CreateReferenceExplorerDock();
   void CreateNewReferenceExplorer();
   void CreateCodeView();
+  void OpenEntityRelatedToToken(const CodeModelIndex &index);
   void OpenTokenContextMenu(const CodeModelIndex &index);
   void OpenTokenReferenceExplorer(const CodeModelIndex &index);
   void CloseTokenReferenceExplorer();
-  void CreateNewCodeView(const RawEntityId &file_entity_id,
-                         const QString &tab_name);
+  ICodeView *CreateNewCodeView(RawEntityId file_entity_id,
+                               QString tab_name);
+
+  ICodeView *GetOrCreateFileCodeView(
+      RawEntityId file_id, std::optional<QString> opt_tab_name=std::nullopt);
 
  private slots:
-  void OnIndexViewFileClicked(const PackedFileId &file_id,
-                              const std::string &file_name,
-                              const bool &middle_button);
+  void OnIndexViewFileClicked(RawEntityId file_id,
+                              QString file_name,
+                              Qt::KeyboardModifiers modifiers,
+                              Qt::MouseButtons buttons);
 
   void OnTokenClicked(const CodeModelIndex &index,
-                      const Qt::MouseButton &mouse_button,
-                      const Qt::KeyboardModifiers &modifiers,
+                      Qt::MouseButtons mouse_button,
+                      Qt::KeyboardModifiers modifiers,
                       bool double_click);
 
   void OnReferenceExplorerItemClicked(const QModelIndex &index,

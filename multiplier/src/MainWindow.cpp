@@ -11,6 +11,7 @@
 #include <multiplier/ui/IIndexView.h>
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IReferenceExplorer.h>
+#include <multiplier/ui/Util.h>
 
 #include <QDockWidget>
 #include <QTreeView>
@@ -220,8 +221,8 @@ void MainWindow::CloseTokenReferenceExplorer() {
   }
 }
 
-void MainWindow::CreateNewCodeView(const RawEntityId &file_entity_id,
-                                   const QString &tab_name) {
+ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
+                                         QString tab_name) {
   auto model = ICodeModel::Create(d->file_location_cache, d->index, this);
   auto code_view = ICodeView::Create(model);
 
@@ -238,40 +239,113 @@ void MainWindow::CreateNewCodeView(const RawEntityId &file_entity_id,
           &MainWindow::OnTokenClicked);
 
   model->SetEntity(file_entity_id);
+  return code_view;
 }
 
-void MainWindow::OnIndexViewFileClicked(const PackedFileId &file_id,
-                                        const std::string &file_name,
-                                        const bool &middle_button) {
+ICodeView *MainWindow::GetOrCreateFileCodeView(
+    RawEntityId file_id, std::optional<QString> opt_tab_name) {
 
-  auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
+  ICodeView *tab_code_view = nullptr;
+  ICodeModel *tab_model = nullptr;
+  QTabWidget &tab_widget = *static_cast<QTabWidget *>(centralWidget());
 
-  auto should_create_tab = tab_widget.count() == 0 || middle_button;
-  auto tab_name = QString::fromStdString(file_name);
+  for (auto i = 0; i < tab_widget.count(); ++i) {
+    tab_code_view = dynamic_cast<ICodeView *>(tab_widget.widget(i));
+    if (!tab_code_view) {
+      continue;
+    }
 
-  if (should_create_tab) {
-    CreateNewCodeView(file_id.Pack(), tab_name);
+    tab_model = tab_code_view->Model();
+    if (!tab_model) {
+      continue;
+    }
 
-  } else {
-    auto &current_code_view =
-        *static_cast<ICodeView *>(tab_widget.currentWidget());
-    auto &current_code_model = *current_code_view.Model();
-    current_code_model.SetEntity(file_id.Pack());
+    std::optional<RawEntityId> tab_file_id = tab_model->GetEntity();
+    if (!tab_file_id.has_value() || tab_file_id.value() != file_id) {
+      continue;
+    }
 
-    auto current_index = tab_widget.currentIndex();
-    tab_widget.setTabText(current_index, tab_name);
+    tab_widget.setCurrentWidget(tab_code_view);
+    return tab_code_view;
   }
 
+  if (opt_tab_name.has_value()) {
+    return CreateNewCodeView(file_id, opt_tab_name.value());
+  }
+
+  for (auto [path, id] : d->index.file_paths()) {
+    if (id.Pack() != file_id) {
+      continue;
+    }
+
+    return CreateNewCodeView(
+        file_id,
+        QString::fromStdString(path.filename().generic_string()));
+  }
+
+  return nullptr;
+}
+
+void MainWindow::OpenEntityRelatedToToken(const CodeModelIndex &index) {
+  QVariant entity_id_var = index.model->Data(
+      index, ICodeModel::TokenRelatedEntityIdRole);
+  if (!entity_id_var.isValid()) {
+    return;
+  }
+
+  RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  VariantEntity entity = d->index.entity(entity_id);
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
+
+  if (std::holds_alternative<Decl>(entity)) {
+    entity = std::get<Decl>(entity).canonical_declaration();
+  }
+
+  std::optional<File> opt_file = FileOfEntity(entity);
+  if (!opt_file.has_value()) {
+    return;
+  }
+
+  ICodeView *code_view = GetOrCreateFileCodeView(opt_file->id().Pack());
+  if (!code_view) {
+    return;
+  }
+
+  ICodeModel *code_model = code_view->Model();
+  if (!code_model) {
+    return;
+  }
+
+  if (Token opt_tok = FirstFileToken(entity)) {
+    const FileLocationCache loc_cache = code_model->GetFileLocationCache();
+    auto maybe_loc = opt_tok.location(loc_cache);
+    if (!maybe_loc.has_value()) {
+      return;
+    }
+
+    auto [line, col] = maybe_loc.value();
+    code_view->ScrollToLineNumber(line);
+  }
+}
+
+void MainWindow::OnIndexViewFileClicked(RawEntityId file_id,
+                                        QString tab_name,
+                                        Qt::KeyboardModifiers,
+                                        Qt::MouseButtons) {
   CloseTokenReferenceExplorer();
+  (void) GetOrCreateFileCodeView(file_id, tab_name);
 }
 
 void MainWindow::OnTokenClicked(const CodeModelIndex &index,
-                                const Qt::MouseButton &mouse_button,
-                                const Qt::KeyboardModifiers &modifiers,
-                                bool double_click) {
+                                Qt::MouseButtons mouse_button,
+                                Qt::KeyboardModifiers /* modifiers */,
+                                bool /* double_click */) {
+  if (mouse_button == Qt::LeftButton) {
+    OpenEntityRelatedToToken(index);
 
-  if (!double_click && modifiers == Qt::NoModifier &&
-      mouse_button == Qt::RightButton) {
+  } else if (mouse_button == Qt::RightButton) {
     OpenTokenContextMenu(index);
   }
 }

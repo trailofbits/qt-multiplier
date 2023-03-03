@@ -56,10 +56,14 @@ class ICodeModel : public QObject {
                             const Index &index, QObject *parent = nullptr);
 
   //! Returns the internal mx::FileLocationCache object
-  virtual const FileLocationCache &GetFileLocationCache() const = 0;
+  virtual const FileLocationCache &GetFileLocationCache(void) const = 0;
 
   //! Returns the internal mx::Index object
   virtual Index &GetIndex() = 0;
+
+  //! Asks the model for the currently showing entity. This is usually a file
+  //! id or a fragment id.
+  virtual std::optional<RawEntityId> GetEntity(void) const = 0;
 
   //! Asks the model to fetch the specified entity.
   virtual void SetEntity(RawEntityId id) = 0;

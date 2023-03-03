@@ -26,6 +26,8 @@ class CodeModel final : public ICodeModel {
   virtual const FileLocationCache &GetFileLocationCache() const override;
   virtual Index &GetIndex() override;
 
+  virtual std::optional<RawEntityId> GetEntity(void) const override;
+
   virtual void SetEntity(RawEntityId id) override;
 
   virtual int RowCount() const override;

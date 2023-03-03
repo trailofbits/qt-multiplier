@@ -17,6 +17,9 @@ namespace mx::gui {
 namespace {
 
 struct TokenRangeData final {
+  // Entity ID associated with the request.
+  RawEntityId requested_id;
+
   TokenRange file_tokens;
 
   // This is a mapping of the file token IDs to fragment tokens. The file token
@@ -90,6 +93,8 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
                      RawEntityId entity_id) {
 
   TokenRangeData output;
+  output.requested_id = entity_id;
+
   std::vector<Token> frag_tokens;
 
   // Download all tokens from a file. This pulls in all of the file's fragments.
@@ -297,6 +302,7 @@ static IndexedTokenRangeDataOrError IndexTokenRange(
     TokenRangeData input) {
 
   IndexedTokenRangeData output;
+  output.requested_id = input.requested_id;
   output.fragment_ids.push_back(kInvalidEntityId);
 
   unsigned line_number = 0u;
