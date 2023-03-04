@@ -7,6 +7,8 @@
 #include "QuickReferenceExplorer.h"
 #include "PreviewableReferenceExplorer.h"
 
+#include <multiplier/ui/Util.h>
+
 #include <QVBoxLayout>
 #include <QKeyEvent>
 #include <QApplication>
@@ -98,8 +100,19 @@ void QuickReferenceExplorer::InitializeWidgets(
   // Title bar
   //
 
-  // TODO: Title
-  auto window_name = tr("References to entity ") + QString::number(entity_id);
+  // TODO(pag): Put all of this into a future.
+  std::unordered_map<RawEntityId, QString> file_paths;
+  for (auto [path, id] : index.file_paths()) {
+    file_paths.emplace(id.Pack(),
+                       QString::fromStdString(path.filename().generic_string()));
+  }
+  auto name = NameOfEntity(index.entity(entity_id), file_paths);
+  QString window_name;
+  if (name.has_value()) {
+    window_name = tr("References to ") + name.value();
+  } else {
+    window_name = tr("References to entity ") + QString::number(entity_id);
+  }
   auto window_title = new QLabel(window_name);
 
   // Save to active button

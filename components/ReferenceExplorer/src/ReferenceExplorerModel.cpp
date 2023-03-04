@@ -48,6 +48,12 @@ bool ReferenceExplorerModel::AppendEntityObject(RawEntityId entity_id,
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
 
+  // TODO(pag): Switch to something that can be made into a QFuture.
+  VariantEntity entity = d->index.entity(entity_id);
+  if (std::holds_alternative<Decl>(entity)) {
+    entity_id = std::get<Decl>(entity).canonical_declaration().id().Pack();
+  }
+
   // TODO: Switch to beginInsertRows/endInsertRows in order to preserve
   // the view state
   auto succeeded = d->node_importer.ImportEntity(

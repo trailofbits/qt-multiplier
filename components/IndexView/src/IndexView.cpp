@@ -74,38 +74,19 @@ void IndexView::InstallModel(IFileTreeModel *model) {
 }
 
 void IndexView::OnFileTreeItemClicked(const QModelIndex &index) {
-  bool middle_button{};
-
-  auto mouse_button = qApp->mouseButtons();
-  if (mouse_button == Qt::MiddleButton) {
-    middle_button = true;
-
-  } else if (mouse_button == Qt::LeftButton) {
-    middle_button = false;
-
-  } else {
-    return;
-  }
 
   auto opt_file_id_var =
-      d->model_proxy->data(index, IFileTreeModel::OptionalPackedFileIdRole);
+      d->model_proxy->data(index, IFileTreeModel::FileIdRole);
 
   if (!opt_file_id_var.isValid()) {
     return;
   }
 
-  const auto &opt_file_id =
-      qvariant_cast<std::optional<mx::PackedFileId>>(opt_file_id_var);
-
-  if (!opt_file_id.has_value()) {
-    return;
-  }
-
-  const auto &file_id = opt_file_id.value();
-
+  const auto file_id = qvariant_cast<RawEntityId>(opt_file_id_var);
   auto file_name_var = d->model_proxy->data(index);
-  emit FileClicked(file_id, file_name_var.toString().toStdString(),
-                   middle_button);
+  emit FileClicked(file_id, file_name_var.toString(),
+                   qApp->keyboardModifiers(),
+                   qApp->mouseButtons());
 }
 
 void IndexView::OnSearchParametersChange(

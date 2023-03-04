@@ -23,7 +23,7 @@ NodeImporter::IndexData GetIndexData() {
 
   for (auto [path, id] : index_data.index.file_paths()) {
     index_data.file_path_map.emplace(
-        id, QString::fromStdString(path.generic_string()));
+        id.Pack(), QString::fromStdString(path.generic_string()));
   }
 
   return index_data;

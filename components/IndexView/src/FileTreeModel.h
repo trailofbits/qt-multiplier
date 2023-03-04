@@ -57,7 +57,7 @@ class FileTreeModel final : public IFileTreeModel {
     //! Data for file nodes
     struct FileData final {
       //! The PackedFileId for this node
-      std::optional<mx::PackedFileId> opt_file_id;
+      RawEntityId opt_file_id{kInvalidEntityId};
 
       //! The file name for this node
       std::string file_name;
@@ -79,13 +79,13 @@ class FileTreeModel final : public IFileTreeModel {
   //! Imports a path list into the given NodeMap object
   static bool ImportPathList(
       NodeMap &node_map,
-      const std::map<std::filesystem::path, mx::PackedFileId> &path_list);
+      const std::map<std::filesystem::path, PackedFileId> &path_list);
 
   //! Imports the specified path into the NodeMap object
   //! \todo file_id is an optional, since we can't easily fake it for tests
   static bool
   ImportPath(NodeMap &node_map, const std::filesystem::path &path,
-             const std::optional<mx::PackedFileId> &opt_file_id = std::nullopt);
+             RawEntityId opt_file_id = kInvalidEntityId);
 
   //! Visits the node map populating the parent values (required by Qt)
   static void PopulateParents(NodeMap &node_map);

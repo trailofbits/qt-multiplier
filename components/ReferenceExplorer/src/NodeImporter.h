@@ -54,7 +54,7 @@ class NodeImporter final {
     mx::FileLocationCache file_location_cache;
 
     //! The path map from mx::Index, keyed by id
-    std::unordered_map<PackedFileId, QString> file_path_map;
+    std::unordered_map<RawEntityId, QString> file_path_map;
   };
 
   //! Imports an entity by id

@@ -14,9 +14,8 @@ class Database final : public IDatabase {
  public:
   virtual ~Database() override;
 
-  virtual FutureResult DownloadFile(PackedFileId file_id) override;
-
-  virtual FutureResult DownloadFragment(PackedFragmentId fragment_id) override;
+  virtual FutureResult DownloadFile(RawEntityId file_id) override;
+  virtual FutureResult DownloadFragment(RawEntityId fragment_id) override;
 
  private:
   struct PrivateData;

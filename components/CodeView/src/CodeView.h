@@ -40,10 +40,6 @@ class CodeView final : public ICodeView {
   //! Destructor
   virtual ~CodeView() override;
 
-  //! \copybrief ICodeView::GetEntityCursorPosition
-  virtual std::optional<int>
-  GetEntityCursorPosition(RawEntityId entity_id) const override;
-
   //! \copybrief ICodeView::GetCursorPosition
   virtual int GetCursorPosition() const override;
 
@@ -59,15 +55,6 @@ class CodeView final : public ICodeView {
 
   //! Scrolls the view to the specified entity id
   virtual bool ScrollToLineNumber(unsigned line) const override;
-
-  //! \copybrief ICodeView::ScrollToEntityId
-  virtual bool ScrollToEntityId(RawEntityId entity_id) const override;
-
-  //! \copybrief ICodeView::ScrollToToken
-  virtual bool ScrollToToken(const Token &token) const override;
-
-  //! \copybrief ICodeView::ScrollToTokenRange
-  virtual bool ScrollToTokenRange(const TokenRange &token_range) const override;
 
  protected:
   //! Constructor
@@ -122,10 +109,6 @@ class CodeView final : public ICodeView {
     //! The key is unique and derived from a CodeModelIndex
     std::unordered_map<std::uint64_t, Entry> data;
 
-    //! This maps an entity id to one or more internal unique token IDs
-    std::unordered_map<RawEntityId, std::vector<std::uint64_t>>
-        entity_id_to_unique_token_id_list;
-
     //! This maps a block number to a list of unique token identifiers
     std::unordered_map<int, std::vector<std::uint64_t>>
         block_number_to_unique_token_id_list;
@@ -159,11 +142,6 @@ class CodeView final : public ICodeView {
   static std::optional<CodeModelIndex>
   GetCodeModelIndexFromTextCursor(const TokenMap &token_map,
                                   const QTextCursor &cursor);
-
-  //! Returns zero or more cursor positions that match the given entity id
-  static std::vector<int>
-  GetTextCursorListFromRawEntityId(const TokenMap &token_map,
-                                   const RawEntityId &entity_id);
 
   //! Used with CreateTextDocument to display graphical progress
   using CreateTextDocumentProgressCallback = std::function<bool(int)>;
@@ -208,6 +186,10 @@ class CodeView final : public ICodeView {
  private slots:
   //! This slot regenerates the code view contents using CreateTextDocument
   void OnModelReset();
+
+  //! This slot receives tells us when a request for a model reset is was
+  //! skipped because the current model is already the right model to use.
+  void OnModelResetDone();
 
   //! Used to track single click events and emit the TokenClicked signal
   void OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event);

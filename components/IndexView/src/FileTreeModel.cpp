@@ -70,7 +70,7 @@ bool SplitComponentAt(FileTreeModel::NodeMap &node_map,
 bool ImportPathHelper(FileTreeModel::NodeMap &node_map,
                       std::uint64_t parent_node_id,
                       std::vector<std::string> path,
-                      const std::optional<mx::PackedFileId> &opt_file_id) {
+                      RawEntityId opt_file_id) {
   // Get the folder data structure of the parent node
   auto &parent_node = node_map.at(parent_node_id);
   if (!std::holds_alternative<FileTreeModel::Node::FolderData>(
@@ -438,10 +438,11 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
     if (role == Qt::DisplayRole) {
       return QString::fromStdString(file_data.file_name);
 
-    } else if (role == IFileTreeModel::OptionalPackedFileIdRole) {
+    } else if (role == IFileTreeModel::FileIdRole) {
       QVariant value;
-      value.setValue(file_data.opt_file_id);
-
+      if (file_data.opt_file_id != kInvalidEntityId) {
+        value.setValue(file_data.opt_file_id);
+      }
       return value;
 
     } else {
@@ -459,7 +460,7 @@ FileTreeModel::FileTreeModel(mx::Index index, QObject *parent)
 
 bool FileTreeModel::ImportPathList(
     FileTreeModel::NodeMap &node_map,
-    const std::map<std::filesystem::path, mx::PackedFileId> &path_list) {
+    const std::map<std::filesystem::path, PackedFileId> &path_list) {
 
   // clang-format off
   node_map = {
@@ -508,7 +509,7 @@ bool FileTreeModel::ImportPathList(
   auto succeeded{true};
   for (const auto &file_path_p : path_list) {
     const auto &path = file_path_p.first;
-    const auto &file_id = file_path_p.second;
+    const auto file_id = file_path_p.second.Pack();
 
     if (!ImportPath(node_map, path, file_id)) {
       succeeded = false;
@@ -522,7 +523,7 @@ bool FileTreeModel::ImportPathList(
 
 bool FileTreeModel::ImportPath(
     FileTreeModel::NodeMap &node_map, const std::filesystem::path &path,
-    const std::optional<mx::PackedFileId> &opt_file_id) {
+    RawEntityId opt_file_id) {
 
   std::vector<std::string> component_list;
   for (const auto &comp : path) {

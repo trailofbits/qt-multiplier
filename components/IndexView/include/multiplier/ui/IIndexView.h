@@ -36,8 +36,9 @@ class IIndexView : public QWidget {
 
  signals:
   //! Emitted when a file has been clicked
-  void FileClicked(const PackedFileId &file_id, const std::string &file_name,
-                   const bool &middle_button);
+  void FileClicked(RawEntityId file_id, QString file_name,
+                   Qt::KeyboardModifiers modifiers,
+                   Qt::MouseButtons buttons);
 };
 
 }  // namespace mx::gui

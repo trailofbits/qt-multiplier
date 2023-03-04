@@ -34,7 +34,7 @@ struct NodeImporter::PrivateData {
 
     for (auto [path, id] : index.file_paths()) {
       index_data.file_path_map.emplace(
-          id, QString::fromStdString(path.generic_string()));
+          id.Pack(), QString::fromStdString(path.generic_string()));
     }
   }
 
@@ -123,7 +123,7 @@ void NodeImporter::ImportEntity(NodeTree &node_tree,
     IReferenceExplorerModel::Location location;
     location.file_id = file->id().Pack();
 
-    auto file_path_map_it = index_data.file_path_map.find(file->id());
+    auto file_path_map_it = index_data.file_path_map.find(location.file_id);
     Assert(file_path_map_it != index_data.file_path_map.end(),
            "Invalid path id");
 

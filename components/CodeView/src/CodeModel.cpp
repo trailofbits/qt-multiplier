@@ -54,6 +54,7 @@ struct CodeModel::PrivateData final {
 
   ModelState model_state{ModelState::Ready};
   TokenRowList token_row_list;
+  std::optional<RawEntityId> entity_id;
 };
 
 CodeModel::~CodeModel() {}
@@ -66,6 +67,12 @@ Index &CodeModel::GetIndex() {
   return d->index;
 }
 
+//! Asks the model for the currently showing entity. This is usually a file
+//! id or a fragment id.
+std::optional<RawEntityId> CodeModel::GetEntity(void) const {
+  return d->entity_id;
+}
+
 void CodeModel::SetEntity(RawEntityId raw_id) {
   if (d->future_result.isRunning()) {
     d->future_result.cancel();
@@ -73,22 +80,29 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
 
   d->future_result = {};
 
+  // Try to skip resetting this model if we don't need to.
+  if (d->entity_id.has_value() &&
+      d->entity_id.value() == raw_id &&
+      d->model_state == ModelState::Ready) {
+    emit ModelResetSkipped();
+    return;
+  }
+
   emit BeginResetModel();
+  d->entity_id.reset();
 
   EntityId eid(raw_id);
   VariantId vid = eid.Unpack();
 
   if (std::holds_alternative<FileId>(vid)) {
-    FileId fid = std::get<FileId>(vid);
-    d->future_result = d->database->DownloadFile(fid);
+    d->future_result = d->database->DownloadFile(raw_id);
 
   } else if (std::holds_alternative<FileTokenId>(vid)) {
-    FileId fid(std::get<FileTokenId>(vid).file_id);
-    d->future_result = d->database->DownloadFile(fid);
+    d->future_result = d->database->DownloadFile(raw_id);
 
   } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
-    FragmentId fid = frag_id.value();
-    d->future_result = d->database->DownloadFragment(fid);
+    d->future_result = d->database->DownloadFragment(
+        EntityId(frag_id.value()).Pack());
 
   } else {
     emit EndResetModel(ModelState::UpdateFailed);
@@ -120,8 +134,12 @@ int CodeModel::TokenCount(int row) const {
   return static_cast<int>(token_row.column_list.size());
 }
 
+bool CodeModel::IsReady() const {
+  return d->model_state == ModelState::Ready;
+}
+
 QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
-  if (d->model_state != ModelState::Ready) {
+  if (!IsReady()) {
     if (index.row != 0 || index.token_index != 0) {
       return QVariant();
     }
@@ -234,6 +252,8 @@ void CodeModel::FutureResultStateChanged() {
 
   IndexedTokenRangeData indexed_token_range_data =
       std::move(std::get<IndexedTokenRangeData>(future_result));
+
+  d->entity_id = indexed_token_range_data.requested_id;
 
   auto token_count = indexed_token_range_data.start_of_token.size() - 1;
 

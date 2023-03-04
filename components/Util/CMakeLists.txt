@@ -7,7 +7,7 @@
 #
 
 add_library("mx_util"
-  include/multiplier/Util.h
+  include/multiplier/ui/Util.h
   src/Util.h
   src/Util.cpp
 )
