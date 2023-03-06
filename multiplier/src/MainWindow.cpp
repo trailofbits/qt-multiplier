@@ -117,7 +117,14 @@ void MainWindow::CreateReferenceExplorerDock() {
   d->reference_explorer_dock->hide();
 }
 
-void MainWindow::CreateNewReferenceExplorer() {
+void MainWindow::CreateNewReferenceExplorer(QString window_title) {
+  auto new_tab_index = d->ref_explorer_tab_widget->count();
+
+  if (window_title.isEmpty()) {
+    window_title =
+        tr("Reference Explorer #") + QString::number(new_tab_index + 1);
+  }
+
   auto ref_explorer_model =
       IReferenceExplorerModel::Create(d->index, d->file_location_cache, this);
 
@@ -129,10 +136,7 @@ void MainWindow::CreateNewReferenceExplorer() {
   connect(reference_explorer, &PreviewableReferenceExplorer::ItemClicked, this,
           &MainWindow::OnReferenceExplorerItemClicked);
 
-  auto new_tab_index = d->ref_explorer_tab_widget->count();
-  auto name = tr("Reference Explorer #") + QString::number(new_tab_index + 1);
-
-  d->ref_explorer_tab_widget->addTab(reference_explorer, name);
+  d->ref_explorer_tab_widget->addTab(reference_explorer, window_title);
   d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
 
   d->reference_explorer_dock->toggleViewAction()->setEnabled(true);
@@ -178,8 +182,8 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
     action->setData(action_data);
   }
 
-  QVariant related_entity_id_var = index.model->Data(
-      index, ICodeModel::TokenRelatedEntityIdRole);
+  QVariant related_entity_id_var =
+      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
 
   // Only enable the references browser if the token is related to an entity.
   d->code_view_context_menu.show_ref_explorer_action->setEnabled(
@@ -192,8 +196,7 @@ void MainWindow::OpenTokenReferenceExplorer(RawEntityId entity_id) {
   CloseTokenReferenceExplorer();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
-      d->index, d->file_location_cache,
-      entity_id, this);
+      d->index, d->file_location_cache, entity_id, this);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
           &MainWindow::OnQuickRefExplorerSaveAllClicked);
@@ -255,8 +258,9 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   return code_view;
 }
 
-ICodeView *MainWindow::GetOrCreateFileCodeView(
-    RawEntityId file_id, std::optional<QString> opt_tab_name) {
+ICodeView *
+MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
+                                    std::optional<QString> opt_tab_name) {
 
   ICodeView *tab_code_view = nullptr;
   ICodeModel *tab_model = nullptr;
@@ -292,16 +296,15 @@ ICodeView *MainWindow::GetOrCreateFileCodeView(
     }
 
     return CreateNewCodeView(
-        file_id,
-        QString::fromStdString(path.filename().generic_string()));
+        file_id, QString::fromStdString(path.filename().generic_string()));
   }
 
   return nullptr;
 }
 
 void MainWindow::OpenEntityRelatedToToken(CodeModelIndex index) {
-  QVariant entity_id_var = index.model->Data(
-      index, ICodeModel::TokenRelatedEntityIdRole);
+  QVariant entity_id_var =
+      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
   if (!entity_id_var.isValid()) {
     return;
   }
@@ -345,8 +348,7 @@ void MainWindow::OpenEntityRelatedToToken(CodeModelIndex index) {
   }
 }
 
-void MainWindow::OnIndexViewFileClicked(RawEntityId file_id,
-                                        QString tab_name,
+void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
                                         Qt::KeyboardModifiers,
                                         Qt::MouseButtons) {
   CloseTokenReferenceExplorer();
@@ -416,9 +418,10 @@ void MainWindow::OnToggleWordWrap(bool checked) {
 }
 
 void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
+                                                  const QString &window_title,
                                                   const bool &as_new_tab) {
   if (d->ref_explorer_tab_widget->count() == 0 || as_new_tab) {
-    CreateNewReferenceExplorer();
+    CreateNewReferenceExplorer(window_title);
   }
 
   auto current_tab = d->ref_explorer_tab_widget->currentIndex();
