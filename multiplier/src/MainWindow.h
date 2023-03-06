@@ -6,7 +6,7 @@
 
 #include <multiplier/Index.h>
 
-#include <multiplier/ui/ICodeModel.h>
+#include <multiplier/ui/ICodeView.h>
 
 #include <QMainWindow>
 #include <QMimeData>
@@ -50,8 +50,8 @@ class MainWindow final : public QMainWindow {
                               Qt::KeyboardModifiers modifiers,
                               Qt::MouseButtons buttons);
 
-  void OnTokenClicked(CodeModelIndex index, Qt::MouseButtons mouse_button,
-                      Qt::KeyboardModifiers modifiers, bool double_click);
+  void OnTokenTriggered(const ICodeView::TokenAction &token_action,
+                        const CodeModelIndex &index);
 
   void OnReferenceExplorerItemClicked(const QModelIndex &index,
                                       const bool &middle_button);

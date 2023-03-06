@@ -197,17 +197,17 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
     auto mouse_event = static_cast<QMouseEvent *>(event);
 
     if (obj == d->text_edit->viewport()) {
-      OnTextEditViewportMouseButtonReleaseEvent(mouse_event);
+      OnTextEditViewportMouseButtonPress(mouse_event);
       return false;
     }
 
     return false;
 
-  } else if (event->type() == QEvent::MouseButtonDblClick) {
-    auto mouse_event = static_cast<QMouseEvent *>(event);
+  } else if (event->type() == QEvent::KeyPress) {
+    auto key_event = static_cast<QKeyEvent *>(event);
 
-    if (obj == d->text_edit->viewport()) {
-      OnTextEditViewportMouseButtonDblClick(mouse_event);
+    if (obj == d->text_edit) {
+      OnTextEditViewportKeyboardButtonPress(key_event);
       return false;
     }
 
@@ -232,11 +232,10 @@ void CodeView::InstallModel(ICodeModel *model) {
   d->model = model;
   d->model->setParent(this);
 
-  connect(d->model, &ICodeModel::ModelReset,
-          this, &CodeView::OnModelReset);
+  connect(d->model, &ICodeModel::ModelReset, this, &CodeView::OnModelReset);
 
-  connect(d->model, &ICodeModel::ModelResetSkipped,
-          this, &CodeView::OnModelResetDone);
+  connect(d->model, &ICodeModel::ModelResetSkipped, this,
+          &CodeView::OnModelResetDone);
 }
 
 void CodeView::InitializeWidgets() {
@@ -244,7 +243,9 @@ void CodeView::InitializeWidgets() {
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setReadOnly(true);
   d->text_edit->setContextMenuPolicy(Qt::NoContextMenu);
-  d->text_edit->setTextInteractionFlags(Qt::TextBrowserInteraction);
+  d->text_edit->setTextInteractionFlags(Qt::TextSelectableByMouse |
+                                        Qt::TextSelectableByKeyboard);
+  d->text_edit->installEventFilter(this);
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
 
@@ -282,6 +283,8 @@ void CodeView::InitializeWidgets() {
   SetTabWidth(d->tab_width);
 
   // Initialize the go-to-line widget
+  // TODO: Is there a default binding we can use which is already
+  // defined in Qt?
   d->go_to_line_widget = new GoToLineWidget(this);
   d->go_to_line_shortcut = new QShortcut(
       QKeySequence(Qt::CTRL | Qt::Key_L), this, this,
@@ -301,10 +304,6 @@ CodeView::GetCodeModelIndexFromMousePosition(const QPoint &pos) {
 }
 
 void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
-  if (!isSignalConnected(QMetaMethod::fromSignal(&CodeView::TokenHovered))) {
-    return;
-  }
-
   auto opt_model_index = GetCodeModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
     d->opt_prev_hovered_model_index = std::nullopt;
@@ -324,19 +323,51 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
   }
 
   d->opt_prev_hovered_model_index = model_index;
-  emit TokenHovered(model_index);
+  emit TokenTriggered({TokenAction::Type::Hover, std::nullopt}, model_index);
 }
 
-void CodeView::OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
-                                                  bool double_click) {
+void CodeView::OnTextEditViewportMouseButtonPress(QMouseEvent *event) {
   auto opt_model_index = GetCodeModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
     return;
   }
 
   const CodeModelIndex &model_index = opt_model_index.value();
-  emit TokenClicked(model_index, event->buttons(), event->modifiers(),
-                    double_click);
+
+  if (event->button() == Qt::LeftButton &&
+      event->modifiers() == Qt::ControlModifier) {
+    emit TokenTriggered({TokenAction::Type::Primary, std::nullopt},
+                        model_index);
+
+  } else if (event->button() == Qt::RightButton &&
+             event->modifiers() == Qt::NoModifier) {
+    emit TokenTriggered({TokenAction::Type::Secondary, std::nullopt},
+                        model_index);
+  }
+}
+
+void CodeView::OnTextEditViewportKeyboardButtonPress(QKeyEvent *event) {
+  auto text_cursor = d->text_edit->textCursor();
+
+  auto opt_model_index =
+      GetCodeModelIndexFromTextCursor(d->token_map, text_cursor);
+
+  if (!opt_model_index.has_value()) {
+    return;
+  }
+
+  TokenAction::KeyboardButton keyboard_button;
+  keyboard_button.key = event->key();
+
+  keyboard_button.shift_modifier =
+      (event->modifiers() & Qt::ShiftModifier) != 0;
+
+  keyboard_button.control_modifier =
+      (event->modifiers() & Qt::ControlModifier) != 0;
+
+  const CodeModelIndex &model_index = opt_model_index.value();
+  emit TokenTriggered({TokenAction::Type::Keyboard, keyboard_button},
+                      model_index);
 }
 
 void CodeView::OnTextEditTextZoom(QWheelEvent *event) {
@@ -825,14 +856,6 @@ void CodeView::OnModelResetDone() {
   }
 
   emit DocumentChanged();
-}
-
-void CodeView::OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event) {
-  OnTextEditViewportMouseButtonEvent(event, false);
-}
-
-void CodeView::OnTextEditViewportMouseButtonDblClick(QMouseEvent *event) {
-  OnTextEditViewportMouseButtonEvent(event, true);
 }
 
 void CodeView::OnGutterPaintEvent(QPaintEvent *event) {

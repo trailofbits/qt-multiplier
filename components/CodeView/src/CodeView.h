@@ -80,9 +80,11 @@ class CodeView final : public ICodeView {
   //! Implements support for token hover notifications
   void OnTextEditViewportMouseMoveEvent(QMouseEvent *event);
 
-  //! Utility function used to handle single/double click events
-  void OnTextEditViewportMouseButtonEvent(QMouseEvent *event,
-                                          bool double_click);
+  //! Utility function used to handle mouse press events
+  void OnTextEditViewportMouseButtonPress(QMouseEvent *event);
+
+  //! Utility function used to handle key press events
+  void OnTextEditViewportKeyboardButtonPress(QKeyEvent *event);
 
   //! Updates the font size when using mouse wheel + cmd
   void OnTextEditTextZoom(QWheelEvent *event);
@@ -191,12 +193,6 @@ class CodeView final : public ICodeView {
   //! skipped because the current model is already the right model to use.
   void OnModelResetDone();
 
-  //! Used to track single click events and emit the TokenClicked signal
-  void OnTextEditViewportMouseButtonReleaseEvent(QMouseEvent *event);
-
-  //! Used to track double click events and emit the TokenClicked signal
-  void OnTextEditViewportMouseButtonDblClick(QMouseEvent *event);
-
   //! Repaints the line numbers on the gutter
   void OnGutterPaintEvent(QPaintEvent *event);
 
@@ -213,7 +209,7 @@ class CodeView final : public ICodeView {
   //! Called by the go-to-line QShortcut
   void OnGoToLineTriggered();
 
-  //! Called by GoToLineWIdget when a valid line number has been requested
+  //! Called by the GoToLineWidget when a valid line number has been requested
   void OnGoToLine(unsigned line_number);
 
   friend class ICodeView;
