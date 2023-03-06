@@ -31,6 +31,7 @@ struct ContextMenu final {
   QMenu *menu{nullptr};
   QAction *copy_details_action{nullptr};
   QAction *expand_item_action{nullptr};
+  QAction *set_root_action{nullptr};
 };
 
 }  // namespace
@@ -41,6 +42,7 @@ struct ReferenceExplorer::PrivateData final {
   QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
+  QWidget *alternative_root_warning{nullptr};
   ContextMenu context_menu;
 };
 
@@ -104,6 +106,29 @@ void ReferenceExplorer::InitializeWidgets() {
   connect(d->search_widget, &ISearchWidget::Deactivated,
           d->filter_settings_widget, &FilterSettingsWidget::Deactivate);
 
+
+  // Create the alternative root item warning
+  auto root_warning_label = new QLabel();
+  root_warning_label->setTextFormat(Qt::RichText);
+  root_warning_label->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
+  root_warning_label->setText(tr(
+      "A custom root has been set. <a href=\"#set_default_root\">Click here to disable it</a>"));
+
+  auto warning_font = font();
+  warning_font.setItalic(true);
+  root_warning_label->setFont(warning_font);
+
+  connect(root_warning_label, &QLabel::linkActivated, this,
+          &ReferenceExplorer::OnDisableCustomRootLinkClicked);
+
+  auto root_warning_layout = new QHBoxLayout();
+  root_warning_layout->setContentsMargins(0, 0, 0, 0);
+  root_warning_layout->addWidget(root_warning_label);
+  root_warning_layout->addStretch();
+
+  d->alternative_root_warning = new QWidget(this);
+  d->alternative_root_warning->setLayout(root_warning_layout);
+
   // Setup the main layout
   setContentsMargins(0, 0, 0, 0);
 
@@ -112,15 +137,19 @@ void ReferenceExplorer::InitializeWidgets() {
   layout->addWidget(d->tree_view);
   layout->addWidget(d->filter_settings_widget);
   layout->addWidget(d->search_widget);
+  layout->addWidget(d->alternative_root_warning);
   setLayout(layout);
 
   // Setup che custom context menu
   d->context_menu.menu = new QMenu(tr("Reference Explorer menu"));
   d->context_menu.copy_details_action = new QAction(tr("Copy details"));
   d->context_menu.expand_item_action = new QAction(tr("Expand"));
+  d->context_menu.set_root_action = new QAction(tr("Set as root"));
 
   d->context_menu.menu->addAction(d->context_menu.copy_details_action);
   d->context_menu.menu->addAction(d->context_menu.expand_item_action);
+  d->context_menu.menu->addSeparator();
+  d->context_menu.menu->addAction(d->context_menu.set_root_action);
 
   connect(d->context_menu.menu, &QMenu::triggered, this,
           &ReferenceExplorer::OnContextMenuActionTriggered);
@@ -162,6 +191,9 @@ void ReferenceExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
 }
 
 void ReferenceExplorer::OnModelReset() {
+  auto display_root_warning = d->model->HasAlternativeRoot();
+  d->alternative_root_warning->setVisible(display_root_warning);
+
   d->tree_view->expandRecursively(QModelIndex());
   d->tree_view->resizeColumnToContents(0);
 }
@@ -218,6 +250,9 @@ void ReferenceExplorer::OnContextMenuActionTriggered(QAction *action) {
 
   } else if (action == d->context_menu.expand_item_action) {
     ExpandRefExplorerItem(index);
+
+  } else if (action == d->context_menu.set_root_action) {
+    d->model->SetRoot(index);
   }
 }
 
@@ -261,6 +296,10 @@ void ReferenceExplorer::OnFilterParametersChange() {
 
   d->model_proxy->EnableEntityIDFilter(
       d->filter_settings_widget->FilterByEntityID());
+}
+
+void ReferenceExplorer::OnDisableCustomRootLinkClicked() {
+  d->model->SetDefaultRoot();
 }
 
 }  // namespace mx::gui

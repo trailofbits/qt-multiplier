@@ -66,6 +66,9 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Called when the FilterSettingsWidget options are changed
   void OnFilterParametersChange();
 
+  //! Called when the user disables the custom root item from the warning widget
+  void OnDisableCustomRootLinkClicked();
+
   friend class IReferenceExplorer;
 };
 

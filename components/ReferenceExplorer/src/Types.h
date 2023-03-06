@@ -36,8 +36,10 @@ struct NodeTree final {
     //! The parent node id
     std::uint64_t parent_node_id{};
 
-    //! Multiplier-specific identifiers
+    //! Multiplier's entity id
     RawEntityId entity_id{kInvalidEntityId};
+
+    //! Multiplier's referenced entity id
     RawEntityId referenced_entity_id{kInvalidEntityId};
 
     //! An optional name for this entity
