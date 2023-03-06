@@ -62,6 +62,7 @@ class MainWindow final : public QMainWindow {
                                         const QString &window_title,
                                         const bool &as_new_tab);
   void OnReferenceExplorerTabBarClose(int index);
+  void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
 };
 
