@@ -7,6 +7,7 @@
 #include "MainWindow.h"
 #include "QuickReferenceExplorer.h"
 #include "PreviewableReferenceExplorer.h"
+#include "SimpleTextInputDialog.h"
 
 #include <multiplier/ui/IIndexView.h>
 #include <multiplier/ui/ICodeView.h>
@@ -102,6 +103,9 @@ void MainWindow::CreateReferenceExplorerDock() {
 
   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabCloseRequested,
           this, &MainWindow::OnReferenceExplorerTabBarClose);
+
+  connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
+          this, &MainWindow::OnReferenceExplorerTabBarDoubleClick);
 
   d->reference_explorer_dock = new QDockWidget(tr("Reference Explorer"), this);
   d->view_menu->addAction(d->reference_explorer_dock->toggleViewAction());
@@ -442,6 +446,27 @@ void MainWindow::OnReferenceExplorerTabBarClose(int index) {
   auto widget_visible = d->ref_explorer_tab_widget->count() != 0;
   d->reference_explorer_dock->setVisible(widget_visible);
   d->reference_explorer_dock->toggleViewAction()->setEnabled(widget_visible);
+}
+
+void MainWindow::OnReferenceExplorerTabBarDoubleClick(int index) {
+  auto current_tab_name = d->ref_explorer_tab_widget->tabText(index);
+
+  SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,
+                               this);
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  const auto &opt_tab_name = dialog.GetTextInput();
+
+  QString new_tab_name;
+  if (opt_tab_name.has_value()) {
+    new_tab_name = opt_tab_name.value();
+  } else {
+    new_tab_name = tr("Reference explorer #") + QString::number(index);
+  }
+
+  d->ref_explorer_tab_widget->setTabText(index, new_tab_name);
 }
 
 void MainWindow::OnCodeViewTabBarClose(int index) {
