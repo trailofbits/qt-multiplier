@@ -82,6 +82,10 @@ class QuickReferenceExplorer final : public QWidget {
 
   //! Called when the save to new tab button is pressed
   void OnSaveAllToNewRefExplorerButtonPress();
+
+  //! Called when the entity name resolution has finished
+  void
+  OnEntityNameResolutionFinished(const std::optional<QString> &opt_entity_name);
 };
 
 }  // namespace mx::gui
