@@ -8,6 +8,7 @@
 #include "PreviewableReferenceExplorer.h"
 
 #include <multiplier/ui/Util.h>
+#include <multiplier/ui/IEntityNameResolver.h>
 
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -19,6 +20,7 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QPoint>
+#include <QThread>
 
 #include <optional>
 
@@ -29,6 +31,10 @@ struct QuickReferenceExplorer::PrivateData final {
   bool closed{false};
 
   std::optional<QPoint> opt_previous_drag_pos;
+  QLabel *window_title{nullptr};
+
+  QThread *name_resolver_thread{nullptr};
+  IEntityNameResolver *entity_name_resolver{nullptr};
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
@@ -40,7 +46,14 @@ QuickReferenceExplorer::QuickReferenceExplorer(
   InitializeWidgets(index, file_location_cache, entity_id);
 }
 
-QuickReferenceExplorer::~QuickReferenceExplorer() {}
+QuickReferenceExplorer::~QuickReferenceExplorer() {
+  // Ask the EntityNameResolver instance to stop
+  d->name_resolver_thread->requestInterruption();
+
+  // Terminate the thread
+  d->name_resolver_thread->quit();
+  d->name_resolver_thread->wait();
+}
 
 void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
   if (event->key() == Qt::Key_Escape) {
@@ -100,20 +113,27 @@ void QuickReferenceExplorer::InitializeWidgets(
   // Title bar
   //
 
-  // TODO(pag): Put all of this into a future.
-  std::unordered_map<RawEntityId, QString> file_paths;
-  for (auto [path, id] : index.file_paths()) {
-    file_paths.emplace(id.Pack(),
-                       QString::fromStdString(path.filename().generic_string()));
-  }
-  auto name = NameOfEntity(index.entity(entity_id), file_paths);
-  QString window_name;
-  if (name.has_value()) {
-    window_name = tr("References to ") + name.value();
-  } else {
-    window_name = tr("References to entity ") + QString::number(entity_id);
-  }
-  auto window_title = new QLabel(window_name);
+  // Use a temporary window name at first. This won't be shown at all if the
+  // name resolution is fast enough
+  auto window_name = tr("References to entity ") + QString::number(entity_id);
+  d->window_title = new QLabel(window_name);
+
+  // Start a request to fetch the real entity name
+  d->name_resolver_thread = new QThread(this);
+
+  d->entity_name_resolver = IEntityNameResolver::Create(index, entity_id);
+  d->entity_name_resolver->moveToThread(d->name_resolver_thread);
+
+  connect(d->name_resolver_thread, &QThread::started, d->entity_name_resolver,
+          &IEntityNameResolver::Start);
+
+  connect(d->entity_name_resolver, &IEntityNameResolver::Finished, this,
+          &QuickReferenceExplorer::OnEntityNameResolutionFinished);
+
+  connect(d->entity_name_resolver, &IEntityNameResolver::Finished,
+          d->name_resolver_thread, &QThread::quit);
+
+  d->name_resolver_thread->start();
 
   // Save to active button
   auto save_to_active_ref_explorer_button = new QPushButton(
@@ -150,7 +170,7 @@ void QuickReferenceExplorer::InitializeWidgets(
   // Setup the layout
   auto title_frame_layout = new QHBoxLayout();
   title_frame_layout->setContentsMargins(0, 0, 0, 0);
-  title_frame_layout->addWidget(window_title);
+  title_frame_layout->addWidget(d->window_title);
   title_frame_layout->addStretch();
   title_frame_layout->addWidget(save_to_active_ref_explorer_button);
   title_frame_layout->addWidget(save_to_new_ref_explorer_button);
@@ -239,6 +259,19 @@ void QuickReferenceExplorer::OnSaveAllToActiveRefExplorerButtonPress() {
 
 void QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress() {
   EmitSaveSignal(true);
+}
+
+void QuickReferenceExplorer::OnEntityNameResolutionFinished(
+    const std::optional<QString> &opt_entity_name) {
+
+  if (!opt_entity_name.has_value()) {
+    return;
+  }
+
+  const auto &entity_name = opt_entity_name.value();
+
+  auto title = tr("References to ") + "`" + entity_name + "`";
+  d->window_title->setText(title);
 }
 
 }  // namespace mx::gui
