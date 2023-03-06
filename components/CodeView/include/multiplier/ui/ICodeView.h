@@ -27,6 +27,43 @@ class ICodeView : public QWidget {
   Q_OBJECT
 
  public:
+  //! \brief Generic token action structure.
+  //! Custom actions should be implemented in the event receiver
+  struct TokenAction final {
+    enum class Type {
+      //! Bound to command+click
+      Primary,
+
+      //! Bound to right-click
+      Secondary,
+
+      //! When the mouse is hovering on a token
+      Hover,
+
+      //! Keyboard button, when the text cursor is on a token
+      Keyboard,
+    };
+
+    //! Action type
+    Type type{Type::Primary};
+
+    //! Keyboard button data
+    struct KeyboardButton final {
+      //! See Qt::Key
+      int key{};
+
+      //! True if the shift modifier was held down
+      bool shift_modifier{};
+
+      //! \brief True if the control modifier was held down
+      //! On macOS, this button is the command key
+      bool control_modifier{};
+    };
+
+    //! Keyboard button, if applicable. See Qt::Key
+    std::optional<KeyboardButton> opt_keyboard_button;
+  };
+
   //! Factory function
   static ICodeView *Create(ICodeModel *model, QWidget *parent = nullptr);
 
@@ -69,13 +106,9 @@ class ICodeView : public QWidget {
   ICodeView &operator=(const ICodeView &) = delete;
 
  signals:
-  //! This signal is emitted when a token is clicked
-  void TokenClicked(const CodeModelIndex &index,
-                    Qt::MouseButtons mouse_button,
-                    Qt::KeyboardModifiers modifiers, bool double_click);
-
-  //! This signal is emitted whenever the mouse cursor is hovering on a token
-  void TokenHovered(const CodeModelIndex &index);
+  //! This signal is emitted when a token action is performed
+  void TokenTriggered(const TokenAction &token_action,
+                      const CodeModelIndex &index);
 
   //! Emitted when the document is changed in response to a model reset
   void DocumentChanged();

@@ -10,7 +10,6 @@
 #include "SimpleTextInputDialog.h"
 
 #include <multiplier/ui/IIndexView.h>
-#include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/Util.h>
 
@@ -25,8 +24,6 @@
 #include <QCursor>
 #include <QSplitter>
 #include <QTabBar>
-
-#include <iostream>
 
 namespace mx::gui {
 
@@ -255,8 +252,8 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   auto tab_count = central_tab_widget.count();
   central_tab_widget.setCurrentIndex(tab_count - 1);
 
-  connect(code_view, &ICodeView::TokenClicked, this,
-          &MainWindow::OnTokenClicked);
+  connect(code_view, &ICodeView::TokenTriggered, this,
+          &MainWindow::OnTokenTriggered);
 
   model->SetEntity(file_entity_id);
   return code_view;
@@ -359,15 +356,27 @@ void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
   (void) GetOrCreateFileCodeView(file_id, tab_name);
 }
 
-void MainWindow::OnTokenClicked(CodeModelIndex index,
-                                Qt::MouseButtons mouse_button,
-                                Qt::KeyboardModifiers /* modifiers */,
-                                bool /* double_click */) {
-  if (mouse_button == Qt::LeftButton) {
+void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
+                                  const CodeModelIndex &index) {
+
+  if (token_action.type == ICodeView::TokenAction::Type::Primary) {
     OpenEntityRelatedToToken(index);
 
-  } else if (mouse_button == Qt::RightButton) {
+  } else if (token_action.type == ICodeView::TokenAction::Type::Secondary) {
     OpenTokenContextMenu(index);
+
+  } else if (token_action.type == ICodeView::TokenAction::Type::Keyboard) {
+    // Here to test keyboard events; Before we add more buttons, we should
+    // find a better strategy to managed them.
+    //
+    // Ideally we should find a Qt-friendly method that the framework handles
+    // well natively
+    const auto &keyboard_button = token_action.opt_keyboard_button.value();
+
+    if (keyboard_button.key == Qt::Key_X && !keyboard_button.shift_modifier &&
+        !keyboard_button.control_modifier) {
+      OpenTokenReferenceExplorer(index);
+    }
   }
 }
 
