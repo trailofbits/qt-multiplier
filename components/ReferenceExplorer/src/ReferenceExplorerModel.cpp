@@ -22,6 +22,7 @@
 #include <QIODevice>
 
 namespace mx::gui {
+
 namespace {
 
 const QString kMimeTypeName{"application/mx-reference-explorer"};
@@ -38,12 +39,13 @@ struct ReferenceExplorerModel::PrivateData final {
   mx::FileLocationCache file_location_cache;
   NodeTree node_tree;
   NodeImporter node_importer;
+  std::uint64_t root_node_id{};
 };
 
 bool ReferenceExplorerModel::AppendEntityObject(RawEntityId entity_id,
                                                 const QModelIndex &parent) {
 
-  std::uint64_t parent_node_id{};
+  std::uint64_t parent_node_id{d->root_node_id};
   if (parent.isValid()) {
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
@@ -83,6 +85,32 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
   emit endResetModel();
 }
 
+bool ReferenceExplorerModel::HasAlternativeRoot() const {
+  return d->root_node_id != 0;
+}
+
+void ReferenceExplorerModel::SetRoot(const QModelIndex &index) {
+  std::uint64_t root_node_id{};
+  if (index.isValid()) {
+    auto node_id_var =
+        index.data(IReferenceExplorerModel::InternalIdentifierRole);
+
+    if (node_id_var.isValid()) {
+      root_node_id = node_id_var.toULongLong();
+    }
+  }
+
+  emit beginResetModel();
+
+  d->root_node_id = root_node_id;
+
+  emit endResetModel();
+}
+
+void ReferenceExplorerModel::SetDefaultRoot() {
+  SetRoot(QModelIndex());
+}
+
 ReferenceExplorerModel::~ReferenceExplorerModel() {}
 
 QModelIndex ReferenceExplorerModel::index(int row, int column,
@@ -91,7 +119,7 @@ QModelIndex ReferenceExplorerModel::index(int row, int column,
     return QModelIndex();
   }
 
-  std::uint64_t parent_node_id{};
+  std::uint64_t parent_node_id{d->root_node_id};
   if (parent.isValid()) {
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
@@ -168,7 +196,7 @@ int ReferenceExplorerModel::rowCount(const QModelIndex &parent) const {
     return 0;
   }
 
-  std::uint64_t parent_node_id{};
+  std::uint64_t parent_node_id{d->root_node_id};
   if (parent.isValid()) {
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }

@@ -33,6 +33,15 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   //! \copybrief IReferenceExplorerModel::ExpandEntity
   virtual void ExpandEntity(const QModelIndex &index) override;
 
+  //! \copybrief IReferenceExplorerModel::HasAlternativeRoot
+  virtual bool HasAlternativeRoot() const override;
+
+  //! \copybrief IReferenceExplorerModel::SetRoot
+  virtual void SetRoot(const QModelIndex &index) override;
+
+  //! \copybrief IReferenceExplorerModel::SetDefaultRoot
+  virtual void SetDefaultRoot() override;
+
   //! Destructor
   virtual ~ReferenceExplorerModel() override;
 

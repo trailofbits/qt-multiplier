@@ -215,6 +215,10 @@ void QuickReferenceExplorer::InitializeWidgets(
 
 void QuickReferenceExplorer::EmitSaveSignal(const bool &as_new_tab) {
   auto mime_data = d->model->mimeData({QModelIndex()});
+  if (mime_data == nullptr) {
+    return;
+  }
+
   mime_data->setParent(this);
 
   emit SaveAll(mime_data, d->window_title->text(), as_new_tab);

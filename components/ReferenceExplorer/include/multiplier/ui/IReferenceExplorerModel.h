@@ -73,6 +73,15 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   //! Expands the specified entity
   virtual void ExpandEntity(const QModelIndex &index) = 0;
 
+  //! Returns true if an alternative root is being used
+  virtual bool HasAlternativeRoot() const = 0;
+
+  //! Sets the given item as the new root
+  virtual void SetRoot(const QModelIndex &index) = 0;
+
+  //! Restores the default root item
+  virtual void SetDefaultRoot() = 0;
+
   //! Constructor
   IReferenceExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}
 
