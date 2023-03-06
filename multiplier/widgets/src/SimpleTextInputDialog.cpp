@@ -65,6 +65,8 @@ void SimpleTextInputDialog::InitializeWidgets(
   connect(accept_button, &QPushButton::pressed, this, &QDialog::accept);
   connect(text_input, &QLineEdit::textEdited, this,
           &SimpleTextInputDialog::OnTextEdited);
+
+  d->opt_text_input = opt_default_text;
 }
 
 void SimpleTextInputDialog::OnTextEdited(const QString &text) {
