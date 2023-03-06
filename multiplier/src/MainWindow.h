@@ -32,29 +32,26 @@ class MainWindow final : public QMainWindow {
   void InitializeWidgets();
   void CreateFileTreeDock();
   void CreateReferenceExplorerDock();
-  void CreateNewReferenceExplorer();
+  void CreateNewReferenceExplorer(QString window_title);
   void CreateCodeView();
   void OpenEntityRelatedToToken(CodeModelIndex index);
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
   void OpenTokenReferenceExplorer(RawEntityId entity_id);
   void CloseTokenReferenceExplorer();
-  ICodeView *CreateNewCodeView(RawEntityId file_entity_id,
-                               QString tab_name);
+  ICodeView *CreateNewCodeView(RawEntityId file_entity_id, QString tab_name);
 
-  ICodeView *GetOrCreateFileCodeView(
-      RawEntityId file_id, std::optional<QString> opt_tab_name=std::nullopt);
+  ICodeView *
+  GetOrCreateFileCodeView(RawEntityId file_id,
+                          std::optional<QString> opt_tab_name = std::nullopt);
 
  private slots:
-  void OnIndexViewFileClicked(RawEntityId file_id,
-                              QString file_name,
+  void OnIndexViewFileClicked(RawEntityId file_id, QString file_name,
                               Qt::KeyboardModifiers modifiers,
                               Qt::MouseButtons buttons);
 
-  void OnTokenClicked(CodeModelIndex index,
-                      Qt::MouseButtons mouse_button,
-                      Qt::KeyboardModifiers modifiers,
-                      bool double_click);
+  void OnTokenClicked(CodeModelIndex index, Qt::MouseButtons mouse_button,
+                      Qt::KeyboardModifiers modifiers, bool double_click);
 
   void OnReferenceExplorerItemClicked(const QModelIndex &index,
                                       const bool &middle_button);
@@ -62,6 +59,7 @@ class MainWindow final : public QMainWindow {
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
   void OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
+                                        const QString &window_title,
                                         const bool &as_new_tab);
   void OnReferenceExplorerTabBarClose(int index);
   void OnCodeViewTabBarClose(int index);

@@ -217,7 +217,7 @@ void QuickReferenceExplorer::EmitSaveSignal(const bool &as_new_tab) {
   auto mime_data = d->model->mimeData({QModelIndex()});
   mime_data->setParent(this);
 
-  emit SaveAll(mime_data, as_new_tab);
+  emit SaveAll(mime_data, d->window_title->text(), as_new_tab);
   close();
 }
 

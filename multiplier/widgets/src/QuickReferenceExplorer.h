@@ -34,7 +34,13 @@ class QuickReferenceExplorer final : public QWidget {
 
  signals:
   //! Emitted when the references should be saved by the parent widget
-  void SaveAll(QMimeData *mime_data, const bool &as_new_tab);
+  //! \param window_title A reference explorer could contain multiple
+  //!        different things inside once they have been edited. For
+  //!        this reason, we emit the window title instead of the
+  //!        entity name, because that reference could have been
+  //!        removed.
+  void SaveAll(QMimeData *mime_data, const QString &window_title,
+               const bool &as_new_tab);
 
   //! The forwarded PreviewableReferenceExplorer::ItemClicked signal
   void ItemClicked(const QModelIndex &index, const bool &middle_button);
