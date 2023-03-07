@@ -43,6 +43,12 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Called when attempt to expand a reference explorer item
   void ExpandRefExplorerItem(const QModelIndex &index);
 
+  //! Used for the tree view hover events
+  virtual bool eventFilter(QObject *obj, QEvent *event) override;
+
+  //! Updates the treeview item hover buttons
+  void UpdateTreeViewItemButtons();
+
  private slots:
   //! Used to expand and resize the items after a model reset
   void OnModelReset();
@@ -68,6 +74,12 @@ class ReferenceExplorer final : public IReferenceExplorer {
 
   //! Called when the user disables the custom root item from the warning widget
   void OnDisableCustomRootLinkClicked();
+
+  //! Called when the "activate" item button has been pressed
+  void OnActivateTreeViewItem();
+
+  //! Called when the "expand" item button has been pressed
+  void OnExpandTreeViewItem();
 
   friend class IReferenceExplorer;
 };

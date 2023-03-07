@@ -134,8 +134,8 @@ void MainWindow::CreateNewReferenceExplorer(QString window_title) {
 
   reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
 
-  connect(reference_explorer, &PreviewableReferenceExplorer::ItemClicked, this,
-          &MainWindow::OnReferenceExplorerItemClicked);
+  connect(reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
+          this, &MainWindow::OnReferenceExplorerItemActivated);
 
   d->ref_explorer_tab_widget->addTab(reference_explorer, window_title);
   d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
@@ -201,6 +201,9 @@ void MainWindow::OpenTokenReferenceExplorer(RawEntityId entity_id) {
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
           &MainWindow::OnQuickRefExplorerSaveAllClicked);
+
+  connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ItemActivated,
+          this, &MainWindow::OnReferenceExplorerItemActivated);
 
   auto dialog_pos = QCursor::pos();
 
@@ -303,15 +306,19 @@ MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
   return nullptr;
 }
 
-void MainWindow::OpenEntityRelatedToToken(CodeModelIndex index) {
-  QVariant entity_id_var =
+void MainWindow::OpenEntityRelatedToToken(const CodeModelIndex &index) {
+  auto entity_id_var =
       index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+
   if (!entity_id_var.isValid()) {
     return;
   }
 
-  RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  OpenEntityRelatedToEntityId(entity_id);
+}
 
+void MainWindow::OpenEntityRelatedToEntityId(const RawEntityId &entity_id) {
   // TODO(pag): Make this fetch the entity via a QFuture or something like that.
   VariantEntity entity = d->index.entity(entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
@@ -353,7 +360,7 @@ void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
                                         Qt::KeyboardModifiers,
                                         Qt::MouseButtons) {
   CloseTokenReferenceExplorer();
-  (void) GetOrCreateFileCodeView(file_id, tab_name);
+  static_cast<void>(GetOrCreateFileCodeView(file_id, tab_name));
 }
 
 void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
@@ -380,34 +387,14 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
   }
 }
 
-void MainWindow::OnReferenceExplorerItemClicked(const QModelIndex &index,
-                                                const bool &middle_button) {
-  if (!middle_button) {
+void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
+  auto entity_id_role = index.data(IReferenceExplorerModel::EntityIdRole);
+  if (!entity_id_role.isValid()) {
     return;
   }
 
-  auto file_id_role_var = index.data(IReferenceExplorerModel::FileIdRole);
-  if (!file_id_role_var.isValid()) {
-    return;
-  }
-
-  auto file_id_role = qvariant_cast<RawEntityId>(file_id_role_var);
-
-  QString tab_name;
-  auto location_role_var = index.data(IReferenceExplorerModel::LocationRole);
-  if (location_role_var.isValid()) {
-    auto location_role =
-        qvariant_cast<IReferenceExplorerModel::Location>(location_role_var);
-
-    std::filesystem::path path{location_role.path.toStdString()};
-    tab_name = QString::fromStdString(path.filename());
-
-  } else {
-    tab_name = tr("Unnamed file id #") +
-               QString::number(static_cast<std::uint64_t>(file_id_role));
-  }
-
-  CreateNewCodeView(file_id_role, tab_name);
+  auto entity_id = qvariant_cast<RawEntityId>(entity_id_role);
+  OpenEntityRelatedToEntityId(entity_id);
 }
 
 void MainWindow::OnCodeViewContextMenuActionTriggered(QAction *action) {

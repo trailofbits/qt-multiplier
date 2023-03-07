@@ -58,6 +58,9 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   connect(d->reference_explorer, &IReferenceExplorer::ItemClicked, this,
           &PreviewableReferenceExplorer::ItemClicked);
 
+  connect(d->reference_explorer, &IReferenceExplorer::ItemActivated, this,
+          &PreviewableReferenceExplorer::ItemActivated);
+
   d->code_model = ICodeModel::Create(file_location_cache, index, this);
 
   d->code_view = ICodeView::Create(d->code_model);
@@ -113,11 +116,7 @@ PreviewableReferenceExplorer::GetScheduledPostUpdateLineScrollCommand() {
 }
 
 void PreviewableReferenceExplorer::OnReferenceExplorerItemClicked(
-    const QModelIndex &index, const bool &middle_button) {
-
-  if (middle_button) {
-    return;
-  }
+    const QModelIndex &index) {
 
   auto file_raw_entity_id_var =
       index.data(IReferenceExplorerModel::ReferencedEntityIdRole);

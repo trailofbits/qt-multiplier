@@ -20,6 +20,9 @@
 #include <QLabel>
 #include <QRadioButton>
 #include <QMouseEvent>
+#include <QPushButton>
+
+#include <optional>
 
 #include <multiplier/ui/Assert.h>
 
@@ -30,8 +33,12 @@ namespace {
 struct ContextMenu final {
   QMenu *menu{nullptr};
   QAction *copy_details_action{nullptr};
-  QAction *expand_item_action{nullptr};
   QAction *set_root_action{nullptr};
+};
+
+struct TreeviewItemButtons final {
+  std::optional<QModelIndex> opt_hovered_index;
+  std::vector<QPushButton *> button_list;
 };
 
 }  // namespace
@@ -44,6 +51,8 @@ struct ReferenceExplorer::PrivateData final {
   FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
   ContextMenu context_menu;
+
+  TreeviewItemButtons treeview_item_buttons;
 };
 
 ReferenceExplorer::~ReferenceExplorer() {}
@@ -65,9 +74,9 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
 }
 
 void ReferenceExplorer::InitializeWidgets() {
-  // Initialize the tree view
   setAcceptDrops(true);
 
+  // Initialize the tree view
   d->tree_view = new QTreeView();
   d->tree_view->setHeaderHidden(true);
   d->tree_view->setSortingEnabled(true);
@@ -77,6 +86,8 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree_view->setExpandsOnDoubleClick(false);
+  d->tree_view->viewport()->installEventFilter(this);
+  d->tree_view->viewport()->setMouseTracking(true);
 
   connect(d->tree_view, &QTreeView::pressed, this,
           &ReferenceExplorer::OnItemClick);
@@ -87,6 +98,25 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setDragEnabled(true);
   d->tree_view->setAcceptDrops(true);
   d->tree_view->setDropIndicatorShown(true);
+
+  // Initialize the treeview item buttons
+  auto item_activate_button =
+      new QPushButton(QIcon(":/ReferenceExplorer/activate_ref_item"), "", this);
+  item_activate_button->setToolTip(tr("Activate item"));
+
+  d->treeview_item_buttons.button_list.push_back(item_activate_button);
+
+  connect(item_activate_button, &QPushButton::pressed, this,
+          &ReferenceExplorer::OnActivateTreeViewItem);
+
+  auto item_expand_button =
+      new QPushButton(QIcon(":/ReferenceExplorer/expand_ref_item"), "", this);
+  item_expand_button->setToolTip(tr("Expand item"));
+
+  d->treeview_item_buttons.button_list.push_back(item_expand_button);
+
+  connect(item_expand_button, &QPushButton::pressed, this,
+          &ReferenceExplorer::OnExpandTreeViewItem);
 
   // Create the search widget
   d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
@@ -143,11 +173,9 @@ void ReferenceExplorer::InitializeWidgets() {
   // Setup che custom context menu
   d->context_menu.menu = new QMenu(tr("Reference Explorer menu"));
   d->context_menu.copy_details_action = new QAction(tr("Copy details"));
-  d->context_menu.expand_item_action = new QAction(tr("Expand"));
   d->context_menu.set_root_action = new QAction(tr("Set as root"));
 
   d->context_menu.menu->addAction(d->context_menu.copy_details_action);
-  d->context_menu.menu->addAction(d->context_menu.expand_item_action);
   d->context_menu.menu->addSeparator();
   d->context_menu.menu->addAction(d->context_menu.set_root_action);
 
@@ -190,6 +218,68 @@ void ReferenceExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
   d->model->ExpandEntity(d->model_proxy->mapToSource(index));
 }
 
+bool ReferenceExplorer::eventFilter(QObject *, QEvent *event) {
+  // It is important to double check the leave event; it is sent
+  // even if the mouse is still inside our treeview item but
+  // above the button (which steals the focus)
+  QPoint mouse_pos;
+  if (event->type() == QEvent::Leave) {
+    mouse_pos = QCursor::pos();
+    mouse_pos = d->tree_view->mapFromGlobal(mouse_pos);
+
+  } else if (event->type() == QEvent::MouseMove) {
+    auto &mouse_event = *static_cast<QMouseEvent *>(event);
+    mouse_pos = mouse_event.pos();
+
+  } else {
+    return false;
+  }
+
+  auto index = d->tree_view->indexAt(mouse_pos);
+  if (!index.isValid()) {
+    d->treeview_item_buttons.opt_hovered_index = std::nullopt;
+  } else {
+    d->treeview_item_buttons.opt_hovered_index = index;
+  }
+
+  UpdateTreeViewItemButtons();
+  return false;
+}
+
+void ReferenceExplorer::UpdateTreeViewItemButtons() {
+  auto enable_buttons(d->treeview_item_buttons.opt_hovered_index.has_value());
+  for (auto &button : d->treeview_item_buttons.button_list) {
+    button->setVisible(enable_buttons);
+  }
+
+  if (!enable_buttons) {
+    return;
+  }
+
+  const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
+
+  auto rect = d->tree_view->visualRect(index);
+
+  auto button_margin = rect.height() / 6;
+  auto button_size = rect.height() - (button_margin * 2);
+
+  auto button_count =
+      static_cast<int>(d->treeview_item_buttons.button_list.size());
+  auto button_area_width =
+      (button_count * button_size) + (button_count * button_margin);
+
+  auto current_x = rect.x() + rect.width() - button_area_width;
+  auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
+
+  for (auto &button : d->treeview_item_buttons.button_list) {
+    button->resize(button_size, button_size);
+    button->move(current_x, current_y);
+    button->raise();
+
+    current_x += button_size + button_margin;
+  }
+}
+
 void ReferenceExplorer::OnModelReset() {
   auto display_root_warning = d->model->HasAlternativeRoot();
   d->alternative_root_warning->setVisible(display_root_warning);
@@ -205,16 +295,7 @@ void ReferenceExplorer::OnRowsInserted(const QModelIndex &, int, int) {
 }
 
 void ReferenceExplorer::OnItemClick(const QModelIndex &index) {
-  auto mouse_button = qApp->mouseButtons();
-  if (mouse_button == Qt::MiddleButton) {
-    emit ItemClicked(index, true);
-
-  } else if (mouse_button == Qt::LeftButton) {
-    emit ItemClicked(index, false);
-
-  } else {
-    return;
-  }
+  emit ItemClicked(index);
 }
 
 void ReferenceExplorer::OnOpenItemContextMenu(const QPoint &point) {
@@ -247,9 +328,6 @@ void ReferenceExplorer::OnContextMenuActionTriggered(QAction *action) {
 
   if (action == d->context_menu.copy_details_action) {
     CopyRefExplorerItemDetails(index);
-
-  } else if (action == d->context_menu.expand_item_action) {
-    ExpandRefExplorerItem(index);
 
   } else if (action == d->context_menu.set_root_action) {
     d->model->SetRoot(index);
@@ -300,6 +378,24 @@ void ReferenceExplorer::OnFilterParametersChange() {
 
 void ReferenceExplorer::OnDisableCustomRootLinkClicked() {
   d->model->SetDefaultRoot();
+}
+
+void ReferenceExplorer::OnActivateTreeViewItem() {
+  if (!d->treeview_item_buttons.opt_hovered_index.has_value()) {
+    return;
+  }
+
+  const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
+  emit ItemActivated(index);
+}
+
+void ReferenceExplorer::OnExpandTreeViewItem() {
+  if (!d->treeview_item_buttons.opt_hovered_index.has_value()) {
+    return;
+  }
+
+  const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
+  ExpandRefExplorerItem(index);
 }
 
 }  // namespace mx::gui
