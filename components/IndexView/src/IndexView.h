@@ -42,6 +42,18 @@ class IndexView final : public IIndexView {
   void OnSearchParametersChange(
       const ISearchWidget::SearchParameters &search_parameters);
 
+  //! Custom context menu for the tree view items
+  void OnOpenItemContextMenu(const QPoint &point);
+
+  //! Called when an action in the context menu is triggered
+  void OnContextMenuActionTriggered(QAction *action);
+
+  //! Called at each model reset
+  void OnModelReset();
+
+  //! Called when the user disables the custom root item from the warning widget
+  void OnDisableCustomRootLinkClicked();
+
   friend class IIndexView;
 };
 
