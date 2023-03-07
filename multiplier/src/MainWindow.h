@@ -34,7 +34,8 @@ class MainWindow final : public QMainWindow {
   void CreateReferenceExplorerDock();
   void CreateNewReferenceExplorer(QString window_title);
   void CreateCodeView();
-  void OpenEntityRelatedToToken(CodeModelIndex index);
+  void OpenEntityRelatedToToken(const CodeModelIndex &index);
+  void OpenEntityRelatedToEntityId(const RawEntityId &entity_id);
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
   void OpenTokenReferenceExplorer(RawEntityId entity_id);
@@ -53,8 +54,7 @@ class MainWindow final : public QMainWindow {
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
                         const CodeModelIndex &index);
 
-  void OnReferenceExplorerItemClicked(const QModelIndex &index,
-                                      const bool &middle_button);
+  void OnReferenceExplorerItemActivated(const QModelIndex &index);
 
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);

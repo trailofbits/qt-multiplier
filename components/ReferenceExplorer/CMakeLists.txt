@@ -37,6 +37,10 @@ add_library("mx_referenceexplorer"
   src/SearchFilterModelProxy.cpp
 )
 
+target_sources("mx_referenceexplorer" INTERFACE
+  Resources/Resources.qrc
+)
+
 target_link_libraries("mx_referenceexplorer"
   PRIVATE
     "qtmx_cxx_flags"

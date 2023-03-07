@@ -29,10 +29,6 @@ add_library("mx_codeview"
   src/GoToLineWidget.cpp
 )
 
-target_sources("mx_codeview" INTERFACE
-  Resources/Resources.qrc
-)
-
 target_link_libraries("mx_codeview"
   PRIVATE
     "qtmx_cxx_flags"

@@ -194,6 +194,9 @@ void QuickReferenceExplorer::InitializeWidgets(
   connect(reference_explorer, &PreviewableReferenceExplorer::ItemClicked, this,
           &QuickReferenceExplorer::ItemClicked);
 
+  connect(reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
+          this, &QuickReferenceExplorer::ItemActivated);
+
   reference_explorer->setSizePolicy(QSizePolicy::Expanding,
                                     QSizePolicy::Expanding);
 

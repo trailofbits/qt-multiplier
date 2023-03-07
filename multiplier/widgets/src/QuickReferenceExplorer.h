@@ -43,7 +43,10 @@ class QuickReferenceExplorer final : public QWidget {
                const bool &as_new_tab);
 
   //! The forwarded PreviewableReferenceExplorer::ItemClicked signal
-  void ItemClicked(const QModelIndex &index, const bool &middle_button);
+  void ItemClicked(const QModelIndex &index);
+
+  //! The forwarded PreviewableReferenceExplorer::ItemActivated signal
+  void ItemActivated(const QModelIndex &index);
 
  protected:
   //! Closes the widget when the escape key is pressed
