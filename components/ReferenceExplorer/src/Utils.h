@@ -20,7 +20,8 @@
 namespace mx::gui {
 
 // Return the ID of the entity with a name that contains `entity`.
-RawEntityId NamedEntityContaining(VariantEntity entity);
+RawEntityId NamedEntityContaining(VariantEntity entity,
+                                  const VariantEntity &containing);
 
 //! Generate references to the entity with `entity`. The references
 //! pairs of named entities and the referenced entity. Sometimes the

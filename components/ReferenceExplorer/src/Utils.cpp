@@ -10,12 +10,23 @@
 
 #include <multiplier/Entities/DefineMacroDirective.h>
 #include <multiplier/Entities/IncludeLikeMacroDirective.h>
+#include <multiplier/Entities/TypeDecl.h>
 #include <utility>
 
 namespace mx::gui {
 
-RawEntityId NamedEntityContaining(VariantEntity entity) {
+RawEntityId NamedEntityContaining(VariantEntity entity,
+                                  const VariantEntity &containing) {
   if (std::holds_alternative<Decl>(entity)) {
+
+    if (auto contained_decl = std::get_if<Decl>(&containing);
+        contained_decl && TypeDecl::from(*contained_decl)) {
+
+      if (auto nd = NamedDecl::from(std::get<Decl>(entity))) {
+        return nd->canonical_declaration().id().Pack();
+      }
+    }
+
     if (auto cd = NamedDeclContaining(std::get<Decl>(entity));
         cd != kInvalidEntityId) {
       return cd;
@@ -84,7 +95,7 @@ RawEntityId NamedEntityContaining(VariantEntity entity) {
     }
 
     for (Macro m : Macro::containing(tok)) {
-      if (auto ne = NamedEntityContaining(std::move(m));
+      if (auto ne = NamedEntityContaining(std::move(m), containing);
           ne != kInvalidEntityId) {
         return ne;
       }
@@ -123,7 +134,7 @@ References(VariantEntity entity) {
 #define REFERENCES_TO_CATEGORY(type_name, lower_name, enum_name, category) \
   } else if (std::holds_alternative<type_name>(entity)) { \
     for (Reference ref : std::get<type_name>(entity).references()) { \
-      RawEntityId eid = NamedEntityContaining(ref.as_variant()); \
+      RawEntityId eid = NamedEntityContaining(ref.as_variant(), entity); \
       if (eid != kInvalidEntityId) { \
         co_yield std::pair<RawEntityId, Reference>(eid, std::move(ref)); \
       } \
