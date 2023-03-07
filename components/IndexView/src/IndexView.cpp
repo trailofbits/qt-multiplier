@@ -15,14 +15,32 @@
 #include <QHBoxLayout>
 #include <QSortFilterProxyModel>
 #include <QApplication>
+#include <QMenu>
+#include <QAction>
+#include <QLabel>
+#include <QClipboard>
 
 namespace mx::gui {
+
+namespace {
+
+struct ContextMenu final {
+  QMenu *menu{nullptr};
+  QMenu *copy_menu{nullptr};
+  QAction *set_root_action{nullptr};
+  QAction *copy_file_name{nullptr};
+  QAction *copy_full_path{nullptr};
+};
+
+}  // namespace
 
 struct IndexView::PrivateData final {
   IFileTreeModel *model{nullptr};
   QSortFilterProxyModel *model_proxy{nullptr};
   QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
+  ContextMenu context_menu;
+  QWidget *alternative_root_warning{nullptr};
 };
 
 IndexView::~IndexView() {}
@@ -36,8 +54,7 @@ IndexView::IndexView(IFileTreeModel *model, QWidget *parent)
 }
 
 void IndexView::InitializeWidgets() {
-  setContentsMargins(0, 0, 0, 0);
-
+  // Setup the tree view
   d->tree_view = new QTreeView();
   d->tree_view->setHeaderHidden(true);
   d->tree_view->setSortingEnabled(true);
@@ -50,14 +67,62 @@ void IndexView::InitializeWidgets() {
   connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
           &IndexView::OnSearchParametersChange);
 
+  // Create the alternative root item warning
+  auto root_warning_label = new QLabel();
+  root_warning_label->setTextFormat(Qt::RichText);
+  root_warning_label->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
+  root_warning_label->setText(tr(
+      "A custom root has been set. <a href=\"#set_default_root\">Click here to disable it</a>"));
+
+  auto warning_font = font();
+  warning_font.setItalic(true);
+  root_warning_label->setFont(warning_font);
+
+  connect(root_warning_label, &QLabel::linkActivated, this,
+          &IndexView::OnDisableCustomRootLinkClicked);
+
+  auto root_warning_layout = new QHBoxLayout();
+  root_warning_layout->setContentsMargins(0, 0, 0, 0);
+  root_warning_layout->addWidget(root_warning_label);
+  root_warning_layout->addStretch();
+
+  d->alternative_root_warning = new QWidget(this);
+  d->alternative_root_warning->setLayout(root_warning_layout);
+
+  // Setup the main layout
+  setContentsMargins(0, 0, 0, 0);
+
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->tree_view);
   layout->addWidget(d->search_widget);
+  layout->addWidget(d->alternative_root_warning);
   setLayout(layout);
 
   connect(d->tree_view, &QTreeView::pressed, this,
           &IndexView::OnFileTreeItemClicked);
+
+  // Setup che custom context menu
+  d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
+
+  d->context_menu.menu = new QMenu(tr("Index View menu"));
+  d->context_menu.set_root_action = new QAction(tr("Set as root"));
+  d->context_menu.menu->addAction(d->context_menu.set_root_action);
+
+  d->context_menu.copy_menu = new QMenu(tr("Copy..."));
+  d->context_menu.copy_file_name = new QAction(tr("File name"));
+  d->context_menu.copy_menu->addAction(d->context_menu.copy_file_name);
+
+  d->context_menu.copy_full_path = new QAction(tr("Full path"));
+  d->context_menu.copy_menu->addAction(d->context_menu.copy_full_path);
+
+  d->context_menu.menu->addMenu(d->context_menu.copy_menu);
+
+  connect(d->context_menu.menu, &QMenu::triggered, this,
+          &IndexView::OnContextMenuActionTriggered);
+
+  connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
+          &IndexView::OnOpenItemContextMenu);
 }
 
 void IndexView::InstallModel(IFileTreeModel *model) {
@@ -69,12 +134,14 @@ void IndexView::InstallModel(IFileTreeModel *model) {
   d->model_proxy->setFilterRole(IFileTreeModel::AbsolutePathRole);
 
   d->tree_view->setModel(d->model_proxy);
-  d->tree_view->expandRecursively(QModelIndex());
-  d->tree_view->resizeColumnToContents(0);
+
+  connect(d->model, &QAbstractItemModel::modelReset, this,
+          &IndexView::OnModelReset);
+
+  OnModelReset();
 }
 
 void IndexView::OnFileTreeItemClicked(const QModelIndex &index) {
-
   auto opt_file_id_var =
       d->model_proxy->data(index, IFileTreeModel::FileIdRole);
 
@@ -84,8 +151,7 @@ void IndexView::OnFileTreeItemClicked(const QModelIndex &index) {
 
   const auto file_id = qvariant_cast<RawEntityId>(opt_file_id_var);
   auto file_name_var = d->model_proxy->data(index);
-  emit FileClicked(file_id, file_name_var.toString(),
-                   qApp->keyboardModifiers(),
+  emit FileClicked(file_id, file_name_var.toString(), qApp->keyboardModifiers(),
                    qApp->mouseButtons());
 }
 
@@ -118,6 +184,79 @@ void IndexView::OnSearchParametersChange(
 
   d->tree_view->expandRecursively(QModelIndex());
   d->tree_view->resizeColumnToContents(0);
+}
+
+void IndexView::OnOpenItemContextMenu(const QPoint &point) {
+  auto index = d->tree_view->indexAt(point);
+  if (!index.isValid()) {
+    return;
+  }
+
+  QVariant action_data;
+  action_data.setValue(index);
+
+  auto file_id_role = index.data(IFileTreeModel::FileIdRole);
+  auto is_directory = !file_id_role.isValid();
+  d->context_menu.set_root_action->setVisible(is_directory);
+
+  for (auto menu : {d->context_menu.menu, d->context_menu.copy_menu}) {
+    for (auto &action : menu->actions()) {
+      action->setData(action_data);
+    }
+  }
+
+  auto menu_position = d->tree_view->viewport()->mapToGlobal(point);
+  d->context_menu.menu->exec(menu_position);
+}
+
+void IndexView::OnContextMenuActionTriggered(QAction *action) {
+  auto index_var = action->data();
+  if (!index_var.isValid()) {
+    return;
+  }
+
+  const auto &index = qvariant_cast<QModelIndex>(index_var);
+  if (!index.isValid()) {
+    return;
+  }
+
+  if (action == d->context_menu.set_root_action) {
+    d->model->SetRoot(index);
+
+  } else if (action == d->context_menu.copy_file_name ||
+             action == d->context_menu.copy_full_path) {
+
+    auto file_path_var = index.data(IFileTreeModel::AbsolutePathRole);
+    if (file_path_var.isValid()) {
+      auto clipboard_value = file_path_var.toString();
+
+      if (action == d->context_menu.copy_file_name) {
+        std::filesystem::path path{clipboard_value.toStdString()};
+        clipboard_value = QString::fromStdString(path.filename());
+
+        // Use '/' as file name even if the absolute path is the
+        // root
+        if (clipboard_value.isEmpty()) {
+          clipboard_value = file_path_var.toString();
+        }
+      }
+
+      auto &clipboard = *QGuiApplication::clipboard();
+      clipboard.setText(clipboard_value);
+    }
+  }
+}
+
+void IndexView::OnModelReset() {
+  auto display_root_warning = d->model->HasAlternativeRoot();
+  d->alternative_root_warning->setVisible(display_root_warning);
+
+  d->tree_view->expandRecursively(QModelIndex());
+  d->tree_view->resizeColumnToContents(0);
+}
+
+void IndexView::OnDisableCustomRootLinkClicked() {
+  d->model->SetDefaultRoot();
 }
 
 }  // namespace mx::gui

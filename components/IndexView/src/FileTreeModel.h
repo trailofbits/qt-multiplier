@@ -25,6 +25,15 @@ class FileTreeModel final : public IFileTreeModel {
   //! \copybrief IFileTreeModel::Update
   virtual void Update() override;
 
+  //! \copybrief IFileTreeModel::HasAlternativeRoot
+  virtual bool HasAlternativeRoot() const override;
+
+  //! \copybrief IFileTreeModel::SetRoot
+  virtual void SetRoot(const QModelIndex &index) override;
+
+  //! \copybrief IReferenceExplorerModel::SetDefaultRoot
+  virtual void SetDefaultRoot() override;
+
   //! Creates a new Qt model index
   virtual QModelIndex index(int row, int column,
                             const QModelIndex &parent) const override;
@@ -83,9 +92,8 @@ class FileTreeModel final : public IFileTreeModel {
 
   //! Imports the specified path into the NodeMap object
   //! \todo file_id is an optional, since we can't easily fake it for tests
-  static bool
-  ImportPath(NodeMap &node_map, const std::filesystem::path &path,
-             RawEntityId opt_file_id = kInvalidEntityId);
+  static bool ImportPath(NodeMap &node_map, const std::filesystem::path &path,
+                         RawEntityId opt_file_id = kInvalidEntityId);
 
   //! Visits the node map populating the parent values (required by Qt)
   static void PopulateParents(NodeMap &node_map);

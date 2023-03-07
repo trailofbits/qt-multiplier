@@ -26,6 +26,9 @@ class IFileTreeModel : public QAbstractItemModel {
 
     //! Returns a QString containing the absolute path
     AbsolutePathRole,
+
+    //! Returns the internal node identifier
+    InternalIdentifierRole,
   };
 
   //! Factory method
@@ -33,6 +36,15 @@ class IFileTreeModel : public QAbstractItemModel {
 
   //! Resets the model by querying the stored mx::Index from scratch
   virtual void Update() = 0;
+
+  //! Returns true if an alternative root is being used
+  virtual bool HasAlternativeRoot() const = 0;
+
+  //! Sets the given item as the new root
+  virtual void SetRoot(const QModelIndex &index) = 0;
+
+  //! Restores the default root item
+  virtual void SetDefaultRoot() = 0;
 
   //! Constructor
   IFileTreeModel(QObject *parent) : QAbstractItemModel(parent) {}

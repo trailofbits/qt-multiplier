@@ -12,6 +12,8 @@
 #include <QFont>
 #include <QPalette>
 
+#include <iostream>
+
 namespace mx::gui {
 
 namespace {
@@ -69,8 +71,7 @@ bool SplitComponentAt(FileTreeModel::NodeMap &node_map,
 
 bool ImportPathHelper(FileTreeModel::NodeMap &node_map,
                       std::uint64_t parent_node_id,
-                      std::vector<std::string> path,
-                      RawEntityId opt_file_id) {
+                      std::vector<std::string> path, RawEntityId opt_file_id) {
   // Get the folder data structure of the parent node
   auto &parent_node = node_map.at(parent_node_id);
   if (!std::holds_alternative<FileTreeModel::Node::FolderData>(
@@ -234,6 +235,7 @@ void PopulateParentsHelper(FileTreeModel::NodeMap &node_map,
 struct FileTreeModel::PrivateData final {
   mx::Index index;
   NodeMap node_map;
+  std::uint64_t root_node_id{};
 };
 
 FileTreeModel::~FileTreeModel() {}
@@ -247,6 +249,31 @@ void FileTreeModel::Update() {
   emit endResetModel();
 }
 
+bool FileTreeModel::HasAlternativeRoot() const {
+  return d->root_node_id != 0;
+}
+
+void FileTreeModel::SetRoot(const QModelIndex &index) {
+  std::uint64_t root_node_id{};
+  if (index.isValid()) {
+    auto node_id_var = index.data(IFileTreeModel::InternalIdentifierRole);
+
+    if (node_id_var.isValid()) {
+      root_node_id = node_id_var.toULongLong();
+    }
+  }
+
+  emit beginResetModel();
+
+  d->root_node_id = root_node_id;
+
+  emit endResetModel();
+}
+
+void FileTreeModel::SetDefaultRoot() {
+  SetRoot(QModelIndex());
+}
+
 QModelIndex FileTreeModel::index(int row, int column,
                                  const QModelIndex &parent) const {
 
@@ -254,7 +281,7 @@ QModelIndex FileTreeModel::index(int row, int column,
     return QModelIndex();
   }
 
-  std::uint64_t parent_node_id{};
+  std::uint64_t parent_node_id{d->root_node_id};
   if (parent.isValid()) {
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
@@ -353,7 +380,7 @@ int FileTreeModel::rowCount(const QModelIndex &parent) const {
     return 0;
   }
 
-  std::uint64_t parent_node_id{};
+  std::uint64_t parent_node_id{d->root_node_id};
   if (parent.isValid()) {
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
@@ -395,6 +422,9 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
 
   if (role == AbsolutePathRole) {
     return GetNodeAbsolutePath(d->node_map, node_id);
+
+  } else if (role == InternalIdentifierRole) {
+    return node_id;
   }
 
   const auto &node = node_it->second;
@@ -521,9 +551,9 @@ bool FileTreeModel::ImportPathList(
   return succeeded;
 }
 
-bool FileTreeModel::ImportPath(
-    FileTreeModel::NodeMap &node_map, const std::filesystem::path &path,
-    RawEntityId opt_file_id) {
+bool FileTreeModel::ImportPath(FileTreeModel::NodeMap &node_map,
+                               const std::filesystem::path &path,
+                               RawEntityId opt_file_id) {
 
   std::vector<std::string> component_list;
   for (const auto &comp : path) {
