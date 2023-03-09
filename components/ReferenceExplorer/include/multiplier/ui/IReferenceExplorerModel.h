@@ -11,7 +11,9 @@
 #include <filesystem>
 #include <multiplier/Index.h>
 
+#include <QDataStream>
 #include <QAbstractItemModel>
+#include <QMetaType>
 
 namespace mx::gui {
 
@@ -20,10 +22,27 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
+
+  //! Expansion modes.
+  enum ExpansionMode {
+    //! A node whose current expansion mode has already been activated. This
+    //! is used to prevent us from repeatedly expanding the same node.
+    AlreadyExpanded,
+
+    //! Expand showing the call hierarchy.
+    CallHierarchyMode
+  };
+
   //! Additional item data roles for this model
   enum ItemDataRole {
     //! Returns a Location object
     LocationRole = Qt::UserRole + 1,
+
+    //! Returns the default expansion mode for this node's children.
+    DefaultExpansionMode,
+
+    //! Tells us whether or not this node has been expanded.
+    HasBeenExpanded,
 
     //! Returns the internal node identifier
     InternalIdentifierRole,
@@ -59,16 +78,17 @@ class IReferenceExplorerModel : public QAbstractItemModel {
 
     //! An optional column number
     unsigned column{0};
+
+    friend QDataStream &operator<<(QDataStream &stream, const Location &self);
+
+    // NOTE(pag): May throw.
+    friend QDataStream &operator>>(QDataStream &stream, Location &self);
   };
 
   //! Factory method
   static IReferenceExplorerModel *
   Create(mx::Index index, mx::FileLocationCache file_location_cache,
          QObject *parent = nullptr);
-
-  //! Adds a new entity object under the given parent
-  virtual bool AppendEntityObject(RawEntityId entity_id,
-                                  const QModelIndex &parent) = 0;
 
   //! Expands the specified entity
   virtual void ExpandEntity(const QModelIndex &index) = 0;
@@ -88,6 +108,20 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   //! Destructor
   virtual ~IReferenceExplorerModel() override = default;
 
+ public slots:
+
+  //! Adds a new entity object under the given parent
+  virtual void AppendEntityById(
+      RawEntityId entity_id, ExpansionMode import_mode,
+      const QModelIndex &parent) = 0;
+
+  //! Adds a new entity object under the given parent
+  virtual void AppendEntityObject(
+      VariantEntity entity, ExpansionMode import_mode,
+      const QModelIndex &parent) = 0;
+
+ private:
+
   //! Disabled copy constructor
   IReferenceExplorerModel(const IReferenceExplorerModel &) = delete;
 
@@ -99,3 +133,4 @@ class IReferenceExplorerModel : public QAbstractItemModel {
 
 //! Allows mx::gui::IReferenceExplorerModel::Location values to fit inside QVariant objects
 Q_DECLARE_METATYPE(mx::gui::IReferenceExplorerModel::Location);
+Q_DECLARE_METATYPE(mx::gui::IReferenceExplorerModel::ExpansionMode);

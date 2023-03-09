@@ -19,6 +19,8 @@ class Index;
 class Token;
 namespace gui {
 
+//! Return the entity ID associated with `ent`.
+RawEntityId IdOfEntity(const VariantEntity &ent);
 
 //! Return the file containing an entity.
 std::optional<File> FileOfEntity(const VariantEntity &ent);
@@ -29,9 +31,7 @@ std::optional<File> FileOfEntity(const VariantEntity &ent);
 Token FirstFileToken(const VariantEntity &ent);
 
 //! Return the name of an entity.
-std::optional<QString> NameOfEntity(
-    const VariantEntity &ent,
-    const std::unordered_map<RawEntityId, QString> &file_paths);
+std::optional<QString> NameOfEntity(const VariantEntity &ent);
 
 //// Try to determine the declarations associated with this token.
 //std::optional<Decl> DeclForToken(const Token &token);

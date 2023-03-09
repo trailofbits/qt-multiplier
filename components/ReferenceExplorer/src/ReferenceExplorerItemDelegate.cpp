@@ -59,7 +59,7 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   auto label = label_var.toString();
 
   QString location;
-  auto location_info_var = index.data(IReferenceExplorerModel::LocationRole);
+  QVariant location_info_var = index.data(IReferenceExplorerModel::LocationRole);
   if (location_info_var.isValid()) {
     auto location_info =
         qvariant_cast<IReferenceExplorerModel::Location>(location_info_var);

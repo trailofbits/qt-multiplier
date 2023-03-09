@@ -429,7 +429,7 @@ void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
       d->ref_explorer_tab_widget->widget(current_tab));
 
   auto reference_explorer_model = reference_explorer->Model();
-  reference_explorer_model->dropMimeData(mime_data, Qt::CopyAction, 0, 0,
+  reference_explorer_model->dropMimeData(mime_data, Qt::CopyAction, -1, 0,
                                          QModelIndex());
 }
 

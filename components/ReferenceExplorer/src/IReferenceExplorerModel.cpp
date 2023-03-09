@@ -19,4 +19,23 @@ IReferenceExplorerModel::Create(mx::Index index,
   return new ReferenceExplorerModel(index, file_location_cache, parent);
 }
 
+QDataStream &operator<<(QDataStream &stream,
+                        const IReferenceExplorerModel::Location &location) {
+  stream << location.path;
+  stream << location.file_id;
+  stream << location.line;
+  stream << location.column;
+  return stream;
+}
+
+QDataStream &operator>>(QDataStream &stream,
+                        IReferenceExplorerModel::Location &location) {
+
+  stream >> location.path;
+  stream >> location.file_id;
+  stream >> location.line;
+  stream >> location.column;
+  return stream;
+}
+
 }  // namespace mx::gui

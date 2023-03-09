@@ -20,7 +20,7 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QPoint>
-#include <QThread>
+#include <QThreadPool>
 
 #include <optional>
 
@@ -32,9 +32,6 @@ struct QuickReferenceExplorer::PrivateData final {
 
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
-
-  QThread *name_resolver_thread{nullptr};
-  IEntityNameResolver *entity_name_resolver{nullptr};
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
@@ -46,14 +43,7 @@ QuickReferenceExplorer::QuickReferenceExplorer(
   InitializeWidgets(index, file_location_cache, entity_id);
 }
 
-QuickReferenceExplorer::~QuickReferenceExplorer() {
-  // Ask the EntityNameResolver instance to stop
-  d->name_resolver_thread->requestInterruption();
-
-  // Terminate the thread
-  d->name_resolver_thread->quit();
-  d->name_resolver_thread->wait();
-}
+QuickReferenceExplorer::~QuickReferenceExplorer() {}
 
 void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
   if (event->key() == Qt::Key_Escape) {
@@ -119,21 +109,14 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->window_title = new QLabel(window_name);
 
   // Start a request to fetch the real entity name
-  d->name_resolver_thread = new QThread(this);
+  IEntityNameResolver *entity_name_resolver =
+      IEntityNameResolver::Create(index, entity_id);
+  entity_name_resolver->setAutoDelete(true);
 
-  d->entity_name_resolver = IEntityNameResolver::Create(index, entity_id);
-  d->entity_name_resolver->moveToThread(d->name_resolver_thread);
+  connect(entity_name_resolver, &IEntityNameResolver::Finished,
+          this, &QuickReferenceExplorer::OnEntityNameResolutionFinished);
 
-  connect(d->name_resolver_thread, &QThread::started, d->entity_name_resolver,
-          &IEntityNameResolver::Start);
-
-  connect(d->entity_name_resolver, &IEntityNameResolver::Finished, this,
-          &QuickReferenceExplorer::OnEntityNameResolutionFinished);
-
-  connect(d->entity_name_resolver, &IEntityNameResolver::Finished,
-          d->name_resolver_thread, &QThread::quit);
-
-  d->name_resolver_thread->start();
+  QThreadPool::globalInstance()->start(entity_name_resolver);
 
   // Save to active button
   auto save_to_active_ref_explorer_button = new QPushButton(
@@ -186,7 +169,8 @@ void QuickReferenceExplorer::InitializeWidgets(
   //
 
   d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
-  d->model->AppendEntityObject(entity_id, QModelIndex());
+  d->model->AppendEntityById(
+      entity_id, IReferenceExplorerModel::CallHierarchyMode, QModelIndex());
 
   auto reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, this);
@@ -275,10 +259,8 @@ void QuickReferenceExplorer::OnEntityNameResolutionFinished(
     return;
   }
 
-  const auto &entity_name = opt_entity_name.value();
-
-  auto title = tr("References to ") + "`" + entity_name + "`";
-  d->window_title->setText(title);
+  d->window_title->setText(
+      tr("References to ") + "`" + opt_entity_name.value() + "`");
 }
 
 }  // namespace mx::gui

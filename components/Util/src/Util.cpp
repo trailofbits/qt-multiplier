@@ -102,9 +102,18 @@ Token FirstFileToken(const VariantEntity &ent) {
       return entity.file_tokens().front();
     },
     [] (const File &entity) { return entity.tokens().front(); },
-    [](auto) { return Token(); }
+    [] (auto) { return Token(); }
   };
   return std::visit<Token>(VariantEntityVisitor, ent);
+}
+
+//! Return the entity ID associated with `ent`.
+RawEntityId IdOfEntity(const VariantEntity &ent) {
+  const auto VariantEntityVisitor = Overload{
+    [] (const auto &entity) { return entity.id().Pack(); },
+    [] (const NotAnEntity &) { return kInvalidEntityId; }
+  };
+  return std::visit<RawEntityId>(VariantEntityVisitor, ent);
 }
 
 //! Return the file containing an entity.
@@ -121,15 +130,13 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
     [] (const TemplateParameterList &entity) { return File::containing(entity); },
     [] (const Fragment &entity) { return File::containing(entity); },
     [] (const File &entity) { return entity; },
-    [](auto) -> std::optional<File> { return std::nullopt; }
+    [] (auto) -> std::optional<File> { return std::nullopt; }
   };
   return std::visit<std::optional<File>>(VariantEntityVisitor, ent);
 }
 
 //! Return the name of an entity.
-std::optional<QString> NameOfEntity(
-    const VariantEntity &ent,
-    const std::unordered_map<RawEntityId, QString> &file_paths) {
+std::optional<QString> NameOfEntity(const VariantEntity &ent) {
 
   const auto VariantEntityVisitor = Overload{
     [] (const Decl &decl) -> std::optional<QString> {
@@ -149,9 +156,10 @@ std::optional<QString> NameOfEntity(
       }
       return std::nullopt;
     },
-    [&file_paths] (const File &file) -> std::optional<QString> {
-      if (auto it = file_paths.find(file.id().Pack()); it != file_paths.end()) {
-        return it->second;
+
+    [] (const File &file) -> std::optional<QString> {
+      for (std::filesystem::path path : file.paths()) {
+        return QString::fromStdString(path.generic_string());
       }
       return std::nullopt;
     },

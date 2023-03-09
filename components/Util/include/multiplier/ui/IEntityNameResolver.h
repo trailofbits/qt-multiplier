@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QObject>
+#include <QRunnable>
 #include <QString>
 
 #include <multiplier/Index.h>
@@ -16,7 +17,7 @@
 namespace mx::gui {
 
 //! This component is used to asynchronously resolve entity names
-class IEntityNameResolver : public QObject {
+class IEntityNameResolver : public QObject, public QRunnable {
   Q_OBJECT
 
  public:
@@ -34,10 +35,6 @@ class IEntityNameResolver : public QObject {
 
   //! Disabled copy assignment operator
   IEntityNameResolver &operator=(const IEntityNameResolver &) = delete;
-
- public slots:
-  //! Starts the name resolution process
-  virtual void Start() = 0;
 
  signals:
   //! This signal is emitted when the name resolution has finished

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2022-present, Trail of Bits, Inc.
+  Copyright (c) 2023-present, Trail of Bits, Inc.
   All rights reserved.
 
   This source code is licensed in accordance with the terms specified in
@@ -8,65 +8,47 @@
 
 #pragma once
 
+#include <multiplier/ui/IReferenceExplorerModel.h>
+#include <QObject>
+#include <QRunnable>
+
 #include "Types.h"
 
-namespace mx::gui {
+namespace mx {
+class FileLocationCache;
+namespace gui {
 
-//! A worker that can be used to import model nodes asynchronously
-class NodeImporter final {
- public:
-  //! Constructor
-  NodeImporter(mx::Index index, mx::FileLocationCache file_location_cache,
-               NodeTree &node_tree);
+//! A worker that can be used to import model nodes asynchronously. Model nodes
+//! are associated with two entities: the referenced entity, which corresponds
+//! to its general "location", and the primary entity, which corresponds to
+//! its name. In many cases, the referenced and primary entities will match,
+//! though in others, such as with the call hierarchy nodes, the referenced node
+//! will be something inside of a function, and the primary entity will be the
+//! function itself. The primary entity is the subject of expansion.
+class NodeImporter final : public QObject, public QRunnable {
+  Q_OBJECT
 
-  //! Destructor
-  ~NodeImporter();
-
-  //! Imports a new node. Here, `entity_id` contains a reference, and the
-  //! entity ID corresponding to the location of the reference is associated
-  //! with `referenced_entity_id`.
-  bool ImportEntity(RawEntityId entity_id, RawEntityId referenced_entity_id,
-                    NodeTree::Node::ImportMode import_mode,
-                    std::optional<std::uint64_t> opt_parent_node_id,
-                    std::optional<std::size_t> opt_max_depth);
-
-  //! Expands the specified node a new node
-  void ExpandNode(std::uint64_t node_id,
-                  std::optional<std::size_t> opt_max_depth);
-
-  //! Disabled copy constructor
-  NodeImporter(const NodeImporter &) = delete;
-
-  //! Disabled copy assignment operator
-  NodeImporter &operator=(const NodeImporter &) = delete;
-
- private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
  public:
-  //! Contains both the Index and the file location cache
-  struct IndexData final {
-    //! Multiplier's Index object
-    mx::Index index;
+  virtual ~NodeImporter(void);
 
-    //! Multiplier's file location cache
-    mx::FileLocationCache file_location_cache;
+  static Node CreateNode(const FileLocationCache &file_cache,
+                         VariantEntity entity, VariantEntity referenced_entity,
+                         IReferenceExplorerModel::ExpansionMode import_mode);
 
-    //! The path map from mx::Index, keyed by id
-    std::unordered_map<RawEntityId, QString> file_path_map;
-  };
+  NodeImporter(
+      const FileLocationCache &file_cache,
+      VariantEntity entity, VariantEntity referenced_entity,
+      IReferenceExplorerModel::ExpansionMode import_mode,
+      const QModelIndex &parent);
 
-  //! Imports an entity by id
-  static void ImportEntity(NodeTree &node_tree, const IndexData &index_data,
-                           std::uint64_t parent_node_id, RawEntityId entity_id,
-                           RawEntityId referenced_entity_id,
-                           std::optional<std::size_t> opt_max_depth);
+  void run() final;
 
-  //! Expands the specified node id
-  static void ExpandNode(NodeTree &node_tree, const IndexData &index_data,
-                         std::uint64_t node_id,
-                         std::optional<std::size_t> opt_max_depth);
+ signals:
+  void Finished(Node node, const QModelIndex &parent);
 };
 
-}  // namespace mx::gui
+}  // namespace gui
+}  // namespace mx

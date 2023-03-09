@@ -10,8 +10,14 @@
 
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
+#include <QTreeView>
 
 namespace mx::gui {
+
+class ReferenceExplorerTreeView final : public QTreeView {
+ public:
+  using QTreeView::rowsInserted;
+};
 
 //! The implementation for the IReferenceExplorer interface
 class ReferenceExplorer final : public IReferenceExplorer {
@@ -54,7 +60,7 @@ class ReferenceExplorer final : public IReferenceExplorer {
   void OnModelReset();
 
   //! Like OnModelReset, but for row insertion
-  void OnRowsInserted(const QModelIndex &parent, int first, int last);
+  void OnRowsAdded(const QModelIndex &parent, int first, int last);
 
   //! Called when the user clicks an item
   void OnItemClick(const QModelIndex &index);

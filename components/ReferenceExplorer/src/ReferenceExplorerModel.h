@@ -26,9 +26,6 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   Q_OBJECT
 
  public:
-  //! \copybrief IReferenceExplorerModel::AppendEntityObject
-  virtual bool AppendEntityObject(RawEntityId entity_id,
-                                  const QModelIndex &parent) override;
 
   //! \copybrief IReferenceExplorerModel::ExpandEntity
   virtual void ExpandEntity(const QModelIndex &index) override;
@@ -76,6 +73,23 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   //! Defines the mime types supported by this model
   virtual QStringList mimeTypes() const override;
 
+ public slots:
+  //! \copybrief IReferenceExplorerModel::AppendEntityById
+  virtual void AppendEntityById(
+      RawEntityId entity_id, ExpansionMode import_mode,
+      const QModelIndex &parent) override;
+
+  //! \copybrief IReferenceExplorerModel::AppendEntityObject
+  virtual void AppendEntityObject(
+      VariantEntity entity, ExpansionMode import_mode,
+      const QModelIndex &parent) override;
+
+ private slots:
+  void AddNodeAt(Node node, const QModelIndex &index);
+
+  void AppendNodes(std::vector<Node> node, const QModelIndex &parent,
+                   int num_produced_so_far);
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
@@ -85,11 +99,10 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
                          mx::FileLocationCache file_location_cache,
                          QObject *parent);
 
-  //! Serializes the given node
-  static void SerializeNode(QDataStream &stream, const NodeTree::Node &node);
+  bool InsertNodes(std::vector<Node> nodes, int row,
+                   const QModelIndex &parent);
 
-  //! Deserializes a node from the given data stream
-  static std::optional<NodeTree::Node> DeserializeNode(QDataStream &stream);
+  QModelIndex RootIndex(void);
 
   friend class IReferenceExplorerModel;
 };

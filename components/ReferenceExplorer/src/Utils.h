@@ -20,43 +20,43 @@
 namespace mx::gui {
 
 // Return the ID of the entity with a name that contains `entity`.
-RawEntityId NamedEntityContaining(VariantEntity entity,
-                                  const VariantEntity &containing);
+VariantEntity NamedEntityContaining(VariantEntity entity,
+                                    const VariantEntity &containing);
 
 //! Generate references to the entity with `entity`. The references
 //! pairs of named entities and the referenced entity. Sometimes the
 //! referenced entity will match the named entity, other times the named
 //! entity will contain the reference (e.g. a function containing a call).
-gap::generator<std::pair<RawEntityId, Reference>>
+gap::generator<std::pair<VariantEntity, VariantEntity>>
 References(VariantEntity entity);
 
 template <typename T>
-static RawEntityId NamedDeclContaining(const T &thing) {
+static VariantEntity NamedDeclContaining(const T &thing) {
   for (FunctionDecl func : FunctionDecl::containing(thing)) {
-    return func.id().Pack();
+    return func;
   }
 
   for (FieldDecl field : FieldDecl::containing(thing)) {
-    return field.id().Pack();
+    return field;
   }
 
   for (VarDecl var : VarDecl::containing(thing)) {
     if (var.is_local_variable_declaration_or_parm()) {
-      if (RawEntityId eid = NamedDeclContaining<Decl>(var);
-          eid != kInvalidEntityId) {
-        return eid;
+      if (VariantEntity ent = NamedDeclContaining<Decl>(var);
+          !std::holds_alternative<NotAnEntity>(ent)) {
+        return ent;
       }
 
     } else {
-      return var.id().Pack();
+      return var;
     }
   }
 
   for (NamedDecl nd : NamedDecl::containing(thing)) {
-    return nd.id().Pack();
+    return nd;
   }
 
-  return kInvalidEntityId;
+  return NotAnEntity{};
 }
 
 }  // namespace mx::gui

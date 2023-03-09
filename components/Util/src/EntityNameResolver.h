@@ -21,8 +21,8 @@ class EntityNameResolver final : public IEntityNameResolver {
   virtual ~EntityNameResolver() override;
 
  public slots:
-  //! \copybrief IEntityNameResolver::start
-  virtual void Start() override;
+  //! \copybrief IEntityNameResolver::run
+  virtual void run() override;
 
  private:
   struct PrivateData;

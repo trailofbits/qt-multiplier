@@ -23,7 +23,11 @@ add_library("mx_referenceexplorer"
   src/ReferenceExplorerItemDelegate.cpp
 
   src/Types.h
+  src/Types.cpp
 
+  src/NodeExpander.h
+  src/NodeExpander.cpp
+  
   src/NodeImporter.h
   src/NodeImporter.cpp
 
@@ -35,6 +39,12 @@ add_library("mx_referenceexplorer"
 
   src/SearchFilterModelProxy.h
   src/SearchFilterModelProxy.cpp
+  
+  src/EntityResolver.h
+  src/EntityResolver.cpp
+  
+  src/CallHierarchyRootsResolver.h
+  src/CallHierarchyRootsResolver.cpp
 )
 
 target_sources("mx_referenceexplorer" INTERFACE

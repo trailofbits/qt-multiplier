@@ -12,8 +12,7 @@ namespace mx::gui {
 
 IEntityNameResolver *IEntityNameResolver::Create(Index index,
                                                  const RawEntityId &entity_id) {
-
-  return new EntityNameResolver(index, entity_id);
+  return new EntityNameResolver(std::move(index), entity_id);
 }
 
 }  // namespace mx::gui
