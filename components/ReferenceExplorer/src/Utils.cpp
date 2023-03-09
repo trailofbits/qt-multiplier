@@ -8,14 +8,11 @@
 
 #include "Utils.h"
 
-#include <multiplier/Entities/DefineMacroDirective.h>
-#include <multiplier/Entities/IncludeLikeMacroDirective.h>
-#include <multiplier/Entities/TypeDecl.h>
 #include <utility>
 
 namespace mx::gui {
 
-VariantEntity NamedEntityContaining(VariantEntity entity,
+VariantEntity NamedEntityContaining(const VariantEntity &entity,
                                     const VariantEntity &containing) {
   if (std::holds_alternative<Decl>(entity)) {
 
@@ -130,7 +127,7 @@ VariantEntity NamedEntityContaining(VariantEntity entity,
 //! referenced entity will match the named entity, other times the named
 //! entity will contain the reference (e.g. a function containing a call).
 gap::generator<std::pair<VariantEntity, VariantEntity>>
-References(VariantEntity entity) {
+References(const VariantEntity &entity) {
 
   if (std::holds_alternative<NotAnEntity>(entity)) {
     co_return;

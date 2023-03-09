@@ -12,6 +12,10 @@ add_library("mx_referenceexplorer"
 
   include/multiplier/ui/IReferenceExplorerModel.h
   src/IReferenceExplorerModel.cpp
+  
+  
+  include/multiplier/ui/INodeGenerator.h
+  src/INodeGenerator.cpp
 
   src/ReferenceExplorer.h
   src/ReferenceExplorer.cpp
@@ -22,14 +26,11 @@ add_library("mx_referenceexplorer"
   src/ReferenceExplorerItemDelegate.h
   src/ReferenceExplorerItemDelegate.cpp
 
-  src/Types.h
-  src/Types.cpp
-
-  src/NodeExpander.h
-  src/NodeExpander.cpp
+  src/CallHierarchyChildGenerator.h
+  src/CallHierarchyChildGenerator.cpp
   
-  src/NodeImporter.h
-  src/NodeImporter.cpp
+  src/CallHierarchyRootGenerator.h
+  src/CallHierarchyRootGenerator.cpp
 
   src/Utils.h
   src/Utils.cpp
@@ -39,12 +40,6 @@ add_library("mx_referenceexplorer"
 
   src/SearchFilterModelProxy.h
   src/SearchFilterModelProxy.cpp
-  
-  src/EntityResolver.h
-  src/EntityResolver.cpp
-  
-  src/CallHierarchyRootsResolver.h
-  src/CallHierarchyRootsResolver.cpp
 )
 
 target_sources("mx_referenceexplorer" INTERFACE
@@ -72,7 +67,3 @@ target_include_directories("mx_referenceexplorer" SYSTEM INTERFACE
 )
 
 enable_qt_properties("mx_referenceexplorer")
-
-if(MXQT_ENABLE_TESTS)
-  add_subdirectory("tests")
-endif()

@@ -8,17 +8,8 @@
 
 #pragma once
 
-#include "Types.h"
-
-#include <gap/core/generator.hpp>
 #include <multiplier/ui/IReferenceExplorerModel.h>
-#include <multiplier/Reference.h>
 
-namespace mx {
-class Decl;
-class TokenRange;
-class Macro;
-}  // namespace mx
 namespace mx::gui {
 
 //! Implements the IReferenceExplorerModel interface
@@ -76,33 +67,20 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
  public slots:
   //! \copybrief IReferenceExplorerModel::AppendEntityById
   virtual void AppendEntityById(
-      RawEntityId entity_id, ExpansionMode import_mode,
-      const QModelIndex &parent) override;
-
-  //! \copybrief IReferenceExplorerModel::AppendEntityObject
-  virtual void AppendEntityObject(
-      VariantEntity entity, ExpansionMode import_mode,
+      RawEntityId entity_id, ExpansionMode expansion_mode,
       const QModelIndex &parent) override;
 
  private slots:
-  void AddNodeAt(Node node, const QModelIndex &index);
-
-  void AppendNodes(std::vector<Node> node, const QModelIndex &parent,
-                   int num_produced_so_far);
+  void InsertNodes(QVector<Node> node, int row, const QModelIndex &parent);
 
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  ReferenceExplorerModel(mx::Index index,
-                         mx::FileLocationCache file_location_cache,
+  ReferenceExplorerModel(const Index &index,
+                         const FileLocationCache &file_location_cache,
                          QObject *parent);
-
-  bool InsertNodes(std::vector<Node> nodes, int row,
-                   const QModelIndex &parent);
-
-  QModelIndex RootIndex(void);
 
   friend class IReferenceExplorerModel;
 };

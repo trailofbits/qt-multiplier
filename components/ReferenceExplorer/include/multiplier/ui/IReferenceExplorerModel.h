@@ -9,13 +9,17 @@
 #pragma once
 
 #include <filesystem>
-#include <multiplier/Index.h>
-
+#include <multiplier/Entity.h>
 #include <QDataStream>
 #include <QAbstractItemModel>
 #include <QMetaType>
+#include <QString>
+#include <unordered_map>
 
-namespace mx::gui {
+namespace mx {
+class FileLocationCache;
+class Index;
+namespace gui {
 
 //! A model for the reference explorer widget
 class IReferenceExplorerModel : public QAbstractItemModel {
@@ -85,6 +89,73 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     friend QDataStream &operator>>(QDataStream &stream, Location &self);
   };
 
+
+  //! A single node in the model
+  struct Node final {
+    static QString kMimeTypeName;
+
+    //! How this node was imported
+    IReferenceExplorerModel::ExpansionMode expansion_mode{
+        IReferenceExplorerModel::CallHierarchyMode};
+
+    // Create and initialize a node.
+    //
+    // NOTE(pag): This is a blocking operation.
+    static Node Create(const FileLocationCache &file_cache,
+                       const VariantEntity &entity,
+                       const VariantEntity &referenced_entity,
+                       IReferenceExplorerModel::ExpansionMode import_mode);
+
+    // Initialize this node with a specific parent id node.
+    void AssignUniqueId(void);
+
+    //! The id for this node
+    std::uint64_t node_id{};
+
+    //! The parent node id
+    std::uint64_t parent_node_id{};
+
+    //! Multiplier's entity id
+    RawEntityId entity_id{kInvalidEntityId};
+
+    //! Multiplier's referenced entity id
+    RawEntityId referenced_entity_id{kInvalidEntityId};
+
+    //! An optional name for this entity
+    std::optional<QString> opt_name;
+
+    //! Optional file location information (path + line + column)
+    std::optional<IReferenceExplorerModel::Location> opt_location;
+
+    //! Child nodes
+    std::vector<std::uint64_t> child_node_id_list;
+
+    friend QDataStream &operator<<(QDataStream &stream, const Node &self);
+
+    // NOTE(pag): May throw.
+    friend QDataStream &operator>>(QDataStream &stream, Node &self);
+  };
+
+  //! A node tree representing the model data
+  struct NodeTree final {
+
+    //! A map containing all the nodes in the tree, indexed by their unique
+    //! node IDs.
+    std::unordered_map<std::uint64_t, Node> node_map;
+
+    //! The id of the root node. There are two separate IDs because we allow the
+    //! tree to be "re-rooted." `root_node_id` reflects the true root of the tree,
+    //! and `curr_root_node_id` reflects the current active / visible root.
+    const std::uint64_t root_node_id;
+    std::uint64_t curr_root_node_id;
+
+    // Reset the tree and prevent the practical re-use of node IDs.
+    NodeTree(void);
+
+    Node *CurrentRootNode(void);
+    const Node *CurrentRootNode(void) const;
+  };
+
   //! Factory method
   static IReferenceExplorerModel *
   Create(mx::Index index, mx::FileLocationCache file_location_cache,
@@ -115,11 +186,6 @@ class IReferenceExplorerModel : public QAbstractItemModel {
       RawEntityId entity_id, ExpansionMode import_mode,
       const QModelIndex &parent) = 0;
 
-  //! Adds a new entity object under the given parent
-  virtual void AppendEntityObject(
-      VariantEntity entity, ExpansionMode import_mode,
-      const QModelIndex &parent) = 0;
-
  private:
 
   //! Disabled copy constructor
@@ -129,8 +195,10 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   IReferenceExplorerModel &operator=(const IReferenceExplorerModel &) = delete;
 };
 
-}  // namespace mx::gui
+}  // namespace gui
+}  // namespace mx
 
 //! Allows mx::gui::IReferenceExplorerModel::Location values to fit inside QVariant objects
 Q_DECLARE_METATYPE(mx::gui::IReferenceExplorerModel::Location);
+Q_DECLARE_METATYPE(mx::gui::IReferenceExplorerModel::Node);
 Q_DECLARE_METATYPE(mx::gui::IReferenceExplorerModel::ExpansionMode);

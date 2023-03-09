@@ -8,10 +8,22 @@
 
 #pragma once
 
-#include "Types.h"
-
-#include <multiplier/Entities/FunctionDecl.h>
+#include <gap/core/generator.hpp>
+#include <multiplier/Entity.h>
+#include <multiplier/Entities/Attr.h>
+#include <multiplier/Entities/CXXBaseSpecifier.h>
+#include <multiplier/Entities/DefineMacroDirective.h>
+#include <multiplier/Entities/Designator.h>
 #include <multiplier/Entities/FieldDecl.h>
+#include <multiplier/Entities/File.h>
+#include <multiplier/Entities/Fragment.h>
+#include <multiplier/Entities/FunctionDecl.h>
+#include <multiplier/Entities/IncludeLikeMacroDirective.h>
+#include <multiplier/Entities/Stmt.h>
+#include <multiplier/Entities/TemplateArgument.h>
+#include <multiplier/Entities/TemplateParameterList.h>
+#include <multiplier/Entities/Type.h>
+#include <multiplier/Entities/TypeDecl.h>
 #include <multiplier/Entities/VarDecl.h>
 #include <multiplier/ui/Util.h>
 #include <QString>
@@ -20,7 +32,7 @@
 namespace mx::gui {
 
 // Return the ID of the entity with a name that contains `entity`.
-VariantEntity NamedEntityContaining(VariantEntity entity,
+VariantEntity NamedEntityContaining(const VariantEntity &entity,
                                     const VariantEntity &containing);
 
 //! Generate references to the entity with `entity`. The references
@@ -28,7 +40,7 @@ VariantEntity NamedEntityContaining(VariantEntity entity,
 //! referenced entity will match the named entity, other times the named
 //! entity will contain the reference (e.g. a function containing a call).
 gap::generator<std::pair<VariantEntity, VariantEntity>>
-References(VariantEntity entity);
+References(const VariantEntity &entity);
 
 template <typename T>
 static VariantEntity NamedDeclContaining(const T &thing) {

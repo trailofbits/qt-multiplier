@@ -8,33 +8,23 @@
 
 #include "ReferenceExplorerModel.h"
 
-#include <multiplier/Entities/DefineMacroDirective.h>
-#include <multiplier/Entities/FieldDecl.h>
-#include <multiplier/Entities/FunctionDecl.h>
-#include <multiplier/Entities/IncludeLikeMacroDirective.h>
-#include <multiplier/Entities/VarDecl.h>
+#include <filesystem>
+#include <multiplier/File.h>
+#include <multiplier/Index.h>
 #include <multiplier/ui/Assert.h>
+#include <multiplier/ui/INodeGenerator.h>
 #include <multiplier/ui/Util.h>
-
 #include <QByteArray>
-#include <QDataStream>
 #include <QIODevice>
 #include <QMimeData>
-#include <QRunnable>
 #include <QString>
 #include <QThreadPool>
-
-#include <filesystem>
-
-#include "CallHierarchyRootsResolver.h"
-#include "EntityResolver.h"
-#include "NodeExpander.h"
-#include "NodeImporter.h"
 
 namespace mx::gui {
 
 struct ReferenceExplorerModel::PrivateData final {
-  PrivateData(mx::Index index_, mx::FileLocationCache file_location_cache_)
+  PrivateData(const mx::Index &index_,
+              const mx::FileLocationCache &file_location_cache_)
       : index(index_),
         file_location_cache(file_location_cache_) {
 
@@ -46,89 +36,38 @@ struct ReferenceExplorerModel::PrivateData final {
 
   mx::Index index;
 
+  //! Caches file/line/column mappings for open files.
   mx::FileLocationCache file_location_cache;
 
   //! The path map from mx::Index, keyed by id
   std::unordered_map<RawEntityId, QString> file_path_map;
 
+  //! Node tree for this model.
   NodeTree node_tree;
 };
 
-void ReferenceExplorerModel::AddNodeAt(Node node, const QModelIndex &index) {
-
-  qDebug()
-      << "ReferenceExplorerModel::AddRootNode: Adding node"
-      << node.node_id << "with primary entity id" << node.entity_id
-      << "and referenced entity id" << node.referenced_entity_id;
-
-  std::vector<Node> nodes;
-  nodes.emplace_back(std::move(node));
-  InsertNodes(std::move(nodes), -1, index);
-}
-
-void ReferenceExplorerModel::AppendNodes(
-    std::vector<Node> nodes, const QModelIndex &parent,
-    int num_produced_so_far) {
-  InsertNodes(std::move(nodes), num_produced_so_far, parent);
-}
-
-QModelIndex ReferenceExplorerModel::RootIndex(void) {
-  auto root = d->node_tree.CurrentRootNode();
-  return createIndex(0, 0, static_cast<quintptr>(root->node_id));
-}
-
 //! Adds a new entity object under the given parent
 void ReferenceExplorerModel::AppendEntityById(
-    RawEntityId entity_id, ExpansionMode import_mode,
+    RawEntityId entity_id, ExpansionMode expansion_mode,
     const QModelIndex &parent) {
 
-  // The call hierarchy mode goes and gets redeclarations for the root level,
-  // as wells as fetches level 1 of the references.
-  if (import_mode == IReferenceExplorerModel::CallHierarchyMode) {
-    auto node_importer = new CallHierarchyRootsResolver(
-        d->index, d->file_location_cache, entity_id, parent);
-    node_importer->setAutoDelete(true);
+  INodeGenerator *generator = INodeGenerator::CreateRootGenerator(
+      d->index, d->file_location_cache, entity_id, parent,
+      expansion_mode);
 
-    connect(node_importer, &CallHierarchyRootsResolver::Finished,
-            this, &ReferenceExplorerModel::AppendNodes);
-
-    QThreadPool::globalInstance()->start(node_importer);
-
-  // Start a request to fetch the entity so that we can import it. This is a
-  // more generic importer.
-  } else {
-    auto entity_resolver = new EntityResolver(
-        d->index, entity_id, import_mode, parent);
-    entity_resolver->setAutoDelete(true);
-
-    connect(
-        entity_resolver, &EntityResolver::Finished,
-        this, &ReferenceExplorerModel::AppendEntityObject);
-
-    QThreadPool::globalInstance()->start(entity_resolver);
-  }
-}
-
-//! Adds a new entity object under the given parent
-void ReferenceExplorerModel::AppendEntityObject(
-    VariantEntity entity, ExpansionMode import_mode,
-    const QModelIndex &parent) {
-  if (std::holds_alternative<NotAnEntity>(entity)) {
+  if (!generator) {
     return;
   }
 
-  qDebug()
-      << "ReferenceExplorerModel::AppendEntityObject: Got entity with id"
-      << IdOfEntity(entity);
+  generator->setAutoDelete(true);
 
-  auto node_importer = new NodeImporter(
-      d->file_location_cache, entity, entity, import_mode, parent);
-  node_importer->setAutoDelete(true);
+  connect(generator, &INodeGenerator::NodesAvailable,
+          this, &ReferenceExplorerModel::InsertNodes);
 
-  connect(node_importer, &NodeImporter::Finished,
-          this, &ReferenceExplorerModel::AddNodeAt);
+  connect(generator, &INodeGenerator::Finished,
+          this, &ReferenceExplorerModel::InsertNodes);
 
-  QThreadPool::globalInstance()->start(node_importer);
+  QThreadPool::globalInstance()->start(generator);
 }
 
 void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
@@ -147,30 +86,26 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
     return;
   }
 
-  qDebug()
-      << "ReferenceExplorerModel::ExpandEntity: Expanding entity with id"
-      << node_it->second.entity_id;
-
   // Prevent this mode from being expanded any more.
   node_it->second.expansion_mode = IReferenceExplorerModel::AlreadyExpanded;
 
-  auto node_expander = NodeExpander::CreateNodeExpander(
-      d->index,
-      d->file_location_cache,
-      node_it->second.entity_id,
-      index,
+  INodeGenerator *generator = INodeGenerator::CreateChildGenerator(
+      d->index, d->file_location_cache, node_it->second.entity_id, index,
       expansion_mode);
-  node_expander->setAutoDelete(true);
 
-  connect(
-      node_expander, &NodeExpander::NodesAvailable,
-      this, &ReferenceExplorerModel::AppendNodes);
+  if (!generator) {
+    return;
+  }
 
-  // TODO(pag): Somehow use `NodeExpander::RequestCancellation`.
-  // TODO(pag): Store an `is_expanded` bool in the `Node` so that in the view
-  //            we can prevent the repeated expansion of the node.
+  generator->setAutoDelete(true);
 
-  QThreadPool::globalInstance()->start(node_expander);
+  connect(generator, &INodeGenerator::NodesAvailable,
+          this, &ReferenceExplorerModel::InsertNodes);
+
+  connect(generator, &INodeGenerator::Finished,
+          this, &ReferenceExplorerModel::InsertNodes);
+
+  QThreadPool::globalInstance()->start(generator);
 }
 
 bool ReferenceExplorerModel::HasAlternativeRoot() const {
@@ -468,10 +403,8 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
   return mime_data;
 }
 
-bool ReferenceExplorerModel::InsertNodes(std::vector<Node> nodes, int row,
+void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
                                          const QModelIndex &drop_target) {
-
-  qDebug() << "ReferenceExplorerModel::InsertNodes"  << drop_target << row;
 
   // Figure out the drop target. This is the internal node id of the parent
   // node that will contain our dropped nodes.
@@ -484,8 +417,7 @@ bool ReferenceExplorerModel::InsertNodes(std::vector<Node> nodes, int row,
   }
 
   if (!d->node_tree.node_map.contains(drop_target_node_id)) {
-    qDebug() << "Couldn't find drop target node" << drop_target_node_id;
-    return false;
+    return;
   }
 
   // Figure out where to drop the item in within the `drop_target_node_id`.
@@ -503,8 +435,7 @@ bool ReferenceExplorerModel::InsertNodes(std::vector<Node> nodes, int row,
   Assert(parent_node.node_id == drop_target_node_id, "Invalid drop target");
 
   if (static_cast<size_t>(begin_row) > parent_node.child_node_id_list.size()) {
-    Assert(false, "Out of bounds insertion row");
-    return false;
+    return;
   }
 
   std::vector<std::uint64_t> root_nodes_dropped;
@@ -536,13 +467,11 @@ bool ReferenceExplorerModel::InsertNodes(std::vector<Node> nodes, int row,
   // We did nothing, or we did nothing visible.
   auto num_dropped_nodes = static_cast<int>(root_nodes_dropped.size());
   if (!num_dropped_nodes) {
-    qDebug() << "No root nodes being dropped";
-    return false;
+    return;
   }
 
   auto end_row = begin_row + static_cast<int>(root_nodes_dropped.size()) - 1;
   emit beginInsertRows(drop_target, begin_row, end_row);
-  qDebug() << "beginInsertRows" << drop_target << begin_row << end_row;
 
   // Add the nodes into our tree.
   for (Node &node : nodes) {
@@ -564,7 +493,6 @@ bool ReferenceExplorerModel::InsertNodes(std::vector<Node> nodes, int row,
       root_nodes_dropped.end());
 
   emit endInsertRows();
-  return true;
 }
 
 bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
@@ -592,16 +520,18 @@ bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
   }
 
   // Deserialize and add the new nodes to the model.
-  std::vector<Node> decoded_nodes;
+  QVector<Node> decoded_nodes;
   while (!encoded_data_stream.atEnd()) {
-    encoded_data_stream >> decoded_nodes.emplace_back();
+    encoded_data_stream >> decoded_nodes.emplaceBack();
   }
 
-  if (decoded_nodes.empty()) {
+  if (decoded_nodes.isEmpty()) {
     return false;
   }
 
-  return InsertNodes(std::move(decoded_nodes), row, drop_target);
+  auto old_num_nodes = d->node_tree.node_map.size();
+  InsertNodes(std::move(decoded_nodes), row, drop_target);
+  return d->node_tree.node_map.size() > old_num_nodes;
 }
 
 Qt::ItemFlags ReferenceExplorerModel::flags(const QModelIndex &index) const {
@@ -619,7 +549,8 @@ QStringList ReferenceExplorerModel::mimeTypes() const {
 }
 
 ReferenceExplorerModel::ReferenceExplorerModel(
-    mx::Index index, mx::FileLocationCache file_location_cache, QObject *parent)
+    const Index &index, const FileLocationCache &file_location_cache,
+    QObject *parent)
     : IReferenceExplorerModel(parent),
       d(new PrivateData(index, file_location_cache)) {}
 
