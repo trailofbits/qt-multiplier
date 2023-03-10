@@ -10,7 +10,8 @@
 
 #include <QString>
 
-#include <map>
+#include <unordered_map>
+
 #include <multiplier/Entities/Stmt.h>
 #include <multiplier/Entities/Token.h>
 #include <multiplier/ui/Assert.h>
@@ -29,7 +30,7 @@ struct TokenRangeData final {
   // IDs are the "left corners" of the fragments: the first token from the
   // fragment than can be directly tied to a file token. The fragment tokens
   // are tokens from the fragment that have
-  std::multimap<RawEntityId, std::vector<Token>> fragment_tokens;
+  std::unordered_multimap<RawEntityId, std::vector<Token>> fragment_tokens;
 };
 
 static void PrefetchMacrosFromMacro(
