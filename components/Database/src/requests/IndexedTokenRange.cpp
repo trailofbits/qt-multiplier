@@ -8,10 +8,8 @@
 
 #include "IndexedTokenRange.h"
 
-#include <QDebug>
 #include <QString>
 
-#include <iostream>
 #include <map>
 #include <multiplier/Entities/Stmt.h>
 #include <multiplier/Entities/Token.h>
