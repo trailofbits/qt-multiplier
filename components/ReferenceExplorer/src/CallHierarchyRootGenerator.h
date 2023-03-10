@@ -8,9 +8,9 @@
 
 #include "INodeGenerator.h"
 
-#include <memory>
-
 #include <multiplier/Entity.h>
+
+#include <memory>
 
 namespace mx {
 class Index;

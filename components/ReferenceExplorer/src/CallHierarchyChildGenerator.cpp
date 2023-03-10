@@ -7,11 +7,10 @@
 */
 
 #include "CallHierarchyChildGenerator.h"
+#include "Utils.h"
 
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
-
-#include "Utils.h"
 
 namespace mx::gui {
 

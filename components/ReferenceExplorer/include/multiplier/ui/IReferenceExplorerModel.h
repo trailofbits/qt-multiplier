@@ -8,12 +8,14 @@
 
 #pragma once
 
-#include <filesystem>
 #include <multiplier/Entity.h>
+
 #include <QDataStream>
 #include <QAbstractItemModel>
 #include <QMetaType>
 #include <QString>
+
+#include <filesystem>
 #include <unordered_map>
 
 namespace mx {

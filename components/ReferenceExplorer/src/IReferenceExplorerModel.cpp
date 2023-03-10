@@ -6,16 +6,18 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
+#include "ReferenceExplorerModel.h"
+#include "Utils.h"
+
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
-#include <filesystem>
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
 #include <multiplier/ui/Assert.h>
+
 #include <QAtomicInt>
 
-#include "ReferenceExplorerModel.h"
-#include "Utils.h"
+#include <filesystem>
 
 namespace mx::gui {
 namespace {

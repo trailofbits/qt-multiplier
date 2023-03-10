@@ -8,14 +8,15 @@
 
 #pragma once
 
-#include <gap/core/generator.hpp>
+#include <multiplier/ui/IReferenceExplorerModel.h>
+
 #include <QAtomicInt>
 #include <QModelIndex>
 #include <QObject>
 #include <QRunnable>
 #include <QVector>
 
-#include <multiplier/ui/IReferenceExplorerModel.h>
+#include <gap/core/generator.hpp>
 
 namespace mx {
 class FileLocationCache;

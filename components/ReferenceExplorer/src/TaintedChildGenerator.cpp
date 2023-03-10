@@ -7,13 +7,12 @@
 */
 
 #include "TaintedChildGenerator.h"
+#include "Utils.h"
 
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
 #include <multiplier/Analysis/Taint.h>
 #include <multiplier/Entities/StmtKind.h>
-
-#include "Utils.h"
 
 namespace mx::gui {
 namespace {

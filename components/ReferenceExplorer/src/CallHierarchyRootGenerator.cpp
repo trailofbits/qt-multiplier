@@ -5,13 +5,13 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "CallHierarchyRootGenerator.h"
+#include "Utils.h"
 
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
 
-#include "Utils.h"
-
 namespace mx::gui {
+
 namespace {
 
 // If it's a declaration, then we want to have multiple roots where each

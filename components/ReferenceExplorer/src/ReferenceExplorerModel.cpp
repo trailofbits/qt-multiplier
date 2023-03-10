@@ -9,16 +9,19 @@
 #include "ReferenceExplorerModel.h"
 #include "INodeGenerator.h"
 
-#include <filesystem>
-#include <multiplier/File.h>
-#include <multiplier/Index.h>
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/Util.h>
+
+#include <multiplier/File.h>
+#include <multiplier/Index.h>
+
 #include <QByteArray>
 #include <QIODevice>
 #include <QMimeData>
 #include <QString>
 #include <QThreadPool>
+
+#include <filesystem>
 
 namespace mx::gui {
 

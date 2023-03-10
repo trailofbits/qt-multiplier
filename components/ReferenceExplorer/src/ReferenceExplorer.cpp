@@ -11,6 +11,8 @@
 #include "FilterSettingsWidget.h"
 #include "SearchFilterModelProxy.h"
 
+#include <multiplier/ui/Assert.h>
+
 #include <QApplication>
 #include <QClipboard>
 #include <QCheckBox>
@@ -24,8 +26,6 @@
 #include <QVBoxLayout>
 
 #include <optional>
-
-#include <multiplier/ui/Assert.h>
 
 namespace mx::gui {
 

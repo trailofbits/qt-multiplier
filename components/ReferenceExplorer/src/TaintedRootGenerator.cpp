@@ -7,7 +7,6 @@
 */
 
 #include "TaintedRootGenerator.h"
-
 #include "Utils.h"
 
 namespace mx::gui {

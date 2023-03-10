@@ -8,12 +8,12 @@
 
 #include "FilterSettingsWidget.h"
 
+#include <multiplier/ui/Assert.h>
+
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QRadioButton>
 #include <QCheckBox>
-
-#include <multiplier/ui/Assert.h>
 
 namespace mx::gui {
 

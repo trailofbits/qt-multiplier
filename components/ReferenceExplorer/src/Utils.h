@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include <gap/core/generator.hpp>
 #include <multiplier/Entity.h>
 #include <multiplier/Entities/Attr.h>
 #include <multiplier/Entities/CXXBaseSpecifier.h>
@@ -26,7 +25,11 @@
 #include <multiplier/Entities/TypeDecl.h>
 #include <multiplier/Entities/VarDecl.h>
 #include <multiplier/ui/Util.h>
+
 #include <QString>
+
+#include <gap/core/generator.hpp>
+
 #include <unordered_map>
 
 namespace mx::gui {

@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
+
 #include <QTreeView>
 
 namespace mx::gui {
