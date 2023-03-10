@@ -12,10 +12,14 @@
 
 namespace mx::gui {
 
+//! A QFuture wrapper that automatically cancels the future
 template <typename ResultType>
 class DatabaseFuture final : public QFuture<ResultType> {
  public:
+  //! Constructor
   DatabaseFuture();
+
+  //! Destructor
   virtual ~DatabaseFuture() override;
 };
 
@@ -28,10 +32,12 @@ DatabaseFuture<ResultType>::~DatabaseFuture() {
   using QFuture<ResultType>::cancel;
   using QFuture<ResultType>::waitForFinished;
 
-  if (isRunning()) {
-    cancel();
-    waitForFinished();
+  if (!isRunning()) {
+    return;
   }
+
+  cancel();
+  waitForFinished();
 }
 
 }  // namespace mx::gui

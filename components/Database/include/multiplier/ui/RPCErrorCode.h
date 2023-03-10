@@ -8,6 +8,7 @@
 
 namespace mx::gui {
 
+//! Error codes used by the IDatabase interface
 enum class RPCErrorCode {
   Interrupted,
   NoDataReceived,
@@ -22,4 +23,4 @@ enum class RPCErrorCode {
   InvalidFileTokenSorting,
 };
 
-}
+}  // namespace mx::gui
