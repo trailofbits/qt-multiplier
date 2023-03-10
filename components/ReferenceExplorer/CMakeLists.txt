@@ -13,7 +13,6 @@ add_library("mx_referenceexplorer"
   include/multiplier/ui/IReferenceExplorerModel.h
   src/IReferenceExplorerModel.cpp
   
-  
   include/multiplier/ui/INodeGenerator.h
   src/INodeGenerator.cpp
 
