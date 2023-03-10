@@ -7,13 +7,11 @@
 #pragma once
 
 #include <multiplier/ui/RPCErrorCode.h>
-#include <multiplier/ui/DatabaseFuture.h>
 #include <multiplier/ui/IndexedTokenRangeData.h>
 
 #include <multiplier/Index.h>
 #include <pasta/Util/Result.h>
 
-#include <QFuture>
 #include <QFutureWatcher>
 #include <QString>
 
@@ -40,18 +38,26 @@ class IDatabase {
                     const FileLocationCache &file_location_cache);
 
   //! The output of a file or fragment request
-  using FileResult = pasta::Result<IndexedTokenRangeData, RPCErrorCode>;
+  using IndexedTokenRangeDataResult =
+      pasta::Result<IndexedTokenRangeData, RPCErrorCode>;
+
+  //! Request type for RequestIndexedTokenRangeData
+  enum class IndexedTokenRangeDataRequestType {
+    Fragment,
+    File,
+  };
 
   //! Requests the specified file
-  virtual QFuture<FileResult> DownloadFile(const RawEntityId &file_id) = 0;
+  virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
+      const RawEntityId &entity_id,
+      const IndexedTokenRangeDataRequestType &request_type) = 0;
 
-  //! Requests the specified fragment
-  virtual QFuture<FileResult>
-  DownloadFragment(const RawEntityId &fragment_id) = 0;
+  //! An optional name
+  using OptionalName = std::optional<QString>;
 
   //! Starts a name resolution request for the given entity
-  virtual QFuture<std::optional<QString>>
-  GetEntityName(const RawEntityId &fragment_id) = 0;
+  virtual QFuture<OptionalName>
+  RequestEntityName(const RawEntityId &fragment_id) = 0;
 
   //! Disabled copy constructor
   IDatabase(const IDatabase &) = delete;

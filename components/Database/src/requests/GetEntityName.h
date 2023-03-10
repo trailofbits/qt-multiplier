@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <multiplier/ui/IDatabase.h>
+
 #include <multiplier/Index.h>
 
 #include <QPromise>
@@ -19,7 +21,7 @@ namespace mx::gui {
 
 using OptionalName = std::optional<QString>;
 
-void CreateEntityNameRequest(QPromise<OptionalName> &entity_name_promise,
-                             const Index &index, const RawEntityId &entity_id);
+void GetEntityName(QPromise<OptionalName> &entity_name_promise,
+                   const Index &index, const RawEntityId &entity_id);
 
 }  // namespace mx::gui

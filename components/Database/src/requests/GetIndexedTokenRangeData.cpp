@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "IndexedTokenRange.h"
+#include "GetIndexedTokenRangeData.h"
 
 #include <QString>
 
@@ -33,15 +33,14 @@ struct TokenRangeData final {
   std::unordered_multimap<RawEntityId, std::vector<Token>> fragment_tokens;
 };
 
-static void
-PrefetchMacrosFromMacro(const QPromise<IDatabase::FileResult> &result_promise,
-                        std::vector<Token> &output, const Macro &macro,
-                        RawEntityId &first_fid);
+static void PrefetchMacrosFromMacro(
+    const QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    std::vector<Token> &output, const Macro &macro, RawEntityId &first_fid);
 
-static void
-PrefetchMacrosFromNode(const QPromise<IDatabase::FileResult> &result_promise,
-                       std::vector<Token> &output, MacroOrToken macro_or_tok,
-                       RawEntityId &first_fid) {
+static void PrefetchMacrosFromNode(
+    const QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    std::vector<Token> &output, MacroOrToken macro_or_tok,
+    RawEntityId &first_fid) {
 
   if (std::holds_alternative<Macro>(macro_or_tok)) {
     Macro macro = std::move(std::get<Macro>(macro_or_tok));
@@ -69,7 +68,7 @@ PrefetchMacrosFromNode(const QPromise<IDatabase::FileResult> &result_promise,
 }
 
 void PrefetchMacrosFromMacro(
-    const QPromise<IDatabase::FileResult> &result_promise,
+    const QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
     std::vector<Token> &output, const Macro &macro, RawEntityId &first_fid) {
   for (MacroOrToken macro_or_tok : macro.children()) {
     if (result_promise.isCanceled()) {
@@ -83,7 +82,7 @@ void PrefetchMacrosFromMacro(
 // Go fetch all of the macros. We don't actually read these, but we want to
 // fetch all the macros here where we can check the status of the promise.
 static void PrefetchMacrosFromFragment(
-    const QPromise<IDatabase::FileResult> &result_promise,
+    const QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
     std::vector<Token> &output, const Fragment &frag, RawEntityId &first_fid) {
   for (MacroOrToken macro_or_tok : frag.preprocessed_code()) {
     if (result_promise.isCanceled()) {
@@ -96,10 +95,11 @@ static void PrefetchMacrosFromFragment(
 
 using TokenRangeDataOrError = std::variant<TokenRangeData, RPCErrorCode>;
 
-static TokenRangeDataOrError
-DownloadEntityTokens(const QPromise<IDatabase::FileResult> &result_promise,
-                     const Index &index, DownloadRequestType request_type,
-                     RawEntityId entity_id) {
+static TokenRangeDataOrError DownloadEntityTokens(
+    const QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    const Index &index,
+    IDatabase::IndexedTokenRangeDataRequestType request_type,
+    RawEntityId entity_id) {
 
   TokenRangeData output;
   output.requested_id = entity_id;
@@ -107,7 +107,7 @@ DownloadEntityTokens(const QPromise<IDatabase::FileResult> &result_promise,
   std::vector<Token> frag_tokens;
 
   // Download all tokens from a file. This pulls in all of the file's fragments.
-  if (request_type == DownloadRequestType::FileTokens) {
+  if (request_type == IDatabase::IndexedTokenRangeDataRequestType::File) {
     auto file = index.file(entity_id);
     if (!file) {
       return RPCErrorCode::InvalidEntityID;
@@ -132,7 +132,8 @@ DownloadEntityTokens(const QPromise<IDatabase::FileResult> &result_promise,
     }
 
     // Download all tokens from a fragment.
-  } else if (request_type == DownloadRequestType::FragmentTokens) {
+  } else if (request_type ==
+             IDatabase::IndexedTokenRangeDataRequestType::Fragment) {
     std::optional<Fragment> fragment = index.fragment(entity_id);
     if (!fragment) {
       return RPCErrorCode::InvalidEntityID;
@@ -313,10 +314,9 @@ static RawEntityId FragmentIdFromTokens(const std::vector<Token> &frag_toks) {
 
 // Create an indexed version of some token range data. This means going and
 // finding the
-static IndexedTokenRangeDataOrError
-IndexTokenRange(const QPromise<IDatabase::FileResult> &result_promise,
-                const FileLocationCache &file_location_cache,
-                TokenRangeData input) {
+static IndexedTokenRangeDataOrError IndexTokenRange(
+    const QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    const FileLocationCache &file_location_cache, TokenRangeData input) {
 
   IndexedTokenRangeData output;
   output.requested_id = input.requested_id;
@@ -432,14 +432,14 @@ IndexTokenRange(const QPromise<IDatabase::FileResult> &result_promise,
 
 }  // namespace
 
-void CreateIndexedTokenRangeData(
-    QPromise<IDatabase::FileResult> &result_promise, const Index &index,
-    const FileLocationCache &file_location_cache,
-    const SingleEntityRequest &request) {
+void GetIndexedTokenRangeData(
+    QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    const Index &index, const FileLocationCache &file_location_cache,
+    const RawEntityId &entity_id,
+    const IDatabase::IndexedTokenRangeDataRequestType &request_type) {
 
-  auto token_range_data_res = DownloadEntityTokens(
-      result_promise, index, request.download_request_type, request.entity_id);
-
+  auto token_range_data_res =
+      DownloadEntityTokens(result_promise, index, request_type, entity_id);
 
   if (std::holds_alternative<RPCErrorCode>(token_range_data_res)) {
     result_promise.addResult(std::get<RPCErrorCode>(token_range_data_res));

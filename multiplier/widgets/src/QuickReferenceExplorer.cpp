@@ -127,7 +127,7 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->window_title = new QLabel(window_name);
 
   // Start a request to fetch the real entity name
-  d->entity_name_future = d->database->GetEntityName(entity_id);
+  d->entity_name_future = d->database->RequestEntityName(entity_id);
   d->future_watcher.setFuture(d->entity_name_future);
 
   // Save to active button

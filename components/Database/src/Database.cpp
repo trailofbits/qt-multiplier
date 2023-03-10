@@ -6,26 +6,14 @@
 
 #include "Database.h"
 
-#include <requests/IndexedTokenRange.h>
-#include <requests/EntityNameRequest.h>
+#include <requests/GetIndexedTokenRangeData.h>
+#include <requests/GetEntityName.h>
 
 #include <QThreadPool>
 #include <QtConcurrent>
 #include <thread>
 
 namespace mx::gui {
-
-namespace {
-
-/*void ExecuteRequest(QPromise<Database::Result> &result_promise,
-                    const Index &index,
-                    const FileLocationCache &file_location_cache,
-                    const Request &request) {
-  CreateIndexedTokenRangeData(result_promise, index, file_location_cache,
-                              request);
-}*/
-
-}  // namespace
 
 struct Database::PrivateData {
   PrivateData(const Index &index_,
@@ -41,35 +29,18 @@ struct Database::PrivateData {
 
 Database::~Database() {}
 
-QFuture<IDatabase::FileResult>
-Database::DownloadFile(const RawEntityId &file_id) {
+QFuture<IDatabase::IndexedTokenRangeDataResult>
+Database::RequestIndexedTokenRangeData(
+    const RawEntityId &entity_id,
+    const IndexedTokenRangeDataRequestType &request_type) {
 
-  SingleEntityRequest request{
-      DownloadRequestType::FileTokens,
-      file_id,
-  };
-
-  return QtConcurrent::run(&d->thread_pool, CreateIndexedTokenRangeData,
-                           d->index, d->file_location_cache,
-                           std::move(request));
+  return QtConcurrent::run(&d->thread_pool, GetIndexedTokenRangeData, d->index,
+                           d->file_location_cache, entity_id, request_type);
 }
 
-QFuture<IDatabase::FileResult>
-Database::DownloadFragment(const RawEntityId &fragment_id) {
-
-  SingleEntityRequest request{
-      DownloadRequestType::FragmentTokens,
-      fragment_id,
-  };
-
-  return QtConcurrent::run(&d->thread_pool, CreateIndexedTokenRangeData,
-                           d->index, d->file_location_cache,
-                           std::move(request));
-}
-
-QFuture<std::optional<QString>>
-Database::GetEntityName(const RawEntityId &fragment_id) {
-  return QtConcurrent::run(&d->thread_pool, CreateEntityNameRequest, d->index,
+QFuture<OptionalName>
+Database::RequestEntityName(const RawEntityId &fragment_id) {
+  return QtConcurrent::run(&d->thread_pool, GetEntityName, d->index,
                            fragment_id);
 }
 

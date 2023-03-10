@@ -51,8 +51,8 @@ struct CodeModel::PrivateData final {
   Index index;
 
   IDatabase::Ptr database;
-  QFuture<IDatabase::FileResult> future_result;
-  QFutureWatcher<IDatabase::FileResult> future_watcher;
+  QFuture<IDatabase::IndexedTokenRangeDataResult> future_result;
+  QFutureWatcher<IDatabase::IndexedTokenRangeDataResult> future_watcher;
 
   ModelState model_state{ModelState::Ready};
   TokenRowList token_row_list;
@@ -96,14 +96,17 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   VariantId vid = eid.Unpack();
 
   if (std::holds_alternative<FileId>(vid)) {
-    d->future_result = d->database->DownloadFile(raw_id);
+    d->future_result = d->database->RequestIndexedTokenRangeData(
+        raw_id, IDatabase::IndexedTokenRangeDataRequestType::File);
 
   } else if (std::holds_alternative<FileTokenId>(vid)) {
-    d->future_result = d->database->DownloadFile(raw_id);
+    d->future_result = d->database->RequestIndexedTokenRangeData(
+        raw_id, IDatabase::IndexedTokenRangeDataRequestType::File);
 
   } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
-    d->future_result =
-        d->database->DownloadFragment(EntityId(frag_id.value()).Pack());
+    d->future_result = d->database->RequestIndexedTokenRangeData(
+        EntityId(frag_id.value()).Pack(),
+        IDatabase::IndexedTokenRangeDataRequestType::Fragment);
 
   } else {
     emit EndResetModel(ModelState::UpdateFailed);
@@ -229,7 +232,8 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache,
       d(new PrivateData(file_location_cache, index)) {
 
   d->database = IDatabase::Create(index, file_location_cache);
-  connect(&d->future_watcher, &QFutureWatcher<IDatabase::FileResult>::finished,
+  connect(&d->future_watcher,
+          &QFutureWatcher<IDatabase::IndexedTokenRangeDataResult>::finished,
           this, &CodeModel::FutureResultStateChanged);
 
   connect(this, &CodeModel::BeginResetModel, this,

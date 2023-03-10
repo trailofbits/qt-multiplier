@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "EntityNameRequest.h"
+#include "GetEntityName.h"
 
 #include <multiplier/ui/Util.h>
 
@@ -15,8 +15,8 @@
 
 namespace mx::gui {
 
-void CreateEntityNameRequest(QPromise<OptionalName> &entity_name_promise,
-                             const Index &index, const RawEntityId &entity_id) {
+void GetEntityName(QPromise<OptionalName> &entity_name_promise,
+                   const Index &index, const RawEntityId &entity_id) {
 
   auto variant_entity = index.entity(entity_id);
 
