@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/Types.h>
+
 #include <QObject>
 #include <QVariant>
 

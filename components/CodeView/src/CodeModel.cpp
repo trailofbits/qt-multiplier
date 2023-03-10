@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/IDatabase.h>
+
 #include <multiplier/Entities/TokenCategory.h>
 
 #include <QString>

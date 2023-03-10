@@ -6,9 +6,9 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/ICodeView.h>
-
 #include "CodeView.h"
+
+#include <multiplier/ui/ICodeView.h>
 
 namespace mx::gui {
 

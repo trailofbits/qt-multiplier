@@ -11,9 +11,9 @@
 #include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/ICodeModel.h>
 
-#include <optional>
-
 #include <QWidget>
+
+#include <optional>
 
 namespace mx {
 class Token;
