@@ -6,8 +6,11 @@
 
 #include "EntityNameResolver.h"
 
+#include <multiplier/Entities/Token.h>
+#include <multiplier/Entities/TokenKind.h>
 #include <multiplier/ui/Util.h>
 
+#include <QString>
 #include <QThread>
 
 namespace mx::gui {
@@ -27,7 +30,19 @@ EntityNameResolver::EntityNameResolver(Index index,
 EntityNameResolver::~EntityNameResolver() {}
 
 void EntityNameResolver::run() {
-  emit Finished(NameOfEntity(d->index.entity(d->entity_id)));
+  VariantEntity entity = d->index.entity(d->entity_id);
+  std::optional<QString> name = NameOfEntity(entity);
+  if (name && !name->isEmpty()) {
+    emit Finished(name);
+    return;
+  }
+
+  if (QString tokens = TokensToString(entity); !tokens.isEmpty()) {
+    emit Finished(tokens);
+    return;
+  }
+
+  emit Finished(std::nullopt);
 }
 
 }  // namespace mx::gui

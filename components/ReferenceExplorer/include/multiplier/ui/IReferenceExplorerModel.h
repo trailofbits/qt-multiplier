@@ -34,7 +34,10 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     AlreadyExpanded,
 
     //! Expand showing the call hierarchy.
-    CallHierarchyMode
+    CallHierarchyMode,
+
+    //! Expand showing the taint.
+    TaintMode,
   };
 
   //! Additional item data roles for this model
@@ -87,6 +90,12 @@ class IReferenceExplorerModel : public QAbstractItemModel {
 
     // NOTE(pag): May throw.
     friend QDataStream &operator>>(QDataStream &stream, Location &self);
+
+    // Create and initialize a location.
+    //
+    // NOTE(pag): This is a blocking operation.
+    static std::optional<Location> Create(const FileLocationCache &file_cache,
+                                          const VariantEntity &entity);
   };
 
 
@@ -95,8 +104,7 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     static QString kMimeTypeName;
 
     //! How this node was imported
-    IReferenceExplorerModel::ExpansionMode expansion_mode{
-        IReferenceExplorerModel::CallHierarchyMode};
+    IReferenceExplorerModel::ExpansionMode expansion_mode{};
 
     // Create and initialize a node.
     //

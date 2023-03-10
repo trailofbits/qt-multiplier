@@ -69,6 +69,9 @@ struct IndexedTokenRangeData final {
   // macro ID.
   std::vector<RawEntityId> related_entity_ids;
 
+  // The entity ID of the statement containing the Nth token.
+  std::vector<RawEntityId> statement_containing_token;
+
   // The category of the Nth token. The category informs things like syntax
   // coloring.
   std::vector<TokenCategory> token_categories;

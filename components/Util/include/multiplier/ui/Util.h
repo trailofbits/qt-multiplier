@@ -17,6 +17,7 @@ class Decl;
 class File;
 class Index;
 class Token;
+class TokenRange;
 namespace gui {
 
 //! Return the entity ID associated with `ent`.
@@ -25,13 +26,17 @@ RawEntityId IdOfEntity(const VariantEntity &ent);
 //! Return the file containing an entity.
 std::optional<File> FileOfEntity(const VariantEntity &ent);
 
+//! Get the file token range associated with an entity.
+TokenRange FileTokens(const VariantEntity &ent);
+
 //! Get the first file token associated with an entity.
-//!
-//! NOTE(pag): We prefer `TokenRange::file_tokens` as that walks up macros.
 Token FirstFileToken(const VariantEntity &ent);
 
 //! Return the name of an entity.
 std::optional<QString> NameOfEntity(const VariantEntity &ent);
+
+//! Return the tokens of `ent` as a string.
+QString TokensToString(const VariantEntity &ent);
 
 //// Try to determine the declarations associated with this token.
 //std::optional<Decl> DeclForToken(const Token &token);

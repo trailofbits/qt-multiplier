@@ -12,12 +12,29 @@
 #include "Utils.h"
 
 namespace mx::gui {
+namespace {
+
+// If it's a declaration, then we want to have multiple roots where each
+// root is a redeclaration of the entity. The first redeclaration is the
+// definition if one is available.
+static gap::generator<VariantEntity> TopLevelEntities(
+    VariantEntity entity) {
+  if (std::holds_alternative<Decl>(entity)) {
+    for (Decl decl : std::get<Decl>(entity).redeclarations()) {
+      co_yield VariantEntity(std::move(decl));
+    }
+
+  } else {
+    co_yield entity;
+  }
+}
+
+}  // namespace
 
 struct CallHierarchyRootGenerator::PrivateData final {
   Index index;
   FileLocationCache file_cache;
   RawEntityId entity_id{};
-  QModelIndex loc;
 
   inline PrivateData(const Index &index_, const FileLocationCache &file_cache_)
       : index(index_),
@@ -27,58 +44,57 @@ struct CallHierarchyRootGenerator::PrivateData final {
 CallHierarchyRootGenerator::CallHierarchyRootGenerator(
     const Index &index, const FileLocationCache &file_cache_,
     RawEntityId entity_id, const QModelIndex &location)
-    : d(new PrivateData(index, file_cache_)) {
+    : INodeGenerator(location),
+      d(new PrivateData(index, file_cache_)) {
 
   d->entity_id = entity_id;
-  d->loc = location;
 }
 
 CallHierarchyRootGenerator::~CallHierarchyRootGenerator() {}
 
-void CallHierarchyRootGenerator::run() {
+gap::generator<IReferenceExplorerModel::Node>
+CallHierarchyRootGenerator::GenerateNodes(void) {
   VariantEntity entity = d->index.entity(d->entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
-    return;
+    co_return;
   }
 
-  // TODO(pag): Cancellation.
+  auto is_first = true;
+  for (VariantEntity root_entity : TopLevelEntities(std::move(entity))) {
+    auto first_node = IReferenceExplorerModel::Node::Create(
+        d->file_cache, root_entity, root_entity,
+        IReferenceExplorerModel::AlreadyExpanded);
 
-  QVector<IReferenceExplorerModel::Node> nodes;
-
-  // If it's a declaration, then we want to have multiple roots where each
-  // root is a redeclaration of the entity. The first redeclaration is the
-  // definition if one is available.
-  if (std::holds_alternative<Decl>(entity)) {
-    for (Decl decl : std::get<Decl>(entity).redeclarations()) {
-      VariantEntity decl_entity(std::move(decl));
-      nodes.emplaceBack(IReferenceExplorerModel::Node::Create(
-          d->file_cache, decl_entity, decl_entity,
-          IReferenceExplorerModel::AlreadyExpanded));
+    if (CancelRequested()) {
+      break;
     }
 
-  } else {
-    nodes.emplaceBack(IReferenceExplorerModel::Node::Create(
-        d->file_cache, entity, entity,
-        IReferenceExplorerModel::AlreadyExpanded));
+    if (is_first) {
+      QList<IReferenceExplorerModel::Node> child_nodes;
+      for (const auto &ref : References(root_entity)) {
+        if (CancelRequested()) {
+          break;
+        }
+
+        auto child_node = IReferenceExplorerModel::Node::Create(
+            d->file_cache, ref.first, ref.second,
+            IReferenceExplorerModel::CallHierarchyMode);
+
+        first_node.child_node_id_list.push_back(child_node.node_id);
+        child_node.parent_node_id = first_node.node_id;
+        child_nodes.emplaceBack(std::move(child_node));
+      }
+
+      co_yield first_node;
+      for (auto child_node : child_nodes) {
+        co_yield child_node;
+      }
+
+      is_first = false;
+    } else {
+      co_yield first_node;
+    }
   }
-
-  if (nodes.empty()) {
-    return;
-  }
-
-  // For the call hierarchy, we want to expand the first node up to the first
-  // level.
-  for (const auto &ref : References(entity)) {
-    auto &added_node = nodes.emplaceBack(IReferenceExplorerModel::Node::Create(
-        d->file_cache, ref.first, ref.second,
-        IReferenceExplorerModel::CallHierarchyMode));
-
-    nodes[0].child_node_id_list.push_back(added_node.node_id);
-    added_node.parent_node_id = nodes[0].node_id;
-  }
-
-  // Insert these nows before row `0`.
-  emit Finished(std::move(nodes), 0, d->loc);
 }
 
 }  // namespace mx::gui

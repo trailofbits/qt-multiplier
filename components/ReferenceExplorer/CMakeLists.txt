@@ -31,6 +31,12 @@ add_library("mx_referenceexplorer"
   
   src/CallHierarchyRootGenerator.h
   src/CallHierarchyRootGenerator.cpp
+  
+  src/TaintedChildGenerator.h
+  src/TaintedChildGenerator.cpp
+  
+  src/TaintedRootGenerator.h
+  src/TaintedRootGenerator.cpp
 
   src/Utils.h
   src/Utils.cpp
@@ -53,6 +59,7 @@ target_link_libraries("mx_referenceexplorer"
   PUBLIC
     "thirdparty_qt"
     "multiplier::mx-api"
+    "multiplier::mx-analysis"
     "mx_assert"
     "mx_searchwidget"
     "mx_util"

@@ -8,25 +8,24 @@
 
 #pragma once
 
-#include <multiplier/ui/INodeGenerator.h>
+#include "TaintedChildGenerator.h"
 
 namespace mx::gui {
 
-class CallHierarchyChildGenerator final : public INodeGenerator {
+class TaintedRootGenerator final : public TaintedChildGenerator {
   Q_OBJECT
 
-  struct PrivateData;
-  std::unique_ptr<PrivateData> d;
-
  public:
-  virtual ~CallHierarchyChildGenerator(void) override;
+  virtual ~TaintedRootGenerator(void) override;
 
-  CallHierarchyChildGenerator(const Index &index_,
+  inline TaintedRootGenerator(const ::mx::Index &index_,
                               const FileLocationCache &file_cache_,
                               RawEntityId entity_id_,
-                              const QModelIndex &parent_);
+                              const QModelIndex &parent_)
+      : TaintedChildGenerator(index_, file_cache_, entity_id_, parent_) {}
 
-  gap::generator<IReferenceExplorerModel::Node> GenerateNodes(void) final;
+  virtual gap::generator<IReferenceExplorerModel::Node>
+  GenerateNodes(void) override;
 };
 
 }  // namespace mx::gui

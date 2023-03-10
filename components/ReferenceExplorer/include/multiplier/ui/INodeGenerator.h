@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <gap/core/generator.hpp>
 #include <QAtomicInt>
 #include <QModelIndex>
 #include <QObject>
@@ -28,10 +29,16 @@ class INodeGenerator : public QObject, public QRunnable {
   QAtomicInt cancel_requested;
 
  protected:
-  INodeGenerator(void) = default;
+  QModelIndex parent_index;
+
+ private:
+  INodeGenerator(void) = delete;
 
  public:
   virtual ~INodeGenerator(void);
+
+  inline explicit INodeGenerator(const QModelIndex &index_)
+      : parent_index(index_) {}
 
   void RequestCancel(void);
   bool CancelRequested(void);
@@ -51,6 +58,10 @@ class INodeGenerator : public QObject, public QRunnable {
       RawEntityId entity_id,
       const QModelIndex &parent,
       IReferenceExplorerModel::ExpansionMode expansion_mode);
+
+  virtual void run(void) override;
+
+  virtual gap::generator<IReferenceExplorerModel::Node> GenerateNodes(void);
 
  signals:
   void NodesAvailable(QVector<IReferenceExplorerModel::Node> node, int row,

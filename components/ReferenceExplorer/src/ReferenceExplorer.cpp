@@ -11,16 +11,17 @@
 #include "FilterSettingsWidget.h"
 #include "SearchFilterModelProxy.h"
 
-#include <QTreeView>
-#include <QVBoxLayout>
-#include <QMenu>
 #include <QApplication>
 #include <QClipboard>
 #include <QCheckBox>
 #include <QLabel>
-#include <QRadioButton>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QRadioButton>
+#include <QScrollBar>
+#include <QTreeView>
+#include <QVBoxLayout>
 
 #include <optional>
 
@@ -193,7 +194,7 @@ void ReferenceExplorer::InitializeWidgets() {
   setLayout(layout);
 
   // Setup che custom context menu
-  d->context_menu.menu = new QMenu(tr("Reference Explorer menu"));
+  d->context_menu.menu = new QMenu(tr("Reference browser menu"));
   d->context_menu.copy_details_action = new QAction(tr("Copy details"));
   d->context_menu.set_root_action = new QAction(tr("Set as root"));
 
@@ -321,6 +322,13 @@ void ReferenceExplorer::UpdateTreeViewItemButtons() {
   }
 
   auto rect = d->tree_view->visualRect(index);
+
+  // TODO(pag): Try to place the buttons to the left of any vertical scroll bar
+  //            if a horizontal scrollbar is present.
+//  auto max_width = d->tree_view->viewport()->width();
+//  if (max_width >= rect.width()) {
+//    rect.setWidth(max_width - d->tree_view->verticalScrollBar()->width());
+//  }
 
   auto button_margin = rect.height() / 6;
   auto button_size = rect.height() - (button_margin * 2);

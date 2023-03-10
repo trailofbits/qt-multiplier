@@ -29,18 +29,23 @@ namespace mx::gui {
 struct QuickReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   bool closed{false};
+  const IReferenceExplorerModel::ExpansionMode mode;
 
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
+
+  inline PrivateData(IReferenceExplorerModel::ExpansionMode mode_)
+      : mode(mode_) {}
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
-    mx::Index index, mx::FileLocationCache file_location_cache,
-    RawEntityId entity_id, QWidget *parent)
+    const Index &index, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode,
+    QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData) {
+      d(new PrivateData(mode)) {
 
-  InitializeWidgets(index, file_location_cache, entity_id);
+  InitializeWidgets(index, file_location_cache, entity_id, mode);
 }
 
 QuickReferenceExplorer::~QuickReferenceExplorer() {}
@@ -88,8 +93,8 @@ bool QuickReferenceExplorer::eventFilter(QObject *, QEvent *event) {
 }
 
 void QuickReferenceExplorer::InitializeWidgets(
-    mx::Index index, mx::FileLocationCache file_location_cache,
-    RawEntityId entity_id) {
+    const Index &index, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -105,8 +110,7 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   // Use a temporary window name at first. This won't be shown at all if the
   // name resolution is fast enough
-  auto window_name = tr("References to entity ") + QString::number(entity_id);
-  d->window_title = new QLabel(window_name);
+  d->window_title = new QLabel(Title(QString::number(entity_id), mode));
 
   // Start a request to fetch the real entity name
   IEntityNameResolver *entity_name_resolver =
@@ -169,8 +173,7 @@ void QuickReferenceExplorer::InitializeWidgets(
   //
 
   d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
-  d->model->AppendEntityById(
-      entity_id, IReferenceExplorerModel::CallHierarchyMode, QModelIndex());
+  d->model->AppendEntityById(entity_id, mode, QModelIndex());
 
   auto reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, this);
@@ -260,7 +263,20 @@ void QuickReferenceExplorer::OnEntityNameResolutionFinished(
   }
 
   d->window_title->setText(
-      tr("References to ") + "`" + opt_entity_name.value() + "`");
+      Title("`" + opt_entity_name.value() + "`", d->mode));
+}
+
+//! Generate a new window title.
+QString QuickReferenceExplorer::Title(
+    QString entity_name, IReferenceExplorerModel::ExpansionMode mode) {
+  switch (mode) {
+    case IReferenceExplorerModel::AlreadyExpanded:
+      return tr("References to ") + entity_name;
+    case IReferenceExplorerModel::CallHierarchyMode:
+      return tr("Call hierarchy of ") + entity_name;
+    case IReferenceExplorerModel::TaintMode:
+      return tr("Values tainted by ") + entity_name;
+  }
 }
 
 }  // namespace mx::gui

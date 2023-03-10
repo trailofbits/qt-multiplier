@@ -7,6 +7,7 @@
 #include <multiplier/Index.h>
 
 #include <multiplier/ui/ICodeView.h>
+#include <multiplier/ui/IReferenceExplorerModel.h>
 
 #include <QMainWindow>
 #include <QMimeData>
@@ -38,7 +39,9 @@ class MainWindow final : public QMainWindow {
   void OpenEntityRelatedToEntityId(const RawEntityId &entity_id);
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
-  void OpenTokenReferenceExplorer(RawEntityId entity_id);
+  void OpenTokenTaintExplorer(CodeModelIndex index);
+  void OpenReferenceExplorer(RawEntityId entity_id,
+                             IReferenceExplorerModel::ExpansionMode mode);
   void CloseTokenReferenceExplorer();
   ICodeView *CreateNewCodeView(RawEntityId file_entity_id, QString tab_name);
 

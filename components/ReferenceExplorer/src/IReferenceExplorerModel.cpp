@@ -53,6 +53,40 @@ QDataStream &operator>>(QDataStream &stream,
 QString IReferenceExplorerModel::Node::kMimeTypeName =
     "application/mx-reference-explorer-node";
 
+// Create and initialize a location.
+//
+// NOTE(pag): This is a blocking operation.
+std::optional<IReferenceExplorerModel::Location>
+IReferenceExplorerModel::Location::Create(const FileLocationCache &file_cache,
+                                          const VariantEntity &entity) {
+  Token file_tok = FirstFileToken(entity).file_token();
+  if (!file_tok) {
+    return std::nullopt;
+  }
+
+  std::optional<File> file = File::containing(file_tok);
+  if (!file.has_value()) {
+    Assert(file.has_value(), "Token::file_token returned non-file token?");
+    return std::nullopt;
+  }
+
+  Location location;
+  location.file_id = file->id().Pack();
+
+  for (std::filesystem::path path : file->paths()) {
+    location.path = QString::fromStdString(path.generic_string());
+  }
+
+  Assert(!location.path.isEmpty(), "Empty file paths aren't allowed");
+
+  if (auto line_col = file_tok.location(file_cache)) {
+    location.line = line_col->first;
+    location.column = line_col->second;
+  }
+
+  return location;
+}
+
 IReferenceExplorerModel::Node
 IReferenceExplorerModel::Node::Create(
     const FileLocationCache &file_cache,
@@ -66,34 +100,13 @@ IReferenceExplorerModel::Node::Create(
   node.entity_id = IdOfEntity(entity);
   node.opt_name = NameOfEntity(entity);
 
+  node.opt_location = Location::Create(file_cache, referenced_entity);
+  if (!node.opt_location.has_value()) {
+    node.opt_location = Location::Create(file_cache, entity);
+  }
+
   // Root nodes reference themselves.
   node.referenced_entity_id = IdOfEntity(referenced_entity);
-
-  Token file_tok = FirstFileToken(referenced_entity).file_token();
-  if (!file_tok) {
-    file_tok = FirstFileToken(entity).file_token();
-  }
-
-  if (file_tok) {
-    std::optional<File> file = File::containing(file_tok);
-    Assert(file.has_value(), "Token::file_token returned non-file token?");
-
-    Location location;
-    location.file_id = file->id().Pack();
-
-    for (std::filesystem::path path : file->paths()) {
-      location.path = QString::fromStdString(path.generic_string());
-    }
-
-    Assert(!location.path.isEmpty(), "Empty file paths aren't allowed");
-
-    if (auto line_col = file_tok.location(file_cache)) {
-      location.line = line_col->first;
-      location.column = line_col->second;
-    }
-
-    node.opt_location = std::move(location);
-  }
 
   return node;
 }

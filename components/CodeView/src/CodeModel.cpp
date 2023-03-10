@@ -23,6 +23,7 @@ namespace {
 struct TokenColumn final {
   RawEntityId token_id;
   RawEntityId related_entity_id;
+  RawEntityId statement_entity_id;
   TokenCategory token_category;
   QString data;
   std::optional<std::uint64_t> opt_token_group_id;
@@ -144,8 +145,10 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
       return QVariant();
     }
 
-    if (role == LineNumberRole || role == TokenRawEntityIdRole ||
-        role == TokenRelatedEntityIdRole) {
+    if (role == LineNumberRole ||
+        role == TokenRawEntityIdRole ||
+        role == TokenRelatedEntityIdRole ||
+        role == EntityIdOfStmtContainingTokenRole) {
       return 1;
 
     } else if (role == TokenCategoryRole) {
@@ -210,6 +213,13 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
         return static_cast<std::uint64_t>(column.related_entity_id);
       }
 
+    case EntityIdOfStmtContainingTokenRole:
+      if (column.statement_entity_id == kInvalidEntityId) {
+        return QVariant();
+      } else {
+        return static_cast<std::uint64_t>(column.statement_entity_id);
+      }
+
     default: return QVariant();
   }
 }
@@ -267,6 +277,8 @@ void CodeModel::FutureResultStateChanged() {
 
     col.token_id = indexed_token_range_data.token_ids[i];
     col.related_entity_id = indexed_token_range_data.related_entity_ids[i];
+    col.statement_entity_id =
+        indexed_token_range_data.statement_containing_token[i];
     col.token_category = indexed_token_range_data.token_categories[i];
 
     auto frag_id_index = indexed_token_range_data.fragment_id_index[i];

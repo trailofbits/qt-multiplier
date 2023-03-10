@@ -10,6 +10,8 @@
 
 #include "CallHierarchyChildGenerator.h"
 #include "CallHierarchyRootGenerator.h"
+#include "TaintedChildGenerator.h"
+#include "TaintedRootGenerator.h"
 
 namespace mx::gui {
 
@@ -23,6 +25,33 @@ bool INodeGenerator::CancelRequested(void) {
   return cancel_requested.loadAcquire() == 1;
 }
 
+gap::generator<IReferenceExplorerModel::Node>
+INodeGenerator::GenerateNodes(void) {
+  co_return;
+}
+
+void INodeGenerator::run(void) {
+  QVector<IReferenceExplorerModel::Node> nodes;
+  int emitted_rows = 0;
+
+  for (IReferenceExplorerModel::Node node : this->GenerateNodes()) {
+    nodes.emplaceBack(std::move(node));
+
+    if (auto num_nodes = static_cast<int>(nodes.size());
+        num_nodes >= 512) {
+
+      emit NodesAvailable(std::move(nodes), emitted_rows, parent_index);
+      emitted_rows += num_nodes;
+      nodes.clear();
+    }
+
+    if (CancelRequested()) {
+      break;
+    }
+  }
+
+  emit Finished(std::move(nodes), emitted_rows, parent_index);
+}
 
 //! Create a node generator for a root node.
 INodeGenerator *INodeGenerator::CreateRootGenerator(
@@ -37,6 +66,9 @@ INodeGenerator *INodeGenerator::CreateRootGenerator(
       return nullptr;
     case IReferenceExplorerModel::CallHierarchyMode:
       return new CallHierarchyRootGenerator(
+          index, file_cache, entity_id, parent);
+    case IReferenceExplorerModel::TaintMode:
+      return new TaintedRootGenerator(
           index, file_cache, entity_id, parent);
   }
 }
@@ -54,6 +86,9 @@ INodeGenerator *INodeGenerator::CreateChildGenerator(
       return nullptr;
     case IReferenceExplorerModel::CallHierarchyMode:
       return new CallHierarchyChildGenerator(
+          index, file_cache, entity_id, parent);
+    case IReferenceExplorerModel::TaintMode:
+      return new TaintedChildGenerator(
           index, file_cache, entity_id, parent);
   }
 }

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/Index.h>
+#include <multiplier/ui/IReferenceExplorerModel.h>
 
 #include <QWidget>
 #include <QMimeData>
@@ -19,9 +19,11 @@ class QuickReferenceExplorer final : public QWidget {
 
  public:
   //! Constructor
-  QuickReferenceExplorer(mx::Index index,
-                         mx::FileLocationCache file_location_cache,
-                         RawEntityId entity_id, QWidget *parent = nullptr);
+  QuickReferenceExplorer(const Index &index,
+                         const FileLocationCache &file_location_cache,
+                         RawEntityId entity_id,
+                         IReferenceExplorerModel::ExpansionMode mode,
+                         QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickReferenceExplorer() override;
@@ -66,9 +68,10 @@ class QuickReferenceExplorer final : public QWidget {
   std::unique_ptr<PrivateData> d;
 
   //! Initializes the internal widgets
-  void InitializeWidgets(mx::Index index,
-                         mx::FileLocationCache file_location_cache,
-                         RawEntityId entity_id);
+  void InitializeWidgets(const Index &index,
+                         const FileLocationCache &file_location_cache,
+                         RawEntityId entity_id,
+                         IReferenceExplorerModel::ExpansionMode mode);
 
   //! Used to emit the SaveAll signal
   void EmitSaveSignal(const bool &as_new_tab);
@@ -81,6 +84,10 @@ class QuickReferenceExplorer final : public QWidget {
 
   //! Used to stop window dragging
   void OnTitleFrameMouseRelease(QMouseEvent *event);
+
+  //! Generate a new window title.
+  static QString Title(QString entity_name,
+                       IReferenceExplorerModel::ExpansionMode mode);
 
  private slots:
   //! Restores the widget visibility when the application gains focus
