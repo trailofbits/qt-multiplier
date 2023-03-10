@@ -85,9 +85,15 @@ class QuickReferenceExplorer final : public QWidget {
   //! Used to stop window dragging
   void OnTitleFrameMouseRelease(QMouseEvent *event);
 
-  //! Generate a new window title.
-  static QString Title(QString entity_name,
-                       IReferenceExplorerModel::ExpansionMode mode);
+  //! Generate a new window name for the given entity name
+  static QString
+  GenerateWindowName(const QString &entity_name,
+                     const IReferenceExplorerModel::ExpansionMode &mode);
+
+  //! Generate a new window name for the given entity id
+  static QString
+  GenerateWindowName(const RawEntityId &entity_id,
+                     const IReferenceExplorerModel::ExpansionMode &mode);
 
  private slots:
   //! Restores the widget visibility when the application gains focus
@@ -100,8 +106,7 @@ class QuickReferenceExplorer final : public QWidget {
   void OnSaveAllToNewRefExplorerButtonPress();
 
   //! Called when the entity name resolution has finished
-  void
-  OnEntityNameResolutionFinished(const std::optional<QString> &opt_entity_name);
+  void EntityNameFutureStatusChanged();
 };
 
 }  // namespace mx::gui

@@ -7,6 +7,7 @@
 #include "Database.h"
 
 #include <requests/IndexedTokenRange.h>
+#include <requests/EntityNameRequest.h>
 
 #include <QThreadPool>
 #include <QtConcurrent>
@@ -51,8 +52,7 @@ Database::FutureResult Database::DownloadFile(RawEntityId file_id) {
                            d->file_location_cache, std::move(request));
 }
 
-Database::FutureResult
-Database::DownloadFragment(RawEntityId fragment_id) {
+Database::FutureResult Database::DownloadFragment(RawEntityId fragment_id) {
 
   Request request{SingleEntityRequest{
       DownloadRequestType::FragmentTokens,
@@ -61,6 +61,12 @@ Database::DownloadFragment(RawEntityId fragment_id) {
 
   return QtConcurrent::run(&d->thread_pool, ExecuteRequest, d->index,
                            d->file_location_cache, std::move(request));
+}
+
+QFuture<std::optional<QString>>
+Database::GetEntityName(const RawEntityId &fragment_id) {
+  return QtConcurrent::run(&d->thread_pool, CreateEntityNameRequest, d->index,
+                           fragment_id);
 }
 
 Database::Database(const Index &index,

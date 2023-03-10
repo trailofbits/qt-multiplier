@@ -8,7 +8,7 @@
 #include "PreviewableReferenceExplorer.h"
 
 #include <multiplier/ui/Util.h>
-#include <multiplier/ui/IEntityNameResolver.h>
+#include <multiplier/ui/IDatabase.h>
 
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -20,7 +20,6 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QPoint>
-#include <QThreadPool>
 
 #include <optional>
 
@@ -34,6 +33,10 @@ struct QuickReferenceExplorer::PrivateData final {
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
 
+  IDatabase::Ptr database;
+  QFuture<std::optional<QString>> entity_name_future;
+  QFutureWatcher<std::optional<QString>> future_watcher;
+
   inline PrivateData(IReferenceExplorerModel::ExpansionMode mode_)
       : mode(mode_) {}
 };
@@ -45,10 +48,20 @@ QuickReferenceExplorer::QuickReferenceExplorer(
     : QWidget(parent),
       d(new PrivateData(mode)) {
 
+  d->database = IDatabase::Create(index, file_location_cache);
+  connect(&d->future_watcher,
+          &QFutureWatcher<QFuture<std::optional<QString>>>::finished, this,
+          &QuickReferenceExplorer::EntityNameFutureStatusChanged);
+
   InitializeWidgets(index, file_location_cache, entity_id, mode);
 }
 
-QuickReferenceExplorer::~QuickReferenceExplorer() {}
+QuickReferenceExplorer::~QuickReferenceExplorer() {
+  if (d->entity_name_future.isRunning()) {
+    d->entity_name_future.cancel();
+    d->entity_name_future.waitForFinished();
+  }
+}
 
 void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
   if (event->key() == Qt::Key_Escape) {
@@ -110,17 +123,12 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   // Use a temporary window name at first. This won't be shown at all if the
   // name resolution is fast enough
-  d->window_title = new QLabel(Title(QString::number(entity_id), mode));
+  auto window_name = GenerateWindowName(entity_id, mode);
+  d->window_title = new QLabel(window_name);
 
   // Start a request to fetch the real entity name
-  IEntityNameResolver *entity_name_resolver =
-      IEntityNameResolver::Create(index, entity_id);
-  entity_name_resolver->setAutoDelete(true);
-
-  connect(entity_name_resolver, &IEntityNameResolver::Finished, this,
-          &QuickReferenceExplorer::OnEntityNameResolutionFinished);
-
-  QThreadPool::globalInstance()->start(entity_name_resolver);
+  d->entity_name_future = d->database->GetEntityName(entity_id);
+  d->future_watcher.setFuture(d->entity_name_future);
 
   // Save to active button
   auto save_to_active_ref_explorer_button = new QPushButton(
@@ -255,28 +263,46 @@ void QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress() {
   EmitSaveSignal(true);
 }
 
-void QuickReferenceExplorer::OnEntityNameResolutionFinished(
-    const std::optional<QString> &opt_entity_name) {
+void QuickReferenceExplorer::EntityNameFutureStatusChanged() {
+  if (d->entity_name_future.isCanceled()) {
+    return;
+  }
 
+  auto opt_entity_name = d->entity_name_future.takeResult();
   if (!opt_entity_name.has_value()) {
     return;
   }
 
-  d->window_title->setText(Title("`" + opt_entity_name.value() + "`", d->mode));
+  const auto &entity_name = opt_entity_name.value();
+
+  auto window_name = GenerateWindowName(entity_name, d->mode);
+  d->window_title->setText(window_name);
 }
 
-//! Generate a new window title.
-QString
-QuickReferenceExplorer::Title(QString entity_name,
-                              IReferenceExplorerModel::ExpansionMode mode) {
+QString QuickReferenceExplorer::GenerateWindowName(
+    const QString &entity_name,
+    const IReferenceExplorerModel::ExpansionMode &mode) {
+
+  auto quoted_entity_name = QString("`") + entity_name + "`";
+
   switch (mode) {
     case IReferenceExplorerModel::AlreadyExpanded:
-      return tr("References to ") + entity_name;
+      return tr("References to ") + quoted_entity_name;
+
     case IReferenceExplorerModel::CallHierarchyMode:
-      return tr("Call hierarchy of ") + entity_name;
+      return tr("Call hierarchy of ") + quoted_entity_name;
+
     case IReferenceExplorerModel::TaintMode:
-      return tr("Values tainted by ") + entity_name;
+      return tr("Values tainted by ") + quoted_entity_name;
   }
+}
+
+QString QuickReferenceExplorer::GenerateWindowName(
+    const RawEntityId &entity_id,
+    const IReferenceExplorerModel::ExpansionMode &mode) {
+
+  auto entity_name = tr("Entity ID #") + QString::number(entity_id);
+  return GenerateWindowName(entity_name, mode);
 }
 
 }  // namespace mx::gui

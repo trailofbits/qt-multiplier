@@ -15,6 +15,9 @@ add_library("mx_database"
 
   src/requests/IndexedTokenRange.h
   src/requests/IndexedTokenRange.cpp
+
+  src/requests/EntityNameRequest.h
+  src/requests/EntityNameRequest.cpp
 )
 
 target_link_libraries("mx_database"

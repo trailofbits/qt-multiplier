@@ -15,6 +15,7 @@
 
 #include <variant>
 #include <vector>
+#include <optional>
 
 namespace mx::gui {
 
@@ -91,6 +92,8 @@ class IDatabase {
 
   virtual FutureResult DownloadFile(RawEntityId file_id) = 0;
   virtual FutureResult DownloadFragment(RawEntityId fragment_id) = 0;
+  virtual QFuture<std::optional<QString>>
+  GetEntityName(const RawEntityId &fragment_id) = 0;
 
   IDatabase(const IDatabase &) = delete;
   IDatabase &operator=(const IDatabase &) = delete;
