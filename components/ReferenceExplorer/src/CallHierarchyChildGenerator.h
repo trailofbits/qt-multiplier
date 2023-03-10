@@ -26,7 +26,7 @@ class CallHierarchyChildGenerator final : public INodeGenerator {
                               RawEntityId entity_id_,
                               const QModelIndex &parent_);
 
-  gap::generator<IReferenceExplorerModel::Node> GenerateNodes(void) final;
+  gap::generator<Node> GenerateNodes(void) final;
 };
 
 }  // namespace mx::gui

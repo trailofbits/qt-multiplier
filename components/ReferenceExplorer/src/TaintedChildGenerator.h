@@ -29,8 +29,7 @@ class TaintedChildGenerator : public INodeGenerator {
                         const FileLocationCache &file_cache_,
                         RawEntityId entity_id_, const QModelIndex &parent_);
 
-  virtual gap::generator<IReferenceExplorerModel::Node>
-  GenerateNodes(void) override;
+  virtual gap::generator<Node> GenerateNodes(void) override;
 };
 
 }  // namespace mx::gui

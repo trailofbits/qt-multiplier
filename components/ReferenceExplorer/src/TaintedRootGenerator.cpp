@@ -13,20 +13,18 @@ namespace mx::gui {
 
 TaintedRootGenerator::~TaintedRootGenerator(void) {}
 
-
-gap::generator<IReferenceExplorerModel::Node>
-TaintedRootGenerator::GenerateNodes(void) {
+gap::generator<Node> TaintedRootGenerator::GenerateNodes(void) {
   VariantEntity entity = Entity();
   if (std::holds_alternative<NotAnEntity>(entity)) {
     co_return;
   }
 
-  auto root_node = IReferenceExplorerModel::Node::Create(
+  Node root_node = Node::Create(
       FileCache(), entity, entity, IReferenceExplorerModel::AlreadyExpanded);
   root_node.opt_name = TokensToString(entity);
 
-  QList<IReferenceExplorerModel::Node> child_nodes;
-  for (IReferenceExplorerModel::Node child_node :
+  QList<Node> child_nodes;
+  for (Node child_node :
        this->TaintedChildGenerator::GenerateNodes()) {
     if (CancelRequested()) {
       break;

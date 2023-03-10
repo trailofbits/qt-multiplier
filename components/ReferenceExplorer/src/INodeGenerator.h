@@ -18,10 +18,9 @@
 
 #include <gap/core/generator.hpp>
 
-namespace mx {
-class FileLocationCache;
-class Index;
-namespace gui {
+#include "Types.h"
+
+namespace mx::gui {
 
 class INodeGenerator : public QObject, public QRunnable {
   Q_OBJECT
@@ -58,15 +57,11 @@ class INodeGenerator : public QObject, public QRunnable {
 
   virtual void run(void) override;
 
-  virtual gap::generator<IReferenceExplorerModel::Node> GenerateNodes(void);
+  virtual gap::generator<Node> GenerateNodes(void);
 
  signals:
-  void NodesAvailable(QVector<IReferenceExplorerModel::Node> node, int row,
-                      const QModelIndex &parent);
-
-  void Finished(QVector<IReferenceExplorerModel::Node> node, int row,
-                const QModelIndex &parent);
+  void NodesAvailable(QVector<Node> node, int row, const QModelIndex &parent);
+  void Finished(QVector<Node> node, int row, const QModelIndex &parent);
 };
 
-}  // namespace gui
-}  // namespace mx
+}  // namespace mx::gui

@@ -24,16 +24,15 @@ bool INodeGenerator::CancelRequested(void) {
   return cancel_requested.loadAcquire() == 1;
 }
 
-gap::generator<IReferenceExplorerModel::Node>
-INodeGenerator::GenerateNodes(void) {
+gap::generator<Node> INodeGenerator::GenerateNodes(void) {
   co_return;
 }
 
 void INodeGenerator::run(void) {
-  QVector<IReferenceExplorerModel::Node> nodes;
+  QVector<Node> nodes;
   int emitted_rows = 0;
 
-  for (IReferenceExplorerModel::Node node : this->GenerateNodes()) {
+  for (Node node : this->GenerateNodes()) {
     nodes.emplaceBack(std::move(node));
 
     if (auto num_nodes = static_cast<int>(nodes.size()); num_nodes >= 512) {

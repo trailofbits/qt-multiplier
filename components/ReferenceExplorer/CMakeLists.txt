@@ -40,6 +40,9 @@ add_library("mx_referenceexplorer"
   src/Utils.h
   src/Utils.cpp
 
+  src/Types.h
+  src/Types.cpp
+
   src/FilterSettingsWidget.h
   src/FilterSettingsWidget.cpp
 

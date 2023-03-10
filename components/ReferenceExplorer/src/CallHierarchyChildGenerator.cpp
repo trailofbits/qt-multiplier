@@ -34,8 +34,7 @@ CallHierarchyChildGenerator::CallHierarchyChildGenerator(
     : INodeGenerator(parent_),
       d(new PrivateData(index_, file_cache_, entity_id_)) {}
 
-gap::generator<IReferenceExplorerModel::Node>
-CallHierarchyChildGenerator::GenerateNodes(void) {
+gap::generator<Node> CallHierarchyChildGenerator::GenerateNodes(void) {
   VariantEntity entity = d->index.entity(d->entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     co_return;
@@ -43,7 +42,7 @@ CallHierarchyChildGenerator::GenerateNodes(void) {
 
   for (const std::pair<VariantEntity, VariantEntity> &ref :
        References(entity)) {
-    co_yield IReferenceExplorerModel::Node::Create(
+    co_yield Node::Create(
         d->file_cache, ref.first, ref.second,
         IReferenceExplorerModel::CallHierarchyMode);
   }

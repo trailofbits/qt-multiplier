@@ -15,6 +15,8 @@
 
 #include <filesystem>
 
+#include "Types.h"
+
 namespace mx::gui {
 
 struct ReferenceExplorerItemDelegate::PrivateData final {};
@@ -61,8 +63,7 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   QString location;
   QVariant location_info_var = index.data(IReferenceExplorerModel::LocationRole);
   if (location_info_var.isValid()) {
-    auto location_info =
-        qvariant_cast<IReferenceExplorerModel::Location>(location_info_var);
+    auto location_info = qvariant_cast<Location>(location_info_var);
 
     auto filename =
         std::filesystem::path(location_info.path.toStdString()).filename();

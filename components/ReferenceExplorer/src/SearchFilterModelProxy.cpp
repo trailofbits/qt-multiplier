@@ -10,6 +10,8 @@
 
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
+#include "Types.h"
+
 namespace mx::gui {
 
 struct SearchFilterModelProxy::PrivateData final {
@@ -74,8 +76,7 @@ bool SearchFilterModelProxy::filterAcceptsRow(
   if (d->path_filter_type != FilterSettingsWidget::PathFilterType::None) {
     auto location_var = index.data(IReferenceExplorerModel::LocationRole);
     if (location_var.isValid()) {
-      const auto &location =
-          qvariant_cast<IReferenceExplorerModel::Location>(location_var);
+      const Location &location = qvariant_cast<Location>(location_var);
 
       QString path;
       if (d->path_filter_type ==
@@ -109,11 +110,8 @@ bool SearchFilterModelProxy::lessThan(const QModelIndex &left,
   std::optional<bool> opt_column_cmp_result;
 
   if (left_location_role_var.isValid() && right_location_role_var.isValid()) {
-    auto left_location_role = qvariant_cast<IReferenceExplorerModel::Location>(
-        left_location_role_var);
-
-    auto right_location_role = qvariant_cast<IReferenceExplorerModel::Location>(
-        right_location_role_var);
+    auto left_location_role = qvariant_cast<Location>(left_location_role_var);
+    auto right_location_role = qvariant_cast<Location>(right_location_role_var);
 
     if (left_location_role.path != right_location_role.path) {
       return left_location_role.path < right_location_role.path;

@@ -51,8 +51,7 @@ CallHierarchyRootGenerator::CallHierarchyRootGenerator(
 
 CallHierarchyRootGenerator::~CallHierarchyRootGenerator() {}
 
-gap::generator<IReferenceExplorerModel::Node>
-CallHierarchyRootGenerator::GenerateNodes(void) {
+gap::generator<Node> CallHierarchyRootGenerator::GenerateNodes(void) {
   VariantEntity entity = d->index.entity(d->entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     co_return;
@@ -60,7 +59,7 @@ CallHierarchyRootGenerator::GenerateNodes(void) {
 
   auto is_first = true;
   for (VariantEntity root_entity : TopLevelEntities(std::move(entity))) {
-    auto first_node = IReferenceExplorerModel::Node::Create(
+    Node first_node = Node::Create(
         d->file_cache, root_entity, root_entity,
         IReferenceExplorerModel::AlreadyExpanded);
 
@@ -69,13 +68,13 @@ CallHierarchyRootGenerator::GenerateNodes(void) {
     }
 
     if (is_first) {
-      QList<IReferenceExplorerModel::Node> child_nodes;
+      QList<Node> child_nodes;
       for (const auto &ref : References(root_entity)) {
         if (CancelRequested()) {
           break;
         }
 
-        auto child_node = IReferenceExplorerModel::Node::Create(
+        auto child_node = Node::Create(
             d->file_cache, ref.first, ref.second,
             IReferenceExplorerModel::CallHierarchyMode);
 

@@ -72,8 +72,7 @@ const FileLocationCache &TaintedChildGenerator::FileCache(void) const {
   return d->file_cache;
 }
 
-gap::generator<IReferenceExplorerModel::Node>
-TaintedChildGenerator::GenerateNodes(void) {
+gap::generator<Node> TaintedChildGenerator::GenerateNodes(void) {
   VariantEntity entity = Entity();
 
   if (std::holds_alternative<NotAnEntity>(entity)) {
@@ -83,23 +82,21 @@ TaintedChildGenerator::GenerateNodes(void) {
   TaintTracker tt(d->index);
 
   for (const TaintTrackingResult &res : Taint(tt, std::move(entity))) {
-    IReferenceExplorerModel::Node node;
+    Node node;
 
     if (std::holds_alternative<TaintTrackingSink>(res)) {
       const TaintTrackingSink &sink = std::get<TaintTrackingSink>(res);
       node.expansion_mode = IReferenceExplorerModel::AlreadyExpanded;
       node.opt_name = QString::fromStdString(sink.message());
       node.referenced_entity_id = d->entity_id;
-      node.opt_location = IReferenceExplorerModel::Location::Create(
-          d->file_cache, sink.as_variant());
+      node.opt_location = Location::Create(d->file_cache, sink.as_variant());
 
     } else if (std::holds_alternative<TaintTrackingStep>(res)) {
       const TaintTrackingStep &step = std::get<TaintTrackingStep>(res);
       node.expansion_mode = IReferenceExplorerModel::TaintMode;
       node.referenced_entity_id = step.id().Pack();
       node.entity_id = node.referenced_entity_id;
-      node.opt_location = IReferenceExplorerModel::Location::Create(
-          d->file_cache, step.as_variant());
+      node.opt_location = Location::Create(d->file_cache, step.as_variant());
 
       if (QString tokens = TokensToString(step.as_variant());
           !tokens.isEmpty()) {

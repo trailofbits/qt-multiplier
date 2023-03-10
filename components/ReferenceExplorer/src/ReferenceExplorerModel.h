@@ -10,6 +10,8 @@
 
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
+#include "Types.h"
+
 namespace mx::gui {
 
 //! Implements the IReferenceExplorerModel interface
