@@ -108,6 +108,106 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
   QThreadPool::globalInstance()->start(generator);
 }
 
+void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
+  if (!index.isValid()) {
+    return;
+  }
+
+  std::uint64_t node_id = static_cast<std::uint64_t>(index.internalId());
+  auto &node_map = d->node_tree.node_map;
+  auto node_it = node_map.find(node_id);
+  if (node_it == node_map.end()) {
+    return;
+  }
+
+  Assert(node_id == node_it->second.node_id, "Out-of-sync node ids.");
+
+  std::uint64_t parent_node_id = node_it->second.parent_node_id;
+
+  auto parent_it = node_map.find(parent_node_id);
+  bool full_reset = false;
+
+  // Check if we're removing the alternate root.
+  if (node_id == d->node_tree.curr_root_node_id) {
+    Assert(d->node_tree.curr_root_node_id != d->node_tree.root_node_id,
+           "Can't remove the true root node.");
+    d->node_tree.curr_root_node_id = d->node_tree.root_node_id;
+    full_reset = true;
+  }
+
+  QModelIndex parent_index = QModelIndex();
+  int parent_offset = 0;
+  if (parent_it == node_map.end()) {
+    Assert(false, "Missing parent node, or removing true root node");
+    full_reset = true;
+
+  // We're removing something inside of our parent.
+  } else {
+    Assert(parent_node_id == parent_it->second.node_id,
+           "Out-of-sync node ids");
+
+    auto found = false;
+    for (auto sibling_id : parent_it->second.child_node_id_list) {
+      if (sibling_id == node_id) {
+        found = true;
+        break;
+      }
+      ++parent_offset;
+    }
+    if (!found) {
+      Assert(false, "Didn't find node to be deleted in parent's child list.");
+      full_reset = true;
+    }
+
+    if (parent_node_id != d->node_tree.curr_root_node_id) {
+      parent_index = createIndex(parent_offset, 0, parent_node_id);
+    }
+  }
+
+  if (full_reset) {
+    emit beginResetModel();
+
+  } else {
+    emit beginRemoveRows(parent_index, parent_offset, parent_offset);
+  }
+
+  std::vector<std::uint64_t> wl;
+  wl.push_back(node_id);
+
+  // Recursively delete the child nodes.
+  while (!wl.empty()) {
+    std::uint64_t next_node_id = wl.back();
+    Assert(next_node_id != parent_node_id, "Tree is actually a graph.");
+    wl.pop_back();
+
+    node_it = node_map.find(next_node_id);
+    if (node_it == node_map.end()) {
+      continue;
+    }
+
+    for (std::uint64_t child_node_id : node_it->second.child_node_id_list) {
+      wl.push_back(child_node_id);
+    }
+
+    node_map.erase(node_it);
+  }
+
+  // Remove the node in its parent's list of child ids.
+  if (parent_it != node_map.end()) {
+    auto it = std::remove(parent_it->second.child_node_id_list.begin(),
+                          parent_it->second.child_node_id_list.end(),
+                          node_id);
+    parent_it->second.child_node_id_list.erase(
+        it, parent_it->second.child_node_id_list.end());
+  }
+
+  if (full_reset) {
+    emit endResetModel();
+  } else {
+    emit endRemoveRows();
+  }
+}
+
 bool ReferenceExplorerModel::HasAlternativeRoot() const {
   return d->node_tree.root_node_id != d->node_tree.curr_root_node_id;
 }

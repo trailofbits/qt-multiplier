@@ -164,6 +164,9 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   //! Expands the specified entity
   virtual void ExpandEntity(const QModelIndex &index) = 0;
 
+  //! Removes the specified entity and all of its children.
+  virtual void RemoveEntity(const QModelIndex &index) = 0;
+
   //! Returns true if an alternative root is being used
   virtual bool HasAlternativeRoot() const = 0;
 

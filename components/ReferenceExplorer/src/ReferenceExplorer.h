@@ -17,6 +17,8 @@ namespace mx::gui {
 class ReferenceExplorerTreeView final : public QTreeView {
  public:
   using QTreeView::rowsInserted;
+  using QTreeView::rowsAboutToBeRemoved;
+  using QTreeView::rowsRemoved;
 };
 
 //! The implementation for the IReferenceExplorer interface
@@ -46,6 +48,9 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Called when copying the details of a reference explorer item
   void CopyRefExplorerItemDetails(const QModelIndex &index);
 
+  //! Called when attempt to delete a reference explorer item
+  void RemoveRefExplorerItem(const QModelIndex &index);
+
   //! Called when attempt to expand a reference explorer item
   void ExpandRefExplorerItem(const QModelIndex &index);
 
@@ -61,6 +66,12 @@ class ReferenceExplorer final : public IReferenceExplorer {
 
   //! Like OnModelReset, but for row insertion
   void OnRowsAdded(const QModelIndex &parent, int first, int last);
+
+  //! Like OnModelReset, but for row deletion
+  void OnRowsRemoved(const QModelIndex &parent, int first, int last);
+
+  //! Like OnModelReset, but for row deletion
+  void OnRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last);
 
   //! Called when the user clicks an item
   void OnItemClick(const QModelIndex &index);
@@ -81,8 +92,11 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Called when the user disables the custom root item from the warning widget
   void OnDisableCustomRootLinkClicked();
 
-  //! Called when the "activate" item button has been pressed
+  //! Called when the "open" item button has been pressed
   void OnActivateTreeViewItem();
+
+  //! Called when the "close" item button has been pressed
+  void OnCloseTreeViewItem();
 
   //! Called when the "expand" item button has been pressed
   void OnExpandTreeViewItem();

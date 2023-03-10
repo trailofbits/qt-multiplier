@@ -21,6 +21,9 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   //! \copybrief IReferenceExplorerModel::ExpandEntity
   virtual void ExpandEntity(const QModelIndex &index) override;
 
+  //! \copybrief IReferenceExplorerModel::RemoveEntity
+  virtual void RemoveEntity(const QModelIndex &index) override;
+
   //! \copybrief IReferenceExplorerModel::HasAlternativeRoot
   virtual bool HasAlternativeRoot() const override;
 
