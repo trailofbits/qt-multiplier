@@ -15,7 +15,7 @@
 #include <QRunnable>
 #include <QVector>
 
-#include "IReferenceExplorerModel.h"
+#include <multiplier/ui/IReferenceExplorerModel.h>
 
 namespace mx {
 class FileLocationCache;

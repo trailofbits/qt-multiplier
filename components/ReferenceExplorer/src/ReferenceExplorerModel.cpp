@@ -7,12 +7,12 @@
 */
 
 #include "ReferenceExplorerModel.h"
+#include "INodeGenerator.h"
 
 #include <filesystem>
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
 #include <multiplier/ui/Assert.h>
-#include <multiplier/ui/INodeGenerator.h>
 #include <multiplier/ui/Util.h>
 #include <QByteArray>
 #include <QIODevice>
@@ -29,8 +29,8 @@ struct ReferenceExplorerModel::PrivateData final {
         file_location_cache(file_location_cache_) {
 
     for (auto [path, id] : index.file_paths()) {
-      file_path_map.emplace(
-          id.Pack(), QString::fromStdString(path.generic_string()));
+      file_path_map.emplace(id.Pack(),
+                            QString::fromStdString(path.generic_string()));
     }
   }
 
@@ -47,13 +47,12 @@ struct ReferenceExplorerModel::PrivateData final {
 };
 
 //! Adds a new entity object under the given parent
-void ReferenceExplorerModel::AppendEntityById(
-    RawEntityId entity_id, ExpansionMode expansion_mode,
-    const QModelIndex &parent) {
+void ReferenceExplorerModel::AppendEntityById(RawEntityId entity_id,
+                                              ExpansionMode expansion_mode,
+                                              const QModelIndex &parent) {
 
   INodeGenerator *generator = INodeGenerator::CreateRootGenerator(
-      d->index, d->file_location_cache, entity_id, parent,
-      expansion_mode);
+      d->index, d->file_location_cache, entity_id, parent, expansion_mode);
 
   if (!generator) {
     return;
@@ -61,11 +60,11 @@ void ReferenceExplorerModel::AppendEntityById(
 
   generator->setAutoDelete(true);
 
-  connect(generator, &INodeGenerator::NodesAvailable,
-          this, &ReferenceExplorerModel::InsertNodes);
+  connect(generator, &INodeGenerator::NodesAvailable, this,
+          &ReferenceExplorerModel::InsertNodes);
 
-  connect(generator, &INodeGenerator::Finished,
-          this, &ReferenceExplorerModel::InsertNodes);
+  connect(generator, &INodeGenerator::Finished, this,
+          &ReferenceExplorerModel::InsertNodes);
 
   QThreadPool::globalInstance()->start(generator);
 }
@@ -99,11 +98,11 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
 
   generator->setAutoDelete(true);
 
-  connect(generator, &INodeGenerator::NodesAvailable,
-          this, &ReferenceExplorerModel::InsertNodes);
+  connect(generator, &INodeGenerator::NodesAvailable, this,
+          &ReferenceExplorerModel::InsertNodes);
 
-  connect(generator, &INodeGenerator::Finished,
-          this, &ReferenceExplorerModel::InsertNodes);
+  connect(generator, &INodeGenerator::Finished, this,
+          &ReferenceExplorerModel::InsertNodes);
 
   QThreadPool::globalInstance()->start(generator);
 }
@@ -141,10 +140,9 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
     Assert(false, "Missing parent node, or removing true root node");
     full_reset = true;
 
-  // We're removing something inside of our parent.
+    // We're removing something inside of our parent.
   } else {
-    Assert(parent_node_id == parent_it->second.node_id,
-           "Out-of-sync node ids");
+    Assert(parent_node_id == parent_it->second.node_id, "Out-of-sync node ids");
 
     auto found = false;
     for (auto sibling_id : parent_it->second.child_node_id_list) {
@@ -195,8 +193,7 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
   // Remove the node in its parent's list of child ids.
   if (parent_it != node_map.end()) {
     auto it = std::remove(parent_it->second.child_node_id_list.begin(),
-                          parent_it->second.child_node_id_list.end(),
-                          node_id);
+                          parent_it->second.child_node_id_list.end(), node_id);
     parent_it->second.child_node_id_list.erase(
         it, parent_it->second.child_node_id_list.end());
   }
@@ -443,7 +440,7 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
   std::vector<std::uint64_t> node_id_stack;
 
   // Append the internal node ID associated with `index` to `node_id_stack`.
-  auto append_to_node_id_stack = [&] (const QModelIndex &index) {
+  auto append_to_node_id_stack = [&](const QModelIndex &index) {
     if (!index.isValid()) {
       return false;
     }
@@ -493,8 +490,7 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
     const Node &node = node_it->second;
     encoded_data_stream << node;
 
-    node_id_stack.insert(node_id_stack.end(),
-                         node.child_node_id_list.rbegin(),
+    node_id_stack.insert(node_id_stack.end(), node.child_node_id_list.rbegin(),
                          node.child_node_id_list.rend());
   }
 
@@ -589,15 +585,13 @@ void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
 
   parent_node.child_node_id_list.insert(
       parent_node.child_node_id_list.begin() + static_cast<unsigned>(begin_row),
-      root_nodes_dropped.begin(),
-      root_nodes_dropped.end());
+      root_nodes_dropped.begin(), root_nodes_dropped.end());
 
   emit endInsertRows();
 }
 
 bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
-                                          Qt::DropAction action,
-                                          int row, int,
+                                          Qt::DropAction action, int row, int,
                                           const QModelIndex &drop_target) {
   if (action == Qt::IgnoreAction) {
     return true;

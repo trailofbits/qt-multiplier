@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/ui/INodeGenerator.h>
+#include "INodeGenerator.h"
 
 namespace mx::gui {
 

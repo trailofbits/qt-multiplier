@@ -6,8 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/INodeGenerator.h>
-
+#include "INodeGenerator.h"
 #include "CallHierarchyChildGenerator.h"
 #include "CallHierarchyRootGenerator.h"
 #include "TaintedChildGenerator.h"

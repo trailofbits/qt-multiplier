@@ -6,9 +6,11 @@
 
 #pragma once
 
+#include "INodeGenerator.h"
+
 #include <memory>
+
 #include <multiplier/Entity.h>
-#include <multiplier/ui/INodeGenerator.h>
 
 namespace mx {
 class Index;
