@@ -57,10 +57,7 @@ QuickReferenceExplorer::QuickReferenceExplorer(
 }
 
 QuickReferenceExplorer::~QuickReferenceExplorer() {
-  if (d->entity_name_future.isRunning()) {
-    d->entity_name_future.cancel();
-    d->entity_name_future.waitForFinished();
-  }
+  CancelRunningRequest();
 }
 
 void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
@@ -277,6 +274,17 @@ void QuickReferenceExplorer::EntityNameFutureStatusChanged() {
 
   auto window_name = GenerateWindowName(entity_name, d->mode);
   d->window_title->setText(window_name);
+}
+
+void QuickReferenceExplorer::CancelRunningRequest() {
+  if (!d->entity_name_future.isRunning()) {
+    return;
+  }
+
+  d->entity_name_future.cancel();
+  d->entity_name_future.waitForFinished();
+
+  d->entity_name_future = {};
 }
 
 QString QuickReferenceExplorer::GenerateWindowName(

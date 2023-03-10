@@ -85,6 +85,9 @@ class QuickReferenceExplorer final : public QWidget {
   //! Used to stop window dragging
   void OnTitleFrameMouseRelease(QMouseEvent *event);
 
+  //! Aborts the running request
+  void CancelRunningRequest();
+
   //! Generate a new window name for the given entity name
   static QString
   GenerateWindowName(const QString &entity_name,
