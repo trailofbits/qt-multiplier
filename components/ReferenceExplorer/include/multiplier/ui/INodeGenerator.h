@@ -44,20 +44,16 @@ class INodeGenerator : public QObject, public QRunnable {
   bool CancelRequested(void);
 
   //! Create a node generator for a root node.
-  static INodeGenerator *CreateRootGenerator(
-      const Index &index,
-      const FileLocationCache &file_cache_,
-      RawEntityId entity_id,
-      const QModelIndex &parent,
-      IReferenceExplorerModel::ExpansionMode expansion_mode);
+  static INodeGenerator *
+  CreateRootGenerator(const Index &index, const FileLocationCache &file_cache_,
+                      RawEntityId entity_id, const QModelIndex &parent,
+                      IReferenceExplorerModel::ExpansionMode expansion_mode);
 
   //! Create a node generator for a child node.
-  static INodeGenerator *CreateChildGenerator(
-      const Index &index,
-      const FileLocationCache &file_cache_,
-      RawEntityId entity_id,
-      const QModelIndex &parent,
-      IReferenceExplorerModel::ExpansionMode expansion_mode);
+  static INodeGenerator *
+  CreateChildGenerator(const Index &index, const FileLocationCache &file_cache_,
+                       RawEntityId entity_id, const QModelIndex &parent,
+                       IReferenceExplorerModel::ExpansionMode expansion_mode);
 
   virtual void run(void) override;
 

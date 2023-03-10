@@ -87,10 +87,8 @@ IReferenceExplorerModel::Location::Create(const FileLocationCache &file_cache,
   return location;
 }
 
-IReferenceExplorerModel::Node
-IReferenceExplorerModel::Node::Create(
-    const FileLocationCache &file_cache,
-    const VariantEntity &entity,
+IReferenceExplorerModel::Node IReferenceExplorerModel::Node::Create(
+    const FileLocationCache &file_cache, const VariantEntity &entity,
     const VariantEntity &referenced_entity,
     IReferenceExplorerModel::ExpansionMode import_mode) {
 
@@ -129,7 +127,8 @@ IReferenceExplorerModel::NodeTree::CurrentRootNode(void) {
     return &(it->second);
   } else {
     return nullptr;
-  }}
+  }
+}
 
 const IReferenceExplorerModel::Node *
 IReferenceExplorerModel::NodeTree::CurrentRootNode(void) const {
@@ -140,8 +139,8 @@ IReferenceExplorerModel::NodeTree::CurrentRootNode(void) const {
   }
 }
 
-QDataStream &operator<<(
-    QDataStream &stream, const IReferenceExplorerModel::Node &node) {
+QDataStream &operator<<(QDataStream &stream,
+                        const IReferenceExplorerModel::Node &node) {
   stream << node.node_id;
   stream << node.parent_node_id;
   stream << node.expansion_mode;

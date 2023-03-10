@@ -195,8 +195,7 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
 }
 
 void MainWindow::OpenReferenceExplorer(
-    RawEntityId entity_id,
-    IReferenceExplorerModel::ExpansionMode mode) {
+    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode) {
   CloseTokenReferenceExplorer();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
@@ -413,14 +412,12 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 
     // Like in IDA Pro, pressing X while the cursor is on an entity shows us
     // its cross-references.
-    if (keyboard_button.key == Qt::Key_X &&
-        !keyboard_button.shift_modifier &&
+    if (keyboard_button.key == Qt::Key_X && !keyboard_button.shift_modifier &&
         !keyboard_button.control_modifier) {
       OpenTokenReferenceExplorer(index);
     }
 
-    if (keyboard_button.key == Qt::Key_T &&
-        !keyboard_button.shift_modifier &&
+    if (keyboard_button.key == Qt::Key_T && !keyboard_button.shift_modifier &&
         !keyboard_button.control_modifier) {
       OpenTokenTaintExplorer(index);
     }
@@ -428,8 +425,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
     // Like in IDA Pro, pressing Enter while the cursor is on a use of that
     // entity will bring us to that entity.
     if (keyboard_button.key == Qt::Key_Enter &&
-        !keyboard_button.shift_modifier &&
-        !keyboard_button.control_modifier) {
+        !keyboard_button.shift_modifier && !keyboard_button.control_modifier) {
       OpenEntityRelatedToToken(index);
     }
   }

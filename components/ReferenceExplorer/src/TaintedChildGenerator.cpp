@@ -20,8 +20,8 @@ namespace {
 
 // Compressed version of the taint tracker that tries to eliminate implicit
 // things.
-static gap::generator<TaintTrackingResult> Taint(
-    TaintTracker &tt, VariantEntity entity) {
+static gap::generator<TaintTrackingResult> Taint(TaintTracker &tt,
+                                                 VariantEntity entity) {
   for (TaintTrackingResult res : tt.add_source(entity)) {
     if (std::holds_alternative<TaintTrackingStep>(res)) {
       if (auto stmt = std::get<TaintTrackingStep>(res).as_statement()) {
@@ -32,9 +32,7 @@ static gap::generator<TaintTrackingResult> Taint(
               co_yield sub_res;
             }
             break;
-          default:
-            co_yield res;
-            break;
+          default: co_yield res; break;
         }
       } else {
         co_yield res;
@@ -52,13 +50,11 @@ struct TaintedChildGenerator::PrivateData {
   FileLocationCache file_cache;
   const RawEntityId entity_id;
 
-  inline PrivateData(
-      const Index &index_,
-      const FileLocationCache &file_cache_,
-      RawEntityId entity_id_)
+  inline PrivateData(const Index &index_, const FileLocationCache &file_cache_,
+                     RawEntityId entity_id_)
       : index(index_),
         file_cache(file_cache_),
-        entity_id(entity_id_){}
+        entity_id(entity_id_) {}
 };
 
 TaintedChildGenerator::~TaintedChildGenerator(void) {}

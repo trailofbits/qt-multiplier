@@ -82,8 +82,7 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   d->future_result = {};
 
   // Try to skip resetting this model if we don't need to.
-  if (d->entity_id.has_value() &&
-      d->entity_id.value() == raw_id &&
+  if (d->entity_id.has_value() && d->entity_id.value() == raw_id &&
       d->model_state == ModelState::Ready) {
     emit ModelResetSkipped();
     return;
@@ -102,8 +101,8 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
     d->future_result = d->database->DownloadFile(raw_id);
 
   } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
-    d->future_result = d->database->DownloadFragment(
-        EntityId(frag_id.value()).Pack());
+    d->future_result =
+        d->database->DownloadFragment(EntityId(frag_id.value()).Pack());
 
   } else {
     emit EndResetModel(ModelState::UpdateFailed);
@@ -145,8 +144,7 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
       return QVariant();
     }
 
-    if (role == LineNumberRole ||
-        role == TokenRawEntityIdRole ||
+    if (role == LineNumberRole || role == TokenRawEntityIdRole ||
         role == TokenRelatedEntityIdRole ||
         role == EntityIdOfStmtContainingTokenRole) {
       return 1;

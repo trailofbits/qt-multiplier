@@ -37,8 +37,7 @@ void INodeGenerator::run(void) {
   for (IReferenceExplorerModel::Node node : this->GenerateNodes()) {
     nodes.emplaceBack(std::move(node));
 
-    if (auto num_nodes = static_cast<int>(nodes.size());
-        num_nodes >= 512) {
+    if (auto num_nodes = static_cast<int>(nodes.size()); num_nodes >= 512) {
 
       emit NodesAvailable(std::move(nodes), emitted_rows, parent_index);
       emitted_rows += num_nodes;
@@ -55,41 +54,33 @@ void INodeGenerator::run(void) {
 
 //! Create a node generator for a root node.
 INodeGenerator *INodeGenerator::CreateRootGenerator(
-    const Index &index,
-    const FileLocationCache &file_cache,
-    RawEntityId entity_id,
-    const QModelIndex &parent,
+    const Index &index, const FileLocationCache &file_cache,
+    RawEntityId entity_id, const QModelIndex &parent,
     IReferenceExplorerModel::ExpansionMode expansion_mode) {
 
   switch (expansion_mode) {
-    case IReferenceExplorerModel::AlreadyExpanded:
-      return nullptr;
+    case IReferenceExplorerModel::AlreadyExpanded: return nullptr;
     case IReferenceExplorerModel::CallHierarchyMode:
-      return new CallHierarchyRootGenerator(
-          index, file_cache, entity_id, parent);
+      return new CallHierarchyRootGenerator(index, file_cache, entity_id,
+                                            parent);
     case IReferenceExplorerModel::TaintMode:
-      return new TaintedRootGenerator(
-          index, file_cache, entity_id, parent);
+      return new TaintedRootGenerator(index, file_cache, entity_id, parent);
   }
 }
 
 //! Create a node generator for a child node.
 INodeGenerator *INodeGenerator::CreateChildGenerator(
-    const Index &index,
-    const FileLocationCache &file_cache,
-    RawEntityId entity_id,
-    const QModelIndex &parent,
+    const Index &index, const FileLocationCache &file_cache,
+    RawEntityId entity_id, const QModelIndex &parent,
     IReferenceExplorerModel::ExpansionMode expansion_mode) {
 
   switch (expansion_mode) {
-    case IReferenceExplorerModel::AlreadyExpanded:
-      return nullptr;
+    case IReferenceExplorerModel::AlreadyExpanded: return nullptr;
     case IReferenceExplorerModel::CallHierarchyMode:
-      return new CallHierarchyChildGenerator(
-          index, file_cache, entity_id, parent);
+      return new CallHierarchyChildGenerator(index, file_cache, entity_id,
+                                             parent);
     case IReferenceExplorerModel::TaintMode:
-      return new TaintedChildGenerator(
-          index, file_cache, entity_id, parent);
+      return new TaintedChildGenerator(index, file_cache, entity_id, parent);
   }
 }
 

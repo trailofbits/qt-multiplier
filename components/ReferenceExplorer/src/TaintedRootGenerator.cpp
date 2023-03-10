@@ -28,7 +28,7 @@ TaintedRootGenerator::GenerateNodes(void) {
 
   QList<IReferenceExplorerModel::Node> child_nodes;
   for (IReferenceExplorerModel::Node child_node :
-           this->TaintedChildGenerator::GenerateNodes()) {
+       this->TaintedChildGenerator::GenerateNodes()) {
     if (CancelRequested()) {
       break;
     }

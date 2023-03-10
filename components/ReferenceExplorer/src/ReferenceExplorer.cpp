@@ -92,8 +92,8 @@ void ReferenceExplorer::InitializeWidgets() {
   //            sort order into the model by re-ordering node children, then
   //            set the sort to a NOP sort based on this model data, that way
   //            when we drop things, they will land where they were dropped.
-//  setSortingEnabled(true);
-//  sortByColumn(0, Qt::AscendingOrder);
+  //  setSortingEnabled(true);
+  //  sortByColumn(0, Qt::AscendingOrder);
 
   d->tree_view->setAlternatingRowColors(true);
   d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);
@@ -216,17 +216,17 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
 
   d->tree_view->setModel(d->model_proxy);
 
-  connect(d->model_proxy, &QAbstractItemModel::modelReset,
-          this, &ReferenceExplorer::OnModelReset);
+  connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
+          &ReferenceExplorer::OnModelReset);
 
-  connect(d->model_proxy, &QAbstractItemModel::rowsInserted,
-          this, &ReferenceExplorer::OnRowsAdded);
+  connect(d->model_proxy, &QAbstractItemModel::rowsInserted, this,
+          &ReferenceExplorer::OnRowsAdded);
 
-  connect(d->model_proxy, &QAbstractItemModel::rowsAboutToBeRemoved,
-          this, &ReferenceExplorer::OnRowsAboutToBeRemoved);
+  connect(d->model_proxy, &QAbstractItemModel::rowsAboutToBeRemoved, this,
+          &ReferenceExplorer::OnRowsAboutToBeRemoved);
 
-  connect(d->model_proxy, &QAbstractItemModel::rowsRemoved,
-          this, &ReferenceExplorer::OnRowsRemoved);
+  connect(d->model_proxy, &QAbstractItemModel::rowsRemoved, this,
+          &ReferenceExplorer::OnRowsRemoved);
 
   OnModelReset();
 }
@@ -309,7 +309,7 @@ void ReferenceExplorer::UpdateTreeViewItemButtons() {
   auto mode = index.data(IReferenceExplorerModel::DefaultExpansionMode);
   if (mode.isValid() &&
       (qvariant_cast<IReferenceExplorerModel::ExpansionMode>(mode) !=
-           IReferenceExplorerModel::AlreadyExpanded)) {
+       IReferenceExplorerModel::AlreadyExpanded)) {
     d->treeview_item_buttons.buttons.expand->setVisible(true);
     button_list.push_back(d->treeview_item_buttons.buttons.expand);
   } else {
@@ -325,10 +325,10 @@ void ReferenceExplorer::UpdateTreeViewItemButtons() {
 
   // TODO(pag): Try to place the buttons to the left of any vertical scroll bar
   //            if a horizontal scrollbar is present.
-//  auto max_width = d->tree_view->viewport()->width();
-//  if (max_width >= rect.width()) {
-//    rect.setWidth(max_width - d->tree_view->verticalScrollBar()->width());
-//  }
+  //  auto max_width = d->tree_view->viewport()->width();
+  //  if (max_width >= rect.width()) {
+  //    rect.setWidth(max_width - d->tree_view->verticalScrollBar()->width());
+  //  }
 
   auto button_margin = rect.height() / 6;
   auto button_size = rect.height() - (button_margin * 2);
@@ -356,24 +356,24 @@ void ReferenceExplorer::OnModelReset() {
 }
 
 //! Like OnModelReset, but for row insertion
-void ReferenceExplorer::OnRowsAdded(
-    const QModelIndex &parent, int first, int last) {
+void ReferenceExplorer::OnRowsAdded(const QModelIndex &parent, int first,
+                                    int last) {
   d->tree_view->rowsInserted(parent, first, last);
   d->tree_view->expandRecursively(parent, 1);
   d->tree_view->resizeColumnToContents(0);
 }
 
 //! Like OnModelReset, but for row deletion
-void ReferenceExplorer::OnRowsRemoved(
-    const QModelIndex &parent, int first, int last) {
+void ReferenceExplorer::OnRowsRemoved(const QModelIndex &parent, int first,
+                                      int last) {
   d->tree_view->rowsRemoved(parent, first, last);
   d->tree_view->expandRecursively(parent, 1);
   d->tree_view->resizeColumnToContents(0);
 }
 
 //! Like OnModelReset, but for row deletion
-void ReferenceExplorer::OnRowsAboutToBeRemoved(
-    const QModelIndex &parent, int first, int last) {
+void ReferenceExplorer::OnRowsAboutToBeRemoved(const QModelIndex &parent,
+                                               int first, int last) {
   d->tree_view->rowsAboutToBeRemoved(parent, first, last);
 }
 

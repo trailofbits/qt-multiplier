@@ -26,7 +26,6 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
-
   //! Expansion modes.
   enum ExpansionMode {
     //! A node whose current expansion mode has already been activated. This
@@ -193,12 +192,11 @@ class IReferenceExplorerModel : public QAbstractItemModel {
  public slots:
 
   //! Adds a new entity object under the given parent
-  virtual void AppendEntityById(
-      RawEntityId entity_id, ExpansionMode import_mode,
-      const QModelIndex &parent) = 0;
+  virtual void AppendEntityById(RawEntityId entity_id,
+                                ExpansionMode import_mode,
+                                const QModelIndex &parent) = 0;
 
  private:
-
   //! Disabled copy constructor
   IReferenceExplorerModel(const IReferenceExplorerModel &) = delete;
 

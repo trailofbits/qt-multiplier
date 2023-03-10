@@ -17,8 +17,7 @@ namespace {
 // If it's a declaration, then we want to have multiple roots where each
 // root is a redeclaration of the entity. The first redeclaration is the
 // definition if one is available.
-static gap::generator<VariantEntity> TopLevelEntities(
-    VariantEntity entity) {
+static gap::generator<VariantEntity> TopLevelEntities(VariantEntity entity) {
   if (std::holds_alternative<Decl>(entity)) {
     for (Decl decl : std::get<Decl>(entity).redeclarations()) {
       co_yield VariantEntity(std::move(decl));

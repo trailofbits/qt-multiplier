@@ -36,13 +36,12 @@ struct TokenRangeData final {
 
 static void PrefetchMacrosFromMacro(
     const IndexedTokenRangeDataResultPromise &result_promise,
-    std::vector<Token> &output, const Macro &macro,
-    RawEntityId &first_fid);
+    std::vector<Token> &output, const Macro &macro, RawEntityId &first_fid);
 
-static void PrefetchMacrosFromNode(
-    const IndexedTokenRangeDataResultPromise &result_promise,
-    std::vector<Token> &output, MacroOrToken macro_or_tok,
-    RawEntityId &first_fid) {
+static void
+PrefetchMacrosFromNode(const IndexedTokenRangeDataResultPromise &result_promise,
+                       std::vector<Token> &output, MacroOrToken macro_or_tok,
+                       RawEntityId &first_fid) {
 
   if (std::holds_alternative<Macro>(macro_or_tok)) {
     Macro macro = std::move(std::get<Macro>(macro_or_tok));
@@ -51,8 +50,9 @@ static void PrefetchMacrosFromNode(
   } else if (std::holds_alternative<Token>(macro_or_tok)) {
     Token macro_tok = std::move(std::get<Token>(macro_or_tok));
     Token ftok = macro_tok.file_token();
-    Assert(ftok, "Parsed tokens in the usage of a macro should "
-                 "have associated file tokens");
+    Assert(ftok,
+           "Parsed tokens in the usage of a macro should "
+           "have associated file tokens");
 
     // We've found the "left corner" of the macro expansion. This is the first
     // token of the top-level macro usage.
@@ -131,7 +131,7 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
       output.fragment_tokens.emplace(first_fid, std::move(frag_tokens));
     }
 
-  // Download all tokens from a fragment.
+    // Download all tokens from a fragment.
   } else if (request_type == DownloadRequestType::FragmentTokens) {
     std::optional<Fragment> fragment = index.fragment(entity_id);
     if (!fragment) {
@@ -164,13 +164,14 @@ DownloadEntityTokens(const IndexedTokenRangeDataResultPromise &result_promise,
   return output;
 }
 
-using IndexedTokenRangeDataOrError = std::variant<IndexedTokenRangeData, RPCErrorCode>;
+using IndexedTokenRangeDataOrError =
+    std::variant<IndexedTokenRangeData, RPCErrorCode>;
 
-static void RenderToken(
-    std::string_view utf8_tok, TokenCategory category, RawEntityId fid,
-    RawEntityId related_entity_id, RawEntityId statement_containing_token,
-    unsigned &line_number, unsigned fragment_index,
-    IndexedTokenRangeData &output) {
+static void RenderToken(std::string_view utf8_tok, TokenCategory category,
+                        RawEntityId fid, RawEntityId related_entity_id,
+                        RawEntityId statement_containing_token,
+                        unsigned &line_number, unsigned fragment_index,
+                        IndexedTokenRangeData &output) {
 
   unsigned num_utf8_bytes = static_cast<unsigned>(utf8_tok.size());
   unsigned tok_start = static_cast<unsigned>(output.data.size());
@@ -205,8 +206,7 @@ static void RenderToken(
         is_empty = true;
         break;
 
-      case QChar::CarriageReturn:
-        continue;
+      case QChar::CarriageReturn: continue;
 
       // TODO(pag): Consult with QFontMetrics or something else to determine
       //            if this character is visible?
@@ -239,17 +239,14 @@ static void RenderFileToken(const Token &tok, unsigned &line_number,
                             IndexedTokenRangeData &output) {
 
   RenderToken(tok.data(), tok.category(), tok.id().Pack(),
-              tok.related_entity_id().Pack(), kInvalidEntityId,
-              line_number, fragment_index,
-              output);
+              tok.related_entity_id().Pack(), kInvalidEntityId, line_number,
+              fragment_index, output);
 }
 
-static bool RenderFragmentToken(const TokenRange &input_toks,
-                                unsigned &file_tok_index,
-                                std::vector<Token> &frag_toks,
-                                unsigned &line_number,
-                                unsigned fragment_index,
-                                IndexedTokenRangeData &output) {
+static bool
+RenderFragmentToken(const TokenRange &input_toks, unsigned &file_tok_index,
+                    std::vector<Token> &frag_toks, unsigned &line_number,
+                    unsigned fragment_index, IndexedTokenRangeData &output) {
   if (frag_toks.empty() || file_tok_index >= input_toks.size()) {
     return false;  // Done with the fragment.
   }
@@ -268,8 +265,7 @@ static bool RenderFragmentToken(const TokenRange &input_toks,
 
   // There isn't a corresponding fragment token, so render the file token,
   // leaving the fragment token in place.
-  if (frag_file_tok_id == kInvalidEntityId ||
-      frag_file_tok_id > file_tok_id) {
+  if (frag_file_tok_id == kInvalidEntityId || frag_file_tok_id > file_tok_id) {
     RenderFileToken(file_tok, line_number, fragment_index, output);
     return true;
   }
@@ -288,8 +284,8 @@ static bool RenderFragmentToken(const TokenRange &input_toks,
 
   // Render out the file token data, annotated with fragment token info.
   RenderToken(file_tok.data(), frag_tok.category(), frag_tok.id().Pack(),
-              frag_tok.related_entity_id().Pack(), statement_id,
-              line_number, fragment_index, output);
+              frag_tok.related_entity_id().Pack(), statement_id, line_number,
+              fragment_index, output);
 
   frag_toks.pop_back();
   return true;
@@ -301,11 +297,11 @@ static RawEntityId FragmentIdFromTokens(const std::vector<Token> &frag_toks) {
   for (const Token &ftok : frag_toks) {
     VariantId vid = ftok.id().Unpack();
     if (std::holds_alternative<ParsedTokenId>(vid)) {
-      return EntityId(
-          FragmentId(std::get<ParsedTokenId>(vid).fragment_id)).Pack();
+      return EntityId(FragmentId(std::get<ParsedTokenId>(vid).fragment_id))
+          .Pack();
     } else if (std::holds_alternative<MacroTokenId>(vid)) {
-      return EntityId(
-          FragmentId(std::get<MacroTokenId>(vid).fragment_id)).Pack();
+      return EntityId(FragmentId(std::get<MacroTokenId>(vid).fragment_id))
+          .Pack();
 
     } else {
       Assert(false, "Unexpected token in fragmnet token list");
@@ -317,10 +313,10 @@ static RawEntityId FragmentIdFromTokens(const std::vector<Token> &frag_toks) {
 
 // Create an indexed version of some token range data. This means going and
 // finding the
-static IndexedTokenRangeDataOrError IndexTokenRange(
-    const IndexedTokenRangeDataResultPromise &result_promise,
-    const FileLocationCache &file_location_cache,
-    TokenRangeData input) {
+static IndexedTokenRangeDataOrError
+IndexTokenRange(const IndexedTokenRangeDataResultPromise &result_promise,
+                const FileLocationCache &file_location_cache,
+                TokenRangeData input) {
 
   IndexedTokenRangeData output;
   output.requested_id = input.requested_id;
@@ -373,7 +369,8 @@ static IndexedTokenRangeDataOrError IndexTokenRange(
         // Back-fill the original tokens from the same line.
         auto j = 0u;
         for (auto i = last_tok_index;
-             i-- > 0u && output.line_number[i] == old_line_number; ++j) {}
+             i-- > 0u && output.line_number[i] == old_line_number; ++j) {
+        }
 
         for (auto i = 0u; i < j; ++i) {
           auto k = last_tok_index - i;
@@ -391,8 +388,8 @@ static IndexedTokenRangeDataOrError IndexTokenRange(
         }
       }
 
-      std::vector<Token> fragment_tokens = std::move(
-          fragment_tokens_it->second);
+      std::vector<Token> fragment_tokens =
+          std::move(fragment_tokens_it->second);
 
       auto frag_index = static_cast<unsigned>(output.fragment_ids.size());
       output.fragment_ids.push_back(FragmentIdFromTokens(fragment_tokens));
@@ -414,23 +411,19 @@ static IndexedTokenRangeDataOrError IndexTokenRange(
     }
   }
 
-  Assert(output.related_entity_ids.size() ==
-         output.start_of_token.size(), "");
+  Assert(output.related_entity_ids.size() == output.start_of_token.size(), "");
 
-  Assert(output.statement_containing_token.size() ==
-         output.start_of_token.size(), "");
+  Assert(
+      output.statement_containing_token.size() == output.start_of_token.size(),
+      "");
 
-  Assert(output.token_ids.size() ==
-         output.start_of_token.size(), "");
+  Assert(output.token_ids.size() == output.start_of_token.size(), "");
 
-  Assert(output.fragment_id_index.size() ==
-         output.start_of_token.size(), "");
+  Assert(output.fragment_id_index.size() == output.start_of_token.size(), "");
 
-  Assert(output.line_number.size() ==
-         output.start_of_token.size(), "");
+  Assert(output.line_number.size() == output.start_of_token.size(), "");
 
-  Assert(output.token_categories.size() ==
-         output.start_of_token.size(), "");
+  Assert(output.token_categories.size() == output.start_of_token.size(), "");
 
   output.start_of_token.push_back(static_cast<unsigned>(output.data.size()));
 

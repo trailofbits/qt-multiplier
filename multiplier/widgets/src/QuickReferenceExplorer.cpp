@@ -117,8 +117,8 @@ void QuickReferenceExplorer::InitializeWidgets(
       IEntityNameResolver::Create(index, entity_id);
   entity_name_resolver->setAutoDelete(true);
 
-  connect(entity_name_resolver, &IEntityNameResolver::Finished,
-          this, &QuickReferenceExplorer::OnEntityNameResolutionFinished);
+  connect(entity_name_resolver, &IEntityNameResolver::Finished, this,
+          &QuickReferenceExplorer::OnEntityNameResolutionFinished);
 
   QThreadPool::globalInstance()->start(entity_name_resolver);
 
@@ -262,13 +262,13 @@ void QuickReferenceExplorer::OnEntityNameResolutionFinished(
     return;
   }
 
-  d->window_title->setText(
-      Title("`" + opt_entity_name.value() + "`", d->mode));
+  d->window_title->setText(Title("`" + opt_entity_name.value() + "`", d->mode));
 }
 
 //! Generate a new window title.
-QString QuickReferenceExplorer::Title(
-    QString entity_name, IReferenceExplorerModel::ExpansionMode mode) {
+QString
+QuickReferenceExplorer::Title(QString entity_name,
+                              IReferenceExplorerModel::ExpansionMode mode) {
   switch (mode) {
     case IReferenceExplorerModel::AlreadyExpanded:
       return tr("References to ") + entity_name;

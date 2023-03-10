@@ -42,7 +42,8 @@ CallHierarchyChildGenerator::GenerateNodes(void) {
     co_return;
   }
 
-  for (const std::pair<VariantEntity,VariantEntity> &ref : References(entity)) {
+  for (const std::pair<VariantEntity, VariantEntity> &ref :
+       References(entity)) {
     co_yield IReferenceExplorerModel::Node::Create(
         d->file_cache, ref.first, ref.second,
         IReferenceExplorerModel::CallHierarchyMode);

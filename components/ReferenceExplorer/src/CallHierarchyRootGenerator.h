@@ -23,11 +23,11 @@ class CallHierarchyRootGenerator final : public INodeGenerator {
   std::unique_ptr<PrivateData> d;
 
  public:
-
   //! Constructor
-  CallHierarchyRootGenerator(
-      const Index &index, const FileLocationCache &file_cache_,
-      RawEntityId entity_id, const QModelIndex &location);
+  CallHierarchyRootGenerator(const Index &index,
+                             const FileLocationCache &file_cache_,
+                             RawEntityId entity_id,
+                             const QModelIndex &location);
 
   //! Destructor
   virtual ~CallHierarchyRootGenerator() override;
