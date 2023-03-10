@@ -51,8 +51,8 @@ struct CodeModel::PrivateData final {
   Index index;
 
   IDatabase::Ptr database;
-  IDatabase::FutureResult future_result;
-  QFutureWatcher<IDatabase::Result> future_watcher;
+  QFuture<IDatabase::FileResult> future_result;
+  QFutureWatcher<IDatabase::FileResult> future_watcher;
 
   ModelState model_state{ModelState::Ready};
   TokenRowList token_row_list;
@@ -229,7 +229,7 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache,
       d(new PrivateData(file_location_cache, index)) {
 
   d->database = IDatabase::Create(index, file_location_cache);
-  connect(&d->future_watcher, &QFutureWatcher<IDatabase::Result>::finished,
+  connect(&d->future_watcher, &QFutureWatcher<IDatabase::FileResult>::finished,
           this, &CodeModel::FutureResultStateChanged);
 
   connect(this, &CodeModel::BeginResetModel, this,
@@ -254,14 +254,12 @@ void CodeModel::FutureResultStateChanged() {
   }
 
   auto future_result = d->future_result.takeResult();
-  if (!std::holds_alternative<IndexedTokenRangeData>(future_result)) {
+  if (!future_result.Succeeded()) {
     emit EndResetModel(ModelState::UpdateFailed);
     return;
   }
 
-  IndexedTokenRangeData indexed_token_range_data =
-      std::move(std::get<IndexedTokenRangeData>(future_result));
-
+  auto indexed_token_range_data = future_result.TakeValue();
   d->entity_id = indexed_token_range_data.requested_id;
 
   auto token_count = indexed_token_range_data.start_of_token.size() - 1;

@@ -26,13 +26,9 @@ struct SingleEntityRequest final {
   RawEntityId entity_id;
 };
 
-using Request = std::variant<SingleEntityRequest>;
-using IndexedTokenRangeDataResult = std::variant<IndexedTokenRangeData, RPCErrorCode>;
-using IndexedTokenRangeDataResultPromise =
-    QPromise<IndexedTokenRangeDataResult>;
-
 void CreateIndexedTokenRangeData(
-    IndexedTokenRangeDataResultPromise &result_promise, const Index &index,
-    const FileLocationCache &file_location_cache, const Request &request);
+    QPromise<IDatabase::FileResult> &result_promise, const Index &index,
+    const FileLocationCache &file_location_cache,
+    const SingleEntityRequest &request);
 
 }  // namespace mx::gui

@@ -7,6 +7,10 @@
 #
 
 add_library("mx_database"
+  include/multiplier/ui/DatabaseFuture.h
+  include/multiplier/ui/IndexedTokenRangeData.h
+  include/multiplier/ui/RPCErrorCode.h
+
   include/multiplier/ui/IDatabase.h
   src/IDatabase.cpp
 

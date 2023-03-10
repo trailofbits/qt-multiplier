@@ -14,8 +14,10 @@ class Database final : public IDatabase {
  public:
   virtual ~Database() override;
 
-  virtual FutureResult DownloadFile(RawEntityId file_id) override;
-  virtual FutureResult DownloadFragment(RawEntityId fragment_id) override;
+  virtual QFuture<FileResult> DownloadFile(const RawEntityId &file_id) override;
+  virtual QFuture<FileResult>
+  DownloadFragment(const RawEntityId &fragment_id) override;
+
   virtual QFuture<std::optional<QString>>
   GetEntityName(const RawEntityId &fragment_id) override;
 
