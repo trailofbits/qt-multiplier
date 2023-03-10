@@ -52,10 +52,11 @@ class CodeModel final : public ICodeModel {
     Ready,
   };
 
+  void CancelRunningRequest();
+
  private slots:
   void OnBeginResetModel();
   void OnEndResetModel(const ModelState &model_state);
-
   void FutureResultStateChanged();
 
  signals:

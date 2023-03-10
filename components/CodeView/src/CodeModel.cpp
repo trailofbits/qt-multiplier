@@ -59,7 +59,9 @@ struct CodeModel::PrivateData final {
   std::optional<RawEntityId> entity_id;
 };
 
-CodeModel::~CodeModel() {}
+CodeModel::~CodeModel() {
+  CancelRunningRequest();
+}
 
 const FileLocationCache &CodeModel::GetFileLocationCache() const {
   return d->file_location_cache;
@@ -76,11 +78,7 @@ std::optional<RawEntityId> CodeModel::GetEntity(void) const {
 }
 
 void CodeModel::SetEntity(RawEntityId raw_id) {
-  if (d->future_result.isRunning()) {
-    d->future_result.cancel();
-  }
-
-  d->future_result = {};
+  CancelRunningRequest();
 
   // Try to skip resetting this model if we don't need to.
   if (d->entity_id.has_value() && d->entity_id.value() == raw_id &&
@@ -239,6 +237,17 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache,
   connect(this, &CodeModel::BeginResetModel, this,
           &CodeModel::OnBeginResetModel);
   connect(this, &CodeModel::EndResetModel, this, &CodeModel::OnEndResetModel);
+}
+
+void CodeModel::CancelRunningRequest() {
+  if (!d->future_result.isRunning()) {
+    return;
+  }
+
+  d->future_result.cancel();
+  d->future_result.waitForFinished();
+
+  d->future_result = {};
 }
 
 void CodeModel::OnBeginResetModel() {
