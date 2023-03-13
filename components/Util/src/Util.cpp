@@ -55,110 +55,158 @@ std::optional<Token> DeclFileToken(const Decl &decl) {
   }
 }
 
-//! Get the first file token associated with an entity.
+//! Get the file token range associated with an entity.
 //!
 //! NOTE(pag): We prefer `TokenRange::file_tokens` as that walks up macros.
-Token FirstFileToken(const VariantEntity &ent) {
+TokenRange FileTokens(const VariantEntity &ent) {
   const auto VariantEntityVisitor = Overload{
-    [] (const Decl &entity) {
-      if (auto ftok = DeclFileToken(entity)) {
-        return ftok.value();
-      } else {
-        return entity.tokens().file_tokens().front();
-      }
-    },
-    [] (const Stmt &entity) { return entity.tokens().file_tokens().front(); },
-    [] (const Type &) { return Token(); },
+      [](const Decl &entity) { return entity.tokens().file_tokens(); },
+      [](const Stmt &entity) { return entity.tokens().file_tokens(); },
+      [](const Type &) { return TokenRange(); },
 
-    // Find the containing file usage of this, not necessarily the derived filed
-    // token.
-    [] (const Token &entity) {
-      return TokenRange(entity).file_tokens().front();
-    },
+      // Find the containing file usage of this, not necessarily the derived filed
+      // token.
+      [](const Token &entity) { return TokenRange(entity).file_tokens(); },
 
-    [] (const Macro &entity) {
-      for (Token tok : entity.use_tokens()) {
-        return tok.file_token();
-      }
-      return Token();
-    },
-    [] (const Designator &entity) {
-      return entity.tokens().file_tokens().front();
-    },
-    [] (const CXXBaseSpecifier &entity) {
-      return entity.tokens().file_tokens().front();
-    },
-    [] (const TemplateArgument &) {
-      return Token();
-    },
-    [] (const TemplateParameterList &entity) {
-      return entity.tokens().file_tokens().front();
-    },
+      [](const Macro &entity) {
+        for (Token tok : entity.expansion_tokens()) {
+          return TokenRange(tok).file_tokens();
+        }
+        for (Token tok : entity.use_tokens()) {
+          return TokenRange(tok).file_tokens();
+        }
+        return TokenRange();
+      },
+      [](const Designator &entity) { return entity.tokens().file_tokens(); },
+      [](const CXXBaseSpecifier &entity) {
+        return entity.tokens().file_tokens();
+      },
+      [](const TemplateArgument &) { return TokenRange(); },
+      [](const TemplateParameterList &entity) {
+        return entity.tokens().file_tokens();
+      },
 
-    // NOTE(pag): We don't do `entity.parsed_tokens().file_tokens()` because
-    //            if it's a pure macro fragment, then it might not have any
-    //            parsed tokens.
-    [] (const Fragment &entity) {
-      return entity.file_tokens().front();
-    },
-    [] (const File &entity) { return entity.tokens().front(); },
-    [](auto) { return Token(); }
-  };
-  return std::visit<Token>(VariantEntityVisitor, ent);
+      // NOTE(pag): We don't do `entity.parsed_tokens().file_tokens()` because
+      //            if it's a pure macro fragment, then it might not have any
+      //            parsed tokens.
+      [](const Fragment &entity) { return entity.file_tokens(); },
+      [](const File &entity) { return entity.tokens(); },
+      [](auto) { return TokenRange(); }};
+  return std::visit<TokenRange>(VariantEntityVisitor, ent);
+}
+
+//! Get the first file token associated with an entity.
+Token FirstFileToken(const VariantEntity &ent) {
+  if (std::holds_alternative<Decl>(ent)) {
+    if (auto ftok = DeclFileToken(std::get<Decl>(ent))) {
+      return ftok.value();
+    }
+  }
+  return FileTokens(ent).front();
+}
+
+//! Return the entity ID associated with `ent`.
+RawEntityId IdOfEntity(const VariantEntity &ent) {
+  const auto VariantEntityVisitor =
+      Overload{[](const auto &entity) { return entity.id().Pack(); },
+               [](const NotAnEntity &) { return kInvalidEntityId; }};
+  return std::visit<RawEntityId>(VariantEntityVisitor, ent);
 }
 
 //! Return the file containing an entity.
 std::optional<File> FileOfEntity(const VariantEntity &ent) {
   const auto VariantEntityVisitor = Overload{
-    [] (const Decl &entity) { return File::containing(entity); },
-    [] (const Stmt &entity) { return File::containing(entity); },
-    [] (const Type &entity) { return File::containing(entity); },
-    [] (const Token &entity) { return File::containing(entity); },
-    [] (const Macro &entity) { return File::containing(entity); },
-    [] (const Designator &entity) { return File::containing(entity); },
-    [] (const CXXBaseSpecifier &entity) { return File::containing(entity); },
-    [] (const TemplateArgument &entity) { return File::containing(entity); },
-    [] (const TemplateParameterList &entity) { return File::containing(entity); },
-    [] (const Fragment &entity) { return File::containing(entity); },
-    [] (const File &entity) { return entity; },
-    [](auto) -> std::optional<File> { return std::nullopt; }
-  };
+      [](const Decl &entity) { return File::containing(entity); },
+      [](const Stmt &entity) { return File::containing(entity); },
+      [](const Type &entity) { return File::containing(entity); },
+      [](const Token &entity) { return File::containing(entity); },
+      [](const Macro &entity) { return File::containing(entity); },
+      [](const Designator &entity) { return File::containing(entity); },
+      [](const CXXBaseSpecifier &entity) { return File::containing(entity); },
+      [](const TemplateArgument &entity) { return File::containing(entity); },
+      [](const TemplateParameterList &entity) {
+        return File::containing(entity);
+      },
+      [](const Fragment &entity) { return File::containing(entity); },
+      [](const File &entity) { return entity; },
+      [](auto) -> std::optional<File> { return std::nullopt; }};
   return std::visit<std::optional<File>>(VariantEntityVisitor, ent);
 }
 
 //! Return the name of an entity.
-std::optional<QString> NameOfEntity(
-    const VariantEntity &ent,
-    const std::unordered_map<RawEntityId, QString> &file_paths) {
+std::optional<QString> NameOfEntity(const VariantEntity &ent) {
 
   const auto VariantEntityVisitor = Overload{
-    [] (const Decl &decl) -> std::optional<QString> {
-      if (auto named = NamedDecl::from(decl)) {
-        auto name = named->name();
-        return QString::fromUtf8(
-            name.data(), static_cast<qsizetype>(name.size()));
-      }
-      return std::nullopt;
-    },
+      [](const Decl &decl) -> std::optional<QString> {
+        if (auto named = NamedDecl::from(decl)) {
+          auto name = named->name();
+          if (!name.empty()) {
+            return QString::fromUtf8(name.data(),
+                                     static_cast<qsizetype>(name.size()));
+          }
 
-    [] (const Macro &macro) -> std::optional<QString> {
-      if (auto named = DefineMacroDirective::from(macro)) {
-        auto name = named->name().data();
-        return QString::fromUtf8(
-            name.data(), static_cast<qsizetype>(name.size()));
-      }
-      return std::nullopt;
-    },
-    [&file_paths] (const File &file) -> std::optional<QString> {
-      if (auto it = file_paths.find(file.id().Pack()); it != file_paths.end()) {
-        return it->second;
-      }
-      return std::nullopt;
-    },
+          for (NamedDecl redecl : named->redeclarations()) {
+            name = redecl.name();
+            if (!name.empty()) {
+              return QString::fromUtf8(name.data(),
+                                       static_cast<qsizetype>(name.size()));
+            }
+          }
+        }
+        return std::nullopt;
+      },
 
-    [] (auto) -> std::optional<QString> { return std::nullopt; }
-  };
+      [](const Macro &macro) -> std::optional<QString> {
+        if (auto named = DefineMacroDirective::from(macro)) {
+          auto name = named->name().data();
+          return QString::fromUtf8(name.data(),
+                                   static_cast<qsizetype>(name.size()));
+
+        } else if (auto param = MacroParameter::from(macro)) {
+          auto name = param->name().data();
+          return QString::fromUtf8(name.data(),
+                                   static_cast<qsizetype>(name.size()));
+        }
+        return std::nullopt;
+      },
+
+      [](const File &file) -> std::optional<QString> {
+        for (std::filesystem::path path : file.paths()) {
+          return QString::fromStdString(path.generic_string());
+        }
+        return std::nullopt;
+      },
+
+      [](const Token &token) -> std::optional<QString> {
+        return QString::fromUtf8(token.data().data(),
+                                 static_cast<qsizetype>(token.data().size()));
+      },
+
+      [](auto) -> std::optional<QString> { return std::nullopt; }};
   return std::visit<std::optional<QString>>(VariantEntityVisitor, ent);
+}
+
+//! Return the tokens of `ent` as a string.
+QString TokensToString(const VariantEntity &ent) {
+  // If we didn't get a name above, then try to get the file tokens and
+  // form them into a string.
+  TokenRange file_toks = FileTokens(ent);
+  QString data;
+  auto sep = "";
+  for (Token tok : file_toks) {
+    if (tok.kind() == TokenKind::WHITESPACE) {
+      data += sep;
+      sep = "";
+    } else {
+      data += QString::fromUtf8(tok.data().data(),
+                                static_cast<qsizetype>(tok.data().size()));
+
+      // Only materialize whitespace into spaces if there is a non-whitespace
+      // token in-between.
+      sep = " ";
+    }
+  }
+  return data;
 }
 
 //// Returns a pair of `(fragment_id, offset)` or `(kInvalidEntityId, 0)` for a

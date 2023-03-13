@@ -10,12 +10,6 @@ add_library("mx_util"
   include/multiplier/ui/Util.h
   src/Util.h
   src/Util.cpp
-
-  include/multiplier/ui/IEntityNameResolver.h
-  src/IEntityNameResolver.cpp
-
-  src/EntityNameResolver.h
-  src/EntityNameResolver.cpp
 )
 
 target_link_libraries("mx_util" PRIVATE

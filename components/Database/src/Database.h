@@ -10,17 +10,26 @@
 
 namespace mx::gui {
 
+//! The main implementation for the IDatabase interface
 class Database final : public IDatabase {
  public:
+  //! Destructor
   virtual ~Database() override;
 
-  virtual FutureResult DownloadFile(RawEntityId file_id) override;
-  virtual FutureResult DownloadFragment(RawEntityId fragment_id) override;
+  //! \copybrief IDatabase::RequestIndexedTokenRangeData
+  virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
+      const RawEntityId &entity_id,
+      const IndexedTokenRangeDataRequestType &request_type) override;
+
+  //! \copybrief IDatabase::RequestEntityName
+  virtual QFuture<OptionalName>
+  RequestEntityName(const RawEntityId &fragment_id) override;
 
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
+  //! Constructor
   Database(const Index &index, const FileLocationCache &file_location_cache);
 
   friend class IDatabase;

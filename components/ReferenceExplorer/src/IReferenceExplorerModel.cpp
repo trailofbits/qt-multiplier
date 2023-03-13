@@ -6,15 +6,15 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "ReferenceExplorerModel.h"
-
 #include <multiplier/ui/IReferenceExplorerModel.h>
+
+#include "ReferenceExplorerModel.h"
 
 namespace mx::gui {
 
 IReferenceExplorerModel *
-IReferenceExplorerModel::Create(mx::Index index,
-                                mx::FileLocationCache file_location_cache,
+IReferenceExplorerModel::Create(const Index &index,
+                                const FileLocationCache &file_location_cache,
                                 QObject *parent) {
   return new ReferenceExplorerModel(index, file_location_cache, parent);
 }

@@ -8,9 +8,10 @@
 
 #pragma once
 
-#include <multiplier/Token.h>
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/ISearchWidget.h>
+
+#include <multiplier/Token.h>
 
 #include <QTextCursor>
 #include <QTextDocument>

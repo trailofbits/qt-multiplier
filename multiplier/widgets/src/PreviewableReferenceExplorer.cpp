@@ -6,6 +6,7 @@
 
 #include "PreviewableReferenceExplorer.h"
 
+#include <multiplier/Index.h>
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IReferenceExplorer.h>
 
@@ -27,7 +28,7 @@ struct PreviewableReferenceExplorer::PrivateData final {
 };
 
 PreviewableReferenceExplorer::PreviewableReferenceExplorer(
-    mx::Index index, mx::FileLocationCache file_location_cache,
+    const Index &index, const FileLocationCache &file_location_cache,
     IReferenceExplorerModel *model, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData()) {

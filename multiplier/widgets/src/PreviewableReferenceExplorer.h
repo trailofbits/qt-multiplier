@@ -18,8 +18,8 @@ class PreviewableReferenceExplorer final : public QWidget {
 
  public:
   //! Constructor
-  PreviewableReferenceExplorer(mx::Index index,
-                               mx::FileLocationCache file_location_cache,
+  PreviewableReferenceExplorer(const Index &index,
+                               const FileLocationCache &file_location_cache,
                                IReferenceExplorerModel *model,
                                QWidget *parent = nullptr);
 

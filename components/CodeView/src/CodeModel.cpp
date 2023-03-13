@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/IDatabase.h>
+
 #include <multiplier/Entities/TokenCategory.h>
 
 #include <QString>
@@ -23,6 +24,7 @@ namespace {
 struct TokenColumn final {
   RawEntityId token_id;
   RawEntityId related_entity_id;
+  RawEntityId statement_entity_id;
   TokenCategory token_category;
   QString data;
   std::optional<std::uint64_t> opt_token_group_id;
@@ -49,15 +51,17 @@ struct CodeModel::PrivateData final {
   Index index;
 
   IDatabase::Ptr database;
-  IDatabase::FutureResult future_result;
-  QFutureWatcher<IDatabase::Result> future_watcher;
+  QFuture<IDatabase::IndexedTokenRangeDataResult> future_result;
+  QFutureWatcher<IDatabase::IndexedTokenRangeDataResult> future_watcher;
 
   ModelState model_state{ModelState::Ready};
   TokenRowList token_row_list;
   std::optional<RawEntityId> entity_id;
 };
 
-CodeModel::~CodeModel() {}
+CodeModel::~CodeModel() {
+  CancelRunningRequest();
+}
 
 const FileLocationCache &CodeModel::GetFileLocationCache() const {
   return d->file_location_cache;
@@ -74,15 +78,10 @@ std::optional<RawEntityId> CodeModel::GetEntity(void) const {
 }
 
 void CodeModel::SetEntity(RawEntityId raw_id) {
-  if (d->future_result.isRunning()) {
-    d->future_result.cancel();
-  }
-
-  d->future_result = {};
+  CancelRunningRequest();
 
   // Try to skip resetting this model if we don't need to.
-  if (d->entity_id.has_value() &&
-      d->entity_id.value() == raw_id &&
+  if (d->entity_id.has_value() && d->entity_id.value() == raw_id &&
       d->model_state == ModelState::Ready) {
     emit ModelResetSkipped();
     return;
@@ -95,14 +94,17 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   VariantId vid = eid.Unpack();
 
   if (std::holds_alternative<FileId>(vid)) {
-    d->future_result = d->database->DownloadFile(raw_id);
+    d->future_result = d->database->RequestIndexedTokenRangeData(
+        raw_id, IDatabase::IndexedTokenRangeDataRequestType::File);
 
   } else if (std::holds_alternative<FileTokenId>(vid)) {
-    d->future_result = d->database->DownloadFile(raw_id);
+    d->future_result = d->database->RequestIndexedTokenRangeData(
+        raw_id, IDatabase::IndexedTokenRangeDataRequestType::File);
 
   } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
-    d->future_result = d->database->DownloadFragment(
-        EntityId(frag_id.value()).Pack());
+    d->future_result = d->database->RequestIndexedTokenRangeData(
+        EntityId(frag_id.value()).Pack(),
+        IDatabase::IndexedTokenRangeDataRequestType::Fragment);
 
   } else {
     emit EndResetModel(ModelState::UpdateFailed);
@@ -145,7 +147,8 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
     }
 
     if (role == LineNumberRole || role == TokenRawEntityIdRole ||
-        role == TokenRelatedEntityIdRole) {
+        role == TokenRelatedEntityIdRole ||
+        role == EntityIdOfStmtContainingTokenRole) {
       return 1;
 
     } else if (role == TokenCategoryRole) {
@@ -210,6 +213,13 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
         return static_cast<std::uint64_t>(column.related_entity_id);
       }
 
+    case EntityIdOfStmtContainingTokenRole:
+      if (column.statement_entity_id == kInvalidEntityId) {
+        return QVariant();
+      } else {
+        return static_cast<std::uint64_t>(column.statement_entity_id);
+      }
+
     default: return QVariant();
   }
 }
@@ -220,12 +230,24 @@ CodeModel::CodeModel(const FileLocationCache &file_location_cache,
       d(new PrivateData(file_location_cache, index)) {
 
   d->database = IDatabase::Create(index, file_location_cache);
-  connect(&d->future_watcher, &QFutureWatcher<IDatabase::Result>::finished,
+  connect(&d->future_watcher,
+          &QFutureWatcher<IDatabase::IndexedTokenRangeDataResult>::finished,
           this, &CodeModel::FutureResultStateChanged);
 
   connect(this, &CodeModel::BeginResetModel, this,
           &CodeModel::OnBeginResetModel);
   connect(this, &CodeModel::EndResetModel, this, &CodeModel::OnEndResetModel);
+}
+
+void CodeModel::CancelRunningRequest() {
+  if (!d->future_result.isRunning()) {
+    return;
+  }
+
+  d->future_result.cancel();
+  d->future_result.waitForFinished();
+
+  d->future_result = {};
 }
 
 void CodeModel::OnBeginResetModel() {
@@ -245,14 +267,12 @@ void CodeModel::FutureResultStateChanged() {
   }
 
   auto future_result = d->future_result.takeResult();
-  if (!std::holds_alternative<IndexedTokenRangeData>(future_result)) {
+  if (!future_result.Succeeded()) {
     emit EndResetModel(ModelState::UpdateFailed);
     return;
   }
 
-  IndexedTokenRangeData indexed_token_range_data =
-      std::move(std::get<IndexedTokenRangeData>(future_result));
-
+  auto indexed_token_range_data = future_result.TakeValue();
   d->entity_id = indexed_token_range_data.requested_id;
 
   auto token_count = indexed_token_range_data.start_of_token.size() - 1;
@@ -267,6 +287,8 @@ void CodeModel::FutureResultStateChanged() {
 
     col.token_id = indexed_token_range_data.token_ids[i];
     col.related_entity_id = indexed_token_range_data.related_entity_ids[i];
+    col.statement_entity_id =
+        indexed_token_range_data.statement_containing_token[i];
     col.token_category = indexed_token_range_data.token_categories[i];
 
     auto frag_id_index = indexed_token_range_data.fragment_id_index[i];

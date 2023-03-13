@@ -12,6 +12,9 @@ add_library("mx_referenceexplorer"
 
   include/multiplier/ui/IReferenceExplorerModel.h
   src/IReferenceExplorerModel.cpp
+  
+  src/INodeGenerator.h
+  src/INodeGenerator.cpp
 
   src/ReferenceExplorer.h
   src/ReferenceExplorer.cpp
@@ -22,13 +25,23 @@ add_library("mx_referenceexplorer"
   src/ReferenceExplorerItemDelegate.h
   src/ReferenceExplorerItemDelegate.cpp
 
-  src/Types.h
-
-  src/NodeImporter.h
-  src/NodeImporter.cpp
+  src/CallHierarchyChildGenerator.h
+  src/CallHierarchyChildGenerator.cpp
+  
+  src/CallHierarchyRootGenerator.h
+  src/CallHierarchyRootGenerator.cpp
+  
+  src/TaintedChildGenerator.h
+  src/TaintedChildGenerator.cpp
+  
+  src/TaintedRootGenerator.h
+  src/TaintedRootGenerator.cpp
 
   src/Utils.h
   src/Utils.cpp
+
+  src/Types.h
+  src/Types.cpp
 
   src/FilterSettingsWidget.h
   src/FilterSettingsWidget.cpp
@@ -48,6 +61,8 @@ target_link_libraries("mx_referenceexplorer"
   PUBLIC
     "thirdparty_qt"
     "multiplier::mx-api"
+    "multiplier::mx-analysis"
+    "gap::gap"
     "mx_assert"
     "mx_searchwidget"
     "mx_util"
@@ -62,7 +77,3 @@ target_include_directories("mx_referenceexplorer" SYSTEM INTERFACE
 )
 
 enable_qt_properties("mx_referenceexplorer")
-
-if(MXQT_ENABLE_TESTS)
-  add_subdirectory("tests")
-endif()

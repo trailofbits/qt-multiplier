@@ -8,7 +8,7 @@
 #include "PreviewableReferenceExplorer.h"
 
 #include <multiplier/ui/Util.h>
-#include <multiplier/ui/IEntityNameResolver.h>
+#include <multiplier/ui/IDatabase.h>
 
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -20,7 +20,6 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QPoint>
-#include <QThread>
 
 #include <optional>
 
@@ -29,30 +28,36 @@ namespace mx::gui {
 struct QuickReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   bool closed{false};
+  const IReferenceExplorerModel::ExpansionMode mode;
 
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
 
-  QThread *name_resolver_thread{nullptr};
-  IEntityNameResolver *entity_name_resolver{nullptr};
+  IDatabase::Ptr database;
+  QFuture<std::optional<QString>> entity_name_future;
+  QFutureWatcher<std::optional<QString>> future_watcher;
+
+  inline PrivateData(IReferenceExplorerModel::ExpansionMode mode_)
+      : mode(mode_) {}
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
-    mx::Index index, mx::FileLocationCache file_location_cache,
-    RawEntityId entity_id, QWidget *parent)
+    const Index &index, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode,
+    QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData) {
+      d(new PrivateData(mode)) {
 
-  InitializeWidgets(index, file_location_cache, entity_id);
+  d->database = IDatabase::Create(index, file_location_cache);
+  connect(&d->future_watcher,
+          &QFutureWatcher<QFuture<std::optional<QString>>>::finished, this,
+          &QuickReferenceExplorer::EntityNameFutureStatusChanged);
+
+  InitializeWidgets(index, file_location_cache, entity_id, mode);
 }
 
 QuickReferenceExplorer::~QuickReferenceExplorer() {
-  // Ask the EntityNameResolver instance to stop
-  d->name_resolver_thread->requestInterruption();
-
-  // Terminate the thread
-  d->name_resolver_thread->quit();
-  d->name_resolver_thread->wait();
+  CancelRunningRequest();
 }
 
 void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
@@ -98,8 +103,8 @@ bool QuickReferenceExplorer::eventFilter(QObject *, QEvent *event) {
 }
 
 void QuickReferenceExplorer::InitializeWidgets(
-    mx::Index index, mx::FileLocationCache file_location_cache,
-    RawEntityId entity_id) {
+    const Index &index, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -115,25 +120,12 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   // Use a temporary window name at first. This won't be shown at all if the
   // name resolution is fast enough
-  auto window_name = tr("References to entity ") + QString::number(entity_id);
+  auto window_name = GenerateWindowName(entity_id, mode);
   d->window_title = new QLabel(window_name);
 
   // Start a request to fetch the real entity name
-  d->name_resolver_thread = new QThread(this);
-
-  d->entity_name_resolver = IEntityNameResolver::Create(index, entity_id);
-  d->entity_name_resolver->moveToThread(d->name_resolver_thread);
-
-  connect(d->name_resolver_thread, &QThread::started, d->entity_name_resolver,
-          &IEntityNameResolver::Start);
-
-  connect(d->entity_name_resolver, &IEntityNameResolver::Finished, this,
-          &QuickReferenceExplorer::OnEntityNameResolutionFinished);
-
-  connect(d->entity_name_resolver, &IEntityNameResolver::Finished,
-          d->name_resolver_thread, &QThread::quit);
-
-  d->name_resolver_thread->start();
+  d->entity_name_future = d->database->RequestEntityName(entity_id);
+  d->future_watcher.setFuture(d->entity_name_future);
 
   // Save to active button
   auto save_to_active_ref_explorer_button = new QPushButton(
@@ -186,7 +178,7 @@ void QuickReferenceExplorer::InitializeWidgets(
   //
 
   d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
-  d->model->AppendEntityObject(entity_id, QModelIndex());
+  d->model->AppendEntityById(entity_id, mode, QModelIndex());
 
   auto reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, this);
@@ -268,17 +260,57 @@ void QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress() {
   EmitSaveSignal(true);
 }
 
-void QuickReferenceExplorer::OnEntityNameResolutionFinished(
-    const std::optional<QString> &opt_entity_name) {
+void QuickReferenceExplorer::EntityNameFutureStatusChanged() {
+  if (d->entity_name_future.isCanceled()) {
+    return;
+  }
 
+  auto opt_entity_name = d->entity_name_future.takeResult();
   if (!opt_entity_name.has_value()) {
     return;
   }
 
   const auto &entity_name = opt_entity_name.value();
 
-  auto title = tr("References to ") + "`" + entity_name + "`";
-  d->window_title->setText(title);
+  auto window_name = GenerateWindowName(entity_name, d->mode);
+  d->window_title->setText(window_name);
+}
+
+void QuickReferenceExplorer::CancelRunningRequest() {
+  if (!d->entity_name_future.isRunning()) {
+    return;
+  }
+
+  d->entity_name_future.cancel();
+  d->entity_name_future.waitForFinished();
+
+  d->entity_name_future = {};
+}
+
+QString QuickReferenceExplorer::GenerateWindowName(
+    const QString &entity_name,
+    const IReferenceExplorerModel::ExpansionMode &mode) {
+
+  auto quoted_entity_name = QString("`") + entity_name + "`";
+
+  switch (mode) {
+    case IReferenceExplorerModel::AlreadyExpanded:
+      return tr("References to ") + quoted_entity_name;
+
+    case IReferenceExplorerModel::CallHierarchyMode:
+      return tr("Call hierarchy of ") + quoted_entity_name;
+
+    case IReferenceExplorerModel::TaintMode:
+      return tr("Values tainted by ") + quoted_entity_name;
+  }
+}
+
+QString QuickReferenceExplorer::GenerateWindowName(
+    const RawEntityId &entity_id,
+    const IReferenceExplorerModel::ExpansionMode &mode) {
+
+  auto entity_name = tr("Entity ID #") + QString::number(entity_id);
+  return GenerateWindowName(entity_name, mode);
 }
 
 }  // namespace mx::gui

@@ -8,10 +8,10 @@
 
 #pragma once
 
+#include <QColor>
+
 #include <unordered_map>
 #include <vector>
-
-#include <QColor>
 
 namespace mx {
 enum class TokenKind : unsigned short;

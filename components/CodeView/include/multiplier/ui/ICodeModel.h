@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/Types.h>
+
 #include <QObject>
 #include <QVariant>
 
@@ -49,6 +50,9 @@ class ICodeModel : public QObject {
 
     //! The RawEntityId value associated with the "related entity" of this token.
     TokenRelatedEntityIdRole,
+
+    //! The raw form of the `StmtId` for the statement containing this token.
+    EntityIdOfStmtContainingTokenRole,
   };
 
   //! Factory function

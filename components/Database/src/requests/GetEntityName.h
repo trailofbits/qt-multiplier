@@ -8,12 +8,20 @@
 
 #pragma once
 
+#include <multiplier/ui/IDatabase.h>
+
 #include <multiplier/Index.h>
 
-#include <string>
+#include <QPromise>
+#include <QString>
+
+#include <optional>
 
 namespace mx::gui {
 
-mx::Index OpenTestDatabase(const std::string &database_name);
+using OptionalName = std::optional<QString>;
+
+void GetEntityName(QPromise<OptionalName> &entity_name_promise,
+                   const Index &index, const RawEntityId &entity_id);
 
 }  // namespace mx::gui

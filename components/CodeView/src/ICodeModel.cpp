@@ -6,9 +6,9 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/ICodeModel.h>
-
 #include "CodeModel.h"
+
+#include <multiplier/ui/ICodeModel.h>
 
 namespace mx::gui {
 

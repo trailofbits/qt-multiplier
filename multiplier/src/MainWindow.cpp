@@ -9,6 +9,7 @@
 #include "PreviewableReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
 
+#include <multiplier/Entities/StmtKind.h>
 #include <multiplier/ui/IIndexView.h>
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/Util.h>
@@ -83,7 +84,7 @@ void MainWindow::CreateFileTreeDock() {
   connect(d->index_view, &IIndexView::FileClicked, this,
           &MainWindow::OnIndexViewFileClicked);
 
-  auto file_tree_dock = new QDockWidget(tr("File tree"), this);
+  auto file_tree_dock = new QDockWidget(tr("Files"), this);
   file_tree_dock->setAllowedAreas(Qt::LeftDockWidgetArea |
                                   Qt::RightDockWidgetArea);
 
@@ -104,7 +105,7 @@ void MainWindow::CreateReferenceExplorerDock() {
   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
           this, &MainWindow::OnReferenceExplorerTabBarDoubleClick);
 
-  d->reference_explorer_dock = new QDockWidget(tr("Reference Explorer"), this);
+  d->reference_explorer_dock = new QDockWidget(tr("References"), this);
   d->view_menu->addAction(d->reference_explorer_dock->toggleViewAction());
   d->reference_explorer_dock->toggleViewAction()->setEnabled(false);
 
@@ -123,7 +124,7 @@ void MainWindow::CreateNewReferenceExplorer(QString window_title) {
 
   if (window_title.isEmpty()) {
     window_title =
-        tr("Reference Explorer #") + QString::number(new_tab_index + 1);
+        tr("Reference browser #") + QString::number(new_tab_index + 1);
   }
 
   auto ref_explorer_model =
@@ -193,11 +194,12 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
   d->code_view_context_menu.menu->exec(QCursor::pos());
 }
 
-void MainWindow::OpenTokenReferenceExplorer(RawEntityId entity_id) {
+void MainWindow::OpenReferenceExplorer(
+    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode) {
   CloseTokenReferenceExplorer();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
-      d->index, d->file_location_cache, entity_id, this);
+      d->index, d->file_location_cache, entity_id, mode, this);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
           &MainWindow::OnQuickRefExplorerSaveAllClicked);
@@ -231,7 +233,35 @@ void MainWindow::OpenTokenReferenceExplorer(CodeModelIndex index) {
     return;
   }
 
-  OpenTokenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var));
+  OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
+                        IReferenceExplorerModel::CallHierarchyMode);
+}
+
+void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
+
+  QVariant related_stmt_id_var =
+      index.model->Data(index, ICodeModel::EntityIdOfStmtContainingTokenRole);
+
+  // If we clicked on a statement, then if it's a decl statement, it could be
+  // of the form `int a = 1, b = 2;` and the taint tracker doesn't handle that
+  // as well. But if there is a single associated declaration then it is fine
+  // with it usually.
+  if (related_stmt_id_var.isValid()) {
+    OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_stmt_id_var),
+                          IReferenceExplorerModel::TaintMode);
+    return;
+  }
+
+  QVariant related_entity_id_var =
+      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+
+  if (related_entity_id_var.isValid()) {
+    OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
+                          IReferenceExplorerModel::TaintMode);
+    return;
+  }
+
+  CloseTokenReferenceExplorer();
 }
 
 void MainWindow::CloseTokenReferenceExplorer() {
@@ -380,9 +410,23 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
     // well natively
     const auto &keyboard_button = token_action.opt_keyboard_button.value();
 
+    // Like in IDA Pro, pressing X while the cursor is on an entity shows us
+    // its cross-references.
     if (keyboard_button.key == Qt::Key_X && !keyboard_button.shift_modifier &&
         !keyboard_button.control_modifier) {
       OpenTokenReferenceExplorer(index);
+    }
+
+    if (keyboard_button.key == Qt::Key_T && !keyboard_button.shift_modifier &&
+        !keyboard_button.control_modifier) {
+      OpenTokenTaintExplorer(index);
+    }
+
+    // Like in IDA Pro, pressing Enter while the cursor is on a use of that
+    // entity will bring us to that entity.
+    if (keyboard_button.key == Qt::Key_Enter &&
+        !keyboard_button.shift_modifier && !keyboard_button.control_modifier) {
+      OpenEntityRelatedToToken(index);
     }
   }
 }
@@ -429,7 +473,7 @@ void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
       d->ref_explorer_tab_widget->widget(current_tab));
 
   auto reference_explorer_model = reference_explorer->Model();
-  reference_explorer_model->dropMimeData(mime_data, Qt::CopyAction, 0, 0,
+  reference_explorer_model->dropMimeData(mime_data, Qt::CopyAction, -1, 0,
                                          QModelIndex());
 }
 
@@ -459,7 +503,7 @@ void MainWindow::OnReferenceExplorerTabBarDoubleClick(int index) {
   if (opt_tab_name.has_value()) {
     new_tab_name = opt_tab_name.value();
   } else {
-    new_tab_name = tr("Reference explorer #") + QString::number(index);
+    new_tab_name = tr("Reference browser #") + QString::number(index);
   }
 
   d->ref_explorer_tab_widget->setTabText(index, new_tab_name);
