@@ -10,6 +10,7 @@ set(qt_component_list
   "Core"
   "Widgets"
   "Concurrent"
+  "Core5Compat"
 )
 
 find_package("Qt6"
