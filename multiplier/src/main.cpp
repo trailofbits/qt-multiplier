@@ -11,8 +11,10 @@
 
 #include <QApplication>
 
+#include <phantom/phantomstyle.h>
+
 int main(int argc, char *argv[]) {
-  QApplication::setStyle("Fusion");
+  QApplication::setStyle(new PhantomStyle);
   QApplication application(argc, argv);
 
   mx::gui::RegisterMetaTypes();

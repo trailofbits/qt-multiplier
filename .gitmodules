@@ -13,3 +13,6 @@
 [submodule "libraries/vendored/multiplier"]
 	path = libraries/vendored/multiplier
 	url = git@github.com:trailofbits/multiplier
+[submodule "libraries/phantomstyle/src"]
+	path = libraries/phantomstyle/src
+	url = https://github.com/randrew/phantomstyle
