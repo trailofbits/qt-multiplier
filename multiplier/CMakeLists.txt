@@ -45,6 +45,7 @@ target_link_libraries("Multiplier"
   PUBLIC
     "multiplier::mx-api"
     "thirdparty_qt"
+    "thirdparty_phantomstyle"
     "mx_codeview"
     "mx_util"
     "mx_database"
