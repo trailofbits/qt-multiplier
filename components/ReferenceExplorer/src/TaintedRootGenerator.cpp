@@ -13,32 +13,28 @@ namespace mx::gui {
 
 TaintedRootGenerator::~TaintedRootGenerator(void) {}
 
-gap::generator<Node> TaintedRootGenerator::GenerateNodes(void) {
+void TaintedRootGenerator::run(void) {
   VariantEntity entity = Entity();
   if (std::holds_alternative<NotAnEntity>(entity)) {
-    co_return;
+    return;
   }
 
-  Node root_node = Node::Create(
-      FileCache(), entity, entity, IReferenceExplorerModel::AlreadyExpanded);
-  root_node.opt_name = TokensToString(entity);
+  QList<Node> nodes;
+  nodes.emplaceBack(Node::Create(
+      FileCache(), entity, entity, IReferenceExplorerModel::AlreadyExpanded));
+  nodes.front().opt_name = TokensToString(entity);
 
-  QList<Node> child_nodes;
-  for (Node child_node :
-       this->TaintedChildGenerator::GenerateNodes()) {
+  for (Node child_node : this->TaintedChildGenerator::GenerateNodes()) {
     if (CancelRequested()) {
       break;
     }
 
-    child_node.parent_node_id = root_node.node_id;
-    root_node.child_node_id_list.push_back(child_node.node_id);
-    child_nodes.emplaceBack(std::move(child_node));
+    child_node.parent_node_id = nodes.front().node_id;
+    nodes.front().child_node_id_list.push_back(child_node.node_id);
+    nodes.emplaceBack(std::move(child_node));
   }
 
-  co_yield root_node;
-  for (auto node : child_nodes) {
-    co_yield node;
-  }
+  emit Finished(std::move(nodes), 0, ModelIndex());
 }
 
 }  // namespace mx::gui

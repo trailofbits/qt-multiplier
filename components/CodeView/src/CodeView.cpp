@@ -729,57 +729,57 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
 
   QList<QTextEdit::ExtraSelection> extra_selection_list;
 
-  std::size_t color_map_index{};
+//  std::size_t color_map_index{};
   QTextEdit::ExtraSelection selection;
 
   std::unordered_set<std::uint64_t> visited_model_index_list;
   std::unordered_set<int> colored_line_list;
 
-  for (const auto &token_group_p :
-       token_map.token_group_id_to_unique_token_id_list) {
-
-    const auto &unique_token_id_list = token_group_p.second;
-
-    const auto &group_color =
-        theme.token_group_color_list[color_map_index %
-                                     theme.token_group_color_list.size()];
-
-    ++color_map_index;
-
-    for (const auto &unique_token_id : unique_token_id_list) {
-      const auto &token_map_entry = token_map.data.at(unique_token_id);
-      visited_model_index_list.insert(unique_token_id);
-
-      selection = {};
-      selection.format.setBackground(group_color);
-      selection.cursor = text_edit.textCursor();
-      selection.cursor.setPosition(token_map_entry.cursor_start,
-                                   QTextCursor::MoveMode::MoveAnchor);
-
-      selection.cursor.setPosition(token_map_entry.cursor_end,
-                                   QTextCursor::MoveMode::KeepAnchor);
-
-      extra_selection_list.append(std::move(selection));
-
-      auto column_count = model.TokenCount(token_map_entry.model_index.row);
-      auto is_last =
-          token_map_entry.model_index.token_index + 1 == column_count;
-
-      if (is_last) {
-        colored_line_list.insert(token_map_entry.model_index.row);
-
-        selection = {};
-        selection.format.setBackground(group_color);
-        selection.format.setProperty(QTextFormat::FullWidthSelection, true);
-        selection.cursor = text_edit.textCursor();
-        selection.cursor.setPosition(token_map_entry.cursor_end,
-                                     QTextCursor::MoveMode::MoveAnchor);
-
-        selection.cursor.clearSelection();
-        extra_selection_list.prepend(std::move(selection));
-      }
-    }
-  }
+//  for (const auto &token_group_p :
+//       token_map.token_group_id_to_unique_token_id_list) {
+//
+//    const auto &unique_token_id_list = token_group_p.second;
+//
+//    const auto &group_color =
+//        theme.token_group_color_list[color_map_index %
+//                                     theme.token_group_color_list.size()];
+//
+//    ++color_map_index;
+//
+//    for (const auto &unique_token_id : unique_token_id_list) {
+//      const auto &token_map_entry = token_map.data.at(unique_token_id);
+//      visited_model_index_list.insert(unique_token_id);
+//
+//      selection = {};
+//      selection.format.setBackground(group_color);
+//      selection.cursor = text_edit.textCursor();
+//      selection.cursor.setPosition(token_map_entry.cursor_start,
+//                                   QTextCursor::MoveMode::MoveAnchor);
+//
+//      selection.cursor.setPosition(token_map_entry.cursor_end,
+//                                   QTextCursor::MoveMode::KeepAnchor);
+//
+//      extra_selection_list.append(std::move(selection));
+//
+//      auto column_count = model.TokenCount(token_map_entry.model_index.row);
+//      auto is_last =
+//          token_map_entry.model_index.token_index + 1 == column_count;
+//
+//      if (is_last) {
+//        colored_line_list.insert(token_map_entry.model_index.row);
+//
+//        selection = {};
+//        selection.format.setBackground(group_color);
+//        selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+//        selection.cursor = text_edit.textCursor();
+//        selection.cursor.setPosition(token_map_entry.cursor_end,
+//                                     QTextCursor::MoveMode::MoveAnchor);
+//
+//        selection.cursor.clearSelection();
+//        extra_selection_list.prepend(std::move(selection));
+//      }
+//    }
+//  }
 
   for (const auto &colored_line : colored_line_list) {
     auto column_count = model.TokenCount(colored_line);

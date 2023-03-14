@@ -42,6 +42,7 @@ class INodeGenerator : public QObject, public QRunnable {
 
   void RequestCancel(void);
   bool CancelRequested(void);
+  const QModelIndex &ModelIndex(void);
 
   //! Create a node generator for a root node.
   static INodeGenerator *

@@ -24,6 +24,10 @@ bool INodeGenerator::CancelRequested(void) {
   return cancel_requested.loadAcquire() == 1;
 }
 
+const QModelIndex &INodeGenerator::ModelIndex(void) {
+  return parent_index;
+}
+
 gap::generator<Node> INodeGenerator::GenerateNodes(void) {
   co_return;
 }
