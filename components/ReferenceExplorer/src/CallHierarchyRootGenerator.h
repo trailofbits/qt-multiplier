@@ -34,7 +34,7 @@ class CallHierarchyRootGenerator final : public INodeGenerator {
   //! Destructor
   virtual ~CallHierarchyRootGenerator() override;
 
-  gap::generator<Node> GenerateNodes(void) final;
+  void run(void) final;
 };
 
 }  // namespace mx::gui

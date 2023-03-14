@@ -543,7 +543,9 @@ void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
   std::unordered_map<std::uint64_t, std::uint64_t> id_mapping;
   for (Node &node : nodes) {
     const std::uint64_t old_id = node.node_id;
+    Assert(old_id != 0u, "Invalid node id");
     node.AssignUniqueId();  // NOTE(pag): Replaces `Node::node_id`.
+    Assert(node.node_id != 0u, "Invlaid unique node id");
     auto [it, added] = id_mapping.emplace(old_id, node.node_id);
     Assert(added, "Repeat node id found");
   }
