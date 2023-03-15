@@ -432,9 +432,13 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 }
 
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
-  auto entity_id_role = index.data(IReferenceExplorerModel::EntityIdRole);
+  auto entity_id_role = index.data(
+      IReferenceExplorerModel::ReferencedEntityIdRole);
   if (!entity_id_role.isValid()) {
-    return;
+    entity_id_role = index.data(IReferenceExplorerModel::EntityIdRole);
+    if (!entity_id_role.isValid()) {
+      return;
+    }
   }
 
   auto entity_id = qvariant_cast<RawEntityId>(entity_id_role);
