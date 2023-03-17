@@ -326,7 +326,7 @@ void ReferenceExplorer::UpdateTreeViewItemButtons() {
   }
 
   // Enable the expansion button if we haven't yet expanded the node.
-  auto mode = index.data(IReferenceExplorerModel::DefaultExpansionMode);
+  auto mode = index.data(IReferenceExplorerModel::ExpansionModeRole);
   if (mode.isValid() &&
       (qvariant_cast<IReferenceExplorerModel::ExpansionMode>(mode) !=
        IReferenceExplorerModel::AlreadyExpanded)) {
