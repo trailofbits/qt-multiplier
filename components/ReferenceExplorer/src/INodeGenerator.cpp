@@ -61,7 +61,6 @@ INodeGenerator *INodeGenerator::CreateRootGenerator(
     IReferenceExplorerModel::ExpansionMode expansion_mode) {
 
   switch (expansion_mode) {
-    case IReferenceExplorerModel::AlreadyExpanded: return nullptr;
     case IReferenceExplorerModel::CallHierarchyMode:
       return new CallHierarchyRootGenerator(index, file_cache, entity_id,
                                             parent);
@@ -77,7 +76,6 @@ INodeGenerator *INodeGenerator::CreateChildGenerator(
     IReferenceExplorerModel::ExpansionMode expansion_mode) {
 
   switch (expansion_mode) {
-    case IReferenceExplorerModel::AlreadyExpanded: return nullptr;
     case IReferenceExplorerModel::CallHierarchyMode:
       return new CallHierarchyChildGenerator(index, file_cache, entity_id,
                                              parent);

@@ -83,21 +83,16 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
     return;
   }
 
-  auto expansion_mode = node_it->second.expansion_mode;
-  if (expansion_mode == IReferenceExplorerModel::AlreadyExpanded) {
+  auto &node = node_it->second;
+  if (node.expanded) {
     return;
   }
 
-  // Prevent this mode from being expanded any more.
-  node_it->second.expansion_mode = IReferenceExplorerModel::AlreadyExpanded;
+  node.expanded = true;
 
   INodeGenerator *generator = INodeGenerator::CreateChildGenerator(
       d->index, d->file_location_cache, node_it->second.entity_id, index,
-      expansion_mode);
-
-  if (!generator) {
-    return;
-  }
+      node.expansion_mode);
 
   generator->setAutoDelete(true);
 
@@ -425,6 +420,9 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
   } else if (role == IReferenceExplorerModel::ExpansionModeRole) {
     value.setValue(node.expansion_mode);
+
+  } else if (role == IReferenceExplorerModel::ExpansionStatusRole) {
+    value.setValue(node.expanded);
   }
 
   return value;
@@ -564,6 +562,11 @@ void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
       node.parent_node_id = parent_it->second;
     }
   }
+
+  // The `expanded` property of this node has changed, so tell the view
+  // about it. This will disable the expand button (regardless of whether
+  // we did get new nodes or not).
+  emit dataChanged(drop_target, drop_target);
 
   // We did nothing, or we did nothing visible.
   auto num_dropped_nodes = static_cast<int>(root_nodes_dropped.size());

@@ -59,24 +59,28 @@ void CallHierarchyRootGenerator::run(void) {
 
   QList<Node> nodes;
 
+  static const auto kAlreadyExpanded{true};
+
   for (VariantEntity root_entity : TopLevelEntities(entity)) {
-    nodes.emplaceBack(Node::Create(
-        d->file_cache, root_entity, root_entity,
-        IReferenceExplorerModel::AlreadyExpanded));
+    nodes.emplaceBack(Node::Create(d->file_cache, root_entity, root_entity,
+                                   IReferenceExplorerModel::CallHierarchyMode,
+                                   kAlreadyExpanded));
 
     if (CancelRequested()) {
       break;
     }
   }
 
+  static const auto kNotYetExpanded{false};
+
   for (const auto &ref : References(entity)) {
     if (CancelRequested()) {
       break;
     }
 
-    auto child_node = Node::Create(
-        d->file_cache, ref.first, ref.second,
-        IReferenceExplorerModel::CallHierarchyMode);
+    auto child_node = Node::Create(d->file_cache, ref.first, ref.second,
+                                   IReferenceExplorerModel::CallHierarchyMode,
+                                   kNotYetExpanded);
 
     nodes.front().child_node_id_list.push_back(child_node.node_id);
     child_node.parent_node_id = nodes.front().node_id;

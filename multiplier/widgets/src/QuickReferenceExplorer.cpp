@@ -294,9 +294,6 @@ QString QuickReferenceExplorer::GenerateWindowName(
   auto quoted_entity_name = QString("`") + entity_name + "`";
 
   switch (mode) {
-    case IReferenceExplorerModel::AlreadyExpanded:
-      return tr("References to ") + quoted_entity_name;
-
     case IReferenceExplorerModel::CallHierarchyMode:
       return tr("Call hierarchy of ") + quoted_entity_name;
 

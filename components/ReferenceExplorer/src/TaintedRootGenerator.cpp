@@ -19,9 +19,12 @@ void TaintedRootGenerator::run(void) {
     return;
   }
 
+  static const auto kAlreadyExpanded{true};
+
   QList<Node> nodes;
-  nodes.emplaceBack(Node::Create(
-      FileCache(), entity, entity, IReferenceExplorerModel::AlreadyExpanded));
+  nodes.emplaceBack(Node::Create(FileCache(), entity, entity,
+                                 IReferenceExplorerModel::TaintMode,
+                                 kAlreadyExpanded));
   nodes.front().opt_name = TokensToString(entity);
 
   for (Node child_node : this->TaintedChildGenerator::GenerateNodes()) {
