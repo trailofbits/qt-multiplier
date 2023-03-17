@@ -26,6 +26,7 @@
 #include <QVBoxLayout>
 
 #include <optional>
+#include <iostream>
 
 namespace mx::gui {
 
@@ -66,6 +67,10 @@ IReferenceExplorerModel *ReferenceExplorer::Model() {
   return d->model;
 }
 
+void ReferenceExplorer::resizeEvent(QResizeEvent *) {
+  UpdateTreeViewItemButtons();
+}
+
 ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
                                      QWidget *parent)
     : IReferenceExplorer(parent),
@@ -79,8 +84,6 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
 }
 
 void ReferenceExplorer::InitializeWidgets() {
-
-
   setAcceptDrops(true);
 
   // Initialize the tree view
@@ -100,6 +103,7 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree_view->setExpandsOnDoubleClick(false);
+  d->tree_view->installEventFilter(this);
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);
 
@@ -251,22 +255,34 @@ void ReferenceExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
   d->model->ExpandEntity(d->model_proxy->mapToSource(index));
 }
 
-bool ReferenceExplorer::eventFilter(QObject *, QEvent *event) {
+bool ReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
+  // Disable the overlay buttons while scrolling. It is hard to keep
+  // them on screen due to how the scrolling event is propagated.
+  if (event->type() == QEvent::Wheel) {
+    auto scrolling_enabled =
+        (d->tree_view->horizontalScrollBar()->isVisible() ||
+         d->tree_view->verticalScrollBar()->isVisible());
+
+    if (scrolling_enabled) {
+      d->treeview_item_buttons.opt_hovered_index = std::nullopt;
+      UpdateTreeViewItemButtons();
+    }
+
+    return false;
+  }
+
   // It is important to double check the leave event; it is sent
   // even if the mouse is still inside our treeview item but
   // above the button (which steals the focus)
-  QPoint mouse_pos;
-  if (event->type() == QEvent::Leave) {
-    mouse_pos = QCursor::pos();
-    mouse_pos = d->tree_view->mapFromGlobal(mouse_pos);
+  auto process_event =
+      (obj == d->tree_view->viewport() &&
+       (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove));
 
-  } else if (event->type() == QEvent::MouseMove) {
-    auto &mouse_event = *static_cast<QMouseEvent *>(event);
-    mouse_pos = mouse_event.pos();
-
-  } else {
+  if (!process_event) {
     return false;
   }
+
+  auto mouse_pos = d->tree_view->viewport()->mapFromGlobal(QCursor::pos());
 
   auto index = d->tree_view->indexAt(mouse_pos);
   if (!index.isValid()) {
@@ -355,7 +371,6 @@ void ReferenceExplorer::OnModelReset() {
   d->tree_view->resizeColumnToContents(0);
 }
 
-//! Like OnModelReset, but for row insertion
 void ReferenceExplorer::OnRowsAdded(const QModelIndex &parent, int first,
                                     int last) {
   d->tree_view->rowsInserted(parent, first, last);
@@ -363,7 +378,6 @@ void ReferenceExplorer::OnRowsAdded(const QModelIndex &parent, int first,
   d->tree_view->resizeColumnToContents(0);
 }
 
-//! Like OnModelReset, but for row deletion
 void ReferenceExplorer::OnRowsRemoved(const QModelIndex &parent, int first,
                                       int last) {
   d->tree_view->rowsRemoved(parent, first, last);
@@ -371,7 +385,6 @@ void ReferenceExplorer::OnRowsRemoved(const QModelIndex &parent, int first,
   d->tree_view->resizeColumnToContents(0);
 }
 
-//! Like OnModelReset, but for row deletion
 void ReferenceExplorer::OnRowsAboutToBeRemoved(const QModelIndex &parent,
                                                int first, int last) {
   d->tree_view->rowsAboutToBeRemoved(parent, first, last);

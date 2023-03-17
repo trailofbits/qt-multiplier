@@ -17,8 +17,8 @@ namespace mx::gui {
 
 class ReferenceExplorerTreeView final : public QTreeView {
  public:
-  using QTreeView::rowsInserted;
   using QTreeView::rowsAboutToBeRemoved;
+  using QTreeView::rowsInserted;
   using QTreeView::rowsRemoved;
 };
 
@@ -32,6 +32,10 @@ class ReferenceExplorer final : public IReferenceExplorer {
 
   //! \copybrief IReferenceExplorer::Model
   virtual IReferenceExplorerModel *Model() override;
+
+ protected:
+  //! Used to update the button positions
+  virtual void resizeEvent(QResizeEvent *event) override;
 
  private:
   struct PrivateData;
