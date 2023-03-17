@@ -39,8 +39,8 @@ class IReferenceExplorer : public QWidget {
   IReferenceExplorer &operator=(const IReferenceExplorer &) = delete;
 
  signals:
-  //! Emitted when an item has been clicked
-  void ItemClicked(const QModelIndex &index);
+  //! Emitted when the selected item has changed
+  void SelectedItemChanged(const QModelIndex &index);
 
   //! Emitted when an item has been activated using the dedicated button
   void ItemActivated(const QModelIndex &index);

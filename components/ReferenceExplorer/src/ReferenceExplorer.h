@@ -71,8 +71,9 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Used to automatically select the first inserted root
   void OnRowsInserted(const QModelIndex &parent, int first, int last);
 
-  //! Called when the user clicks an item
-  void OnItemClick(const QModelIndex &index);
+  //! Called when the user selects an item
+  void OnCurrentItemChanged(const QModelIndex &current_index,
+                            const QModelIndex &previous_index);
 
   //! Custom context menu for the tree view items
   void OnOpenItemContextMenu(const QPoint &point);

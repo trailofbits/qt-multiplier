@@ -106,9 +106,6 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);
 
-  connect(d->tree_view, &QTreeView::pressed, this,
-          &ReferenceExplorer::OnItemClick);
-
   connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
           &ReferenceExplorer::OnOpenItemContextMenu);
 
@@ -224,6 +221,12 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
   d->model_proxy->setSourceModel(d->model);
 
   d->tree_view->setModel(d->model_proxy);
+
+  // Note: this needs to happen after the model has been set in the
+  // tree view!
+  auto tree_selection_model = d->tree_view->selectionModel();
+  connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
+          &ReferenceExplorer::OnCurrentItemChanged);
 
   connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
           &ReferenceExplorer::OnModelReset);
@@ -387,17 +390,16 @@ void ReferenceExplorer::OnRowsInserted(const QModelIndex &parent, int first,
   if (parent_is_root && first == 0) {
     auto first_root_index = d->tree_view->model()->index(0, 0);
 
-    auto &selection_model = *d->tree_view->selectionModel();
-    selection_model.setCurrentIndex(first_root_index,
-                                    QItemSelectionModel::SelectCurrent);
-
     d->tree_view->setCurrentIndex(first_root_index);
-    emit ItemClicked(first_root_index);
+    d->tree_view->setFocus();
+
+    OnCurrentItemChanged(first_root_index, QModelIndex());
   }
 }
 
-void ReferenceExplorer::OnItemClick(const QModelIndex &index) {
-  emit ItemClicked(index);
+void ReferenceExplorer::OnCurrentItemChanged(const QModelIndex &current_index,
+                                             const QModelIndex &) {
+  emit SelectedItemChanged(current_index);
 }
 
 void ReferenceExplorer::OnOpenItemContextMenu(const QPoint &point) {
