@@ -40,11 +40,11 @@ struct ContextMenu final {
 
 struct TreeviewItemButtons final {
   std::optional<QModelIndex> opt_hovered_index;
-  struct {
-    QPushButton *open{nullptr};
-    QPushButton *close{nullptr};
-    QPushButton *expand{nullptr};
-  } buttons;
+
+  // Keep up to date with UpdateTreeViewItemButtons
+  QPushButton *open{nullptr};
+  QPushButton *close{nullptr};
+  QPushButton *expand{nullptr};
 };
 
 }  // namespace
@@ -118,32 +118,29 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setDropIndicatorShown(true);
 
   // Initialize the treeview item buttons
-  auto item_activate_button =
+  d->treeview_item_buttons.open =
       new QPushButton(QIcon(":/ReferenceExplorer/activate_ref_item"), "", this);
-  item_activate_button->setToolTip(tr("Open"));
 
-  d->treeview_item_buttons.buttons.open = item_activate_button;
+  d->treeview_item_buttons.open->setToolTip(tr("Open"));
 
-  connect(item_activate_button, &QPushButton::pressed, this,
+  connect(d->treeview_item_buttons.open, &QPushButton::pressed, this,
           &ReferenceExplorer::OnActivateTreeViewItem);
 
   // Initialize the treeview item buttons
-  auto item_close_button =
+  d->treeview_item_buttons.close =
       new QPushButton(QIcon(":/ReferenceExplorer/close_ref_item"), "", this);
-  item_close_button->setToolTip(tr("Close"));
 
-  d->treeview_item_buttons.buttons.close = item_close_button;
+  d->treeview_item_buttons.close->setToolTip(tr("Close"));
 
-  connect(item_close_button, &QPushButton::pressed, this,
+  connect(d->treeview_item_buttons.close, &QPushButton::pressed, this,
           &ReferenceExplorer::OnCloseTreeViewItem);
 
-  auto item_expand_button =
+  d->treeview_item_buttons.expand =
       new QPushButton(QIcon(":/ReferenceExplorer/expand_ref_item"), "", this);
-  item_expand_button->setToolTip(tr("Expand"));
 
-  d->treeview_item_buttons.buttons.expand = item_expand_button;
+  d->treeview_item_buttons.expand->setToolTip(tr("Expand"));
 
-  connect(item_expand_button, &QPushButton::pressed, this,
+  connect(d->treeview_item_buttons.expand, &QPushButton::pressed, this,
           &ReferenceExplorer::OnExpandTreeViewItem);
 
   // Create the search widget
@@ -296,65 +293,60 @@ bool ReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
 }
 
 void ReferenceExplorer::UpdateTreeViewItemButtons() {
-  if (!d->treeview_item_buttons.opt_hovered_index.has_value()) {
-    d->treeview_item_buttons.buttons.open->setVisible(false);
-    d->treeview_item_buttons.buttons.close->setVisible(false);
-    d->treeview_item_buttons.buttons.expand->setVisible(false);
+  // Keep up to date with TreeviewItemButtons
+  std::vector<QPushButton *> button_list{d->treeview_item_buttons.open,
+                                         d->treeview_item_buttons.close,
+                                         d->treeview_item_buttons.expand};
+
+  // Always show the buttons, but disable the ones that are not
+  // applicable. This is to prevent buttons from disappearing and/or
+  // reordering while the user is clicking them
+  auto display_buttons = d->treeview_item_buttons.opt_hovered_index.has_value();
+
+  for (auto &button : button_list) {
+    button->setVisible(display_buttons);
+  }
+
+  if (!display_buttons) {
     return;
   }
 
-  std::vector<QPushButton *> button_list;
   const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
 
   // Enable the go-to button if we have a referenced entity id.
-  auto entity_id = index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
-  if (entity_id.isValid() &&
-      qvariant_cast<RawEntityId>(entity_id) != kInvalidEntityId) {
-    d->treeview_item_buttons.buttons.open->setVisible(true);
-    button_list.push_back(d->treeview_item_buttons.buttons.open);
+  d->treeview_item_buttons.open->setEnabled(false);
+  d->treeview_item_buttons.expand->setEnabled(false);
 
-  } else {
-    d->treeview_item_buttons.buttons.open->setVisible(false);
+  auto entity_id_var =
+      index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
+  if (entity_id_var.isValid() &&
+      qvariant_cast<RawEntityId>(entity_id_var) != kInvalidEntityId) {
+
+    d->treeview_item_buttons.open->setEnabled(true);
   }
-
-  // Always show the close button.
-  d->treeview_item_buttons.buttons.close->setVisible(true);
-  button_list.push_back(d->treeview_item_buttons.buttons.close);
 
   // Enable the expansion button if we haven't yet expanded the node.
   auto mode = index.data(IReferenceExplorerModel::DefaultExpansionMode);
   if (mode.isValid() &&
       (qvariant_cast<IReferenceExplorerModel::ExpansionMode>(mode) !=
        IReferenceExplorerModel::AlreadyExpanded)) {
-    d->treeview_item_buttons.buttons.expand->setVisible(true);
-    button_list.push_back(d->treeview_item_buttons.buttons.expand);
-  } else {
-    d->treeview_item_buttons.buttons.expand->setVisible(false);
-  }
 
-  auto button_count = static_cast<int>(button_list.size());
-  if (!button_count) {
-    return;
+    d->treeview_item_buttons.expand->setEnabled(true);
   }
 
   auto rect = d->tree_view->visualRect(index);
 
-  // TODO(pag): Try to place the buttons to the left of any vertical scroll bar
-  //            if a horizontal scrollbar is present.
-  //  auto max_width = d->tree_view->viewport()->width();
-  //  if (max_width >= rect.width()) {
-  //    rect.setWidth(max_width - d->tree_view->verticalScrollBar()->width());
-  //  }
-
   auto button_margin = rect.height() / 6;
   auto button_size = rect.height() - (button_margin * 2);
+
+  auto button_count = static_cast<int>(button_list.size());
   auto button_area_width =
       (button_count * button_size) + (button_count * button_margin);
 
   auto current_x = rect.x() + rect.width() - button_area_width;
   auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
 
-  for (QPushButton *button : button_list) {
+  for (auto *button : button_list) {
     button->resize(button_size, button_size);
     button->move(current_x, current_y);
     button->raise();
