@@ -423,7 +423,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   } else if (role == IReferenceExplorerModel::InternalIdentifierRole) {
     value.setValue(node_id);
 
-  } else if (role == IReferenceExplorerModel::DefaultExpansionMode) {
+  } else if (role == IReferenceExplorerModel::ExpansionModeRole) {
     value.setValue(node.expansion_mode);
   }
 

@@ -25,8 +25,14 @@ class IReferenceExplorerModel : public QAbstractItemModel {
  public:
   //! Expansion modes.
   enum ExpansionMode {
-    //! A node whose current expansion mode has already been activated. This
-    //! is used to prevent us from repeatedly expanding the same node.
+    //! \todo As this is not a mode, it should be moved to a new item data
+    //!       role such as 'ExpansionStatusRole'. Currently, it is going to
+    //!       hide the original ExpansionModeRole value once expansion takes
+    //!       place. The real value could be used by the view to apply per-item
+    //!       paint rules and to refresh the button status when this property
+    //!       changes from the model.
+    //! \brief A node whose current expansion mode has already been activated
+    //! This is used to prevent us from repeatedly expanding the same node.
     AlreadyExpanded,
 
     //! Expand showing the call hierarchy.
@@ -42,10 +48,7 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     LocationRole = Qt::UserRole + 1,
 
     //! Returns the default expansion mode for this node's children.
-    DefaultExpansionMode,
-
-    //! Tells us whether or not this node has been expanded.
-    HasBeenExpanded,
+    ExpansionModeRole,
 
     //! Returns the internal node identifier
     InternalIdentifierRole,
