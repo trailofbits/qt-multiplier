@@ -26,7 +26,6 @@
 #include <QVBoxLayout>
 
 #include <optional>
-#include <iostream>
 
 namespace mx::gui {
 
@@ -52,7 +51,7 @@ struct TreeviewItemButtons final {
 struct ReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
-  ReferenceExplorerTreeView *tree_view{nullptr};
+  QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
@@ -87,7 +86,7 @@ void ReferenceExplorer::InitializeWidgets() {
   setAcceptDrops(true);
 
   // Initialize the tree view
-  d->tree_view = new ReferenceExplorerTreeView;
+  d->tree_view = new QTreeView(this);
   d->tree_view->setHeaderHidden(true);
 
   // TODO(pag): Re-enable with some kind of "intrusive" sort that makes the
@@ -233,13 +232,7 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
           &ReferenceExplorer::OnDataChanged);
 
   connect(d->model_proxy, &QAbstractItemModel::rowsInserted, this,
-          &ReferenceExplorer::OnRowsAdded);
-
-  connect(d->model_proxy, &QAbstractItemModel::rowsAboutToBeRemoved, this,
-          &ReferenceExplorer::OnRowsAboutToBeRemoved);
-
-  connect(d->model_proxy, &QAbstractItemModel::rowsRemoved, this,
-          &ReferenceExplorer::OnRowsRemoved);
+          &ReferenceExplorer::OnRowsInserted);
 
   OnModelReset();
 }
@@ -371,8 +364,7 @@ void ReferenceExplorer::OnModelReset() {
   auto display_root_warning = d->model->HasAlternativeRoot();
   d->alternative_root_warning->setVisible(display_root_warning);
 
-  d->tree_view->expandRecursively(QModelIndex(), 1);
-  d->tree_view->resizeColumnToContents(0);
+  ExpandAllNodes();
 
   d->treeview_item_buttons.opt_hovered_index = std::nullopt;
   UpdateTreeViewItemButtons();
@@ -382,23 +374,26 @@ void ReferenceExplorer::OnDataChanged() {
   UpdateTreeViewItemButtons();
 }
 
-void ReferenceExplorer::OnRowsAdded(const QModelIndex &parent, int first,
-                                    int last) {
-  d->tree_view->rowsInserted(parent, first, last);
-  d->tree_view->expandRecursively(parent, 1);
+void ReferenceExplorer::ExpandAllNodes() {
+  d->tree_view->expandAll();
   d->tree_view->resizeColumnToContents(0);
 }
 
-void ReferenceExplorer::OnRowsRemoved(const QModelIndex &parent, int first,
-                                      int last) {
-  d->tree_view->rowsRemoved(parent, first, last);
-  d->tree_view->expandRecursively(parent, 1);
-  d->tree_view->resizeColumnToContents(0);
-}
+void ReferenceExplorer::OnRowsInserted(const QModelIndex &parent, int first,
+                                       int) {
+  ExpandAllNodes();
 
-void ReferenceExplorer::OnRowsAboutToBeRemoved(const QModelIndex &parent,
-                                               int first, int last) {
-  d->tree_view->rowsAboutToBeRemoved(parent, first, last);
+  auto parent_is_root{!parent.isValid()};
+  if (parent_is_root && first == 0) {
+    auto first_root_index = d->tree_view->model()->index(0, 0);
+
+    auto &selection_model = *d->tree_view->selectionModel();
+    selection_model.setCurrentIndex(first_root_index,
+                                    QItemSelectionModel::SelectCurrent);
+
+    d->tree_view->setCurrentIndex(first_root_index);
+    emit ItemClicked(first_root_index);
+  }
 }
 
 void ReferenceExplorer::OnItemClick(const QModelIndex &index) {

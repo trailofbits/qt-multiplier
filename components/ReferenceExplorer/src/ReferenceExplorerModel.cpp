@@ -122,21 +122,18 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
   std::uint64_t parent_node_id = node_it->second.parent_node_id;
 
   auto parent_it = node_map.find(parent_node_id);
-  bool full_reset = false;
 
   // Check if we're removing the alternate root.
   if (node_id == d->node_tree.curr_root_node_id) {
     Assert(d->node_tree.curr_root_node_id != d->node_tree.root_node_id,
            "Can't remove the true root node.");
     d->node_tree.curr_root_node_id = d->node_tree.root_node_id;
-    full_reset = true;
   }
 
   QModelIndex parent_index = QModelIndex();
   int parent_offset = 0;
   if (parent_it == node_map.end()) {
     Assert(false, "Missing parent node, or removing true root node");
-    full_reset = true;
 
     // We're removing something inside of our parent.
   } else {
@@ -152,7 +149,6 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
     }
     if (!found) {
       Assert(false, "Didn't find node to be deleted in parent's child list.");
-      full_reset = true;
     }
 
     if (parent_node_id != d->node_tree.curr_root_node_id) {
@@ -160,12 +156,7 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
     }
   }
 
-  if (full_reset) {
-    emit beginResetModel();
-
-  } else {
-    emit beginRemoveRows(parent_index, parent_offset, parent_offset);
-  }
+  emit beginResetModel();
 
   std::vector<std::uint64_t> wl;
   wl.push_back(node_id);
@@ -196,11 +187,7 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
         it, parent_it->second.child_node_id_list.end());
   }
 
-  if (full_reset) {
-    emit endResetModel();
-  } else {
-    emit endRemoveRows();
-  }
+  emit endResetModel();
 }
 
 bool ReferenceExplorerModel::HasAlternativeRoot() const {

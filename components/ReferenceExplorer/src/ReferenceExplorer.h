@@ -11,16 +11,7 @@
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
 
-#include <QTreeView>
-
 namespace mx::gui {
-
-class ReferenceExplorerTreeView final : public QTreeView {
- public:
-  using QTreeView::rowsAboutToBeRemoved;
-  using QTreeView::rowsInserted;
-  using QTreeView::rowsRemoved;
-};
 
 //! The implementation for the IReferenceExplorer interface
 class ReferenceExplorer final : public IReferenceExplorer {
@@ -74,14 +65,11 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! ExpansionStatusRole changes
   void OnDataChanged();
 
-  //! Like OnModelReset, but for row insertion
-  void OnRowsAdded(const QModelIndex &parent, int first, int last);
+  //! Automatically expands all nodes
+  void ExpandAllNodes();
 
-  //! Like OnModelReset, but for row deletion
-  void OnRowsRemoved(const QModelIndex &parent, int first, int last);
-
-  //! Like OnModelReset, but for row deletion
-  void OnRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last);
+  //! Used to automatically select the first inserted root
+  void OnRowsInserted(const QModelIndex &parent, int first, int last);
 
   //! Called when the user clicks an item
   void OnItemClick(const QModelIndex &index);
