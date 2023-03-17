@@ -86,7 +86,8 @@ gap::generator<Node> TaintedChildGenerator::GenerateNodes(void) {
 
     if (std::holds_alternative<TaintTrackingSink>(res)) {
       const TaintTrackingSink &sink = std::get<TaintTrackingSink>(res);
-      node.expansion_mode = IReferenceExplorerModel::AlreadyExpanded;
+      node.expansion_mode = IReferenceExplorerModel::TaintMode;
+      node.expanded = true;
       node.opt_name = QString::fromStdString(sink.message());
       node.referenced_entity_id = d->entity_id;
       node.opt_location = Location::Create(d->file_cache, sink.as_variant());

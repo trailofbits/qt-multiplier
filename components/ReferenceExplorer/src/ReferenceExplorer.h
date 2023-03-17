@@ -69,6 +69,11 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Used to expand and resize the items after a model reset
   void OnModelReset();
 
+  //! \brief Handles item button invalidation
+  //! Currently only used to update the item buttons when the
+  //! ExpansionStatusRole changes
+  void OnDataChanged();
+
   //! Like OnModelReset, but for row insertion
   void OnRowsAdded(const QModelIndex &parent, int first, int last);
 

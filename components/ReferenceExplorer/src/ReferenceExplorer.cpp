@@ -117,16 +117,27 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->setAcceptDrops(true);
   d->tree_view->setDropIndicatorShown(true);
 
-  // Initialize the treeview item buttons
-  d->treeview_item_buttons.open =
-      new QPushButton(QIcon(":/ReferenceExplorer/activate_ref_item"), "", this);
+  QIcon open_item_icon;
+  open_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/activate_ref_item_on"),
+                           QIcon::Normal, QIcon::On);
 
+  open_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/activate_ref_item_off"),
+                           QIcon::Disabled, QIcon::On);
+
+  QIcon expand_item_icon;
+  expand_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/expand_ref_item_on"),
+                             QIcon::Normal, QIcon::On);
+
+  expand_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/expand_ref_item_off"),
+                             QIcon::Disabled, QIcon::On);
+
+  // Initialize the treeview item buttons
+  d->treeview_item_buttons.open = new QPushButton(open_item_icon, "", this);
   d->treeview_item_buttons.open->setToolTip(tr("Open"));
 
   connect(d->treeview_item_buttons.open, &QPushButton::pressed, this,
           &ReferenceExplorer::OnActivateTreeViewItem);
 
-  // Initialize the treeview item buttons
   d->treeview_item_buttons.close =
       new QPushButton(QIcon(":/ReferenceExplorer/close_ref_item"), "", this);
 
@@ -135,9 +146,7 @@ void ReferenceExplorer::InitializeWidgets() {
   connect(d->treeview_item_buttons.close, &QPushButton::pressed, this,
           &ReferenceExplorer::OnCloseTreeViewItem);
 
-  d->treeview_item_buttons.expand =
-      new QPushButton(QIcon(":/ReferenceExplorer/expand_ref_item"), "", this);
-
+  d->treeview_item_buttons.expand = new QPushButton(expand_item_icon, "", this);
   d->treeview_item_buttons.expand->setToolTip(tr("Expand"));
 
   connect(d->treeview_item_buttons.expand, &QPushButton::pressed, this,
@@ -219,6 +228,9 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
 
   connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
           &ReferenceExplorer::OnModelReset);
+
+  connect(d->model_proxy, &QAbstractItemModel::dataChanged, this,
+          &ReferenceExplorer::OnDataChanged);
 
   connect(d->model_proxy, &QAbstractItemModel::rowsInserted, this,
           &ReferenceExplorer::OnRowsAdded);
@@ -319,6 +331,7 @@ void ReferenceExplorer::UpdateTreeViewItemButtons() {
 
   auto entity_id_var =
       index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
+
   if (entity_id_var.isValid() &&
       qvariant_cast<RawEntityId>(entity_id_var) != kInvalidEntityId) {
 
@@ -326,14 +339,13 @@ void ReferenceExplorer::UpdateTreeViewItemButtons() {
   }
 
   // Enable the expansion button if we haven't yet expanded the node.
-  auto mode = index.data(IReferenceExplorerModel::ExpansionModeRole);
-  if (mode.isValid() &&
-      (qvariant_cast<IReferenceExplorerModel::ExpansionMode>(mode) !=
-       IReferenceExplorerModel::AlreadyExpanded)) {
-
+  auto expansion_status_var =
+      index.data(IReferenceExplorerModel::ExpansionStatusRole);
+  if (expansion_status_var.isValid() && !expansion_status_var.toBool()) {
     d->treeview_item_buttons.expand->setEnabled(true);
   }
 
+  // Update the button positions
   auto rect = d->tree_view->visualRect(index);
 
   auto button_margin = rect.height() / 6;
@@ -361,6 +373,13 @@ void ReferenceExplorer::OnModelReset() {
 
   d->tree_view->expandRecursively(QModelIndex(), 1);
   d->tree_view->resizeColumnToContents(0);
+
+  d->treeview_item_buttons.opt_hovered_index = std::nullopt;
+  UpdateTreeViewItemButtons();
+}
+
+void ReferenceExplorer::OnDataChanged() {
+  UpdateTreeViewItemButtons();
 }
 
 void ReferenceExplorer::OnRowsAdded(const QModelIndex &parent, int first,

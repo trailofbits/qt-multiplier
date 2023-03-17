@@ -1,7 +1,9 @@
 <RCC>
     <qresource prefix="/ReferenceExplorer">
-        <file alias="activate_ref_item">Icons/activate_ref_item.png</file>
-        <file alias="expand_ref_item">Icons/expand_ref_item.png</file>
+        <file alias="activate_ref_item_on">Icons/activate_ref_item_on.png</file>
+        <file alias="activate_ref_item_off">Icons/activate_ref_item_off.png</file>
+        <file alias="expand_ref_item_on">Icons/expand_ref_item_on.png</file>
+        <file alias="expand_ref_item_off">Icons/expand_ref_item_off.png</file>
         <file alias="close_ref_item">Icons/close_ref_item.png</file>
     </qresource>
 </RCC>
