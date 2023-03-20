@@ -28,7 +28,17 @@ add_executable("Multiplier" MACOSX_BUNDLE
 
   src/meta_types.h
   src/meta_types.cpp
+
+  src/themes.h
+  src/themes.cpp
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  target_sources("Multiplier" PRIVATE
+    src/macos_utils.h
+    src/macos_utils.mm
+  )
+endif()
 
 target_sources("Multiplier" PRIVATE
   Resources/resources.qrc

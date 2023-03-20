@@ -6,6 +6,11 @@
 
 #include "MainWindow.h"
 #include "meta_types.h"
+#include "themes.h"
+
+#ifdef __APPLE__
+#  include "macos_utils.h"
+#endif
 
 #include <multiplier/ui/FontDatabase.h>
 
@@ -14,8 +19,14 @@
 #include <phantom/phantomstyle.h>
 
 int main(int argc, char *argv[]) {
-  QApplication::setStyle(new PhantomStyle);
+  QApplication::setStyle(new PhantomStyle());
   QApplication application(argc, argv);
+
+#ifdef __APPLE__
+  mx::gui::SetNSAppTheme(mx::gui::NSAppTheme::Dark);
+#else
+  application.setPalette(mx::gui::GetDarkPalette());
+#endif
 
   mx::gui::RegisterMetaTypes();
   mx::gui::InitializeFontDatabase();
