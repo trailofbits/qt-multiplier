@@ -6,8 +6,11 @@
 
 #pragma once
 
+#include <QPalette>
+
 namespace mx::gui {
 
-void RegisterMetaTypes();
+QPalette GetLightPalette();
+QPalette GetDarkPalette();
 
 }  // namespace mx::gui

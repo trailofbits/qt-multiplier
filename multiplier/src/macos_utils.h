@@ -6,8 +6,15 @@
 
 #pragma once
 
+#include <QWidget>
+
 namespace mx::gui {
 
-void RegisterMetaTypes();
+enum class NSAppTheme {
+  Dark,
+  Light,
+};
+
+void SetNSAppTheme(const NSAppTheme &theme);
 
 }  // namespace mx::gui
