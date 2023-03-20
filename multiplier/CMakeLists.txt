@@ -62,6 +62,7 @@ target_link_libraries("Multiplier"
     "mx_fontdatabase"
     "mx_indexview"
     "mx_referenceexplorer"
+    "mx_entityexplorer"
     "mx_widgets"
 )
 

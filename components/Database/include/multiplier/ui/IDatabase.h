@@ -21,6 +21,30 @@
 
 namespace mx::gui {
 
+//! A generic template that defines a batched data receiver
+template <typename DataType>
+class IBatchedDataTypeReceiver {
+ public:
+  //! Constructor
+  IBatchedDataTypeReceiver() = default;
+
+  //! Destructor
+  virtual ~IBatchedDataTypeReceiver() = default;
+
+  //! Disabled copy constructor
+  IBatchedDataTypeReceiver(const IBatchedDataTypeReceiver &) = delete;
+
+  //! Disabled copy assignment operator
+  IBatchedDataTypeReceiver &
+  operator=(const IBatchedDataTypeReceiver &) = delete;
+
+  //! A single batch of data of type `DataType`
+  using DataBatch = std::vector<DataType>;
+
+  //! A slot used to receive batched data
+  virtual void OnDataBatch(DataBatch data_batch) = 0;
+};
+
 //! The IDatabase class is responsible for all async operations
 class IDatabase {
  public:
@@ -58,6 +82,30 @@ class IDatabase {
   //! Starts a name resolution request for the given entity
   virtual QFuture<OptionalName>
   RequestEntityName(const RawEntityId &fragment_id) = 0;
+
+  //!
+  struct EntityQueryResult final {
+    //!
+    Fragment fragment;
+
+    //!
+    std::optional<File> opt_file;
+
+    //! The entity name
+    std::string name;
+
+    //! The entity data
+    std::variant<NamedDecl, DefineMacroDirective> data;
+  };
+
+  //! A data batch receiver for EntityQueryResult objects
+  using QueryEntitiesReceiver = IBatchedDataTypeReceiver<EntityQueryResult>;
+
+  //! Queries the internal index for all entities named like `name`
+  //! \return True in case of success, or false otherwise
+  virtual QFuture<bool> QueryEntities(QueryEntitiesReceiver &receiver,
+                                      const QString &name,
+                                      const bool &exact_name) = 0;
 
   //! Disabled copy constructor
   IDatabase(const IDatabase &) = delete;

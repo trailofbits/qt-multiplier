@@ -8,6 +8,7 @@
 
 #include <requests/GetIndexedTokenRangeData.h>
 #include <requests/GetEntityName.h>
+#include <requests/GetEntityList.h>
 
 #include <QThreadPool>
 #include <QtConcurrent>
@@ -42,6 +43,13 @@ QFuture<OptionalName>
 Database::RequestEntityName(const RawEntityId &fragment_id) {
   return QtConcurrent::run(&d->thread_pool, GetEntityName, d->index,
                            fragment_id);
+}
+
+QFuture<bool> Database::QueryEntities(QueryEntitiesReceiver &receiver,
+                                      const QString &name,
+                                      const bool &exact_name) {
+  return QtConcurrent::run(&d->thread_pool, GetEntityList, d->index, &receiver,
+                           name, exact_name);
 }
 
 Database::Database(const Index &index,

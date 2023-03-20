@@ -124,7 +124,8 @@ void SearchWidget::InitializeWidgets() {
 
   d->search_input = new QLineEdit();
   d->search_input->setClearButtonEnabled(true);
-  d->search_input->setPlaceholderText(tr("Search"));
+  d->search_input->setPlaceholderText(d->mode == Mode::Search ? tr("Search")
+                                                              : tr("Filter"));
   search_widget_layout->addWidget(d->search_input);
 
   if (d->mode == Mode::Search) {

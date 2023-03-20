@@ -9,6 +9,7 @@
 add_subdirectory("Assert")
 add_subdirectory("CodeView")
 add_subdirectory("Database")
+add_subdirectory("EntityExplorer")
 add_subdirectory("Util")
 add_subdirectory("FontDatabase")
 add_subdirectory("IndexView")

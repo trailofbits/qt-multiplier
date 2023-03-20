@@ -12,6 +12,7 @@
 #include <multiplier/Entities/StmtKind.h>
 #include <multiplier/ui/IIndexView.h>
 #include <multiplier/ui/IReferenceExplorer.h>
+#include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/Util.h>
 
 #include <QDockWidget>
@@ -42,6 +43,7 @@ struct MainWindow::PrivateData final {
   mx::FileLocationCache file_location_cache;
 
   IIndexView *index_view{nullptr};
+  IEntityExplorer *entity_explorer{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
@@ -73,6 +75,7 @@ void MainWindow::InitializeWidgets() {
   menuBar()->addMenu(d->view_menu);
 
   CreateFileTreeDock();
+  CreateEntityExplorerDock();
   CreateCodeView();
   CreateReferenceExplorerDock();
 }
@@ -93,6 +96,22 @@ void MainWindow::CreateFileTreeDock() {
   file_tree_dock->setWidget(d->index_view);
 
   addDockWidget(Qt::LeftDockWidgetArea, file_tree_dock);
+}
+
+void MainWindow::CreateEntityExplorerDock() {
+  auto entity_explorer_model =
+      IEntityExplorerModel::Create(d->index, d->file_location_cache, this);
+  d->entity_explorer = IEntityExplorer::Create(entity_explorer_model, this);
+
+  auto entity_explorer_dock = new QDockWidget(tr("Entity Explorer"), this);
+  entity_explorer_dock->setAllowedAreas(Qt::LeftDockWidgetArea |
+                                        Qt::RightDockWidgetArea);
+
+  d->view_menu->addAction(entity_explorer_dock->toggleViewAction());
+
+  entity_explorer_dock->setWidget(d->entity_explorer);
+
+  addDockWidget(Qt::LeftDockWidgetArea, entity_explorer_dock);
 }
 
 void MainWindow::CreateReferenceExplorerDock() {
@@ -432,8 +451,8 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 }
 
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
-  auto entity_id_role = index.data(
-      IReferenceExplorerModel::ReferencedEntityIdRole);
+  auto entity_id_role =
+      index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
   if (!entity_id_role.isValid()) {
     entity_id_role = index.data(IReferenceExplorerModel::EntityIdRole);
     if (!entity_id_role.isValid()) {
