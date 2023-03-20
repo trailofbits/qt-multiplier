@@ -34,6 +34,7 @@ class MainWindow final : public QMainWindow {
 
   void InitializeWidgets();
   void CreateFileTreeDock();
+  void CreateEntityExplorerDock();
   void CreateReferenceExplorerDock();
   void CreateNewReferenceExplorer(QString window_title);
   void CreateCodeView();

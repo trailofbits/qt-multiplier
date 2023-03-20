@@ -25,6 +25,11 @@ class Database final : public IDatabase {
   virtual QFuture<OptionalName>
   RequestEntityName(const RawEntityId &fragment_id) override;
 
+  //! \copybrief IDatabase::QueryEntities
+  virtual QFuture<bool> QueryEntities(QueryEntitiesReceiver &receiver,
+                                      const QString &name,
+                                      const bool &exact_name) override;
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
