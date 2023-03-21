@@ -31,20 +31,25 @@ int EntityExplorerModel::rowCount(const QModelIndex &) const {
 
 QVariant EntityExplorerModel::data(const QModelIndex &index, int role) const {
   QVariant value;
-  if (!index.isValid() || role != Qt::DisplayRole) {
+  if (!index.isValid()) {
     return value;
   }
 
-  auto row_it = d->row_list.begin();
-  row_it = std::next(row_it, index.row());
+  auto row_it = std::next(d->row_list.begin(), index.row());
+  if (row_it == d->row_list.end()) {
+    return value;
+  }
 
-  if (row_it != d->row_list.end()) {
-    const auto &row = *row_it;
+  const auto &row = *row_it;
 
+  if (role == Qt::DisplayRole) {
     const auto &string_view = row.name_token.data();
     auto string_view_size = static_cast<qsizetype>(string_view.size());
 
     value.setValue(QString::fromUtf8(string_view.data(), string_view_size));
+
+  } else if (role == EntityExplorerModel::TokenRole) {
+    value.setValue(row.name_token);
   }
 
   return value;

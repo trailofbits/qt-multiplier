@@ -18,6 +18,9 @@ add_library("mx_entityexplorer"
 
   src/EntityExplorer.h
   src/EntityExplorer.cpp
+
+  src/CodeItem.h
+  src/CodeItem.cpp
 )
 
 target_link_libraries("mx_entityexplorer"
@@ -30,6 +33,7 @@ target_link_libraries("mx_entityexplorer"
     "mx_assert"
     "mx_searchwidget"
     "mx_database"
+    "mx_codeview"
 )
 
 target_include_directories("mx_entityexplorer" PRIVATE
