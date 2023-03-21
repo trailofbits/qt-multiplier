@@ -103,7 +103,7 @@ void MainWindow::CreateEntityExplorerDock() {
       IEntityExplorerModel::Create(d->index, d->file_location_cache, this);
   d->entity_explorer = IEntityExplorer::Create(entity_explorer_model, this);
 
-  auto entity_explorer_dock = new QDockWidget(tr("Entity Explorer"), this);
+  auto entity_explorer_dock = new QDockWidget(tr("Symbols"), this);
   entity_explorer_dock->setAllowedAreas(Qt::LeftDockWidgetArea |
                                         Qt::RightDockWidgetArea);
 
