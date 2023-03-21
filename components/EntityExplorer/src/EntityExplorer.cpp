@@ -50,8 +50,9 @@ void EntityExplorer::InitializeWidgets() {
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
 
-  auto dark_theme = GetDefaultTheme(true);
-  auto list_view_item_delegate = new CodeItem(dark_theme, this);
+  static const auto kRequestDarkTheme{true};
+  auto list_view_item_delegate =
+      new CodeItem(GetDefaultCodeViewTheme(kRequestDarkTheme), this);
 
   d->list_view = new QListView(this);
   d->list_view->setItemDelegate(list_view_item_delegate);

@@ -19,12 +19,6 @@ add_library("mx_codeview"
   src/CodeModel.h
   src/CodeModel.cpp
 
-  include/multiplier/ui/CodeViewTheme.h
-  src/CodeViewTheme.cpp
-
-  src/DefaultCodeViewThemes.h
-  src/DefaultCodeViewThemes.cpp
-
   src/GoToLineWidget.h
   src/GoToLineWidget.cpp
 )
@@ -39,6 +33,7 @@ target_link_libraries("mx_codeview"
     "mx_util"
     "mx_database"
     "mx_searchwidget"
+    "mx_codeviewtheme"
 )
 
 target_include_directories("mx_codeview" PRIVATE

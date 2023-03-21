@@ -53,7 +53,6 @@ struct CodeViewTheme final {
   Style TextStyle(const QVariant &category) const;
 };
 
-// TODO(alessandro): Implement function that loads a theme from file
-CodeViewTheme GetDefaultTheme(bool dark_mode);
+CodeViewTheme GetDefaultCodeViewTheme(bool dark_mode);
 
 }  // namespace mx::gui

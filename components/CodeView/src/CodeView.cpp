@@ -7,7 +7,6 @@
 */
 
 #include "CodeView.h"
-#include "DefaultCodeViewThemes.h"
 #include "GoToLineWidget.h"
 
 #include <multiplier/ui/Assert.h>
@@ -297,7 +296,8 @@ void CodeView::InitializeWidgets() {
           &CodeView::OnGoToLine);
 
   // This will also cause a model reset update
-  SetTheme(kDefaultDarkCodeViewTheme);
+  static const auto kRequestDarkTheme{true};
+  SetTheme(GetDefaultCodeViewTheme(kRequestDarkTheme));
 }
 
 std::optional<CodeModelIndex>
