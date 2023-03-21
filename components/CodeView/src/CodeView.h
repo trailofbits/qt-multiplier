@@ -156,26 +156,6 @@ class CodeView final : public ICodeView {
                      const std::optional<CreateTextDocumentProgressCallback>
                          &opt_progress_callback = std::nullopt);
 
-  //! Returns the color map entry that matches with the given token category
-  static std::optional<QColor> GetTextColorMapEntryFromTheme(
-      const QVariant &token_category_var,
-      const std::unordered_map<TokenCategory, QColor> &color_map);
-
-  //! Returns the correct background color from the code view theme
-  static std::optional<QColor>
-  GetTextBackgroundColorFromTheme(const CodeViewTheme &theme,
-                                  const QVariant &token_category_var);
-
-  //! Returns the correct foreground color from the code view theme
-  static QColor
-  GetTextForegroundColorFromTheme(const CodeViewTheme &theme,
-                                  const QVariant &token_category_var);
-
-  //! Returns the correct text style options from the code view theme
-  static CodeViewTheme::Style
-  GetTextStyleFromTheme(const CodeViewTheme &theme,
-                        const QVariant &token_category_var);
-
   //! Initializes the given text_format object according to the code view theme
   static void ConfigureTextFormatFromTheme(QTextCharFormat &text_format,
                                            const CodeViewTheme &theme,
