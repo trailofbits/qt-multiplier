@@ -20,6 +20,12 @@ class IEntityExplorerModel : public QAbstractListModel {
   Q_OBJECT
 
  public:
+  //! Additional item data roles for this model
+  enum ItemDataRole {
+    //! Returns a Token object
+    TokenRole = Qt::UserRole + 1,
+  };
+
   //! Factory method
   static IEntityExplorerModel *
   Create(const Index &index, const FileLocationCache &file_location_cache,
