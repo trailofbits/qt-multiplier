@@ -89,16 +89,17 @@ void EntityExplorer::InitializeWidgets() {
 
 void EntityExplorer::InstallModel(IEntityExplorerModel *model) {
   d->model = model;
-  d->model->setParent(this);
 
   d->model_proxy = new QSortFilterProxyModel(this);
-  d->model_proxy->setRecursiveFilteringEnabled(false);
+  d->model->setParent(d->model_proxy);
+
   d->model_proxy->setSourceModel(d->model);
+  d->model_proxy->setRecursiveFilteringEnabled(false);
   d->model_proxy->setFilterRole(Qt::DisplayRole);
 
   d->list_view->setModel(d->model_proxy);
 
-  connect(d->model, &QAbstractListModel::modelReset, this,
+  connect(d->model_proxy, &QAbstractListModel::modelReset, this,
           &EntityExplorer::OnModelReset);
 
   OnModelReset();

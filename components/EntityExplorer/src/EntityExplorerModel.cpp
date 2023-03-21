@@ -55,6 +55,23 @@ QVariant EntityExplorerModel::data(const QModelIndex &index, int role) const {
   return value;
 }
 
+QModelIndex EntityExplorerModel::index(int row, int column,
+                                       const QModelIndex &) const {
+  if (row >= rowCount(QModelIndex()) || column != 0) {
+    return QModelIndex();
+  }
+
+  return createIndex(row, column);
+}
+
+QModelIndex EntityExplorerModel::parent(const QModelIndex &) const {
+  return QModelIndex();
+}
+
+int EntityExplorerModel::columnCount(const QModelIndex &) const {
+  return 1;
+}
+
 void EntityExplorerModel::Search(const QString &name, const bool &exact_name) {
   CancelSearch();
 

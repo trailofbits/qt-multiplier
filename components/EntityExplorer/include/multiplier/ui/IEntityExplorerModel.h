@@ -11,12 +11,12 @@
 #include <multiplier/Index.h>
 #include <multiplier/Types.h>
 
-#include <QAbstractListModel>
+#include <QAbstractItemModel>
 
 namespace mx::gui {
 
 //! A model for the entity explorer widget
-class IEntityExplorerModel : public QAbstractListModel {
+class IEntityExplorerModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
@@ -32,7 +32,7 @@ class IEntityExplorerModel : public QAbstractListModel {
          QObject *parent = nullptr);
 
   //! Constructor
-  IEntityExplorerModel(QObject *parent) : QAbstractListModel(parent) {}
+  IEntityExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}
 
   //! Destructor
   virtual ~IEntityExplorerModel() override = default;

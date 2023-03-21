@@ -31,6 +31,18 @@ class EntityExplorerModel final : public IEntityExplorerModel,
   virtual QVariant data(const QModelIndex &index,
                         int role = Qt::DisplayRole) const override;
 
+  //! Returns a model index for the specified item
+  virtual QModelIndex index(int row, int column,
+                            const QModelIndex &parent) const override;
+
+  //! Returns the parent model index for the specified item
+  //! \return Always returns an invalid model index
+  virtual QModelIndex parent(const QModelIndex &child) const override;
+
+  //! Returns the amount of column under the given parent
+  //! \return Always returns 1
+  virtual int columnCount(const QModelIndex &parent) const override;
+
  public slots:
   //! Starts a new search request
   virtual void Search(const QString &name, const bool &exact_name) override;
