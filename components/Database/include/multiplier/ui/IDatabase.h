@@ -15,6 +15,7 @@
 #include <QFutureWatcher>
 #include <QString>
 
+#include <deque>
 #include <variant>
 #include <vector>
 #include <optional>
@@ -39,7 +40,7 @@ class IBatchedDataTypeReceiver {
   operator=(const IBatchedDataTypeReceiver &) = delete;
 
   //! A single batch of data of type `DataType`
-  using DataBatch = std::vector<DataType>;
+  using DataBatch = std::deque<DataType>;
 
   //! A slot used to receive batched data
   virtual void OnDataBatch(DataBatch data_batch) = 0;

@@ -89,7 +89,7 @@ QSize EntityExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
 
   QSize contents_size = d.SizeHint(option, qvariant_cast<Token>(val));
 
-  QStyleOptionViewItem opt = option;
+  QStyleOptionViewItem opt(option);
   initStyleOption(&opt, index);
   QStyle *style = opt.widget ? opt.widget->style() : qApp->style();
   return style->sizeFromContents(QStyle::ContentsType::CT_ItemViewItem, &opt,
