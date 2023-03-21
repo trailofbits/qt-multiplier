@@ -58,7 +58,6 @@ void EntityExplorer::InitializeWidgets() {
   d->list_view = new QListView(this);
   d->list_view->setItemDelegate(list_view_item_delegate);
   d->list_view->viewport()->installEventFilter(this);
-  d->list_view->setResizeMode(QListView::Adjust);
   layout->addWidget(d->list_view);
 
   d->filter_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);

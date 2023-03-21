@@ -74,6 +74,8 @@ void MainWindow::InitializeWidgets() {
   d->view_menu = new QMenu(tr("View"));
   menuBar()->addMenu(d->view_menu);
 
+  setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::East);
+  setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
   CreateFileTreeDock();
   CreateEntityExplorerDock();
   CreateCodeView();
