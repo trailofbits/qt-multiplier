@@ -12,6 +12,7 @@
 #include <multiplier/ui/IEntityExplorerModel.h>
 
 #include <multiplier/Token.h>
+#include <multiplier/Entities/TokenKind.h>
 
 #include <QApplication>
 #include <QFont>
@@ -59,6 +60,8 @@ struct EntityExplorerItemDelegate::PrivateData {
 
   int num_printed_since_space{0};
   qreal tab_width{4};
+  qreal line_height{};
+  qreal space_width{};
 
   static QFont CreateFont(const CodeViewTheme &theme_) {
     QFont font(theme_.font_name);
@@ -69,7 +72,9 @@ struct EntityExplorerItemDelegate::PrivateData {
   inline PrivateData(const CodeViewTheme &theme_)
       : theme(theme_),
         font(CreateFont(theme)),
-        font_metrics(font) {}
+        font_metrics(font),
+        line_height(font_metrics.height()),
+        space_width(font_metrics.horizontalAdvance(QChar::Space)) {}
 
   // Return the data of `tok`, but possibly adjusted for whitespace.
   const std::string &Characters(const Token &tok);
@@ -91,6 +96,13 @@ EntityExplorerItemDelegate::PrivateData::Characters(const Token &tok) {
   if (whitespace.has_value()) {
     for (char ch : token_chars) {
       switch (ch) {
+        case '\\':
+          if (tok.kind() != TokenKind::WHITESPACE) {
+            num_printed_since_space += 1;
+            token_data.push_back(ch);
+            continue;
+          }
+          [[clang::fallthrough]];
         case ' ':
         case '\t':
         case '\n':
@@ -181,6 +193,8 @@ void EntityExplorerItemDelegate::SetTheme(const CodeViewTheme &theme) {
   d->theme = theme;
   d->font = PrivateData::CreateFont(theme);
   d->font_metrics = QFontMetricsF(d->font);
+  d->line_height = d->font_metrics.height();
+  d->space_width = d->font_metrics.horizontalAdvance(QChar::Space);
 }
 
 void EntityExplorerItemDelegate::SetTabWidth(std::size_t width) {
@@ -260,9 +274,7 @@ QSize EntityExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
   }
 
   QPointF pos = option.rect.toRectF().topLeft();
-  QRectF empty_rect(pos.x(), pos.y(),
-                    d->font_metrics.horizontalAdvance(QChar::Space),
-                    d->font_metrics.height());
+  QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
   MeasuringPainter painter(empty_rect);
 
   if (is_range) {
