@@ -19,8 +19,8 @@ add_library("mx_entityexplorer"
   src/EntityExplorer.h
   src/EntityExplorer.cpp
 
-  src/CodeItem.h
-  src/CodeItem.cpp
+  src/EntityExplorerItemDelegate.h
+  src/EntityExplorerItemDelegate.cpp
 )
 
 target_link_libraries("mx_entityexplorer"

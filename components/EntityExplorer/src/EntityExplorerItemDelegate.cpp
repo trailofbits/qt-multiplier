@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "CodeItem.h"
+#include "EntityExplorerItemDelegate.h"
 
 #include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/IEntityExplorerModel.h>
@@ -50,7 +50,7 @@ class MeasuringPainter {
 
 }  // namespace
 
-struct CodeItem::PrivateData {
+struct EntityExplorerItemDelegate::PrivateData {
   CodeViewTheme theme;
   QFont font;
   QFontMetricsF font_metrics;
@@ -83,7 +83,8 @@ struct CodeItem::PrivateData {
 //! Generate the characters of `data`. If `whitespace` has a value, then we
 //! encode any sequence of whitespace into a single space token. Also in this
 //! special mode, leading and trailing whitespace are not generated.
-const std::string &CodeItem::PrivateData::Characters(const Token &tok) {
+const std::string &
+EntityExplorerItemDelegate::PrivateData::Characters(const Token &tok) {
   token_data.clear();
   auto token_chars = tok.data();
 
@@ -113,9 +114,9 @@ const std::string &CodeItem::PrivateData::Characters(const Token &tok) {
 }
 
 template <typename Painter>
-void CodeItem::PrivateData::PaintToken(Painter *painter,
-                                       const QStyleOptionViewItem &option,
-                                       const Token &token, QPointF &pos_inout) {
+void EntityExplorerItemDelegate::PrivateData::PaintToken(
+    Painter *painter, const QStyleOptionViewItem &option, const Token &token,
+    QPointF &pos_inout) {
 
   num_printed_since_space = 0;  // Reset.
 
@@ -145,7 +146,10 @@ void CodeItem::PrivateData::PaintToken(Painter *painter,
     }
 
     glyph_rect.moveTo(pos_inout);
-    painter->fillRect(glyph_rect, bg);
+
+    if ((option.state & QStyle::State_Selected) == 0) {
+      painter->fillRect(glyph_rect, bg);
+    }
 
     switch (ch.unicode()) {
       case QChar::Tabulation:
@@ -166,33 +170,35 @@ void CodeItem::PrivateData::PaintToken(Painter *painter,
   }
 }
 
-CodeItem::CodeItem(const CodeViewTheme &theme, QObject *parent)
+EntityExplorerItemDelegate::EntityExplorerItemDelegate(
+    const CodeViewTheme &theme, QObject *parent)
     : QStyledItemDelegate(parent),
       d(new PrivateData(theme)) {}
 
-CodeItem::~CodeItem(void) {}
+EntityExplorerItemDelegate::~EntityExplorerItemDelegate(void) {}
 
-void CodeItem::SetTheme(const CodeViewTheme &theme) {
+void EntityExplorerItemDelegate::SetTheme(const CodeViewTheme &theme) {
   d->theme = theme;
   d->font = PrivateData::CreateFont(theme);
   d->font_metrics = QFontMetricsF(d->font);
 }
 
-void CodeItem::SetTabWidth(std::size_t width) {
+void EntityExplorerItemDelegate::SetTabWidth(std::size_t width) {
   d->tab_width = static_cast<qreal>(width);
 }
 
-void CodeItem::SetWhitespaceReplacement(QString data) {
+void EntityExplorerItemDelegate::SetWhitespaceReplacement(QString data) {
   ClearWhitespaceReplacement();
   d->whitespace = std::move(data);
 }
 
-void CodeItem::ClearWhitespaceReplacement(void) {
+void EntityExplorerItemDelegate::ClearWhitespaceReplacement(void) {
   d->whitespace.reset();
 }
 
-void CodeItem::paint(QPainter *painter, const QStyleOptionViewItem &option,
-                     const QModelIndex &index) const {
+void EntityExplorerItemDelegate::paint(QPainter *painter,
+                                       const QStyleOptionViewItem &option,
+                                       const QModelIndex &index) const {
   if (!index.isValid()) {
     this->QStyledItemDelegate::paint(painter, option, index);
     return;
@@ -213,10 +219,12 @@ void CodeItem::paint(QPainter *painter, const QStyleOptionViewItem &option,
 
   painter->save();
 
-  // Set the background; `setBackground` doesn't quite work so we use
-  // `option.rect` as well.
-  painter->setBackground(d->theme.default_background_color);
-  painter->fillRect(option.rect, d->theme.default_background_color);
+  // Make sure that the system selection highlight is honored
+  if ((option.state & QStyle::State_Selected) != 0) {
+    painter->fillRect(option.rect, option.palette.highlight());
+  } else {
+    painter->fillRect(option.rect, d->theme.default_background_color);
+  }
 
   painter->setRenderHint(QPainter::Antialiasing, true);
 
@@ -234,8 +242,8 @@ void CodeItem::paint(QPainter *painter, const QStyleOptionViewItem &option,
   painter->restore();
 }
 
-QSize CodeItem::sizeHint(const QStyleOptionViewItem &option,
-                         const QModelIndex &index) const {
+QSize EntityExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
+                                           const QModelIndex &index) const {
   if (!index.isValid()) {
     return this->QStyledItemDelegate::sizeHint(option, index);
   }
