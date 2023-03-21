@@ -11,6 +11,9 @@
 #include "GoToLineWidget.h"
 
 #include <multiplier/ui/Assert.h>
+#include <multiplier/ui/CodeViewTheme.h>
+
+#include <multiplier/Entities/TokenCategory.h>
 
 #include <QFont>
 #include <QVBoxLayout>
@@ -644,81 +647,25 @@ QTextDocument *CodeView::CreateTextDocument(
   return document;
 }
 
-std::optional<QColor> CodeView::GetTextColorMapEntryFromTheme(
-    const QVariant &token_category_var,
-    const std::unordered_map<TokenCategory, QColor> &color_map) {
-
-  if (!token_category_var.isValid()) {
-    return std::nullopt;
-  }
-
-  const auto &token_category =
-      static_cast<TokenCategory>(token_category_var.toUInt());
-
-  auto it = color_map.find(token_category);
-  if (it == color_map.end()) {
-    return std::nullopt;
-
-  } else {
-    return it->second;
-  }
-}
-
-std::optional<QColor>
-CodeView::GetTextBackgroundColorFromTheme(const CodeViewTheme &theme,
-                                          const QVariant &token_category_var) {
-
-  return GetTextColorMapEntryFromTheme(token_category_var,
-                                       theme.token_background_color_map);
-}
-
-QColor
-CodeView::GetTextForegroundColorFromTheme(const CodeViewTheme &theme,
-                                          const QVariant &token_category_var) {
-
-  auto opt_color = GetTextColorMapEntryFromTheme(
-      token_category_var, theme.token_foreground_color_map);
-
-  return opt_color.value_or(theme.default_foreground_color);
-}
-
-CodeViewTheme::Style
-CodeView::GetTextStyleFromTheme(const CodeViewTheme &theme,
-                                const QVariant &token_category_var) {
-  if (!token_category_var.isValid()) {
-    return {};
-  }
-
-  const auto &token_category =
-      static_cast<TokenCategory>(token_category_var.toUInt());
-
-  auto it = theme.token_style_map.find(token_category);
-  if (it == theme.token_style_map.end()) {
-    return {};
-
-  } else {
-    return it->second;
-  }
-}
-
 void CodeView::ConfigureTextFormatFromTheme(
     QTextCharFormat &text_format, const CodeViewTheme &theme,
     const QVariant &token_category_var) {
-
-  auto opt_background_color =
-      GetTextBackgroundColorFromTheme(theme, token_category_var);
-  if (opt_background_color.has_value()) {
-    text_format.setBackground(opt_background_color.value());
+  if (!token_category_var.isValid()) {
+    return;
   }
 
-  auto foreground_color =
-      GetTextForegroundColorFromTheme(theme, token_category_var);
-  text_format.setForeground(foreground_color);
+  bool is_ok = true;
+  auto token_category_uint = token_category_var.toUInt(&is_ok);
+  if (!is_ok || token_category_uint >= NumEnumerators(TokenCategory{})) {
+    return;
+  }
 
-  auto text_style = GetTextStyleFromTheme(theme, token_category_var);
+  auto token_category = static_cast<TokenCategory>(token_category_uint);
+  text_format.setBackground(theme.BackgroundColor(token_category));
+  text_format.setForeground(theme.ForegroundColor(token_category));
+  CodeViewTheme::Style text_style = theme.TextStyle(token_category);
   text_format.setFontItalic(text_style.italic);
   text_format.setFontWeight(text_style.bold ? QFont::DemiBold : QFont::Normal);
-
   text_format.setFontUnderline(text_style.underline);
   text_format.setFontStrikeOut(text_style.strikeout);
 }
@@ -729,57 +676,10 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
 
   QList<QTextEdit::ExtraSelection> extra_selection_list;
 
-//  std::size_t color_map_index{};
   QTextEdit::ExtraSelection selection;
 
   std::unordered_set<std::uint64_t> visited_model_index_list;
   std::unordered_set<int> colored_line_list;
-
-//  for (const auto &token_group_p :
-//       token_map.token_group_id_to_unique_token_id_list) {
-//
-//    const auto &unique_token_id_list = token_group_p.second;
-//
-//    const auto &group_color =
-//        theme.token_group_color_list[color_map_index %
-//                                     theme.token_group_color_list.size()];
-//
-//    ++color_map_index;
-//
-//    for (const auto &unique_token_id : unique_token_id_list) {
-//      const auto &token_map_entry = token_map.data.at(unique_token_id);
-//      visited_model_index_list.insert(unique_token_id);
-//
-//      selection = {};
-//      selection.format.setBackground(group_color);
-//      selection.cursor = text_edit.textCursor();
-//      selection.cursor.setPosition(token_map_entry.cursor_start,
-//                                   QTextCursor::MoveMode::MoveAnchor);
-//
-//      selection.cursor.setPosition(token_map_entry.cursor_end,
-//                                   QTextCursor::MoveMode::KeepAnchor);
-//
-//      extra_selection_list.append(std::move(selection));
-//
-//      auto column_count = model.TokenCount(token_map_entry.model_index.row);
-//      auto is_last =
-//          token_map_entry.model_index.token_index + 1 == column_count;
-//
-//      if (is_last) {
-//        colored_line_list.insert(token_map_entry.model_index.row);
-//
-//        selection = {};
-//        selection.format.setBackground(group_color);
-//        selection.format.setProperty(QTextFormat::FullWidthSelection, true);
-//        selection.cursor = text_edit.textCursor();
-//        selection.cursor.setPosition(token_map_entry.cursor_end,
-//                                     QTextCursor::MoveMode::MoveAnchor);
-//
-//        selection.cursor.clearSelection();
-//        extra_selection_list.prepend(std::move(selection));
-//      }
-//    }
-//  }
 
   for (const auto &colored_line : colored_line_list) {
     auto column_count = model.TokenCount(colored_line);
