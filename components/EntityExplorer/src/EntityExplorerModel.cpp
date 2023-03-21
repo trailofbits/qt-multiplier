@@ -40,7 +40,11 @@ QVariant EntityExplorerModel::data(const QModelIndex &index, int role) const {
 
   if (row_it != d->row_list.end()) {
     const auto &row = *row_it;
-    value.setValue(QString::fromStdString(row.name));
+
+    const auto &string_view = row.name_token.data();
+    auto string_view_size = static_cast<qsizetype>(string_view.size());
+
+    value.setValue(QString::fromUtf8(string_view.data(), string_view_size));
   }
 
   return value;

@@ -83,16 +83,16 @@ class IDatabase {
   virtual QFuture<OptionalName>
   RequestEntityName(const RawEntityId &fragment_id) = 0;
 
-  //!
+  //! A single entity query result
   struct EntityQueryResult final {
-    //!
+    //! The fragment containing this token
     Fragment fragment;
 
-    //!
+    //! The file containing this token
     std::optional<File> opt_file;
 
     //! The entity name
-    std::string name;
+    Token name_token;
 
     //! The entity data
     std::variant<NamedDecl, DefineMacroDirective> data;

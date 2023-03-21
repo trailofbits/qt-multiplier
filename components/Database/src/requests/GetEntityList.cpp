@@ -19,26 +19,30 @@ namespace {
 
 const std::size_t kBatchSize{512};
 
-}
+}  // namespace
 
 void GetEntityList(QPromise<bool> &result_promise, const Index &index,
                    IDatabase::QueryEntitiesReceiver *receiver, QString name,
                    bool exact_name) {
 
   IDatabase::QueryEntitiesReceiver::DataBatch data_batch;
-  auto name_as_std_string = name.toStdString();
+  std::string name_as_std_string = name.toStdString();
 
-  for (auto named_entity : index.query_entities(name_as_std_string)) {
+  for (NamedEntity named_entity : index.query_entities(name_as_std_string)) {
     if (result_promise.isCanceled()) {
       return;
     }
 
     if (std::holds_alternative<mx::NamedDecl>(named_entity)) {
-      auto named_decl = std::get<mx::NamedDecl>(named_entity);
-
-      std::string decl_name{named_decl.name()};
+      const auto &named_decl = std::get<mx::NamedDecl>(named_entity);
+      std::string_view decl_name = named_decl.name();
       if (decl_name.empty() ||
           (exact_name && decl_name != name_as_std_string)) {
+        continue;
+      }
+
+      Token name_token = named_decl.token();
+      if (name_token.data() != decl_name) {
         continue;
       }
 
@@ -47,14 +51,15 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
       data_batch.push_back(IDatabase::EntityQueryResult{
           fragment,
           File::containing(fragment),
-          std::move(decl_name),
+          std::move(name_token),
           std::move(named_decl),
       });
 
     } else if (std::holds_alternative<mx::DefineMacroDirective>(named_entity)) {
-      auto macro = std::get<mx::DefineMacroDirective>(named_entity);
+      const auto &macro = std::get<mx::DefineMacroDirective>(named_entity);
 
-      std::string macro_name{macro.name().data()};
+      Token name_token = macro.name();
+      std::string_view macro_name = name_token.data();
       if (macro_name.empty() ||
           (exact_name && macro_name != name_as_std_string)) {
         continue;
@@ -65,7 +70,7 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
       data_batch.push_back(IDatabase::EntityQueryResult{
           fragment,
           File::containing(fragment),
-          std::move(macro_name),
+          std::move(name_token),
           std::move(macro),
       });
     }
