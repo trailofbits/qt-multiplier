@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "CodeItem.h"
-
 #include <multiplier/ui/CodeViewTheme.h>
 
 #include <QPainter>
@@ -19,15 +17,16 @@
 namespace mx::gui {
 
 //! An item delegate used to paint tokens in the EntityExplorer
-class CodeItem final : public QStyledItemDelegate {
+class EntityExplorerItemDelegate final : public QStyledItemDelegate {
   Q_OBJECT
 
  public:
   //! Constructor
-  explicit CodeItem(const CodeViewTheme &theme, QObject *parent = nullptr);
+  explicit EntityExplorerItemDelegate(const CodeViewTheme &theme,
+                                      QObject *parent = nullptr);
 
   //! Destructor
-  virtual ~CodeItem(void) override;
+  virtual ~EntityExplorerItemDelegate(void) override;
 
   //! Sets the specified theme, refreshing the view
   void SetTheme(const CodeViewTheme &theme);

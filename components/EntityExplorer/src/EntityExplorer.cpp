@@ -7,7 +7,7 @@
 */
 
 #include "EntityExplorer.h"
-#include "CodeItem.h"
+#include "EntityExplorerItemDelegate.h"
 
 #include <multiplier/ui/Assert.h>
 
@@ -51,8 +51,8 @@ void EntityExplorer::InitializeWidgets() {
   layout->setContentsMargins(0, 0, 0, 0);
 
   static const auto kRequestDarkTheme{true};
-  auto list_view_item_delegate =
-      new CodeItem(GetDefaultCodeViewTheme(kRequestDarkTheme), this);
+  auto list_view_item_delegate = new EntityExplorerItemDelegate(
+      GetDefaultCodeViewTheme(kRequestDarkTheme), this);
 
   d->list_view = new QListView(this);
   d->list_view->setItemDelegate(list_view_item_delegate);
