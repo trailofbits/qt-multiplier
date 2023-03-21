@@ -11,6 +11,7 @@
 #include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
 
+#include <QEvent>
 #include <QWidget>
 
 namespace mx::gui {
@@ -39,7 +40,13 @@ class EntityExplorer final : public IEntityExplorer {
   //! Installs the specified model, taking ownership of it
   void InstallModel(IEntityExplorerModel *model);
 
+  //! Try to open the token related to a specific model index.
+  bool TryOpenToken(const QModelIndex &index);
+
+  bool eventFilter(QObject *watched, QEvent *event) Q_DECL_FINAL;
+
  private slots:
+
   //! Called automatically whenever the model is reset
   void OnModelReset();
 

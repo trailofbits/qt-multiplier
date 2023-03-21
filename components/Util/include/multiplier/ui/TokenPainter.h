@@ -12,6 +12,7 @@
 #include <multiplier/Token.h>
 #include <optional>
 #include <QPainter>
+#include <QRect>
 #include <QSize>
 #include <QString>
 #include <QStyleOptionViewItem>
@@ -53,6 +54,16 @@ class TokenPainter {
   //! Returns the size hint for the specified token
   QSize SizeHint(const QStyleOptionViewItem &option,
                  const Token &token) const;
+
+  //! Given that we've painted `tokens` into a QRect, go and figure out what
+  //! token was clicked.
+  std::optional<Token> TokenAtPosition(const QRect &rect, const QPoint &pos,
+                                       const TokenRange &tokens) const;
+
+  //! Given that we've painted `token` into a QRect, go and figure out what
+  //! token was clicked.
+  std::optional<Token> TokenAtPosition(const QRect &rect, const QPoint &pos,
+                                       const Token &token) const;
 
   const TokenPainterConfiguration &Configuration(void) const;
 

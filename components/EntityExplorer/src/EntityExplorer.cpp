@@ -11,11 +11,12 @@
 
 #include <multiplier/ui/Assert.h>
 
-#include <QVBoxLayout>
-#include <QListView>
-#include <QSortFilterProxyModel>
-#include <QLineEdit>
 #include <QCheckBox>
+#include <QLineEdit>
+#include <QListView>
+#include <QMouseEvent>
+#include <QSortFilterProxyModel>
+#include <QVBoxLayout>
 
 namespace mx::gui {
 
@@ -56,6 +57,8 @@ void EntityExplorer::InitializeWidgets() {
 
   d->list_view = new QListView(this);
   d->list_view->setItemDelegate(list_view_item_delegate);
+  d->list_view->viewport()->installEventFilter(this);
+  d->list_view->setResizeMode(QListView::Adjust);
   layout->addWidget(d->list_view);
 
   d->filter_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
@@ -103,6 +106,42 @@ void EntityExplorer::InstallModel(IEntityExplorerModel *model) {
           &EntityExplorer::OnModelReset);
 
   OnModelReset();
+}
+
+//! Try to open the token related to a specific model index.
+bool EntityExplorer::TryOpenToken(const QModelIndex &index) {
+  if (!index.isValid()) {
+    return false;
+  }
+
+  auto model_index = d->model_proxy->mapToSource(index);
+  if (!model_index.isValid()) {
+    return false;
+  }
+  QVariant token_var = model_index.data(IEntityExplorerModel::TokenRole);
+  if (!token_var.isValid()) {
+    return false;
+  }
+
+  emit EntityAction(qvariant_cast<Token>(token_var).id().Pack());
+  return true;
+}
+
+bool EntityExplorer::eventFilter(QObject *watched, QEvent *event) {
+  switch (event->type()) {
+    default:
+      break;
+    case QEvent::MouseButtonPress:
+    case QEvent::NonClientAreaMouseButtonPress:
+    case QEvent::GraphicsSceneMousePress:
+      if (TryOpenToken(d->list_view->indexAt(
+                           dynamic_cast<QMouseEvent *>(event)->pos()))) {
+        return true;
+      }
+      break;
+  }
+
+  return this->QObject::eventFilter(watched, event);
 }
 
 void EntityExplorer::OnModelReset() {}

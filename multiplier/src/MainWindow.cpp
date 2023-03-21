@@ -107,6 +107,9 @@ void MainWindow::CreateEntityExplorerDock() {
   entity_explorer_dock->setAllowedAreas(Qt::LeftDockWidgetArea |
                                         Qt::RightDockWidgetArea);
 
+  connect(d->entity_explorer, &IEntityExplorer::EntityAction,
+          this, &MainWindow::OnEntityExplorerEntityClicked);
+
   d->view_menu->addAction(entity_explorer_dock->toggleViewAction());
 
   entity_explorer_dock->setWidget(d->entity_explorer);
@@ -448,6 +451,10 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       OpenEntityRelatedToToken(index);
     }
   }
+}
+
+void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
+  OpenEntityRelatedToEntityId(entity_id);
 }
 
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {

@@ -77,6 +77,11 @@ struct TokenPainter::PrivateData {
   template <typename Painter>
   void PaintToken(Painter *painter, const QStyleOptionViewItem &option,
                   const Token &tok, QPointF &pos_inout);
+
+  void Reset(void) {
+    num_printed_since_space = 0;
+    token_data.clear();
+  }
 };
 
 TokenPainter::PrivateData::PrivateData(const TokenPainterConfiguration &config_)
@@ -132,8 +137,6 @@ template <typename Painter>
 void TokenPainter::PrivateData::PaintToken(
     Painter *painter, const QStyleOptionViewItem &option, const Token &token,
     QPointF &pos_inout) {
-
-  num_printed_since_space = 0;  // Reset.
 
   TokenCategory token_category = token.category();
   painter->setPen(config.theme.ForegroundColor(token_category));
@@ -208,8 +211,7 @@ TokenPainter::TokenPainter(TokenPainter &&that) noexcept
 //! Paints the delegate to screen
 void TokenPainter::Paint(QPainter *painter, const QStyleOptionViewItem &option,
                          const TokenRange &tokens) const {
-  d->num_printed_since_space = 0;
-  d->token_data.clear();
+  d->Reset();
 
   QPointF pos = option.rect.toRectF().topLeft();
   painter->save();
@@ -222,8 +224,7 @@ void TokenPainter::Paint(QPainter *painter, const QStyleOptionViewItem &option,
 //! Paints the delegate to screen
 void TokenPainter::Paint(QPainter *painter, const QStyleOptionViewItem &option,
                          const Token &token) const {
-  d->num_printed_since_space = 0;
-  d->token_data.clear();
+  d->Reset();
 
   QPointF pos = option.rect.toRectF().topLeft();
   painter->save();
@@ -234,8 +235,7 @@ void TokenPainter::Paint(QPainter *painter, const QStyleOptionViewItem &option,
 //! Returns the size hint for the specified token range.
 QSize TokenPainter::SizeHint(const QStyleOptionViewItem &option,
                              const TokenRange &tokens) const {
-  d->num_printed_since_space = 0;
-  d->token_data.clear();
+  d->Reset();
 
   QPointF pos = option.rect.toRectF().topLeft();
   QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
@@ -251,8 +251,7 @@ QSize TokenPainter::SizeHint(const QStyleOptionViewItem &option,
 //! Returns the size hint for the specified token
 QSize TokenPainter::SizeHint(const QStyleOptionViewItem &option,
                              const Token &token) const {
-  d->num_printed_since_space = 0;
-  d->token_data.clear();
+  d->Reset();
 
   QPointF pos = option.rect.toRectF().topLeft();
   QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
@@ -261,6 +260,62 @@ QSize TokenPainter::SizeHint(const QStyleOptionViewItem &option,
   d->PaintToken(&painter, option, token, pos);
 
   return QSizeF(painter.area.width(), painter.area.height()).toSize();
+}
+
+//! Given that we've painted `tokens` into a QRect, go and figure out what
+//! token was clicked.
+std::optional<Token> TokenPainter::TokenAtPosition(
+    const QRect &visual_rect, const QPoint &query_pos,
+    const TokenRange &tokens) const {
+  if (!visual_rect.contains(query_pos)) {
+    return std::nullopt;
+  }
+
+  d->Reset();
+
+  QStyleOptionViewItem option;
+  option.rect = visual_rect;
+
+  QPointF query_pos_f = query_pos.toPointF();
+  QPointF pos = visual_rect.topLeft();
+  QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
+  MeasuringPainter painter(empty_rect);
+
+  for (Token token : tokens) {
+    d->PaintToken(&painter, option, token, pos);
+    if (painter.area.contains(query_pos_f)) {
+      return token;
+    }
+  }
+  return std::nullopt;
+}
+
+//! Given that we've painted `tokens` into a QRect, go and figure out what
+//! token was clicked.
+std::optional<Token> TokenPainter::TokenAtPosition(
+    const QRect &visual_rect, const QPoint &query_pos,
+    const Token &token) const {
+
+  if (!visual_rect.contains(query_pos)) {
+    return std::nullopt;
+  }
+
+  d->Reset();
+
+  QStyleOptionViewItem option;
+  option.rect = visual_rect;
+
+  QPointF query_pos_f = query_pos.toPointF();
+  QPointF pos = visual_rect.topLeft();
+  QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
+  MeasuringPainter painter(empty_rect);
+
+  d->PaintToken(&painter, option, token, pos);
+  if (!painter.area.contains(query_pos_f)) {
+    return std::nullopt;
+  }
+
+  return token;
 }
 
 const TokenPainterConfiguration &TokenPainter::Configuration(void) const {
