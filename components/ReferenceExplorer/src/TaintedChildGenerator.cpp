@@ -11,10 +11,14 @@
 
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
+#include <multiplier/Analysis/IRAnalysis.h>
 #include <multiplier/Analysis/Taint.h>
 #include <multiplier/Entities/StmtKind.h>
+#include <multiplier/Fragment.h>
+#include <multiplier/SourceIR.h>
 
 namespace mx::gui {
+
 namespace {
 
 // Compressed version of the taint tracker that tries to eliminate implicit
@@ -38,6 +42,66 @@ static gap::generator<TaintTrackingResult> Taint(TaintTracker &tt,
       }
     } else {
       co_yield res;
+    }
+  }
+}
+
+// Compressed version of the taint tracker that tries to eliminate implicit
+// things.
+static gap::generator<Node> Taint(const FileLocationCache &file_cache,
+                                  const SourceIR &ir, DependencyAnalysis &tt,
+                                  MLIROperationPtr op) {
+  for (DependencyTrackingResult res : tt.dependents(op)) {
+
+    if (std::holds_alternative<DependencyTrackingStep>(res)) {
+      DependencyTrackingStep &step = std::get<DependencyTrackingStep>(res);
+      VariantEntity ent = step.as_variant(ir);
+      if (std::holds_alternative<NotAnEntity>(ent)) {
+        for (auto node : Taint(file_cache, ir, tt, step.as_operation())) {
+          co_yield node;
+        }
+      }
+
+      if (std::holds_alternative<Stmt>(ent)) {
+        switch (std::get<Stmt>(ent).kind()) {
+          case StmtKind::IMPLICIT_CAST_EXPR:
+          case StmtKind::IMPLICIT_VALUE_INIT_EXPR:
+            for (auto node : Taint(file_cache, ir, tt, step.as_operation())) {
+              co_yield node;
+            }
+            continue;
+          default: break;
+        }
+      }
+
+      Node node;
+      node.expansion_mode = IReferenceExplorerModel::TaintMode;
+      node.referenced_entity_id = EntityId(ent).Pack();
+      node.entity_id = node.referenced_entity_id;
+      node.opt_location = Location::Create(file_cache, ent);
+
+      if (QString tokens = TokensToString(ent); !tokens.isEmpty()) {
+        node.opt_name = tokens;
+      }
+      co_yield node;
+
+    } else if (std::holds_alternative<DependencyTrackingSink>(res)) {
+      DependencyTrackingSink &sink = std::get<DependencyTrackingSink>(res);
+      VariantEntity ent = sink.as_variant(ir);
+      if (!std::holds_alternative<NotAnEntity>(ent)) {
+        ent = ir.entity_for(op);
+      }
+      if (!std::holds_alternative<NotAnEntity>(ent)) {
+        continue;
+      }
+
+      Node node;
+      node.expansion_mode = IReferenceExplorerModel::TaintMode;
+      node.expanded = true;
+      node.opt_name = QString::fromStdString(sink.message());
+      node.referenced_entity_id = EntityId(ent).Pack();
+      node.opt_location = Location::Create(file_cache, ent);
+      co_yield node;
     }
   }
 }
@@ -72,12 +136,14 @@ const FileLocationCache &TaintedChildGenerator::FileCache(void) const {
   return d->file_cache;
 }
 
-gap::generator<Node> TaintedChildGenerator::GenerateNodes(void) {
-  VariantEntity entity = Entity();
+namespace {
+static gap::generator<Node> NoTaints(void) {
+  co_return;
+}
+}  // namespace
 
-  if (std::holds_alternative<NotAnEntity>(entity)) {
-    co_return;
-  }
+gap::generator<Node>
+TaintedChildGenerator::GenerateNodesAST(VariantEntity entity) {
 
   TaintTracker tt(d->index);
 
@@ -108,10 +174,27 @@ gap::generator<Node> TaintedChildGenerator::GenerateNodes(void) {
       continue;
     }
 
-
     node.AssignUniqueId();
     co_yield node;
   }
+}
+
+gap::generator<Node> TaintedChildGenerator::GenerateNodes(void) {
+  VariantEntity entity = Entity();
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return NoTaints();
+  }
+
+  if (std::optional<Fragment> frag = Fragment::containing(entity)) {
+    if (std::optional<SourceIR> ir = frag->ir()) {
+      if (OperationRange op = ir->for_entity(entity)) {
+        DependencyAnalysis tt(d->index);
+        return Taint(d->file_cache, ir.value(), tt, op.value());
+      }
+    }
+  }
+
+  return GenerateNodesAST(std::move(entity));
 }
 
 }  // namespace mx::gui

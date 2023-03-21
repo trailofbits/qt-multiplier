@@ -18,6 +18,8 @@ class TaintedChildGenerator : public INodeGenerator {
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
+  gap::generator<Node> GenerateNodesAST(VariantEntity);
+
  public:
   virtual ~TaintedChildGenerator(void) override;
 
