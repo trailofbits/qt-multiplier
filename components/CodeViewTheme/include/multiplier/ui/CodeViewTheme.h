@@ -32,6 +32,8 @@ struct CodeViewTheme final {
 
   QString font_name;
 
+  QColor selected_line_background_color;
+
   QColor default_background_color;
   QColor default_foreground_color;
 

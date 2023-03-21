@@ -193,6 +193,9 @@ class CodeView final : public ICodeView {
   //! Called by the GoToLineWidget when a valid line number has been requested
   void OnGoToLine(unsigned line_number);
 
+  //! Called when the cursor position has changed.
+  void OnCursorMoved(void);
+
   friend class ICodeView;
 };
 

@@ -120,8 +120,12 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) const {
 
   text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
 
+  // We want to change the scroll in the viewport, so move us to the end of the
+  // document (trick from StackOverflow), then back to the text cursor, then
+  // center on the cursor.
   d->text_edit->moveCursor(QTextCursor::End);
   d->text_edit->setTextCursor(text_cursor);
+  d->text_edit->ensureCursorVisible();
   d->text_edit->centerCursor();
 
   if (opt_end.has_value()) {
@@ -160,8 +164,7 @@ bool CodeView::ScrollToLineNumber(unsigned line) const {
     return false;
   }
 
-  auto end_position = text_block.position() + text_block.length();
-  return SetCursorPosition(text_block.position(), end_position);
+  return SetCursorPosition(text_block.position(), std::nullopt);
 }
 
 CodeView::CodeView(ICodeModel *model, QWidget *parent)
@@ -251,8 +254,11 @@ void CodeView::InitializeWidgets() {
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
 
-  connect(d->text_edit, &QPlainTextEditMod::updateRequest, this,
-          &CodeView::OnTextEditUpdateRequest);
+  connect(d->text_edit, &QPlainTextEditMod::updateRequest,
+          this, &CodeView::OnTextEditUpdateRequest);
+
+  connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged,
+          this, &CodeView::OnCursorMoved);
 
   // Gutter
   d->gutter = new QWidget();
@@ -800,6 +806,23 @@ void CodeView::OnTextEditUpdateRequest(const QRect &rect, int dy) {
   } else {
     d->gutter->update(0, rect.y(), d->gutter->width(), rect.height());
   }
+}
+
+//! Called when the cursor position has changed.
+void CodeView::OnCursorMoved(void) {
+  if (!d->model->IsReady()) {
+    return;
+  }
+
+  QList<QTextEdit::ExtraSelection> extra_selections;
+  QTextEdit::ExtraSelection selection;
+
+  selection.format.setBackground(d->theme.selected_line_background_color);
+  selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+  selection.cursor = d->text_edit->textCursor();
+  selection.cursor.clearSelection();
+  extra_selections.append(selection);
+  d->text_edit->setExtraSelections(extra_selections);
 }
 
 void CodeView::OnSearchParametersChange(
