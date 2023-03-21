@@ -8,6 +8,7 @@
 
 add_subdirectory("Assert")
 add_subdirectory("CodeView")
+add_subdirectory("CodeViewTheme")
 add_subdirectory("Database")
 add_subdirectory("EntityExplorer")
 add_subdirectory("Util")

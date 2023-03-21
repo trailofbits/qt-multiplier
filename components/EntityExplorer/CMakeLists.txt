@@ -33,7 +33,7 @@ target_link_libraries("mx_entityexplorer"
     "mx_assert"
     "mx_searchwidget"
     "mx_database"
-    "mx_codeview"
+    "mx_codeviewtheme"
 )
 
 target_include_directories("mx_entityexplorer" PRIVATE
