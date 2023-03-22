@@ -135,6 +135,7 @@ bool EntityExplorer::eventFilter(QObject *watched, QEvent *event) {
     case QEvent::GraphicsSceneMousePress:
       if (TryOpenToken(d->list_view->indexAt(
                            dynamic_cast<QMouseEvent *>(event)->pos()))) {
+        event->accept();
         return true;
       }
       break;
