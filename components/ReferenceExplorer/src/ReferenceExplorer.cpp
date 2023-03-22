@@ -229,17 +229,17 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
   // Note: this needs to happen after the model has been set in the
   // tree view!
   auto tree_selection_model = d->tree_view->selectionModel();
-  connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
-          &ReferenceExplorer::OnCurrentItemChanged);
+  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
+          this, &ReferenceExplorer::OnCurrentItemChanged);
 
-  connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
-          &ReferenceExplorer::OnModelReset);
+  connect(d->model_proxy, &QAbstractItemModel::modelReset,
+          this, &ReferenceExplorer::OnModelReset);
 
-  connect(d->model_proxy, &QAbstractItemModel::dataChanged, this,
-          &ReferenceExplorer::OnDataChanged);
+  connect(d->model_proxy, &QAbstractItemModel::dataChanged,
+          this, &ReferenceExplorer::OnDataChanged);
 
-  connect(d->model_proxy, &QAbstractItemModel::rowsInserted, this,
-          &ReferenceExplorer::OnRowsInserted);
+  connect(d->model_proxy, &QAbstractItemModel::rowsInserted,
+          this, &ReferenceExplorer::OnRowsInserted);
 
   OnModelReset();
 }

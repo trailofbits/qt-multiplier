@@ -9,9 +9,12 @@
 #include <multiplier/ui/TokenPainter.h>
 
 #include <multiplier/Entities/TokenKind.h>
+#include <QApplication>
+#include <QBrush>
 #include <QColor>
 #include <QFont>
 #include <QFontMetricsF>
+#include <QPalette>
 #include <QPointF>
 #include <QRectF>
 #include <QTextOption>
@@ -150,6 +153,16 @@ void TokenPainter::PrivateData::PaintToken(
   painter->setFont(font);
 
   QColor bg = config.theme.BackgroundColor(token_category);
+
+  // Figure out a background color for if this node is selected.
+  QColor highlight_color = config.theme.selected_line_background_color;
+  if (!highlight_color.isValid() && option.widget) {
+    highlight_color = option.widget->palette().highlight().color();
+  }
+  if (!highlight_color.isValid()) {
+    highlight_color = qApp->palette().highlight().color();
+  }
+
   QTextOption to(option.displayAlignment);
 
   std::string_view tok_data_utf8 = Characters(token);
@@ -171,7 +184,9 @@ void TokenPainter::PrivateData::PaintToken(
 
     glyph_rect.moveTo(pos_inout);
 
-    if ((option.state & QStyle::State_Selected) == 0) {
+    if ((option.state & QStyle::State_Selected) == QStyle::State_Selected) {
+      painter->fillRect(glyph_rect, highlight_color);
+    } else {
       painter->fillRect(glyph_rect, bg);
     }
 

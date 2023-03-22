@@ -40,12 +40,10 @@ class EntityExplorer final : public IEntityExplorer {
   //! Installs the specified model, taking ownership of it
   void InstallModel(IEntityExplorerModel *model);
 
-  //! Try to open the token related to a specific model index.
-  bool TryOpenToken(const QModelIndex &index);
-
-  bool eventFilter(QObject *watched, QEvent *event) Q_DECL_FINAL;
-
  private slots:
+
+  //! Try to open the token related to a specific model index.
+  void SelectionChanged(const QModelIndex &index, const QModelIndex &previous);
 
   //! Called automatically whenever the model is reset
   void OnModelReset();
