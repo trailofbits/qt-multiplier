@@ -20,6 +20,7 @@
 #include <QMimeData>
 #include <QString>
 #include <QThreadPool>
+#include <QColor>
 
 #include <filesystem>
 
@@ -344,6 +345,17 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
     } else {
       value = tr("Unnamed: ") + QString::number(node.entity_id);
+    }
+
+  } else if (role == Qt::BackgroundRole) {
+    switch (node.expansion_mode) {
+      case IReferenceExplorerModel::ExpansionMode::CallHierarchyMode:
+        value.setValue(QColor(0x50, 0x00, 0x00));
+        break;
+
+      case IReferenceExplorerModel::ExpansionMode::TaintMode:
+        value.setValue(QColor(0x00, 0x00, 0x50));
+        break;
     }
 
   } else if (role == Qt::ToolTipRole) {

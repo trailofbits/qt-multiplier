@@ -37,6 +37,9 @@ add_library("mx_referenceexplorer"
   src/TaintedRootGenerator.h
   src/TaintedRootGenerator.cpp
 
+  src/ReferenceExplorerTreeView.h
+  src/ReferenceExplorerTreeView.cpp
+
   src/Utils.h
   src/Utils.cpp
 

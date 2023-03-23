@@ -10,20 +10,17 @@
 #include "ReferenceExplorerItemDelegate.h"
 #include "FilterSettingsWidget.h"
 #include "SearchFilterModelProxy.h"
+#include "ReferenceExplorerTreeView.h"
 
 #include <multiplier/ui/Assert.h>
 
 #include <QApplication>
 #include <QClipboard>
-#include <QCheckBox>
 #include <QLabel>
 #include <QMenu>
-#include <QMouseEvent>
 #include <QPushButton>
-#include <QRadioButton>
-#include <QScrollBar>
-#include <QTreeView>
 #include <QVBoxLayout>
+#include <QScrollBar>
 
 #include <optional>
 
@@ -51,7 +48,7 @@ struct TreeviewItemButtons final {
 struct ReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
-  QTreeView *tree_view{nullptr};
+  ReferenceExplorerTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
@@ -86,7 +83,7 @@ void ReferenceExplorer::InitializeWidgets() {
   setAcceptDrops(true);
 
   // Initialize the tree view
-  d->tree_view = new QTreeView(this);
+  d->tree_view = new ReferenceExplorerTreeView(this);
   d->tree_view->setHeaderHidden(true);
 
   // TODO(pag): Re-enable with some kind of "intrusive" sort that makes the
@@ -110,8 +107,8 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);
 
-  connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
-          &ReferenceExplorer::OnOpenItemContextMenu);
+  connect(d->tree_view, &ReferenceExplorerTreeView::customContextMenuRequested,
+          this, &ReferenceExplorer::OnOpenItemContextMenu);
 
   d->tree_view->setDragEnabled(true);
   d->tree_view->setAcceptDrops(true);
