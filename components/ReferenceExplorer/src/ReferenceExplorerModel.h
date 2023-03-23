@@ -19,7 +19,6 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   Q_OBJECT
 
  public:
-
   //! \copybrief IReferenceExplorerModel::ExpandEntity
   virtual void ExpandEntity(const QModelIndex &index) override;
 
@@ -69,11 +68,21 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   //! Defines the mime types supported by this model
   virtual QStringList mimeTypes() const override;
 
+  //! Drag and drop modes
+  enum class DragAndDropMode {
+    CopySubTree,
+    AddRootAndTaint,
+    AddRootAndShowRefs,
+  };
+
+  //! Sets the active drag and drop mode
+  void SetDragAndDropMode(const DragAndDropMode &mode);
+
  public slots:
   //! \copybrief IReferenceExplorerModel::AppendEntityById
-  virtual void AppendEntityById(
-      RawEntityId entity_id, ExpansionMode expansion_mode,
-      const QModelIndex &parent) override;
+  virtual void AppendEntityById(RawEntityId entity_id,
+                                ExpansionMode expansion_mode,
+                                const QModelIndex &parent) override;
 
  private slots:
   void InsertNodes(QVector<Node> node, int row, const QModelIndex &parent);
