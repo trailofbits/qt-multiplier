@@ -24,7 +24,7 @@ static QAtomicInteger<std::uint64_t> gNextNodeId(1u);
 
 }  // namespace
 
-QString Node::kMimeTypeName = "application/mx-reference-explorer-node";
+QString Node::kMimeTypeName = "application/mx-reference-explorer-node-tree";
 
 QDataStream &operator<<(QDataStream &stream, const Location &location) {
   stream << location.path;
