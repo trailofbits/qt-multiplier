@@ -12,6 +12,7 @@
 #include <optional>
 #include <QApplication>
 #include <QClipboard>
+#include <QDropEvent>
 #include <QLabel>
 #include <QMenu>
 #include <QPushButton>
@@ -312,13 +313,14 @@ bool ReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
 
   } else if (obj == d->tree_view->viewport()) {
     if (event->type() == QEvent::Drop) {
-      auto &drop_event = *static_cast<QDropEvent *>(event);
-
-      // Discard the event if the user cancelled the drag and drop
-      // operation
-      auto process_event = OnTreeViewDropEvent(drop_event);
-      if (!process_event) {
-        return true;
+      if (auto drop_event = dynamic_cast<QDropEvent *>(event)) {
+        // Discard the event if the user cancelled the drag and drop
+        // operation
+        auto process_event = OnTreeViewDropEvent(*drop_event);
+        if (!process_event) {
+          
+          return true;
+        }
       }
 
       return false;
