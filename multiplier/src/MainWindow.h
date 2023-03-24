@@ -70,6 +70,7 @@ class MainWindow final : public QMainWindow {
   void OnReferenceExplorerTabBarClose(int index);
   void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
+  void OnEntityExplorerEntityClicked(RawEntityId entity_id);
 };
 
 }  // namespace mx::gui

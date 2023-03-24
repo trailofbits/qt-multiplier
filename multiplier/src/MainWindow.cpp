@@ -74,6 +74,8 @@ void MainWindow::InitializeWidgets() {
   d->view_menu = new QMenu(tr("View"));
   menuBar()->addMenu(d->view_menu);
 
+  setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::East);
+  setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
   CreateFileTreeDock();
   CreateEntityExplorerDock();
   CreateCodeView();
@@ -106,6 +108,9 @@ void MainWindow::CreateEntityExplorerDock() {
   auto entity_explorer_dock = new QDockWidget(tr("Symbols"), this);
   entity_explorer_dock->setAllowedAreas(Qt::LeftDockWidgetArea |
                                         Qt::RightDockWidgetArea);
+
+  connect(d->entity_explorer, &IEntityExplorer::EntityAction,
+          this, &MainWindow::OnEntityExplorerEntityClicked);
 
   d->view_menu->addAction(entity_explorer_dock->toggleViewAction());
 
@@ -448,6 +453,10 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       OpenEntityRelatedToToken(index);
     }
   }
+}
+
+void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
+  OpenEntityRelatedToEntityId(entity_id);
 }
 
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {

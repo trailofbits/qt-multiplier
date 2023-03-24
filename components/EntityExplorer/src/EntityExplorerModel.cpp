@@ -35,12 +35,12 @@ QVariant EntityExplorerModel::data(const QModelIndex &index, int role) const {
     return value;
   }
 
-  auto row_it = std::next(d->row_list.begin(), index.row());
-  if (row_it == d->row_list.end()) {
+  auto row_index = static_cast<unsigned>(index.row());
+  if (row_index >= d->row_list.size()) {
     return value;
   }
 
-  const auto &row = *row_it;
+  const IDatabase::EntityQueryResult &row = d->row_list[row_index];
 
   if (role == Qt::DisplayRole) {
     const auto &string_view = row.name_token.data();
@@ -126,7 +126,6 @@ void EntityExplorerModel::OnDataBatch(
   d->row_list.insert(d->row_list.end(),
                      std::make_move_iterator(data_batch.begin()),
                      std::make_move_iterator(data_batch.end()));
-
   emit endInsertRows();
 }
 

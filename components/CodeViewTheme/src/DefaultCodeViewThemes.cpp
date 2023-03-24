@@ -17,6 +17,9 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
   // Font name
   "Source Code Pro",
 
+  // selected_line_background_color
+  QColor::fromRgb(5, 5, 5),
+
   // default_background_color
   QColor::fromRgb(20, 20, 20),
 
