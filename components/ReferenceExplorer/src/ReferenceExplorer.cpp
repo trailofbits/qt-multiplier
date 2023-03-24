@@ -7,26 +7,23 @@
 */
 
 #include "ReferenceExplorer.h"
-#include "ReferenceExplorerItemDelegate.h"
-#include "FilterSettingsWidget.h"
-#include "SearchFilterModelProxy.h"
-#include "ReferenceExplorerModel.h"
 
 #include <multiplier/ui/Assert.h>
-
+#include <optional>
 #include <QApplication>
 #include <QClipboard>
-#include <QCheckBox>
+#include <QDropEvent>
 #include <QLabel>
 #include <QMenu>
-#include <QMouseEvent>
 #include <QPushButton>
-#include <QRadioButton>
-#include <QScrollBar>
-#include <QTreeView>
 #include <QVBoxLayout>
+#include <QScrollBar>
 
-#include <optional>
+#include "FilterSettingsWidget.h"
+#include "ReferenceExplorerItemDelegate.h"
+#include "ReferenceExplorerModel.h"
+#include "ReferenceExplorerTreeView.h"
+#include "SearchFilterModelProxy.h"
 
 namespace mx::gui {
 
@@ -59,7 +56,7 @@ struct DragAndDropMenu final {
 struct ReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
-  QTreeView *tree_view{nullptr};
+  ReferenceExplorerTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
@@ -93,7 +90,7 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
 
 void ReferenceExplorer::InitializeWidgets() {
   // Initialize the tree view
-  d->tree_view = new QTreeView(this);
+  d->tree_view = new ReferenceExplorerTreeView(this);
   d->tree_view->setHeaderHidden(true);
 
   // TODO(pag): Re-enable with some kind of "intrusive" sort that makes the
@@ -117,8 +114,8 @@ void ReferenceExplorer::InitializeWidgets() {
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);
 
-  connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
-          &ReferenceExplorer::OnOpenItemContextMenu);
+  connect(d->tree_view, &ReferenceExplorerTreeView::customContextMenuRequested,
+          this, &ReferenceExplorer::OnOpenItemContextMenu);
 
   d->tree_view->setDragEnabled(true);
   d->tree_view->setAcceptDrops(true);
@@ -316,13 +313,14 @@ bool ReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
 
   } else if (obj == d->tree_view->viewport()) {
     if (event->type() == QEvent::Drop) {
-      auto &drop_event = *static_cast<QDropEvent *>(event);
-
-      // Discard the event if the user cancelled the drag and drop
-      // operation
-      auto process_event = OnTreeViewDropEvent(drop_event);
-      if (!process_event) {
-        return true;
+      if (auto drop_event = dynamic_cast<QDropEvent *>(event)) {
+        // Discard the event if the user cancelled the drag and drop
+        // operation
+        auto process_event = OnTreeViewDropEvent(*drop_event);
+        if (!process_event) {
+          
+          return true;
+        }
       }
 
       return false;
