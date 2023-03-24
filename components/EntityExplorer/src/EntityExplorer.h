@@ -11,6 +11,7 @@
 #include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
 
+#include <QEvent>
 #include <QWidget>
 
 namespace mx::gui {
@@ -40,6 +41,10 @@ class EntityExplorer final : public IEntityExplorer {
   void InstallModel(IEntityExplorerModel *model);
 
  private slots:
+
+  //! Try to open the token related to a specific model index.
+  void SelectionChanged(const QModelIndex &index, const QModelIndex &previous);
+
   //! Called automatically whenever the model is reset
   void OnModelReset();
 

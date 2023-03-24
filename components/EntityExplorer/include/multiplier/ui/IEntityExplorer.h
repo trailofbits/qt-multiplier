@@ -18,6 +18,13 @@ namespace mx::gui {
 class IEntityExplorer : public QWidget {
   Q_OBJECT
 
+ private:
+  //! Disabled copy constructor
+  IEntityExplorer(const IEntityExplorer &) = delete;
+
+  //! Disabled copy assignment operator
+  IEntityExplorer &operator=(const IEntityExplorer &) = delete;
+
  public:
   //! Factory method
   static IEntityExplorer *Create(IEntityExplorerModel *model,
@@ -32,11 +39,8 @@ class IEntityExplorer : public QWidget {
   //! Returns the active model
   virtual IEntityExplorerModel *Model() = 0;
 
-  //! Disabled copy constructor
-  IEntityExplorer(const IEntityExplorer &) = delete;
-
-  //! Disabled copy assignment operator
-  IEntityExplorer &operator=(const IEntityExplorer &) = delete;
+ signals:
+  void EntityAction(RawEntityId id);
 };
 
 }  // namespace mx::gui

@@ -11,11 +11,14 @@
 
 #include <multiplier/ui/Assert.h>
 
-#include <QVBoxLayout>
-#include <QListView>
-#include <QSortFilterProxyModel>
-#include <QLineEdit>
+#include <QBrush>
 #include <QCheckBox>
+#include <QLineEdit>
+#include <QListView>
+#include <QMouseEvent>
+#include <QPalette>
+#include <QSortFilterProxyModel>
+#include <QVBoxLayout>
 
 namespace mx::gui {
 
@@ -51,12 +54,36 @@ void EntityExplorer::InitializeWidgets() {
   layout->setContentsMargins(0, 0, 0, 0);
 
   static const auto kRequestDarkTheme{true};
-  auto list_view_item_delegate = new EntityExplorerItemDelegate(
-      GetDefaultCodeViewTheme(kRequestDarkTheme), this);
+  CodeViewTheme theme = GetDefaultCodeViewTheme(kRequestDarkTheme);
+
+  auto list_view_item_delegate = new EntityExplorerItemDelegate(theme, this);
 
   d->list_view = new QListView(this);
+  d->list_view->setSelectionMode(
+      QAbstractItemView::SelectionMode::SingleSelection);
+  d->list_view->setSelectionBehavior(
+      QAbstractItemView::SelectionBehavior::SelectRows);
   d->list_view->setItemDelegate(list_view_item_delegate);
   layout->addWidget(d->list_view);
+
+  QPalette p = d->list_view->palette();
+  auto changed_palette = false;
+  if (theme.selected_line_background_color.isValid() &&
+      theme.selected_line_background_color != theme.default_background_color) {
+    p.setColor(QPalette::ColorGroup::Normal, QPalette::ColorRole::Highlight,
+               theme.selected_line_background_color);
+    changed_palette = true;
+  }
+
+  if (theme.default_background_color.isValid()) {
+    p.setColor(QPalette::ColorGroup::Normal, QPalette::ColorRole::Base,
+               theme.default_background_color);
+    changed_palette = true;
+  }
+
+  if (changed_palette) {
+    d->list_view->setPalette(p);
+  }
 
   d->filter_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
   connect(d->filter_widget, &ISearchWidget::SearchParametersChanged, this,
@@ -99,10 +126,40 @@ void EntityExplorer::InstallModel(IEntityExplorerModel *model) {
 
   d->list_view->setModel(d->model_proxy);
 
+  // Note: this needs to happen after the model has been set in the
+  // list view!
+  auto list_selection_model = d->list_view->selectionModel();
+
+  connect(list_selection_model, &QItemSelectionModel::currentChanged,
+          this, &EntityExplorer::SelectionChanged);
+
   connect(d->model_proxy, &QAbstractListModel::modelReset, this,
           &EntityExplorer::OnModelReset);
 
   OnModelReset();
+}
+
+//! Try to open the token related to a specific model index.
+void EntityExplorer::SelectionChanged(const QModelIndex &index,
+                                      const QModelIndex &) {
+  if (!index.isValid()) {
+    qDebug() << "invalid index";
+    return;
+  }
+
+  auto model_index = d->model_proxy->mapToSource(index);
+  if (!model_index.isValid()) {
+    qDebug() << "invalid mapped index";
+    return;
+  }
+
+  QVariant token_var = model_index.data(IEntityExplorerModel::TokenRole);
+  if (!token_var.isValid()) {
+    qDebug() << "invalid tok";
+    return;
+  }
+
+  emit EntityAction(qvariant_cast<Token>(token_var).id().Pack());
 }
 
 void EntityExplorer::OnModelReset() {}
