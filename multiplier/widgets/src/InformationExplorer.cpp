@@ -14,6 +14,7 @@
 #include <multiplier/Token.h>
 #include <multiplier/ui/IDatabase.h>
 #include <optional>
+
 #include <QPushButton>
 #include <QComboBox>
 #include <QFutureWatcher>

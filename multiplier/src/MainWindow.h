@@ -45,6 +45,7 @@ class MainWindow final : public QMainWindow {
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
   void OpenTokenTaintExplorer(CodeModelIndex index);
+
   void OpenTokenEntityInfo(CodeModelIndex index);
   void OpenReferenceExplorer(RawEntityId entity_id,
                              IReferenceExplorerModel::ExpansionMode mode);
