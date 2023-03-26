@@ -14,7 +14,10 @@
 #include <multiplier/Token.h>
 #include <multiplier/ui/IDatabase.h>
 #include <optional>
+#include <QPushButton>
+#include <QComboBox>
 #include <QFutureWatcher>
+#include <QGridLayout>
 #include <QString>
 #include <QTreeView>
 #include <vector>
@@ -43,6 +46,11 @@ struct InformationExplorer::PrivateData {
 
   // The currently shown entity information.
   EntityInformation *current{nullptr};
+
+  std::unique_ptr<QComboBox> history_view;
+  std::unique_ptr<QPushButton> prev_item;
+  std::unique_ptr<QPushButton> next_item;
+  std::unique_ptr<QTreeView> current_view;
 
   inline PrivateData(const Index &index_,
                      const FileLocationCache &file_location_cache_)
@@ -113,6 +121,8 @@ InformationExplorer::InformationExplorer(
   connect(&d->future_watcher,
           &QFutureWatcher<IDatabase::EntityInformationResult>::finished,
           this, &InformationExplorer::FutureResultStateChanged);
+
+  InitializeWidgets();
 }
 
 void InformationExplorer::PrivateData::CullOldHistory(void) {
@@ -121,6 +131,26 @@ void InformationExplorer::PrivateData::CullOldHistory(void) {
 
 void InformationExplorer::PrivateData::Render(void) {
 
+}
+
+void InformationExplorer::InitializeWidgets(void) {
+  auto layout = new QGridLayout;
+  layout->setContentsMargins(0, 0, 0, 0);
+  setLayout(layout);
+
+  d->history_view = std::make_unique<QComboBox>(this);
+  d->prev_item = std::make_unique<QPushButton>(this);
+  d->next_item = std::make_unique<QPushButton>(this);
+  d->current_view = std::make_unique<QTreeView>(this);
+
+  layout->addWidget(d->history_view.get(), 0, 0, 1, 1);
+  layout->addWidget(d->prev_item.get(), 0, 1, 1, 1);
+  layout->addWidget(d->next_item.get(), 0, 2, 1, 1);
+  layout->addWidget(d->current_view.get(), 1, 0, 1, 3);
+  layout->setColumnStretch(0, 1);
+
+  d->prev_item->setEnabled(false);
+  d->next_item->setEnabled(false);
 }
 
 void InformationExplorer::CancelRunningRequest(void) {

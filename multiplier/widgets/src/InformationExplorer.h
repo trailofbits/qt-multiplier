@@ -54,6 +54,9 @@ class InformationExplorer final : public QWidget {
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
+  //! Initialize widgets.
+  void InitializeWidgets(void);
+
   //! Cancel any running requests for information about an entity.
   void CancelRunningRequest(void);
 };

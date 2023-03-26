@@ -101,6 +101,11 @@ void ReferenceExplorer::InitializeWidgets() {
   //  setSortingEnabled(true);
   //  sortByColumn(0, Qt::AscendingOrder);
 
+  // Select the whole row, now just the current cell.
+  d->tree_view->setSelectionBehavior(QAbstractItemView::SelectRows);
+  d->tree_view->setAllColumnsShowFocus(true);
+  d->tree_view->setTreePosition(0);
+
   // Disallow multiple selection. If we have grouping by file enabled, then when
   // a user clicks on a file name, we instead jump down to the first entry
   // grouped under that file. This is to make using the up/down arrows easier.

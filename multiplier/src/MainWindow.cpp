@@ -89,7 +89,9 @@ void MainWindow::InitializeWidgets() {
 
   setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
-  setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
+  setTabPosition(Qt::RightDockWidgetArea, QTabWidget::East);
+  setTabPosition(Qt::TopDockWidgetArea, QTabWidget::North);
+  setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::South);
   CreateProjectExplorerDock();
   CreateEntityExplorerDock();
   CreateInfoExplorerDock();
@@ -97,6 +99,7 @@ void MainWindow::InitializeWidgets() {
   CreateReferenceExplorerDock();
 
   tabifyDockWidget(d->entity_explorer_dock, d->project_explorer_dock);
+  setDocumentMode(false);
 }
 
 void MainWindow::CreateProjectExplorerDock() {
@@ -132,7 +135,7 @@ void MainWindow::CreateEntityExplorerDock() {
 }
 
 void MainWindow::CreateInfoExplorerDock() {
-  d->info_explorer_dock = new QDockWidget(tr("Info Explorer"), this);
+  d->info_explorer_dock = new QDockWidget(tr("Information Explorer"), this);
   d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
   d->info_explorer_dock->toggleViewAction()->setEnabled(false);
   d->info_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
@@ -151,6 +154,7 @@ void MainWindow::CreateInfoExplorerDock() {
 
 void MainWindow::CreateReferenceExplorerDock() {
   d->ref_explorer_tab_widget = new QTabWidget(this);
+  d->ref_explorer_tab_widget->setDocumentMode(true);
   d->ref_explorer_tab_widget->setTabsClosable(true);
 
   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabCloseRequested,
@@ -199,17 +203,20 @@ void MainWindow::CreateNewReferenceExplorer(QString window_title) {
 void MainWindow::CreateCodeView() {
   auto tab_widget = new QTabWidget();
   tab_widget->setTabsClosable(true);
+  tab_widget->setDocumentMode(true);
+  tab_widget->setTabBarAutoHide(false);
+
   setCentralWidget(tab_widget);
 
-  connect(tab_widget->tabBar(), &QTabBar::tabCloseRequested, this,
-          &MainWindow::OnCodeViewTabBarClose);
+  connect(tab_widget->tabBar(), &QTabBar::tabCloseRequested,
+          this, &MainWindow::OnCodeViewTabBarClose);
 
   auto toggle_word_wrap_action = new QAction(tr("Enable word wrap"));
   toggle_word_wrap_action->setCheckable(true);
   toggle_word_wrap_action->setChecked(false);
 
-  connect(toggle_word_wrap_action, &QAction::triggered, this,
-          &MainWindow::OnToggleWordWrap);
+  connect(toggle_word_wrap_action, &QAction::triggered,
+          this, &MainWindow::OnToggleWordWrap);
 
   d->view_menu->addAction(toggle_word_wrap_action);
 
@@ -217,8 +224,8 @@ void MainWindow::CreateCodeView() {
   d->code_view_context_menu.menu = new QMenu(tr("Token menu"));
 
   // TODO(alessandro): Only show this when there is a related entity.
-  connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
-          &MainWindow::OnCodeViewContextMenuActionTriggered);
+  connect(d->code_view_context_menu.menu, &QMenu::triggered,
+          this, &MainWindow::OnCodeViewContextMenuActionTriggered);
 
   d->code_view_context_menu.show_ref_explorer_action =
       new QAction(tr("Show Reference Explorer"));
@@ -252,8 +259,8 @@ void MainWindow::OpenReferenceExplorer(
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache, entity_id, mode, this);
 
-  connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
-          &MainWindow::OnQuickRefExplorerSaveAllClicked);
+  connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll,
+          this, &MainWindow::OnQuickRefExplorerSaveAllClicked);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
@@ -349,8 +356,8 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   auto tab_count = central_tab_widget.count();
   central_tab_widget.setCurrentIndex(tab_count - 1);
 
-  connect(code_view, &ICodeView::TokenTriggered, this,
-          &MainWindow::OnTokenTriggered);
+  connect(code_view, &ICodeView::TokenTriggered,
+          this, &MainWindow::OnTokenTriggered);
 
   model->SetEntity(file_entity_id);
   return code_view;
@@ -422,7 +429,7 @@ void MainWindow::OpenEntityInfo(RawEntityId entity_id, bool force) {
 
   if (make_visible && d->info_explorer->AddEntityId(entity_id)) {
     d->info_explorer_dock->toggleViewAction()->setEnabled(true);
-    d->info_explorer_dock->setVisible(true);
+    d->info_explorer_dock->show();
     d->info_explorer_opened_before = true;
   }
 }
