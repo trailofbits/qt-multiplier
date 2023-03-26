@@ -272,10 +272,10 @@ void CodeModel::FutureResultStateChanged() {
     return;
   }
 
-  auto indexed_token_range_data = future_result.TakeValue();
+  IndexedTokenRangeData indexed_token_range_data = future_result.TakeValue();
   d->entity_id = indexed_token_range_data.requested_id;
 
-  auto token_count = indexed_token_range_data.start_of_token.size() - 1;
+  auto token_count = indexed_token_range_data.start_of_token.size() - 1u;
 
   TokenRow row;
   TokenColumn col;

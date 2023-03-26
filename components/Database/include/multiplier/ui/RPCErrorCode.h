@@ -13,6 +13,7 @@ enum class RPCErrorCode {
   Interrupted,
   NoDataReceived,
   InvalidEntityID,
+  InvalidInformationRequestType,
   InvalidDownloadRequestType,
   IndexMismatch,
   FragmentMismatch,
