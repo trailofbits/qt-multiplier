@@ -34,6 +34,55 @@ const QString kNodeInfoMimeType = "application/mx-reference-explorer-node-info";
 const QString kInstanceInfoMimeType =
     "application/mx-reference-explorer-instance-info";
 
+static TokenCategory FromDeclCategory(DeclCategory cat) {
+  switch (cat) {
+    case DeclCategory::LOCAL_VARIABLE:
+      return TokenCategory::LOCAL_VARIABLE;
+    case DeclCategory::GLOBAL_VARIABLE:
+      return TokenCategory::GLOBAL_VARIABLE;
+    case DeclCategory::PARAMETER_VARIABLE:
+      return TokenCategory::PARAMETER_VARIABLE;
+    case DeclCategory::FUNCTION:
+      return TokenCategory::FUNCTION;
+    case DeclCategory::INSTANCE_METHOD:
+      return TokenCategory::INSTANCE_METHOD;
+    case DeclCategory::INSTANCE_MEMBER:
+      return TokenCategory::INSTANCE_MEMBER;
+    case DeclCategory::CLASS_METHOD:
+      return TokenCategory::CLASS_METHOD;
+    case DeclCategory::CLASS_MEMBER:
+      return TokenCategory::CLASS_MEMBER;
+    case DeclCategory::THIS:
+      return TokenCategory::THIS;
+    case DeclCategory::CLASS:
+      return TokenCategory::CLASS;
+    case DeclCategory::STRUCTURE:
+      return TokenCategory::STRUCT;
+    case DeclCategory::UNION:
+      return TokenCategory::UNION;
+    case DeclCategory::CONCEPT:
+      return TokenCategory::CONCEPT;
+    case DeclCategory::INTERFACE:
+      return TokenCategory::INTERFACE;
+    case DeclCategory::ENUMERATION:
+      return TokenCategory::ENUM;
+    case DeclCategory::ENUMERATOR:
+      return TokenCategory::ENUMERATOR;
+    case DeclCategory::NAMESPACE:
+      return TokenCategory::NAMESPACE;
+    case DeclCategory::TYPE_ALIAS:
+      return TokenCategory::TYPE_ALIAS;
+    case DeclCategory::TEMPLATE_TYPE_PARAMETER:
+      return TokenCategory::TEMPLATE_PARAMETER_TYPE;
+    case DeclCategory::TEMPLATE_VALUE_PARAMETER:
+      return TokenCategory::TEMPLATE_PARAMETER_VALUE;
+    case DeclCategory::LABEL:
+      return TokenCategory::LABEL;
+    default:
+      return TokenCategory::UNKNOWN;
+  }
+}
+
 }  // namespace
 
 struct ReferenceExplorerModel::PrivateData final {
@@ -372,9 +421,9 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     }
 
   } else if (role == Qt::ToolTipRole) {
-    auto opt_decl_category = GetDeclCategory(d->index, node.entity_id);
+    auto opt_decl_category = GetTokenCategory(d->index, node.entity_id);
     auto buffer =
-        tr("Decl category: ") + GetDeclCategoryname(opt_decl_category) + "\n";
+        tr("Decl category: ") + GetTokenCategoryName(opt_decl_category) + "\n";
 
     buffer += tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
 
@@ -441,9 +490,9 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     value.setValue(node.expanded);
 
   } else if (role == ReferenceExplorerModel::IconLabelRole) {
-    auto opt_decl_category = GetDeclCategory(d->index, node.entity_id);
+    auto opt_decl_category = GetTokenCategory(d->index, node.entity_id);
 
-    auto label = GetDeclCategoryIconLabel(opt_decl_category);
+    auto label = GetTokenCategoryIconLabel(opt_decl_category);
     value.setValue(label);
   }
 
@@ -749,64 +798,84 @@ ReferenceExplorerModel::ReferenceExplorerModel(
     : IReferenceExplorerModel(parent),
       d(new PrivateData(index, file_location_cache)) {}
 
-std::optional<DeclCategory>
-ReferenceExplorerModel::GetDeclCategory(const Index &index,
-                                        const RawEntityId &entity_id) {
+TokenCategory
+ReferenceExplorerModel::GetTokenCategory(const Index &index,
+                                         RawEntityId entity_id) {
   auto entity_var = index.entity(entity_id);
-  if (!std::holds_alternative<Decl>(entity_var)) {
-    return std::nullopt;
-  }
+  if (std::holds_alternative<Decl>(entity_var)) {
+    return FromDeclCategory(std::get<mx::Decl>(entity_var).category());
 
-  const auto &opt_value_decl = ValueDecl::from(std::get<mx::Decl>(entity_var));
-  if (!opt_value_decl.has_value()) {
-    return std::nullopt;
+  } else if (std::holds_alternative<Macro>(entity_var)) {
+    std::optional<Macro> m(std::move(std::get<Macro>(entity_var)));
+    for (; m; m = m->parent()) {
+      switch (m->kind()) {
+        case MacroKind::DEFINE_DIRECTIVE:
+          return TokenCategory::MACRO_NAME;
+        case MacroKind::PARAMETER:
+          return TokenCategory::MACRO_PARAMETER_NAME;
+        case MacroKind::OTHER_DIRECTIVE:
+        case MacroKind::IF_DIRECTIVE:
+        case MacroKind::IF_DEFINED_DIRECTIVE:
+        case MacroKind::IF_NOT_DEFINED_DIRECTIVE:
+        case MacroKind::ELSE_IF_DIRECTIVE:
+        case MacroKind::ELSE_IF_DEFINED_DIRECTIVE:
+        case MacroKind::ELSE_IF_NOT_DEFINED_DIRECTIVE:
+        case MacroKind::ELSE_DIRECTIVE:
+        case MacroKind::END_IF_DIRECTIVE:
+        case MacroKind::UNDEFINE_DIRECTIVE:
+        case MacroKind::PRAGMA_DIRECTIVE:
+        case MacroKind::INCLUDE_DIRECTIVE:
+        case MacroKind::INCLUDE_NEXT_DIRECTIVE:
+        case MacroKind::INCLUDE_MACROS_DIRECTIVE:
+        case MacroKind::IMPORT_DIRECTIVE:
+          return TokenCategory::MACRO_DIRECTIVE_NAME;
+        default:
+          break;
+      }
+    }
+  } else if (std::holds_alternative<Token>(entity_var)) {
+    return std::get<Token>(entity_var).category();
   }
-
-  const auto &value_decl = opt_value_decl.value();
-  return value_decl.category();
+  return TokenCategory::UNKNOWN;
 }
 
-const QString &ReferenceExplorerModel::GetDeclCategoryIconLabel(
-    const std::optional<DeclCategory> &opt_decl_category) {
+const QString &ReferenceExplorerModel::GetTokenCategoryIconLabel(
+    TokenCategory tok_category) {
 
   // We can have up to four characters
+  static const QString kInvalidCategory("Unk");
 
   // clang-format on
-  static const std::unordered_map<DeclCategory, QString> kLabelMap{
-      {DeclCategory::UNKNOWN, "Unk"},
-      {DeclCategory::LOCAL_VARIABLE, "Lvar"},
-      {DeclCategory::GLOBAL_VARIABLE, "Gvar"},
-      {DeclCategory::PARAMETER_VARIABLE, "Parm"},
-      {DeclCategory::FUNCTION, "Fn"},
-      {DeclCategory::INSTANCE_METHOD, "Imet"},
-      {DeclCategory::INSTANCE_MEMBER, "Imem"},
-      {DeclCategory::CLASS_METHOD, "Cmet"},
-      {DeclCategory::CLASS_MEMBER, "Cmem"},
-      {DeclCategory::THIS, "This"},
-      {DeclCategory::CLASS, "Class"},
-      {DeclCategory::STRUCTURE, "Str"},
-      {DeclCategory::UNION, "Un"},
-      {DeclCategory::CONCEPT, "Cc"},
-      {DeclCategory::INTERFACE, "Int"},
-      {DeclCategory::ENUMERATION, "Enum"},
-      {DeclCategory::ENUMERATOR, "EnR"},
-      {DeclCategory::NAMESPACE, "Ns"},
-      {DeclCategory::TYPE_ALIAS, "Alias"},
-      {DeclCategory::TEMPLATE_TYPE_PARAMETER, "Ttyp"},
-      {DeclCategory::TEMPLATE_VALUE_PARAMETER, "Tval"},
-      {DeclCategory::LABEL, "Lbl"},
+  static const std::unordered_map<TokenCategory, QString> kLabelMap{
+      {TokenCategory::UNKNOWN, kInvalidCategory},
+      {TokenCategory::LOCAL_VARIABLE, "Lvar"},
+      {TokenCategory::GLOBAL_VARIABLE, "Gvar"},
+      {TokenCategory::PARAMETER_VARIABLE, "Parm"},
+      {TokenCategory::FUNCTION, "Fn"},
+      {TokenCategory::INSTANCE_METHOD, "Imet"},
+      {TokenCategory::INSTANCE_MEMBER, "Imem"},
+      {TokenCategory::CLASS_METHOD, "Cmet"},
+      {TokenCategory::CLASS_MEMBER, "Cmem"},
+      {TokenCategory::THIS, "This"},
+      {TokenCategory::CLASS, "Class"},
+      {TokenCategory::STRUCT, "Str"},
+      {TokenCategory::UNION, "Un"},
+      {TokenCategory::CONCEPT, "Cc"},
+      {TokenCategory::INTERFACE, "Int"},
+      {TokenCategory::ENUM, "Enum"},
+      {TokenCategory::ENUMERATOR, "EnR"},
+      {TokenCategory::NAMESPACE, "Ns"},
+      {TokenCategory::TYPE_ALIAS, "Alias"},
+      {TokenCategory::TEMPLATE_PARAMETER_TYPE, "Ttyp"},
+      {TokenCategory::TEMPLATE_PARAMETER_VALUE, "Tval"},
+      {TokenCategory::LABEL, "Lbl"},
+      {TokenCategory::MACRO_DIRECTIVE_NAME, "Dir"},
+      {TokenCategory::MACRO_NAME, "Macro"},
+      {TokenCategory::MACRO_PARAMETER_NAME, "MParm"},
   };
   // clang-format on
 
-  static const QString kInvalidCategory("?");
-
-  if (!opt_decl_category.has_value()) {
-    return kInvalidCategory;
-  }
-
-  const auto &decl_category = opt_decl_category.value();
-
-  auto label_map_it = kLabelMap.find(decl_category);
+  auto label_map_it = kLabelMap.find(tok_category);
   if (label_map_it == kLabelMap.end()) {
     return kInvalidCategory;
   }
@@ -814,45 +883,42 @@ const QString &ReferenceExplorerModel::GetDeclCategoryIconLabel(
   return label_map_it->second;
 }
 
-const QString &ReferenceExplorerModel::GetDeclCategoryname(
-    const std::optional<DeclCategory> &opt_decl_category) {
+const QString &ReferenceExplorerModel::GetTokenCategoryName(
+    TokenCategory tok_category) {
+
+  static const QString kInvalidCategory = tr("Unknown");
 
   // clang-format off
-  static const std::unordered_map<DeclCategory, QString> kLabelMap{
-    { DeclCategory::UNKNOWN, tr("Unknown") },
-    { DeclCategory::LOCAL_VARIABLE, tr("Local Variable") },
-    { DeclCategory::GLOBAL_VARIABLE, tr("Global Variable") },
-    { DeclCategory::PARAMETER_VARIABLE, tr("Parameter Variable") },
-    { DeclCategory::FUNCTION, tr("Function") },
-    { DeclCategory::INSTANCE_METHOD, tr("Instance Method") },
-    { DeclCategory::INSTANCE_MEMBER, tr("Instance Member") },
-    { DeclCategory::CLASS_METHOD, tr("Class Method") },
-    { DeclCategory::CLASS_MEMBER, tr("Class Member") },
-    { DeclCategory::THIS, tr("This") },
-    { DeclCategory::CLASS, tr("Class") },
-    { DeclCategory::STRUCTURE, tr("Structure") },
-    { DeclCategory::UNION, tr("Union") },
-    { DeclCategory::CONCEPT, tr("Concept") },
-    { DeclCategory::INTERFACE, tr("Interface") },
-    { DeclCategory::ENUMERATION, tr("Enumeration") },
-    { DeclCategory::ENUMERATOR, tr("Enumerator") },
-    { DeclCategory::NAMESPACE, tr("Namespace") },
-    { DeclCategory::TYPE_ALIAS, tr("Type Alias") },
-    { DeclCategory::TEMPLATE_TYPE_PARAMETER, tr("Template Type Parameter") },
-    { DeclCategory::TEMPLATE_VALUE_PARAMETER, tr("Template Value Parameter") },
-    { DeclCategory::LABEL, tr("Label") },
+  static const std::unordered_map<TokenCategory, QString> kLabelMap{
+    { TokenCategory::UNKNOWN, kInvalidCategory },
+    { TokenCategory::LOCAL_VARIABLE, tr("Local Variable") },
+    { TokenCategory::GLOBAL_VARIABLE, tr("Global Variable") },
+    { TokenCategory::PARAMETER_VARIABLE, tr("Parameter Variable") },
+    { TokenCategory::FUNCTION, tr("Function") },
+    { TokenCategory::INSTANCE_METHOD, tr("Instance Method") },
+    { TokenCategory::INSTANCE_MEMBER, tr("Instance Member") },
+    { TokenCategory::CLASS_METHOD, tr("Class Method") },
+    { TokenCategory::CLASS_MEMBER, tr("Class Member") },
+    { TokenCategory::THIS, tr("This") },
+    { TokenCategory::CLASS, tr("Class") },
+    { TokenCategory::STRUCT, tr("Structure") },
+    { TokenCategory::UNION, tr("Union") },
+    { TokenCategory::CONCEPT, tr("Concept") },
+    { TokenCategory::INTERFACE, tr("Interface") },
+    { TokenCategory::ENUM, tr("Enumeration") },
+    { TokenCategory::ENUMERATOR, tr("Enumerator") },
+    { TokenCategory::NAMESPACE, tr("Namespace") },
+    { TokenCategory::TYPE_ALIAS, tr("Type Alias") },
+    { TokenCategory::TEMPLATE_PARAMETER_TYPE, tr("Template Type Parameter") },
+    { TokenCategory::TEMPLATE_PARAMETER_VALUE, tr("Template Value Parameter") },
+    { TokenCategory::LABEL, tr("Label") },
+    {TokenCategory::MACRO_DIRECTIVE_NAME, "Macro Directive"},
+    {TokenCategory::MACRO_NAME, "Macro"},
+    {TokenCategory::MACRO_PARAMETER_NAME, "Macro Parameter"},
   };
   // clang-format on
 
-  static const QString kInvalidCategory("?");
-
-  if (!opt_decl_category.has_value()) {
-    return kInvalidCategory;
-  }
-
-  const auto &decl_category = opt_decl_category.value();
-
-  auto label_map_it = kLabelMap.find(decl_category);
+  auto label_map_it = kLabelMap.find(tok_category);
   if (label_map_it == kLabelMap.end()) {
     return kInvalidCategory;
   }

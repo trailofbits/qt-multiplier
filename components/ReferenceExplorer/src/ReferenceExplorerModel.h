@@ -11,6 +11,7 @@
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
 #include <multiplier/Entities/DeclCategory.h>
+#include <multiplier/Entities/TokenCategory.h>
 
 #include "Types.h"
 
@@ -108,16 +109,14 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
                          QObject *parent);
 
   //! Returns the category for the given decl
-  static std::optional<DeclCategory>
-  GetDeclCategory(const Index &index, const RawEntityId &entity_id);
+  static TokenCategory
+  GetTokenCategory(const Index &index, RawEntityId entity_id);
 
   //! Returns the label for the specified decl category
-  static const QString &GetDeclCategoryIconLabel(
-      const std::optional<DeclCategory> &opt_decl_category);
+  static const QString &GetTokenCategoryIconLabel(TokenCategory tok_category);
 
   //! Returns the decl category name used to build the tooltip
-  static const QString &
-  GetDeclCategoryname(const std::optional<DeclCategory> &opt_decl_category);
+  static const QString &GetTokenCategoryName(TokenCategory tok_category);
 
   friend class IReferenceExplorerModel;
 };
