@@ -92,12 +92,16 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
     }
   }
 
-  QString icon_label;
+  QString icon_label = "Unk";
   auto icon_label_var = index.data(ReferenceExplorerModel::IconLabelRole);
   if (icon_label_var.isValid()) {
     icon_label = icon_label_var.toString();
-  } else {
-    icon_label = "?";
+  }
+
+  QColor icon_bg = option.palette.base().color().darker();
+  auto icon_bg_var = index.data(ReferenceExplorerModel::ExpansionModeColor);
+  if (icon_bg_var.isValid()) {
+    icon_bg = qvariant_cast<QColor>(icon_bg_var);
   }
 
   QFontMetrics font_metrics(option.font);
@@ -115,7 +119,7 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   int translation{option.rect.x() + margin};
   painter->translate(translation, option.rect.y() + margin);
 
-  DrawIcon(*painter, icon_size, icon_label);
+  DrawIcon(*painter, icon_size, icon_label, icon_bg);
 
   translation += icon_size + margin;
   painter->translate(icon_size + margin, 0);
@@ -140,17 +144,17 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   painter->restore();
 }
 
-void ReferenceExplorerItemDelegate::DrawIcon(QPainter &painter, const int &size,
-                                             const QString &text) {
+void ReferenceExplorerItemDelegate::DrawIcon(
+    QPainter &painter, const int &size, const QString &text, const QColor &bg) {
 
-  painter.fillRect(0, 0, size, size, QColor::fromRgb(0x40, 0x40, 0x40));
+  painter.fillRect(0, 0, size, size, bg);
 
   auto pen_color{QColor::fromRgb(0, 0, 0)};
   painter.setPen(pen_color);
   painter.drawRect(0, 0, size, size);
 
   pen_color = pen_color.lighter(50);
-  painter.setPen(pen_color);
+  painter.setPen(QColor(255, 255, 255));
   painter.drawText(QRect(0, 0, size, size), Qt::AlignCenter, text);
 }
 
