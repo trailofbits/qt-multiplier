@@ -29,6 +29,9 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
 
     //! Returns the icon label
     IconLabelRole,
+
+    //! Returns the color to associate with the expansion mode of this item.
+    ExpansionModeColor,
   };
 
   //! \copybrief IReferenceExplorerModel::ExpandEntity

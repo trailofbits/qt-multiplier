@@ -409,17 +409,6 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
       value = tr("Unnamed: ") + QString::number(node.entity_id);
     }
 
-  } else if (role == Qt::BackgroundRole) {
-    switch (node.expansion_mode) {
-      case IReferenceExplorerModel::ExpansionMode::CallHierarchyMode:
-        value.setValue(QColor(0x50, 0x00, 0x00));
-        break;
-
-      case IReferenceExplorerModel::ExpansionMode::TaintMode:
-        value.setValue(QColor(0x00, 0x00, 0x50));
-        break;
-    }
-
   } else if (role == Qt::ToolTipRole) {
     auto opt_decl_category = GetTokenCategory(d->index, node.entity_id);
     auto buffer =
@@ -494,6 +483,17 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
     auto label = GetTokenCategoryIconLabel(opt_decl_category);
     value.setValue(label);
+
+  } else if (role == ReferenceExplorerModel::ExpansionModeColor) {
+    switch (node.expansion_mode) {
+      case IReferenceExplorerModel::ExpansionMode::CallHierarchyMode:
+        value.setValue(QColor(0x50, 0x00, 0x00));
+        break;
+
+      case IReferenceExplorerModel::ExpansionMode::TaintMode:
+        value.setValue(QColor(0x00, 0x00, 0x50));
+        break;
+    }
   }
 
   return value;
