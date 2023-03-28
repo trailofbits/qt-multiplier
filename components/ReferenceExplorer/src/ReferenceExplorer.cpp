@@ -56,7 +56,7 @@ struct DragAndDropMenu final {
 struct ReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
-  ReferenceExplorerTreeView *tree_view{nullptr};
+  QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
@@ -90,7 +90,7 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
 
 void ReferenceExplorer::InitializeWidgets() {
   // Initialize the tree view
-  d->tree_view = new ReferenceExplorerTreeView(this);
+  d->tree_view = new QTreeView(this);
   d->tree_view->setHeaderHidden(true);
 
   // TODO(pag): Re-enable with some kind of "intrusive" sort that makes the
