@@ -38,6 +38,9 @@ class ReferenceExplorerItemDelegate final : public QStyledItemDelegate {
   ReferenceExplorerItemDelegate &
   operator=(const ReferenceExplorerItemDelegate &) = delete;
 
+  //!
+  static void DrawIcon(QPainter &painter, const int &size, const QString &text);
+
  protected:
   //! Triggered when the user tries to edit the QTreeView item
   virtual bool editorEvent(QEvent *event, QAbstractItemModel *model,
