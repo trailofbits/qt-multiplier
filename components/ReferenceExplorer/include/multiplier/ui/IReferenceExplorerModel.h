@@ -43,9 +43,6 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     //! Returns true if the node has already been expanded
     ExpansionStatusRole,
 
-    //! Returns the internal node identifier
-    InternalIdentifierRole,
-
     //! Returns the entity id as a RawEntityId value
     EntityIdRole,
 
