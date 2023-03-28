@@ -412,7 +412,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   } else if (role == Qt::ToolTipRole) {
     auto opt_decl_category = GetTokenCategory(d->index, node.entity_id);
     auto buffer =
-        tr("Decl category: ") + GetTokenCategoryName(opt_decl_category) + "\n";
+        tr("Category: ") + GetTokenCategoryName(opt_decl_category) + "\n";
 
     buffer += tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
 
