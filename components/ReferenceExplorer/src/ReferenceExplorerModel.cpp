@@ -14,6 +14,7 @@
 
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
+#include <multiplier/AST.h>
 
 #include <QByteArray>
 #include <QIODevice>
@@ -211,7 +212,7 @@ void ReferenceExplorerModel::SetRoot(const QModelIndex &index) {
   std::uint64_t root_node_id = d->node_tree.root_node_id;
   if (index.isValid()) {
     auto node_id_var =
-        index.data(IReferenceExplorerModel::InternalIdentifierRole);
+        index.data(ReferenceExplorerModel::InternalIdentifierRole);
 
     if (node_id_var.isValid()) {
       root_node_id = node_id_var.toULongLong();
@@ -371,7 +372,11 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     }
 
   } else if (role == Qt::ToolTipRole) {
-    auto buffer = tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
+    auto opt_decl_category = GetDeclCategory(d->index, node.entity_id);
+    auto buffer =
+        tr("Decl category: ") + GetDeclCategoryname(opt_decl_category) + "\n";
+
+    buffer += tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
 
     if (std::optional<FragmentId> frag_id =
             FragmentId::from(node.referenced_entity_id)) {
@@ -426,7 +431,7 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
       value.setValue(node.opt_location.value());
     }
 
-  } else if (role == IReferenceExplorerModel::InternalIdentifierRole) {
+  } else if (role == ReferenceExplorerModel::InternalIdentifierRole) {
     value.setValue(node_id);
 
   } else if (role == IReferenceExplorerModel::ExpansionModeRole) {
@@ -434,6 +439,12 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
   } else if (role == IReferenceExplorerModel::ExpansionStatusRole) {
     value.setValue(node.expanded);
+
+  } else if (role == ReferenceExplorerModel::IconLabelRole) {
+    auto opt_decl_category = GetDeclCategory(d->index, node.entity_id);
+
+    auto label = GetDeclCategoryIconLabel(opt_decl_category);
+    value.setValue(label);
   }
 
   return value;
@@ -462,7 +473,7 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
       }
 
       auto node_id_var =
-          index.data(IReferenceExplorerModel::InternalIdentifierRole);
+          index.data(ReferenceExplorerModel::InternalIdentifierRole);
 
       Assert(node_id_var.isValid(), "Invalid InternalIdentifierRole value");
 
@@ -546,7 +557,7 @@ void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
   std::uint64_t drop_target_node_id = d->node_tree.curr_root_node_id;
   if (drop_target.isValid()) {
     auto drop_target_var =
-        drop_target.data(IReferenceExplorerModel::InternalIdentifierRole);
+        drop_target.data(ReferenceExplorerModel::InternalIdentifierRole);
     Assert(drop_target_var.isValid(), "Invalid InternalIdentifierRole value");
     drop_target_node_id = qvariant_cast<std::uint64_t>(drop_target_var);
   }
@@ -737,5 +748,116 @@ ReferenceExplorerModel::ReferenceExplorerModel(
     QObject *parent)
     : IReferenceExplorerModel(parent),
       d(new PrivateData(index, file_location_cache)) {}
+
+std::optional<DeclCategory>
+ReferenceExplorerModel::GetDeclCategory(const Index &index,
+                                        const RawEntityId &entity_id) {
+  auto entity_var = index.entity(entity_id);
+  if (!std::holds_alternative<Decl>(entity_var)) {
+    return std::nullopt;
+  }
+
+  const auto &opt_value_decl = ValueDecl::from(std::get<mx::Decl>(entity_var));
+  if (!opt_value_decl.has_value()) {
+    return std::nullopt;
+  }
+
+  const auto &value_decl = opt_value_decl.value();
+  return value_decl.category();
+}
+
+const QString &ReferenceExplorerModel::GetDeclCategoryIconLabel(
+    const std::optional<DeclCategory> &opt_decl_category) {
+
+  // We can have up to four characters
+
+  // clang-format on
+  static const std::unordered_map<DeclCategory, QString> kLabelMap{
+      {DeclCategory::UNKNOWN, "Unk"},
+      {DeclCategory::LOCAL_VARIABLE, "Lvar"},
+      {DeclCategory::GLOBAL_VARIABLE, "Gvar"},
+      {DeclCategory::PARAMETER_VARIABLE, "Parm"},
+      {DeclCategory::FUNCTION, "Fn"},
+      {DeclCategory::INSTANCE_METHOD, "Imet"},
+      {DeclCategory::INSTANCE_MEMBER, "Imem"},
+      {DeclCategory::CLASS_METHOD, "Cmet"},
+      {DeclCategory::CLASS_MEMBER, "Cmem"},
+      {DeclCategory::THIS, "This"},
+      {DeclCategory::CLASS, "Class"},
+      {DeclCategory::STRUCTURE, "Str"},
+      {DeclCategory::UNION, "Un"},
+      {DeclCategory::CONCEPT, "Cc"},
+      {DeclCategory::INTERFACE, "Int"},
+      {DeclCategory::ENUMERATION, "Enum"},
+      {DeclCategory::ENUMERATOR, "EnR"},
+      {DeclCategory::NAMESPACE, "Ns"},
+      {DeclCategory::TYPE_ALIAS, "Alias"},
+      {DeclCategory::TEMPLATE_TYPE_PARAMETER, "Ttyp"},
+      {DeclCategory::TEMPLATE_VALUE_PARAMETER, "Tval"},
+      {DeclCategory::LABEL, "Lbl"},
+  };
+  // clang-format on
+
+  static const QString kInvalidCategory("?");
+
+  if (!opt_decl_category.has_value()) {
+    return kInvalidCategory;
+  }
+
+  const auto &decl_category = opt_decl_category.value();
+
+  auto label_map_it = kLabelMap.find(decl_category);
+  if (label_map_it == kLabelMap.end()) {
+    return kInvalidCategory;
+  }
+
+  return label_map_it->second;
+}
+
+const QString &ReferenceExplorerModel::GetDeclCategoryname(
+    const std::optional<DeclCategory> &opt_decl_category) {
+
+  // clang-format off
+  static const std::unordered_map<DeclCategory, QString> kLabelMap{
+    { DeclCategory::UNKNOWN, tr("Unknown") },
+    { DeclCategory::LOCAL_VARIABLE, tr("Local Variable") },
+    { DeclCategory::GLOBAL_VARIABLE, tr("Global Variable") },
+    { DeclCategory::PARAMETER_VARIABLE, tr("Parameter Variable") },
+    { DeclCategory::FUNCTION, tr("Function") },
+    { DeclCategory::INSTANCE_METHOD, tr("Instance Method") },
+    { DeclCategory::INSTANCE_MEMBER, tr("Instance Member") },
+    { DeclCategory::CLASS_METHOD, tr("Class Method") },
+    { DeclCategory::CLASS_MEMBER, tr("Class Member") },
+    { DeclCategory::THIS, tr("This") },
+    { DeclCategory::CLASS, tr("Class") },
+    { DeclCategory::STRUCTURE, tr("Structure") },
+    { DeclCategory::UNION, tr("Union") },
+    { DeclCategory::CONCEPT, tr("Concept") },
+    { DeclCategory::INTERFACE, tr("Interface") },
+    { DeclCategory::ENUMERATION, tr("Enumeration") },
+    { DeclCategory::ENUMERATOR, tr("Enumerator") },
+    { DeclCategory::NAMESPACE, tr("Namespace") },
+    { DeclCategory::TYPE_ALIAS, tr("Type Alias") },
+    { DeclCategory::TEMPLATE_TYPE_PARAMETER, tr("Template Type Parameter") },
+    { DeclCategory::TEMPLATE_VALUE_PARAMETER, tr("Template Value Parameter") },
+    { DeclCategory::LABEL, tr("Label") },
+  };
+  // clang-format on
+
+  static const QString kInvalidCategory("?");
+
+  if (!opt_decl_category.has_value()) {
+    return kInvalidCategory;
+  }
+
+  const auto &decl_category = opt_decl_category.value();
+
+  auto label_map_it = kLabelMap.find(decl_category);
+  if (label_map_it == kLabelMap.end()) {
+    return kInvalidCategory;
+  }
+
+  return label_map_it->second;
+}
 
 }  // namespace mx::gui

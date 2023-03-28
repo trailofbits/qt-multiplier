@@ -10,6 +10,8 @@
 
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
+#include <multiplier/Entities/DeclCategory.h>
+
 #include "Types.h"
 
 namespace mx::gui {
@@ -19,6 +21,15 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   Q_OBJECT
 
  public:
+  //! Additional internal item data roles for this model
+  enum PrivateItemDataRole {
+    //! Returns the internal node identifier
+    InternalIdentifierRole = Qt::UserRole + 100,
+
+    //! Returns the icon label
+    IconLabelRole,
+  };
+
   //! \copybrief IReferenceExplorerModel::ExpandEntity
   virtual void ExpandEntity(const QModelIndex &index) override;
 
@@ -95,6 +106,18 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   ReferenceExplorerModel(const Index &index,
                          const FileLocationCache &file_location_cache,
                          QObject *parent);
+
+  //! Returns the category for the given decl
+  static std::optional<DeclCategory>
+  GetDeclCategory(const Index &index, const RawEntityId &entity_id);
+
+  //! Returns the label for the specified decl category
+  static const QString &GetDeclCategoryIconLabel(
+      const std::optional<DeclCategory> &opt_decl_category);
+
+  //! Returns the decl category name used to build the tooltip
+  static const QString &
+  GetDeclCategoryname(const std::optional<DeclCategory> &opt_decl_category);
 
   friend class IReferenceExplorerModel;
 };
