@@ -7,25 +7,23 @@
 */
 
 #include "ReferenceExplorer.h"
-#include "ReferenceExplorerItemDelegate.h"
-#include "FilterSettingsWidget.h"
-#include "SearchFilterModelProxy.h"
 
 #include <multiplier/ui/Assert.h>
-
+#include <optional>
 #include <QApplication>
 #include <QClipboard>
-#include <QCheckBox>
+#include <QDropEvent>
 #include <QLabel>
 #include <QMenu>
-#include <QMouseEvent>
 #include <QPushButton>
-#include <QRadioButton>
-#include <QScrollBar>
-#include <QTreeView>
 #include <QVBoxLayout>
+#include <QScrollBar>
 
-#include <optional>
+#include "FilterSettingsWidget.h"
+#include "ReferenceExplorerItemDelegate.h"
+#include "ReferenceExplorerModel.h"
+#include "ReferenceExplorerTreeView.h"
+#include "SearchFilterModelProxy.h"
 
 namespace mx::gui {
 
@@ -39,11 +37,18 @@ struct ContextMenu final {
 
 struct TreeviewItemButtons final {
   std::optional<QModelIndex> opt_hovered_index;
-  struct {
-    QPushButton *open{nullptr};
-    QPushButton *close{nullptr};
-    QPushButton *expand{nullptr};
-  } buttons;
+
+  // Keep up to date with UpdateTreeViewItemButtons
+  QPushButton *open{nullptr};
+  QPushButton *close{nullptr};
+  QPushButton *expand{nullptr};
+};
+
+struct DragAndDropMenu final {
+  QMenu *menu{nullptr};
+  QAction *copy_subtree_action{nullptr};
+  QAction *add_and_taint_action{nullptr};
+  QAction *add_and_show_refs_action{nullptr};
 };
 
 }  // namespace
@@ -51,19 +56,24 @@ struct TreeviewItemButtons final {
 struct ReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
-  ReferenceExplorerTreeView *tree_view{nullptr};
+  QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
   ContextMenu context_menu;
 
   TreeviewItemButtons treeview_item_buttons;
+  DragAndDropMenu drag_and_drop_menu;
 };
 
 ReferenceExplorer::~ReferenceExplorer() {}
 
 IReferenceExplorerModel *ReferenceExplorer::Model() {
   return d->model;
+}
+
+void ReferenceExplorer::resizeEvent(QResizeEvent *) {
+  UpdateTreeViewItemButtons();
 }
 
 ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
@@ -79,12 +89,8 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
 }
 
 void ReferenceExplorer::InitializeWidgets() {
-
-
-  setAcceptDrops(true);
-
   // Initialize the tree view
-  d->tree_view = new ReferenceExplorerTreeView;
+  d->tree_view = new QTreeView(this);
   d->tree_view->setHeaderHidden(true);
 
   // TODO(pag): Re-enable with some kind of "intrusive" sort that makes the
@@ -95,51 +101,82 @@ void ReferenceExplorer::InitializeWidgets() {
   //  setSortingEnabled(true);
   //  sortByColumn(0, Qt::AscendingOrder);
 
+  // Disallow multiple selection. If we have grouping by file enabled, then when
+  // a user clicks on a file name, we instead jump down to the first entry
+  // grouped under that file. This is to make using the up/down arrows easier.
+  d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
+
   d->tree_view->setAlternatingRowColors(true);
   d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);
-  d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree_view->setExpandsOnDoubleClick(false);
+  d->tree_view->installEventFilter(this);
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);
 
-  connect(d->tree_view, &QTreeView::pressed, this,
-          &ReferenceExplorer::OnItemClick);
-
-  connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
-          &ReferenceExplorer::OnOpenItemContextMenu);
+  connect(d->tree_view, &ReferenceExplorerTreeView::customContextMenuRequested,
+          this, &ReferenceExplorer::OnOpenItemContextMenu);
 
   d->tree_view->setDragEnabled(true);
   d->tree_view->setAcceptDrops(true);
   d->tree_view->setDropIndicatorShown(true);
 
+  QIcon open_item_icon;
+  open_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/activate_ref_item_on"),
+                           QIcon::Normal, QIcon::On);
+
+  open_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/activate_ref_item_off"),
+                           QIcon::Disabled, QIcon::On);
+
+  QIcon expand_item_icon;
+  expand_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/expand_ref_item_on"),
+                             QIcon::Normal, QIcon::On);
+
+  expand_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/expand_ref_item_off"),
+                             QIcon::Disabled, QIcon::On);
+
+  // Initialize the drag and drop menu
+  d->drag_and_drop_menu.menu = new QMenu(tr("Drag and drop menu"), this);
+
+  d->drag_and_drop_menu.copy_subtree_action =
+      new QAction(tr("Copy subtree"), this);
+
+  d->drag_and_drop_menu.menu->addAction(
+      d->drag_and_drop_menu.copy_subtree_action);
+
+  d->drag_and_drop_menu.menu->addSeparator();
+
+  d->drag_and_drop_menu.add_and_taint_action =
+      new QAction(tr("Add node and taint"), this);
+
+  d->drag_and_drop_menu.menu->addAction(
+      d->drag_and_drop_menu.add_and_taint_action);
+
+  d->drag_and_drop_menu.add_and_show_refs_action =
+      new QAction(tr("Add node and show references"), this);
+
+  d->drag_and_drop_menu.menu->addAction(
+      d->drag_and_drop_menu.add_and_show_refs_action);
+
   // Initialize the treeview item buttons
-  auto item_activate_button =
-      new QPushButton(QIcon(":/ReferenceExplorer/activate_ref_item"), "", this);
-  item_activate_button->setToolTip(tr("Open"));
+  d->treeview_item_buttons.open = new QPushButton(open_item_icon, "", this);
+  d->treeview_item_buttons.open->setToolTip(tr("Open"));
 
-  d->treeview_item_buttons.buttons.open = item_activate_button;
-
-  connect(item_activate_button, &QPushButton::pressed, this,
+  connect(d->treeview_item_buttons.open, &QPushButton::pressed, this,
           &ReferenceExplorer::OnActivateTreeViewItem);
 
-  // Initialize the treeview item buttons
-  auto item_close_button =
+  d->treeview_item_buttons.close =
       new QPushButton(QIcon(":/ReferenceExplorer/close_ref_item"), "", this);
-  item_close_button->setToolTip(tr("Close"));
 
-  d->treeview_item_buttons.buttons.close = item_close_button;
+  d->treeview_item_buttons.close->setToolTip(tr("Close"));
 
-  connect(item_close_button, &QPushButton::pressed, this,
+  connect(d->treeview_item_buttons.close, &QPushButton::pressed, this,
           &ReferenceExplorer::OnCloseTreeViewItem);
 
-  auto item_expand_button =
-      new QPushButton(QIcon(":/ReferenceExplorer/expand_ref_item"), "", this);
-  item_expand_button->setToolTip(tr("Expand"));
+  d->treeview_item_buttons.expand = new QPushButton(expand_item_icon, "", this);
+  d->treeview_item_buttons.expand->setToolTip(tr("Expand"));
 
-  d->treeview_item_buttons.buttons.expand = item_expand_button;
-
-  connect(item_expand_button, &QPushButton::pressed, this,
+  connect(d->treeview_item_buttons.expand, &QPushButton::pressed, this,
           &ReferenceExplorer::OnExpandTreeViewItem);
 
   // Create the search widget
@@ -216,17 +253,20 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
 
   d->tree_view->setModel(d->model_proxy);
 
-  connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
-          &ReferenceExplorer::OnModelReset);
+  // Note: this needs to happen after the model has been set in the
+  // tree view!
+  auto tree_selection_model = d->tree_view->selectionModel();
+  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
+          this, &ReferenceExplorer::OnCurrentItemChanged);
 
-  connect(d->model_proxy, &QAbstractItemModel::rowsInserted, this,
-          &ReferenceExplorer::OnRowsAdded);
+  connect(d->model_proxy, &QAbstractItemModel::modelReset,
+          this, &ReferenceExplorer::OnModelReset);
 
-  connect(d->model_proxy, &QAbstractItemModel::rowsAboutToBeRemoved, this,
-          &ReferenceExplorer::OnRowsAboutToBeRemoved);
+  connect(d->model_proxy, &QAbstractItemModel::dataChanged,
+          this, &ReferenceExplorer::OnDataChanged);
 
-  connect(d->model_proxy, &QAbstractItemModel::rowsRemoved, this,
-          &ReferenceExplorer::OnRowsRemoved);
+  connect(d->model_proxy, &QAbstractItemModel::rowsInserted,
+          this, &ReferenceExplorer::OnRowsInserted);
 
   OnModelReset();
 }
@@ -251,94 +291,155 @@ void ReferenceExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
   d->model->ExpandEntity(d->model_proxy->mapToSource(index));
 }
 
-bool ReferenceExplorer::eventFilter(QObject *, QEvent *event) {
-  // It is important to double check the leave event; it is sent
-  // even if the mouse is still inside our treeview item but
-  // above the button (which steals the focus)
-  QPoint mouse_pos;
-  if (event->type() == QEvent::Leave) {
-    mouse_pos = QCursor::pos();
-    mouse_pos = d->tree_view->mapFromGlobal(mouse_pos);
+bool ReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
+  if (obj == d->tree_view) {
+    // Disable the overlay buttons while scrolling. It is hard to keep
+    // them on screen due to how the scrolling event is propagated.
+    if (event->type() == QEvent::Wheel) {
+      auto scrolling_enabled =
+          (d->tree_view->horizontalScrollBar()->isVisible() ||
+           d->tree_view->verticalScrollBar()->isVisible());
 
-  } else if (event->type() == QEvent::MouseMove) {
-    auto &mouse_event = *static_cast<QMouseEvent *>(event);
-    mouse_pos = mouse_event.pos();
+      if (scrolling_enabled) {
+        d->treeview_item_buttons.opt_hovered_index = std::nullopt;
+        UpdateTreeViewItemButtons();
+      }
+
+      return false;
+
+    } else {
+      return false;
+    }
+
+  } else if (obj == d->tree_view->viewport()) {
+    if (event->type() == QEvent::Drop) {
+      if (auto drop_event = dynamic_cast<QDropEvent *>(event)) {
+        // Discard the event if the user cancelled the drag and drop
+        // operation
+        auto process_event = OnTreeViewDropEvent(*drop_event);
+        if (!process_event) {
+          
+          return true;
+        }
+      }
+
+      return false;
+
+    } else if (event->type() == QEvent::Leave ||
+               event->type() == QEvent::MouseMove) {
+      // It is important to double check the leave event; it is sent
+      // even if the mouse is still inside our treeview item but
+      // above the hovering button (which steals the focus)
+      auto mouse_pos = d->tree_view->viewport()->mapFromGlobal(QCursor::pos());
+
+      auto index = d->tree_view->indexAt(mouse_pos);
+      if (!index.isValid()) {
+        d->treeview_item_buttons.opt_hovered_index = std::nullopt;
+      } else {
+        d->treeview_item_buttons.opt_hovered_index = index;
+      }
+
+      UpdateTreeViewItemButtons();
+      return false;
+
+    } else {
+      return false;
+    }
 
   } else {
     return false;
   }
+}
 
-  auto index = d->tree_view->indexAt(mouse_pos);
-  if (!index.isValid()) {
-    d->treeview_item_buttons.opt_hovered_index = std::nullopt;
-  } else {
-    d->treeview_item_buttons.opt_hovered_index = index;
+bool ReferenceExplorer::OnTreeViewDropEvent(const QDropEvent &drop_event) {
+  auto drag_and_drop_mode{ReferenceExplorerModel::DragAndDropMode::CopySubTree};
+
+  if ((drop_event.modifiers() & Qt::ControlModifier) != 0) {
+    // Show menu, and filter out the drag and drop operation if the escape
+    // key is pressed
+    auto selected_action = d->drag_and_drop_menu.menu->exec(QCursor::pos());
+    if (selected_action == nullptr) {
+      return false;
+
+    } else if (selected_action == d->drag_and_drop_menu.copy_subtree_action) {
+      drag_and_drop_mode = ReferenceExplorerModel::DragAndDropMode::CopySubTree;
+
+    } else if (selected_action == d->drag_and_drop_menu.add_and_taint_action) {
+      drag_and_drop_mode =
+          ReferenceExplorerModel::DragAndDropMode::AddRootAndTaint;
+
+    } else if (selected_action ==
+               d->drag_and_drop_menu.add_and_show_refs_action) {
+      drag_and_drop_mode =
+          ReferenceExplorerModel::DragAndDropMode::AddRootAndShowRefs;
+
+    } else {
+      Assert(false, "Invalid drag and drop mode");
+    }
   }
 
-  UpdateTreeViewItemButtons();
-  return false;
+  // Use the private model APIs to set the drag and drop mode
+  auto &model = *static_cast<ReferenceExplorerModel *>(d->model);
+  model.SetDragAndDropMode(drag_and_drop_mode);
+
+  return true;
 }
 
 void ReferenceExplorer::UpdateTreeViewItemButtons() {
-  if (!d->treeview_item_buttons.opt_hovered_index.has_value()) {
-    d->treeview_item_buttons.buttons.open->setVisible(false);
-    d->treeview_item_buttons.buttons.close->setVisible(false);
-    d->treeview_item_buttons.buttons.expand->setVisible(false);
+  // Keep up to date with TreeviewItemButtons
+  std::vector<QPushButton *> button_list{d->treeview_item_buttons.open,
+                                         d->treeview_item_buttons.close,
+                                         d->treeview_item_buttons.expand};
+
+  // Always show the buttons, but disable the ones that are not
+  // applicable. This is to prevent buttons from disappearing and/or
+  // reordering while the user is clicking them
+  auto display_buttons = d->treeview_item_buttons.opt_hovered_index.has_value();
+
+  for (auto &button : button_list) {
+    button->setVisible(display_buttons);
+  }
+
+  if (!display_buttons) {
     return;
   }
 
-  std::vector<QPushButton *> button_list;
   const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
 
   // Enable the go-to button if we have a referenced entity id.
-  auto entity_id = index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
-  if (entity_id.isValid() &&
-      qvariant_cast<RawEntityId>(entity_id) != kInvalidEntityId) {
-    d->treeview_item_buttons.buttons.open->setVisible(true);
-    button_list.push_back(d->treeview_item_buttons.buttons.open);
+  d->treeview_item_buttons.open->setEnabled(false);
+  d->treeview_item_buttons.expand->setEnabled(false);
 
-  } else {
-    d->treeview_item_buttons.buttons.open->setVisible(false);
+  auto entity_id_var =
+      index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
+
+  if (entity_id_var.isValid() &&
+      qvariant_cast<RawEntityId>(entity_id_var) != kInvalidEntityId) {
+
+    d->treeview_item_buttons.open->setEnabled(true);
   }
-
-  // Always show the close button.
-  d->treeview_item_buttons.buttons.close->setVisible(true);
-  button_list.push_back(d->treeview_item_buttons.buttons.close);
 
   // Enable the expansion button if we haven't yet expanded the node.
-  auto mode = index.data(IReferenceExplorerModel::DefaultExpansionMode);
-  if (mode.isValid() &&
-      (qvariant_cast<IReferenceExplorerModel::ExpansionMode>(mode) !=
-       IReferenceExplorerModel::AlreadyExpanded)) {
-    d->treeview_item_buttons.buttons.expand->setVisible(true);
-    button_list.push_back(d->treeview_item_buttons.buttons.expand);
-  } else {
-    d->treeview_item_buttons.buttons.expand->setVisible(false);
+  auto expansion_status_var =
+      index.data(IReferenceExplorerModel::ExpansionStatusRole);
+  if (expansion_status_var.isValid() && !expansion_status_var.toBool()) {
+    d->treeview_item_buttons.expand->setEnabled(true);
   }
 
-  auto button_count = static_cast<int>(button_list.size());
-  if (!button_count) {
-    return;
-  }
-
+  // Update the button positions
   auto rect = d->tree_view->visualRect(index);
-
-  // TODO(pag): Try to place the buttons to the left of any vertical scroll bar
-  //            if a horizontal scrollbar is present.
-  //  auto max_width = d->tree_view->viewport()->width();
-  //  if (max_width >= rect.width()) {
-  //    rect.setWidth(max_width - d->tree_view->verticalScrollBar()->width());
-  //  }
 
   auto button_margin = rect.height() / 6;
   auto button_size = rect.height() - (button_margin * 2);
+
+  auto button_count = static_cast<int>(button_list.size());
   auto button_area_width =
       (button_count * button_size) + (button_count * button_margin);
 
   auto current_x = rect.x() + rect.width() - button_area_width;
   auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
 
-  for (QPushButton *button : button_list) {
+  for (auto *button : button_list) {
     button->resize(button_size, button_size);
     button->move(current_x, current_y);
     button->raise();
@@ -351,34 +452,39 @@ void ReferenceExplorer::OnModelReset() {
   auto display_root_warning = d->model->HasAlternativeRoot();
   d->alternative_root_warning->setVisible(display_root_warning);
 
-  d->tree_view->expandRecursively(QModelIndex(), 1);
+  ExpandAllNodes();
+
+  d->treeview_item_buttons.opt_hovered_index = std::nullopt;
+  UpdateTreeViewItemButtons();
+}
+
+void ReferenceExplorer::OnDataChanged() {
+  UpdateTreeViewItemButtons();
+}
+
+void ReferenceExplorer::ExpandAllNodes() {
+  d->tree_view->expandAll();
   d->tree_view->resizeColumnToContents(0);
 }
 
-//! Like OnModelReset, but for row insertion
-void ReferenceExplorer::OnRowsAdded(const QModelIndex &parent, int first,
-                                    int last) {
-  d->tree_view->rowsInserted(parent, first, last);
-  d->tree_view->expandRecursively(parent, 1);
-  d->tree_view->resizeColumnToContents(0);
+void ReferenceExplorer::OnRowsInserted(const QModelIndex &parent, int first,
+                                       int) {
+  ExpandAllNodes();
+
+  auto parent_is_root{!parent.isValid()};
+  if (parent_is_root && first == 0) {
+    auto first_root_index = d->tree_view->model()->index(0, 0);
+
+    d->tree_view->setCurrentIndex(first_root_index);
+    d->tree_view->setFocus();
+
+    OnCurrentItemChanged(first_root_index, QModelIndex());
+  }
 }
 
-//! Like OnModelReset, but for row deletion
-void ReferenceExplorer::OnRowsRemoved(const QModelIndex &parent, int first,
-                                      int last) {
-  d->tree_view->rowsRemoved(parent, first, last);
-  d->tree_view->expandRecursively(parent, 1);
-  d->tree_view->resizeColumnToContents(0);
-}
-
-//! Like OnModelReset, but for row deletion
-void ReferenceExplorer::OnRowsAboutToBeRemoved(const QModelIndex &parent,
-                                               int first, int last) {
-  d->tree_view->rowsAboutToBeRemoved(parent, first, last);
-}
-
-void ReferenceExplorer::OnItemClick(const QModelIndex &index) {
-  emit ItemClicked(index);
+void ReferenceExplorer::OnCurrentItemChanged(const QModelIndex &current_index,
+                                             const QModelIndex &) {
+  emit SelectedItemChanged(current_index);
 }
 
 void ReferenceExplorer::OnOpenItemContextMenu(const QPoint &point) {

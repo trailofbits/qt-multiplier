@@ -10,6 +10,9 @@
 
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
+#include <multiplier/Entities/DeclCategory.h>
+#include <multiplier/Entities/TokenCategory.h>
+
 #include "Types.h"
 
 namespace mx::gui {
@@ -19,6 +22,17 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   Q_OBJECT
 
  public:
+  //! Additional internal item data roles for this model
+  enum PrivateItemDataRole {
+    //! Returns the internal node identifier
+    InternalIdentifierRole = Qt::UserRole + 100,
+
+    //! Returns the icon label
+    IconLabelRole,
+
+    //! Returns the color to associate with the expansion mode of this item.
+    ExpansionModeColor,
+  };
 
   //! \copybrief IReferenceExplorerModel::ExpandEntity
   virtual void ExpandEntity(const QModelIndex &index) override;
@@ -69,11 +83,21 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   //! Defines the mime types supported by this model
   virtual QStringList mimeTypes() const override;
 
+  //! Drag and drop modes
+  enum class DragAndDropMode {
+    CopySubTree,
+    AddRootAndTaint,
+    AddRootAndShowRefs,
+  };
+
+  //! Sets the active drag and drop mode
+  void SetDragAndDropMode(const DragAndDropMode &mode);
+
  public slots:
   //! \copybrief IReferenceExplorerModel::AppendEntityById
-  virtual void AppendEntityById(
-      RawEntityId entity_id, ExpansionMode expansion_mode,
-      const QModelIndex &parent) override;
+  virtual void AppendEntityById(RawEntityId entity_id,
+                                ExpansionMode expansion_mode,
+                                const QModelIndex &parent) override;
 
  private slots:
   void InsertNodes(QVector<Node> node, int row, const QModelIndex &parent);
@@ -86,6 +110,16 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   ReferenceExplorerModel(const Index &index,
                          const FileLocationCache &file_location_cache,
                          QObject *parent);
+
+  //! Returns the category for the given decl
+  static TokenCategory
+  GetTokenCategory(const Index &index, RawEntityId entity_id);
+
+  //! Returns the label for the specified decl category
+  static const QString &GetTokenCategoryIconLabel(TokenCategory tok_category);
+
+  //! Returns the decl category name used to build the tooltip
+  static const QString &GetTokenCategoryName(TokenCategory tok_category);
 
   friend class IReferenceExplorerModel;
 };

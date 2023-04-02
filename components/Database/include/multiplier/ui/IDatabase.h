@@ -15,11 +15,36 @@
 #include <QFutureWatcher>
 #include <QString>
 
+#include <deque>
 #include <variant>
 #include <vector>
 #include <optional>
 
 namespace mx::gui {
+
+//! A generic template that defines a batched data receiver
+template <typename DataType>
+class IBatchedDataTypeReceiver {
+ public:
+  //! Constructor
+  IBatchedDataTypeReceiver() = default;
+
+  //! Destructor
+  virtual ~IBatchedDataTypeReceiver() = default;
+
+  //! Disabled copy constructor
+  IBatchedDataTypeReceiver(const IBatchedDataTypeReceiver &) = delete;
+
+  //! Disabled copy assignment operator
+  IBatchedDataTypeReceiver &
+  operator=(const IBatchedDataTypeReceiver &) = delete;
+
+  //! A single batch of data of type `DataType`
+  using DataBatch = std::deque<DataType>;
+
+  //! A slot used to receive batched data
+  virtual void OnDataBatch(DataBatch data_batch) = 0;
+};
 
 //! The IDatabase class is responsible for all async operations
 class IDatabase {
@@ -58,6 +83,30 @@ class IDatabase {
   //! Starts a name resolution request for the given entity
   virtual QFuture<OptionalName>
   RequestEntityName(const RawEntityId &fragment_id) = 0;
+
+  //! A single entity query result
+  struct EntityQueryResult final {
+    //! The fragment containing this token
+    Fragment fragment;
+
+    //! The file containing this token
+    std::optional<File> opt_file;
+
+    //! The entity name
+    Token name_token;
+
+    //! The entity data
+    std::variant<NamedDecl, DefineMacroDirective> data;
+  };
+
+  //! A data batch receiver for EntityQueryResult objects
+  using QueryEntitiesReceiver = IBatchedDataTypeReceiver<EntityQueryResult>;
+
+  //! Queries the internal index for all entities named like `name`
+  //! \return True in case of success, or false otherwise
+  virtual QFuture<bool> QueryEntities(QueryEntitiesReceiver &receiver,
+                                      const QString &name,
+                                      const bool &exact_name) = 0;
 
   //! Disabled copy constructor
   IDatabase(const IDatabase &) = delete;

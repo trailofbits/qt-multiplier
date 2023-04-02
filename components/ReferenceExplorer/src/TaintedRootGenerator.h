@@ -24,7 +24,7 @@ class TaintedRootGenerator final : public TaintedChildGenerator {
                               const QModelIndex &parent_)
       : TaintedChildGenerator(index_, file_cache_, entity_id_, parent_) {}
 
-  virtual gap::generator<Node> GenerateNodes(void) override;
+  virtual void run(void) final;
 };
 
 }  // namespace mx::gui

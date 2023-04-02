@@ -25,10 +25,6 @@ class IReferenceExplorerModel : public QAbstractItemModel {
  public:
   //! Expansion modes.
   enum ExpansionMode {
-    //! A node whose current expansion mode has already been activated. This
-    //! is used to prevent us from repeatedly expanding the same node.
-    AlreadyExpanded,
-
     //! Expand showing the call hierarchy.
     CallHierarchyMode,
 
@@ -42,13 +38,10 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     LocationRole = Qt::UserRole + 1,
 
     //! Returns the default expansion mode for this node's children.
-    DefaultExpansionMode,
+    ExpansionModeRole,
 
-    //! Tells us whether or not this node has been expanded.
-    HasBeenExpanded,
-
-    //! Returns the internal node identifier
-    InternalIdentifierRole,
+    //! Returns true if the node has already been expanded
+    ExpansionStatusRole,
 
     //! Returns the entity id as a RawEntityId value
     EntityIdRole,

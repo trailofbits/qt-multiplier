@@ -12,6 +12,7 @@
 #include <multiplier/Entities/StmtKind.h>
 #include <multiplier/ui/IIndexView.h>
 #include <multiplier/ui/IReferenceExplorer.h>
+#include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/Util.h>
 
 #include <QDockWidget>
@@ -42,6 +43,7 @@ struct MainWindow::PrivateData final {
   mx::FileLocationCache file_location_cache;
 
   IIndexView *index_view{nullptr};
+  IEntityExplorer *entity_explorer{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
@@ -72,7 +74,10 @@ void MainWindow::InitializeWidgets() {
   d->view_menu = new QMenu(tr("View"));
   menuBar()->addMenu(d->view_menu);
 
+  setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::East);
+  setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
   CreateFileTreeDock();
+  CreateEntityExplorerDock();
   CreateCodeView();
   CreateReferenceExplorerDock();
 }
@@ -93,6 +98,25 @@ void MainWindow::CreateFileTreeDock() {
   file_tree_dock->setWidget(d->index_view);
 
   addDockWidget(Qt::LeftDockWidgetArea, file_tree_dock);
+}
+
+void MainWindow::CreateEntityExplorerDock() {
+  auto entity_explorer_model =
+      IEntityExplorerModel::Create(d->index, d->file_location_cache, this);
+  d->entity_explorer = IEntityExplorer::Create(entity_explorer_model, this);
+
+  auto entity_explorer_dock = new QDockWidget(tr("Symbols"), this);
+  entity_explorer_dock->setAllowedAreas(Qt::LeftDockWidgetArea |
+                                        Qt::RightDockWidgetArea);
+
+  connect(d->entity_explorer, &IEntityExplorer::EntityAction,
+          this, &MainWindow::OnEntityExplorerEntityClicked);
+
+  d->view_menu->addAction(entity_explorer_dock->toggleViewAction());
+
+  entity_explorer_dock->setWidget(d->entity_explorer);
+
+  addDockWidget(Qt::LeftDockWidgetArea, entity_explorer_dock);
 }
 
 void MainWindow::CreateReferenceExplorerDock() {
@@ -431,10 +455,18 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
   }
 }
 
+void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
+  OpenEntityRelatedToEntityId(entity_id);
+}
+
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
-  auto entity_id_role = index.data(IReferenceExplorerModel::EntityIdRole);
+  auto entity_id_role =
+      index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
   if (!entity_id_role.isValid()) {
-    return;
+    entity_id_role = index.data(IReferenceExplorerModel::EntityIdRole);
+    if (!entity_id_role.isValid()) {
+      return;
+    }
   }
 
   auto entity_id = qvariant_cast<RawEntityId>(entity_id_role);

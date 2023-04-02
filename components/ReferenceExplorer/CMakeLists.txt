@@ -37,6 +37,9 @@ add_library("mx_referenceexplorer"
   src/TaintedRootGenerator.h
   src/TaintedRootGenerator.cpp
 
+  src/ReferenceExplorerTreeView.h
+  src/ReferenceExplorerTreeView.cpp
+
   src/Utils.h
   src/Utils.cpp
 
@@ -62,6 +65,7 @@ target_link_libraries("mx_referenceexplorer"
     "thirdparty_qt"
     "multiplier::mx-api"
     "multiplier::mx-analysis"
+    "multiplier::mx-mlir"
     "gap::gap"
     "mx_assert"
     "mx_searchwidget"

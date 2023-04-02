@@ -24,6 +24,10 @@ bool INodeGenerator::CancelRequested(void) {
   return cancel_requested.loadAcquire() == 1;
 }
 
+const QModelIndex &INodeGenerator::ModelIndex(void) {
+  return parent_index;
+}
+
 gap::generator<Node> INodeGenerator::GenerateNodes(void) {
   co_return;
 }
@@ -57,7 +61,6 @@ INodeGenerator *INodeGenerator::CreateRootGenerator(
     IReferenceExplorerModel::ExpansionMode expansion_mode) {
 
   switch (expansion_mode) {
-    case IReferenceExplorerModel::AlreadyExpanded: return nullptr;
     case IReferenceExplorerModel::CallHierarchyMode:
       return new CallHierarchyRootGenerator(index, file_cache, entity_id,
                                             parent);
@@ -73,7 +76,6 @@ INodeGenerator *INodeGenerator::CreateChildGenerator(
     IReferenceExplorerModel::ExpansionMode expansion_mode) {
 
   switch (expansion_mode) {
-    case IReferenceExplorerModel::AlreadyExpanded: return nullptr;
     case IReferenceExplorerModel::CallHierarchyMode:
       return new CallHierarchyChildGenerator(index, file_cache, entity_id,
                                              parent);

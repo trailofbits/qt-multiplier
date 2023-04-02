@@ -14,16 +14,76 @@
 
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
+#include <multiplier/AST.h>
 
 #include <QByteArray>
 #include <QIODevice>
 #include <QMimeData>
 #include <QString>
 #include <QThreadPool>
+#include <QColor>
 
 #include <filesystem>
 
 namespace mx::gui {
+
+namespace {
+
+const QString kNodeInfoMimeType = "application/mx-reference-explorer-node-info";
+
+const QString kInstanceInfoMimeType =
+    "application/mx-reference-explorer-instance-info";
+
+static TokenCategory FromDeclCategory(DeclCategory cat) {
+  switch (cat) {
+    case DeclCategory::LOCAL_VARIABLE:
+      return TokenCategory::LOCAL_VARIABLE;
+    case DeclCategory::GLOBAL_VARIABLE:
+      return TokenCategory::GLOBAL_VARIABLE;
+    case DeclCategory::PARAMETER_VARIABLE:
+      return TokenCategory::PARAMETER_VARIABLE;
+    case DeclCategory::FUNCTION:
+      return TokenCategory::FUNCTION;
+    case DeclCategory::INSTANCE_METHOD:
+      return TokenCategory::INSTANCE_METHOD;
+    case DeclCategory::INSTANCE_MEMBER:
+      return TokenCategory::INSTANCE_MEMBER;
+    case DeclCategory::CLASS_METHOD:
+      return TokenCategory::CLASS_METHOD;
+    case DeclCategory::CLASS_MEMBER:
+      return TokenCategory::CLASS_MEMBER;
+    case DeclCategory::THIS:
+      return TokenCategory::THIS;
+    case DeclCategory::CLASS:
+      return TokenCategory::CLASS;
+    case DeclCategory::STRUCTURE:
+      return TokenCategory::STRUCT;
+    case DeclCategory::UNION:
+      return TokenCategory::UNION;
+    case DeclCategory::CONCEPT:
+      return TokenCategory::CONCEPT;
+    case DeclCategory::INTERFACE:
+      return TokenCategory::INTERFACE;
+    case DeclCategory::ENUMERATION:
+      return TokenCategory::ENUM;
+    case DeclCategory::ENUMERATOR:
+      return TokenCategory::ENUMERATOR;
+    case DeclCategory::NAMESPACE:
+      return TokenCategory::NAMESPACE;
+    case DeclCategory::TYPE_ALIAS:
+      return TokenCategory::TYPE_ALIAS;
+    case DeclCategory::TEMPLATE_TYPE_PARAMETER:
+      return TokenCategory::TEMPLATE_PARAMETER_TYPE;
+    case DeclCategory::TEMPLATE_VALUE_PARAMETER:
+      return TokenCategory::TEMPLATE_PARAMETER_VALUE;
+    case DeclCategory::LABEL:
+      return TokenCategory::LABEL;
+    default:
+      return TokenCategory::UNKNOWN;
+  }
+}
+
+}  // namespace
 
 struct ReferenceExplorerModel::PrivateData final {
   PrivateData(const mx::Index &index_,
@@ -47,6 +107,9 @@ struct ReferenceExplorerModel::PrivateData final {
 
   //! Node tree for this model.
   NodeTree node_tree;
+
+  //! Active drag and drop mode
+  DragAndDropMode drag_and_drop_mode{DragAndDropMode::CopySubTree};
 };
 
 //! Adds a new entity object under the given parent
@@ -83,21 +146,16 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
     return;
   }
 
-  auto expansion_mode = node_it->second.expansion_mode;
-  if (expansion_mode == IReferenceExplorerModel::AlreadyExpanded) {
+  auto &node = node_it->second;
+  if (node.expanded) {
     return;
   }
 
-  // Prevent this mode from being expanded any more.
-  node_it->second.expansion_mode = IReferenceExplorerModel::AlreadyExpanded;
+  node.expanded = true;
 
   INodeGenerator *generator = INodeGenerator::CreateChildGenerator(
       d->index, d->file_location_cache, node_it->second.entity_id, index,
-      expansion_mode);
-
-  if (!generator) {
-    return;
-  }
+      node.expansion_mode);
 
   generator->setAutoDelete(true);
 
@@ -127,21 +185,18 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
   std::uint64_t parent_node_id = node_it->second.parent_node_id;
 
   auto parent_it = node_map.find(parent_node_id);
-  bool full_reset = false;
 
   // Check if we're removing the alternate root.
   if (node_id == d->node_tree.curr_root_node_id) {
     Assert(d->node_tree.curr_root_node_id != d->node_tree.root_node_id,
            "Can't remove the true root node.");
     d->node_tree.curr_root_node_id = d->node_tree.root_node_id;
-    full_reset = true;
   }
 
   QModelIndex parent_index = QModelIndex();
   int parent_offset = 0;
   if (parent_it == node_map.end()) {
     Assert(false, "Missing parent node, or removing true root node");
-    full_reset = true;
 
     // We're removing something inside of our parent.
   } else {
@@ -157,7 +212,6 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
     }
     if (!found) {
       Assert(false, "Didn't find node to be deleted in parent's child list.");
-      full_reset = true;
     }
 
     if (parent_node_id != d->node_tree.curr_root_node_id) {
@@ -165,12 +219,7 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
     }
   }
 
-  if (full_reset) {
-    emit beginResetModel();
-
-  } else {
-    emit beginRemoveRows(parent_index, parent_offset, parent_offset);
-  }
+  emit beginResetModel();
 
   std::vector<std::uint64_t> wl;
   wl.push_back(node_id);
@@ -201,11 +250,7 @@ void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
         it, parent_it->second.child_node_id_list.end());
   }
 
-  if (full_reset) {
-    emit endResetModel();
-  } else {
-    emit endRemoveRows();
-  }
+  emit endResetModel();
 }
 
 bool ReferenceExplorerModel::HasAlternativeRoot() const {
@@ -216,7 +261,7 @@ void ReferenceExplorerModel::SetRoot(const QModelIndex &index) {
   std::uint64_t root_node_id = d->node_tree.root_node_id;
   if (index.isValid()) {
     auto node_id_var =
-        index.data(IReferenceExplorerModel::InternalIdentifierRole);
+        index.data(ReferenceExplorerModel::InternalIdentifierRole);
 
     if (node_id_var.isValid()) {
       root_node_id = node_id_var.toULongLong();
@@ -365,7 +410,11 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     }
 
   } else if (role == Qt::ToolTipRole) {
-    auto buffer = tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
+    auto opt_decl_category = GetTokenCategory(d->index, node.entity_id);
+    auto buffer =
+        tr("Category: ") + GetTokenCategoryName(opt_decl_category) + "\n";
+
+    buffer += tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
 
     if (std::optional<FragmentId> frag_id =
             FragmentId::from(node.referenced_entity_id)) {
@@ -420,11 +469,31 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
       value.setValue(node.opt_location.value());
     }
 
-  } else if (role == IReferenceExplorerModel::InternalIdentifierRole) {
+  } else if (role == ReferenceExplorerModel::InternalIdentifierRole) {
     value.setValue(node_id);
 
-  } else if (role == IReferenceExplorerModel::DefaultExpansionMode) {
+  } else if (role == IReferenceExplorerModel::ExpansionModeRole) {
     value.setValue(node.expansion_mode);
+
+  } else if (role == IReferenceExplorerModel::ExpansionStatusRole) {
+    value.setValue(node.expanded);
+
+  } else if (role == ReferenceExplorerModel::IconLabelRole) {
+    auto opt_decl_category = GetTokenCategory(d->index, node.entity_id);
+
+    auto label = GetTokenCategoryIconLabel(opt_decl_category);
+    value.setValue(label);
+
+  } else if (role == ReferenceExplorerModel::ExpansionModeColor) {
+    switch (node.expansion_mode) {
+      case IReferenceExplorerModel::ExpansionMode::CallHierarchyMode:
+        value.setValue(QColor(0x50, 0x00, 0x00));
+        break;
+
+      case IReferenceExplorerModel::ExpansionMode::TaintMode:
+        value.setValue(QColor(0x00, 0x00, 0x50));
+        break;
+    }
   }
 
   return value;
@@ -432,7 +501,6 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
 QMimeData *
 ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
-
   // Only allow dragging of one thing at a time. Dragging one thing implies
   // bringing along all of its children.
   if (indexes.size() != 1) {
@@ -440,65 +508,93 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
   }
 
   const QModelIndex &root_index = indexes[0];
-  std::vector<std::uint64_t> node_id_stack;
-
-  // Append the internal node ID associated with `index` to `node_id_stack`.
-  auto append_to_node_id_stack = [&](const QModelIndex &index) {
-    if (!index.isValid()) {
-      return false;
-    }
-
-    auto node_id_var =
-        index.data(IReferenceExplorerModel::InternalIdentifierRole);
-
-    Assert(node_id_var.isValid(), "Invalid InternalIdentifierRole value");
-
-    auto node_id = qvariant_cast<std::uint64_t>(node_id_var);
-    node_id_stack.push_back(node_id);
-    return true;
-  };
-
-  // If we don't get a node ID for the root index, then go look for all of the
-  // top-level rows.
-  if (!append_to_node_id_stack(root_index)) {
-    int row_count = rowCount(QModelIndex());
-    for (int i = 0; i < row_count; ++i) {
-      append_to_node_id_stack(index(i, 0, QModelIndex()));
-    }
-  }
-
-  if (node_id_stack.empty()) {
-    return nullptr;
-  }
-
-  QByteArray encoded_data;
-  QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
-
-  // Embed an instance identifier into the encoded data. This is to prevent
-  // us from dragging and dropping onto ourselves.
-  std::uint64_t instance_identifier = reinterpret_cast<uintptr_t>(this);
-  encoded_data_stream << instance_identifier;
-
-  // NOTE(pag): This serializes nodes in the order that they appear in the
-  //            tree, that way deserialization also preserves the same order,
-  //            and all parent nodes are deserialized before child nodes.
-  std::reverse(node_id_stack.begin(), node_id_stack.end());
-  while (!node_id_stack.empty()) {
-    std::uint64_t node_id = node_id_stack.back();
-    node_id_stack.pop_back();
-
-    auto node_it = d->node_tree.node_map.find(node_id);
-    Assert(node_it != d->node_tree.node_map.end(), "Invalid node identifier");
-
-    const Node &node = node_it->second;
-    encoded_data_stream << node;
-
-    node_id_stack.insert(node_id_stack.end(), node.child_node_id_list.rbegin(),
-                         node.child_node_id_list.rend());
-  }
 
   auto mime_data = new QMimeData();
-  mime_data->setData(Node::kMimeTypeName, encoded_data);
+
+  // Serialize the whole subtree
+  {
+    std::vector<std::uint64_t> node_id_stack;
+
+    // Append the internal node ID associated with `index` to `node_id_stack`.
+    auto append_to_node_id_stack = [&](const QModelIndex &index) {
+      if (!index.isValid()) {
+        return false;
+      }
+
+      auto node_id_var =
+          index.data(ReferenceExplorerModel::InternalIdentifierRole);
+
+      Assert(node_id_var.isValid(), "Invalid InternalIdentifierRole value");
+
+      auto node_id = qvariant_cast<std::uint64_t>(node_id_var);
+      node_id_stack.push_back(node_id);
+      return true;
+    };
+
+    // If we don't get a node ID for the root index, then go look for all of the
+    // top-level rows.
+    if (!append_to_node_id_stack(root_index)) {
+      int row_count = rowCount(QModelIndex());
+      for (int i = 0; i < row_count; ++i) {
+        append_to_node_id_stack(index(i, 0, QModelIndex()));
+      }
+    }
+
+    if (node_id_stack.empty()) {
+      return nullptr;
+    }
+
+    QByteArray encoded_data;
+    QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
+
+    // NOTE(pag): This serializes nodes in the order that they appear in the
+    //            tree, that way deserialization also preserves the same order,
+    //            and all parent nodes are deserialized before child nodes.
+    std::reverse(node_id_stack.begin(), node_id_stack.end());
+    while (!node_id_stack.empty()) {
+      std::uint64_t node_id = node_id_stack.back();
+      node_id_stack.pop_back();
+
+      auto node_it = d->node_tree.node_map.find(node_id);
+      Assert(node_it != d->node_tree.node_map.end(), "Invalid node identifier");
+
+      const Node &node = node_it->second;
+      encoded_data_stream << node;
+
+      node_id_stack.insert(node_id_stack.end(),
+                           node.child_node_id_list.rbegin(),
+                           node.child_node_id_list.rend());
+
+      mime_data->setData(Node::kMimeTypeName, encoded_data);
+    }
+  }
+
+  // Add the instance identifier mime data to prevent us from dragging
+  // and dropping onto ourselves.
+  {
+    QByteArray encoded_data;
+    QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
+
+    std::uint64_t instance_identifier{};
+    auto this_ptr{this};
+    std::memcpy(&instance_identifier, &this_ptr, sizeof(instance_identifier));
+
+    encoded_data_stream << instance_identifier;
+    mime_data->setData(kInstanceInfoMimeType, encoded_data);
+  }
+
+  // Add the raw entity id information
+  auto entity_id_var = root_index.data(IReferenceExplorerModel::EntityIdRole);
+  if (entity_id_var.isValid()) {
+    QByteArray encoded_data;
+    QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
+
+    auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+    encoded_data_stream << entity_id;
+
+    mime_data->setData(kNodeInfoMimeType, encoded_data);
+  }
+
   return mime_data;
 }
 
@@ -510,7 +606,7 @@ void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
   std::uint64_t drop_target_node_id = d->node_tree.curr_root_node_id;
   if (drop_target.isValid()) {
     auto drop_target_var =
-        drop_target.data(IReferenceExplorerModel::InternalIdentifierRole);
+        drop_target.data(ReferenceExplorerModel::InternalIdentifierRole);
     Assert(drop_target_var.isValid(), "Invalid InternalIdentifierRole value");
     drop_target_node_id = qvariant_cast<std::uint64_t>(drop_target_var);
   }
@@ -543,7 +639,9 @@ void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
   std::unordered_map<std::uint64_t, std::uint64_t> id_mapping;
   for (Node &node : nodes) {
     const std::uint64_t old_id = node.node_id;
+    Assert(old_id != 0u, "Invalid node id");
     node.AssignUniqueId();  // NOTE(pag): Replaces `Node::node_id`.
+    Assert(node.node_id != 0u, "Invlaid unique node id");
     auto [it, added] = id_mapping.emplace(old_id, node.node_id);
     Assert(added, "Repeat node id found");
   }
@@ -562,6 +660,11 @@ void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
       node.parent_node_id = parent_it->second;
     }
   }
+
+  // The `expanded` property of this node has changed, so tell the view
+  // about it. This will disable the expand button (regardless of whether
+  // we did get new nodes or not).
+  emit dataChanged(drop_target, drop_target);
 
   // We did nothing, or we did nothing visible.
   auto num_dropped_nodes = static_cast<int>(root_nodes_dropped.size());
@@ -600,35 +703,75 @@ bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
     return true;
   }
 
-  if (!data->hasFormat(Node::kMimeTypeName)) {
+  if (!data->hasFormat(Node::kMimeTypeName) &&
+      !data->hasFormat(kNodeInfoMimeType)) {
+
     return false;
   }
-
-  auto encoded_data = data->data(Node::kMimeTypeName);
-  QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
 
   // Prevent dragging and dropping nodes when the source and destination
   // trees match, i.e. from ourself to ourself.
-  std::uint64_t instance_identifier = reinterpret_cast<uintptr_t>(this);
-  std::uint64_t incoming_instance_identifier{};
-  encoded_data_stream >> incoming_instance_identifier;
-  if (instance_identifier == incoming_instance_identifier) {
-    return false;
+  {
+    auto encoded_data = data->data(kInstanceInfoMimeType);
+    QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
+
+    std::uint64_t instance_identifier{};
+    auto this_ptr{this};
+    std::memcpy(&instance_identifier, &this_ptr, sizeof(instance_identifier));
+
+    std::uint64_t incoming_instance_identifier{};
+    encoded_data_stream >> incoming_instance_identifier;
+    if (instance_identifier == incoming_instance_identifier) {
+      return false;
+    }
   }
 
-  // Deserialize and add the new nodes to the model.
-  QVector<Node> decoded_nodes;
-  while (!encoded_data_stream.atEnd()) {
-    encoded_data_stream >> decoded_nodes.emplaceBack();
+  auto succeeded{false};
+
+  // Deserialize the correct stream and transfer all the nodes as-is
+  // when we are asked to perform a subtree copy
+  if (d->drag_and_drop_mode == DragAndDropMode::CopySubTree) {
+    auto encoded_data = data->data(Node::kMimeTypeName);
+    QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
+
+    // Deserialize the nodes
+    QVector<Node> decoded_nodes;
+    while (!encoded_data_stream.atEnd()) {
+      encoded_data_stream >> decoded_nodes.emplaceBack();
+    }
+
+    if (decoded_nodes.isEmpty()) {
+      return false;
+    }
+
+    auto old_num_nodes = d->node_tree.node_map.size();
+    InsertNodes(std::move(decoded_nodes), row, drop_target);
+
+    succeeded = d->node_tree.node_map.size() > old_num_nodes;
+
+  } else {
+    auto encoded_data = data->data(kNodeInfoMimeType);
+    QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
+
+    RawEntityId entity_id{};
+    encoded_data_stream >> entity_id;
+
+    ExpansionMode expansion_mode{};
+    if (d->drag_and_drop_mode == DragAndDropMode::AddRootAndTaint) {
+      expansion_mode = ExpansionMode::TaintMode;
+
+    } else if (d->drag_and_drop_mode == DragAndDropMode::AddRootAndShowRefs) {
+      expansion_mode = ExpansionMode::CallHierarchyMode;
+
+    } else {
+      Assert(false, "Invalid drag and drop state");
+    }
+
+    AppendEntityById(entity_id, expansion_mode, drop_target);
+    succeeded = true;
   }
 
-  if (decoded_nodes.isEmpty()) {
-    return false;
-  }
-
-  auto old_num_nodes = d->node_tree.node_map.size();
-  InsertNodes(std::move(decoded_nodes), row, drop_target);
-  return d->node_tree.node_map.size() > old_num_nodes;
+  return succeeded;
 }
 
 Qt::ItemFlags ReferenceExplorerModel::flags(const QModelIndex &index) const {
@@ -645,10 +788,142 @@ QStringList ReferenceExplorerModel::mimeTypes() const {
   return {Node::kMimeTypeName};
 }
 
+void ReferenceExplorerModel::SetDragAndDropMode(const DragAndDropMode &mode) {
+  d->drag_and_drop_mode = mode;
+}
+
 ReferenceExplorerModel::ReferenceExplorerModel(
     const Index &index, const FileLocationCache &file_location_cache,
     QObject *parent)
     : IReferenceExplorerModel(parent),
       d(new PrivateData(index, file_location_cache)) {}
+
+TokenCategory
+ReferenceExplorerModel::GetTokenCategory(const Index &index,
+                                         RawEntityId entity_id) {
+  auto entity_var = index.entity(entity_id);
+  if (std::holds_alternative<Decl>(entity_var)) {
+    return FromDeclCategory(std::get<mx::Decl>(entity_var).category());
+
+  } else if (std::holds_alternative<Macro>(entity_var)) {
+    std::optional<Macro> m(std::move(std::get<Macro>(entity_var)));
+    for (; m; m = m->parent()) {
+      switch (m->kind()) {
+        case MacroKind::DEFINE_DIRECTIVE:
+          return TokenCategory::MACRO_NAME;
+        case MacroKind::PARAMETER:
+          return TokenCategory::MACRO_PARAMETER_NAME;
+        case MacroKind::OTHER_DIRECTIVE:
+        case MacroKind::IF_DIRECTIVE:
+        case MacroKind::IF_DEFINED_DIRECTIVE:
+        case MacroKind::IF_NOT_DEFINED_DIRECTIVE:
+        case MacroKind::ELSE_IF_DIRECTIVE:
+        case MacroKind::ELSE_IF_DEFINED_DIRECTIVE:
+        case MacroKind::ELSE_IF_NOT_DEFINED_DIRECTIVE:
+        case MacroKind::ELSE_DIRECTIVE:
+        case MacroKind::END_IF_DIRECTIVE:
+        case MacroKind::UNDEFINE_DIRECTIVE:
+        case MacroKind::PRAGMA_DIRECTIVE:
+        case MacroKind::INCLUDE_DIRECTIVE:
+        case MacroKind::INCLUDE_NEXT_DIRECTIVE:
+        case MacroKind::INCLUDE_MACROS_DIRECTIVE:
+        case MacroKind::IMPORT_DIRECTIVE:
+          return TokenCategory::MACRO_DIRECTIVE_NAME;
+        default:
+          break;
+      }
+    }
+  } else if (std::holds_alternative<Token>(entity_var)) {
+    return std::get<Token>(entity_var).category();
+  }
+  return TokenCategory::UNKNOWN;
+}
+
+const QString &ReferenceExplorerModel::GetTokenCategoryIconLabel(
+    TokenCategory tok_category) {
+
+  // We can have up to four characters
+  static const QString kInvalidCategory("Unk");
+
+  // clang-format on
+  static const std::unordered_map<TokenCategory, QString> kLabelMap{
+      {TokenCategory::UNKNOWN, kInvalidCategory},
+      {TokenCategory::LOCAL_VARIABLE, "Var"},
+      {TokenCategory::GLOBAL_VARIABLE, "GVar"},
+      {TokenCategory::PARAMETER_VARIABLE, "Parm"},
+      {TokenCategory::FUNCTION, "Func"},
+      {TokenCategory::INSTANCE_METHOD, "Meth"},
+      {TokenCategory::INSTANCE_MEMBER, "Fld"},
+      {TokenCategory::CLASS_METHOD, "CFunc"},
+      {TokenCategory::CLASS_MEMBER, "CVar"},
+      {TokenCategory::THIS, "This"},
+      {TokenCategory::CLASS, "Class"},
+      {TokenCategory::STRUCT, "Str"},
+      {TokenCategory::UNION, "Un"},
+      {TokenCategory::CONCEPT, "Cept"},
+      {TokenCategory::INTERFACE, "Int"},
+      {TokenCategory::ENUM, "EnumT"},
+      {TokenCategory::ENUMERATOR, "Enum"},
+      {TokenCategory::NAMESPACE, "Ns"},
+      {TokenCategory::TYPE_ALIAS, "Type"},
+      {TokenCategory::TEMPLATE_PARAMETER_TYPE, "TParm"},
+      {TokenCategory::TEMPLATE_PARAMETER_VALUE, "TParm"},
+      {TokenCategory::LABEL, "Labl"},
+      {TokenCategory::MACRO_DIRECTIVE_NAME, "Dir"},
+      {TokenCategory::MACRO_NAME, "Macro"},
+      {TokenCategory::MACRO_PARAMETER_NAME, "MParm"},
+  };
+  // clang-format on
+
+  auto label_map_it = kLabelMap.find(tok_category);
+  if (label_map_it == kLabelMap.end()) {
+    return kInvalidCategory;
+  }
+
+  return label_map_it->second;
+}
+
+const QString &ReferenceExplorerModel::GetTokenCategoryName(
+    TokenCategory tok_category) {
+
+  static const QString kInvalidCategory = tr("Unknown");
+
+  // clang-format off
+  static const std::unordered_map<TokenCategory, QString> kLabelMap{
+    { TokenCategory::UNKNOWN, kInvalidCategory },
+    { TokenCategory::LOCAL_VARIABLE, tr("Local Variable") },
+    { TokenCategory::GLOBAL_VARIABLE, tr("Global Variable") },
+    { TokenCategory::PARAMETER_VARIABLE, tr("Parameter Variable") },
+    { TokenCategory::FUNCTION, tr("Function") },
+    { TokenCategory::INSTANCE_METHOD, tr("Instance Method") },
+    { TokenCategory::INSTANCE_MEMBER, tr("Instance Member") },
+    { TokenCategory::CLASS_METHOD, tr("Class Method") },
+    { TokenCategory::CLASS_MEMBER, tr("Class Member") },
+    { TokenCategory::THIS, tr("This") },
+    { TokenCategory::CLASS, tr("Class") },
+    { TokenCategory::STRUCT, tr("Structure") },
+    { TokenCategory::UNION, tr("Union") },
+    { TokenCategory::CONCEPT, tr("Concept") },
+    { TokenCategory::INTERFACE, tr("Interface") },
+    { TokenCategory::ENUM, tr("Enumeration") },
+    { TokenCategory::ENUMERATOR, tr("Enumerator") },
+    { TokenCategory::NAMESPACE, tr("Namespace") },
+    { TokenCategory::TYPE_ALIAS, tr("Type Alias") },
+    { TokenCategory::TEMPLATE_PARAMETER_TYPE, tr("Template Type Parameter") },
+    { TokenCategory::TEMPLATE_PARAMETER_VALUE, tr("Template Value Parameter") },
+    { TokenCategory::LABEL, tr("Label") },
+    {TokenCategory::MACRO_DIRECTIVE_NAME, "Macro Directive"},
+    {TokenCategory::MACRO_NAME, "Macro"},
+    {TokenCategory::MACRO_PARAMETER_NAME, "Macro Parameter"},
+  };
+  // clang-format on
+
+  auto label_map_it = kLabelMap.find(tok_category);
+  if (label_map_it == kLabelMap.end()) {
+    return kInvalidCategory;
+  }
+
+  return label_map_it->second;
+}
 
 }  // namespace mx::gui

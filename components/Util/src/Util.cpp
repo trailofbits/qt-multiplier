@@ -72,7 +72,7 @@ TokenRange FileTokens(const VariantEntity &ent) {
         for (Token tok : entity.expansion_tokens()) {
           return TokenRange(tok).file_tokens();
         }
-        for (Token tok : entity.use_tokens()) {
+        for (Token tok : entity.generate_use_tokens()) {
           return TokenRange(tok).file_tokens();
         }
         return TokenRange();

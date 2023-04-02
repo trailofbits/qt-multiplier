@@ -53,11 +53,12 @@ void PreviewableReferenceExplorer::InitializeWidgets(
 
   d->reference_explorer = IReferenceExplorer::Create(model, this);
 
-  connect(d->reference_explorer, &IReferenceExplorer::ItemClicked, this,
-          &PreviewableReferenceExplorer::OnReferenceExplorerItemClicked);
+  connect(
+      d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
+      &PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged);
 
-  connect(d->reference_explorer, &IReferenceExplorer::ItemClicked, this,
-          &PreviewableReferenceExplorer::ItemClicked);
+  connect(d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
+          &PreviewableReferenceExplorer::SelectedItemChanged);
 
   connect(d->reference_explorer, &IReferenceExplorer::ItemActivated, this,
           &PreviewableReferenceExplorer::ItemActivated);
@@ -116,7 +117,7 @@ PreviewableReferenceExplorer::GetScheduledPostUpdateLineScrollCommand() {
   return opt_scroll_to_line;
 }
 
-void PreviewableReferenceExplorer::OnReferenceExplorerItemClicked(
+void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
     const QModelIndex &index) {
 
   auto file_raw_entity_id_var =

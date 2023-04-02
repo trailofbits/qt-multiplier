@@ -44,8 +44,8 @@ class QuickReferenceExplorer final : public QWidget {
   void SaveAll(QMimeData *mime_data, const QString &window_title,
                const bool &as_new_tab);
 
-  //! The forwarded PreviewableReferenceExplorer::ItemClicked signal
-  void ItemClicked(const QModelIndex &index);
+  //! The forwarded PreviewableReferenceExplorer::SelectedItemChanged signal
+  void SelectedItemChanged(const QModelIndex &index);
 
   //! The forwarded PreviewableReferenceExplorer::ItemActivated signal
   void ItemActivated(const QModelIndex &index);

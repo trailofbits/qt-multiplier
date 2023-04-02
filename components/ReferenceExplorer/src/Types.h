@@ -51,13 +51,17 @@ struct Node final {
   //! How this node was imported
   IReferenceExplorerModel::ExpansionMode expansion_mode{};
 
+  //! True if this node has already been expanded
+  bool expanded{false};
+
   // Create and initialize a node.
   //
   // NOTE(pag): This is a blocking operation.
   static Node Create(const FileLocationCache &file_cache,
                      const VariantEntity &entity,
                      const VariantEntity &referenced_entity,
-                     IReferenceExplorerModel::ExpansionMode import_mode);
+                     IReferenceExplorerModel::ExpansionMode import_mode,
+                     const bool &expanded);
 
   // Initialize this node with a specific parent id node.
   void AssignUniqueId(void);

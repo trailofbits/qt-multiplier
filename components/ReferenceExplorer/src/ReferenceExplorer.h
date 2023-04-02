@@ -11,16 +11,7 @@
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
 
-#include <QTreeView>
-
 namespace mx::gui {
-
-class ReferenceExplorerTreeView final : public QTreeView {
- public:
-  using QTreeView::rowsInserted;
-  using QTreeView::rowsAboutToBeRemoved;
-  using QTreeView::rowsRemoved;
-};
 
 //! The implementation for the IReferenceExplorer interface
 class ReferenceExplorer final : public IReferenceExplorer {
@@ -32,6 +23,10 @@ class ReferenceExplorer final : public IReferenceExplorer {
 
   //! \copybrief IReferenceExplorer::Model
   virtual IReferenceExplorerModel *Model() override;
+
+ protected:
+  //! Used to update the button positions
+  virtual void resizeEvent(QResizeEvent *event) override;
 
  private:
   struct PrivateData;
@@ -58,6 +53,10 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Used for the tree view hover events
   virtual bool eventFilter(QObject *obj, QEvent *event) override;
 
+  //! Event filter for the Drop event of the tree view
+  //! \return False if the event should be discarded, or true otherwise
+  bool OnTreeViewDropEvent(const QDropEvent &drop_event);
+
   //! Updates the treeview item hover buttons
   void UpdateTreeViewItemButtons();
 
@@ -65,17 +64,20 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Used to expand and resize the items after a model reset
   void OnModelReset();
 
-  //! Like OnModelReset, but for row insertion
-  void OnRowsAdded(const QModelIndex &parent, int first, int last);
+  //! \brief Handles item button invalidation
+  //! Currently only used to update the item buttons when the
+  //! ExpansionStatusRole changes
+  void OnDataChanged();
 
-  //! Like OnModelReset, but for row deletion
-  void OnRowsRemoved(const QModelIndex &parent, int first, int last);
+  //! Automatically expands all nodes
+  void ExpandAllNodes();
 
-  //! Like OnModelReset, but for row deletion
-  void OnRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last);
+  //! Used to automatically select the first inserted root
+  void OnRowsInserted(const QModelIndex &parent, int first, int last);
 
-  //! Called when the user clicks an item
-  void OnItemClick(const QModelIndex &index);
+  //! Called when the user selects an item
+  void OnCurrentItemChanged(const QModelIndex &current_index,
+                            const QModelIndex &previous_index);
 
   //! Custom context menu for the tree view items
   void OnOpenItemContextMenu(const QPoint &point);

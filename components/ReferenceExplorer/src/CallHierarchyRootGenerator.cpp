@@ -51,48 +51,43 @@ CallHierarchyRootGenerator::CallHierarchyRootGenerator(
 
 CallHierarchyRootGenerator::~CallHierarchyRootGenerator() {}
 
-gap::generator<Node> CallHierarchyRootGenerator::GenerateNodes(void) {
+void CallHierarchyRootGenerator::run(void) {
   VariantEntity entity = d->index.entity(d->entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
-    co_return;
+    return;
   }
 
-  auto is_first = true;
-  for (VariantEntity root_entity : TopLevelEntities(std::move(entity))) {
-    Node first_node = Node::Create(
-        d->file_cache, root_entity, root_entity,
-        IReferenceExplorerModel::AlreadyExpanded);
+  QList<Node> nodes;
+
+  static const auto kAlreadyExpanded{true};
+
+  for (VariantEntity root_entity : TopLevelEntities(entity)) {
+    nodes.emplaceBack(Node::Create(d->file_cache, root_entity, root_entity,
+                                   IReferenceExplorerModel::CallHierarchyMode,
+                                   kAlreadyExpanded));
 
     if (CancelRequested()) {
       break;
     }
-
-    if (is_first) {
-      QList<Node> child_nodes;
-      for (const auto &ref : References(root_entity)) {
-        if (CancelRequested()) {
-          break;
-        }
-
-        auto child_node = Node::Create(
-            d->file_cache, ref.first, ref.second,
-            IReferenceExplorerModel::CallHierarchyMode);
-
-        first_node.child_node_id_list.push_back(child_node.node_id);
-        child_node.parent_node_id = first_node.node_id;
-        child_nodes.emplaceBack(std::move(child_node));
-      }
-
-      co_yield first_node;
-      for (auto child_node : child_nodes) {
-        co_yield child_node;
-      }
-
-      is_first = false;
-    } else {
-      co_yield first_node;
-    }
   }
+
+  static const auto kNotYetExpanded{false};
+
+  for (const auto &ref : References(entity)) {
+    if (CancelRequested()) {
+      break;
+    }
+
+    auto child_node = Node::Create(d->file_cache, ref.first, ref.second,
+                                   IReferenceExplorerModel::CallHierarchyMode,
+                                   kNotYetExpanded);
+
+    nodes.front().child_node_id_list.push_back(child_node.node_id);
+    child_node.parent_node_id = nodes.front().node_id;
+    nodes.emplaceBack(std::move(child_node));
+  }
+
+  emit Finished(std::move(nodes), 0, ModelIndex());
 }
 
 }  // namespace mx::gui

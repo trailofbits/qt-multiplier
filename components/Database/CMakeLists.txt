@@ -22,6 +22,9 @@ add_library("mx_database"
 
   src/requests/GetEntityName.h
   src/requests/GetEntityName.cpp
+
+  src/requests/GetEntityList.h
+  src/requests/GetEntityList.cpp
 )
 
 target_link_libraries("mx_database"

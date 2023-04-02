@@ -4,6 +4,8 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
+#pragma once
+
 #include <multiplier/Index.h>
 
 #include <multiplier/ui/ICodeView.h>
@@ -32,6 +34,7 @@ class MainWindow final : public QMainWindow {
 
   void InitializeWidgets();
   void CreateFileTreeDock();
+  void CreateEntityExplorerDock();
   void CreateReferenceExplorerDock();
   void CreateNewReferenceExplorer(QString window_title);
   void CreateCodeView();
@@ -67,6 +70,7 @@ class MainWindow final : public QMainWindow {
   void OnReferenceExplorerTabBarClose(int index);
   void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
+  void OnEntityExplorerEntityClicked(RawEntityId entity_id);
 };
 
 }  // namespace mx::gui

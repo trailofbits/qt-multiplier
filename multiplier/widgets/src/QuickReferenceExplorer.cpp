@@ -183,8 +183,9 @@ void QuickReferenceExplorer::InitializeWidgets(
   auto reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, this);
 
-  connect(reference_explorer, &PreviewableReferenceExplorer::ItemClicked, this,
-          &QuickReferenceExplorer::ItemClicked);
+  connect(reference_explorer,
+          &PreviewableReferenceExplorer::SelectedItemChanged, this,
+          &QuickReferenceExplorer::SelectedItemChanged);
 
   connect(reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
           this, &QuickReferenceExplorer::ItemActivated);
@@ -294,9 +295,6 @@ QString QuickReferenceExplorer::GenerateWindowName(
   auto quoted_entity_name = QString("`") + entity_name + "`";
 
   switch (mode) {
-    case IReferenceExplorerModel::AlreadyExpanded:
-      return tr("References to ") + quoted_entity_name;
-
     case IReferenceExplorerModel::CallHierarchyMode:
       return tr("Call hierarchy of ") + quoted_entity_name;
 

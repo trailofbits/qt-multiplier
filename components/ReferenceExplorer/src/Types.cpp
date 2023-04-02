@@ -24,7 +24,7 @@ static QAtomicInteger<std::uint64_t> gNextNodeId(1u);
 
 }  // namespace
 
-QString Node::kMimeTypeName = "application/mx-reference-explorer-node";
+QString Node::kMimeTypeName = "application/mx-reference-explorer-node-tree";
 
 QDataStream &operator<<(QDataStream &stream, const Location &location) {
   stream << location.path;
@@ -76,16 +76,18 @@ std::optional<Location> Location::Create(const FileLocationCache &file_cache,
   return location;
 }
 
-Node Node::Create(
-    const FileLocationCache &file_cache, const VariantEntity &entity,
-    const VariantEntity &referenced_entity,
-    IReferenceExplorerModel::ExpansionMode import_mode) {
+Node Node::Create(const FileLocationCache &file_cache,
+                  const VariantEntity &entity,
+                  const VariantEntity &referenced_entity,
+                  IReferenceExplorerModel::ExpansionMode import_mode,
+                  const bool &expanded) {
 
   Node node;
   node.node_id = gNextNodeId.fetchAndAddOrdered(1);
   node.expansion_mode = import_mode;
   node.entity_id = IdOfEntity(entity);
   node.opt_name = NameOfEntity(entity);
+  node.expanded = expanded;
 
   node.opt_location = Location::Create(file_cache, referenced_entity);
   if (!node.opt_location.has_value()) {
