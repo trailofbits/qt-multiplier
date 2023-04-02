@@ -6,11 +6,11 @@
 
 #pragma once
 
+#include <multiplier/ui/Result.h>
 #include <multiplier/ui/RPCErrorCode.h>
 #include <multiplier/ui/IndexedTokenRangeData.h>
 
 #include <multiplier/Index.h>
-#include <pasta/Util/Result.h>
 
 #include <QFutureWatcher>
 #include <QString>
@@ -39,7 +39,7 @@ class IDatabase {
 
   //! The output of a file or fragment request
   using IndexedTokenRangeDataResult =
-      pasta::Result<IndexedTokenRangeData, RPCErrorCode>;
+      Result<IndexedTokenRangeData, RPCErrorCode>;
 
   //! Request type for RequestIndexedTokenRangeData
   enum class IndexedTokenRangeDataRequestType {
