@@ -109,8 +109,8 @@ void MainWindow::CreateEntityExplorerDock() {
   entity_explorer_dock->setAllowedAreas(Qt::LeftDockWidgetArea |
                                         Qt::RightDockWidgetArea);
 
-  connect(d->entity_explorer, &IEntityExplorer::EntityAction,
-          this, &MainWindow::OnEntityExplorerEntityClicked);
+  connect(d->entity_explorer, &IEntityExplorer::EntityAction, this,
+          &MainWindow::OnEntityExplorerEntityClicked);
 
   d->view_menu->addAction(entity_explorer_dock->toggleViewAction());
 
@@ -219,11 +219,12 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
 }
 
 void MainWindow::OpenReferenceExplorer(
-    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode) {
+    RawEntityId entity_id,
+    const IReferenceExplorerModel::ExpansionMode &expansion_mode) {
   CloseTokenReferenceExplorer();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
-      d->index, d->file_location_cache, entity_id, mode, this);
+      d->index, d->file_location_cache, entity_id, expansion_mode, this);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
           &MainWindow::OnQuickRefExplorerSaveAllClicked);

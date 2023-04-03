@@ -36,50 +36,31 @@ const QString kInstanceInfoMimeType =
 
 static TokenCategory FromDeclCategory(DeclCategory cat) {
   switch (cat) {
-    case DeclCategory::LOCAL_VARIABLE:
-      return TokenCategory::LOCAL_VARIABLE;
-    case DeclCategory::GLOBAL_VARIABLE:
-      return TokenCategory::GLOBAL_VARIABLE;
+    case DeclCategory::LOCAL_VARIABLE: return TokenCategory::LOCAL_VARIABLE;
+    case DeclCategory::GLOBAL_VARIABLE: return TokenCategory::GLOBAL_VARIABLE;
     case DeclCategory::PARAMETER_VARIABLE:
       return TokenCategory::PARAMETER_VARIABLE;
-    case DeclCategory::FUNCTION:
-      return TokenCategory::FUNCTION;
-    case DeclCategory::INSTANCE_METHOD:
-      return TokenCategory::INSTANCE_METHOD;
-    case DeclCategory::INSTANCE_MEMBER:
-      return TokenCategory::INSTANCE_MEMBER;
-    case DeclCategory::CLASS_METHOD:
-      return TokenCategory::CLASS_METHOD;
-    case DeclCategory::CLASS_MEMBER:
-      return TokenCategory::CLASS_MEMBER;
-    case DeclCategory::THIS:
-      return TokenCategory::THIS;
-    case DeclCategory::CLASS:
-      return TokenCategory::CLASS;
-    case DeclCategory::STRUCTURE:
-      return TokenCategory::STRUCT;
-    case DeclCategory::UNION:
-      return TokenCategory::UNION;
-    case DeclCategory::CONCEPT:
-      return TokenCategory::CONCEPT;
-    case DeclCategory::INTERFACE:
-      return TokenCategory::INTERFACE;
-    case DeclCategory::ENUMERATION:
-      return TokenCategory::ENUM;
-    case DeclCategory::ENUMERATOR:
-      return TokenCategory::ENUMERATOR;
-    case DeclCategory::NAMESPACE:
-      return TokenCategory::NAMESPACE;
-    case DeclCategory::TYPE_ALIAS:
-      return TokenCategory::TYPE_ALIAS;
+    case DeclCategory::FUNCTION: return TokenCategory::FUNCTION;
+    case DeclCategory::INSTANCE_METHOD: return TokenCategory::INSTANCE_METHOD;
+    case DeclCategory::INSTANCE_MEMBER: return TokenCategory::INSTANCE_MEMBER;
+    case DeclCategory::CLASS_METHOD: return TokenCategory::CLASS_METHOD;
+    case DeclCategory::CLASS_MEMBER: return TokenCategory::CLASS_MEMBER;
+    case DeclCategory::THIS: return TokenCategory::THIS;
+    case DeclCategory::CLASS: return TokenCategory::CLASS;
+    case DeclCategory::STRUCTURE: return TokenCategory::STRUCT;
+    case DeclCategory::UNION: return TokenCategory::UNION;
+    case DeclCategory::CONCEPT: return TokenCategory::CONCEPT;
+    case DeclCategory::INTERFACE: return TokenCategory::INTERFACE;
+    case DeclCategory::ENUMERATION: return TokenCategory::ENUM;
+    case DeclCategory::ENUMERATOR: return TokenCategory::ENUMERATOR;
+    case DeclCategory::NAMESPACE: return TokenCategory::NAMESPACE;
+    case DeclCategory::TYPE_ALIAS: return TokenCategory::TYPE_ALIAS;
     case DeclCategory::TEMPLATE_TYPE_PARAMETER:
       return TokenCategory::TEMPLATE_PARAMETER_TYPE;
     case DeclCategory::TEMPLATE_VALUE_PARAMETER:
       return TokenCategory::TEMPLATE_PARAMETER_VALUE;
-    case DeclCategory::LABEL:
-      return TokenCategory::LABEL;
-    default:
-      return TokenCategory::UNKNOWN;
+    case DeclCategory::LABEL: return TokenCategory::LABEL;
+    default: return TokenCategory::UNKNOWN;
   }
 }
 
@@ -464,6 +445,9 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
       value.setValue(node.opt_location->column);
     }
 
+  } else if (role == IReferenceExplorerModel::TokenCategoryRole) {
+    value.setValue(TokenCategory::FUNCTION);
+
   } else if (role == IReferenceExplorerModel::LocationRole) {
     if (node.opt_location.has_value()) {
       value.setValue(node.opt_location.value());
@@ -798,9 +782,8 @@ ReferenceExplorerModel::ReferenceExplorerModel(
     : IReferenceExplorerModel(parent),
       d(new PrivateData(index, file_location_cache)) {}
 
-TokenCategory
-ReferenceExplorerModel::GetTokenCategory(const Index &index,
-                                         RawEntityId entity_id) {
+TokenCategory ReferenceExplorerModel::GetTokenCategory(const Index &index,
+                                                       RawEntityId entity_id) {
   auto entity_var = index.entity(entity_id);
   if (std::holds_alternative<Decl>(entity_var)) {
     return FromDeclCategory(std::get<mx::Decl>(entity_var).category());
@@ -809,10 +792,8 @@ ReferenceExplorerModel::GetTokenCategory(const Index &index,
     std::optional<Macro> m(std::move(std::get<Macro>(entity_var)));
     for (; m; m = m->parent()) {
       switch (m->kind()) {
-        case MacroKind::DEFINE_DIRECTIVE:
-          return TokenCategory::MACRO_NAME;
-        case MacroKind::PARAMETER:
-          return TokenCategory::MACRO_PARAMETER_NAME;
+        case MacroKind::DEFINE_DIRECTIVE: return TokenCategory::MACRO_NAME;
+        case MacroKind::PARAMETER: return TokenCategory::MACRO_PARAMETER_NAME;
         case MacroKind::OTHER_DIRECTIVE:
         case MacroKind::IF_DIRECTIVE:
         case MacroKind::IF_DEFINED_DIRECTIVE:
@@ -829,8 +810,7 @@ ReferenceExplorerModel::GetTokenCategory(const Index &index,
         case MacroKind::INCLUDE_MACROS_DIRECTIVE:
         case MacroKind::IMPORT_DIRECTIVE:
           return TokenCategory::MACRO_DIRECTIVE_NAME;
-        default:
-          break;
+        default: break;
       }
     }
   } else if (std::holds_alternative<Token>(entity_var)) {
@@ -839,8 +819,8 @@ ReferenceExplorerModel::GetTokenCategory(const Index &index,
   return TokenCategory::UNKNOWN;
 }
 
-const QString &ReferenceExplorerModel::GetTokenCategoryIconLabel(
-    TokenCategory tok_category) {
+const QString &
+ReferenceExplorerModel::GetTokenCategoryIconLabel(TokenCategory tok_category) {
 
   // We can have up to four characters
   static const QString kInvalidCategory("Unk");
@@ -883,8 +863,8 @@ const QString &ReferenceExplorerModel::GetTokenCategoryIconLabel(
   return label_map_it->second;
 }
 
-const QString &ReferenceExplorerModel::GetTokenCategoryName(
-    TokenCategory tok_category) {
+const QString &
+ReferenceExplorerModel::GetTokenCategoryName(TokenCategory tok_category) {
 
   static const QString kInvalidCategory = tr("Unknown");
 

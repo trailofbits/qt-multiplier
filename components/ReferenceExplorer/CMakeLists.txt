@@ -16,8 +16,11 @@ add_library("mx_referenceexplorer"
   src/INodeGenerator.h
   src/INodeGenerator.cpp
 
-  src/ReferenceExplorer.h
-  src/ReferenceExplorer.cpp
+  src/GraphicalReferenceExplorer.h
+  src/GraphicalReferenceExplorer.cpp
+
+  src/TextBasedReferenceExplorer.h
+  src/TextBasedReferenceExplorer.cpp
 
   src/ReferenceExplorerModel.h
   src/ReferenceExplorerModel.cpp
@@ -51,6 +54,12 @@ add_library("mx_referenceexplorer"
 
   src/SearchFilterModelProxy.h
   src/SearchFilterModelProxy.cpp
+
+  src/RefExplorerToCodeViewModelAdapter.h
+  src/RefExplorerToCodeViewModelAdapter.cpp
+
+  src/ReferenceExplorer.h
+  src/ReferenceExplorer.cpp
 )
 
 target_sources("mx_referenceexplorer" INTERFACE
@@ -70,6 +79,7 @@ target_link_libraries("mx_referenceexplorer"
     "mx_assert"
     "mx_searchwidget"
     "mx_util"
+    "mx_codeview"
 )
 
 target_include_directories("mx_referenceexplorer" PRIVATE

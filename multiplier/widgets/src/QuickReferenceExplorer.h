@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IReferenceExplorerModel.h>
+#include <multiplier/ui/IReferenceExplorer.h>
 
 #include <QWidget>
 #include <QMimeData>
@@ -19,11 +19,11 @@ class QuickReferenceExplorer final : public QWidget {
 
  public:
   //! Constructor
-  QuickReferenceExplorer(const Index &index,
-                         const FileLocationCache &file_location_cache,
-                         RawEntityId entity_id,
-                         IReferenceExplorerModel::ExpansionMode mode,
-                         QWidget *parent = nullptr);
+  QuickReferenceExplorer(
+      const Index &index, const FileLocationCache &file_location_cache,
+      RawEntityId entity_id,
+      const IReferenceExplorerModel::ExpansionMode &expansion_mode,
+      QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickReferenceExplorer() override;
@@ -68,10 +68,10 @@ class QuickReferenceExplorer final : public QWidget {
   std::unique_ptr<PrivateData> d;
 
   //! Initializes the internal widgets
-  void InitializeWidgets(const Index &index,
-                         const FileLocationCache &file_location_cache,
-                         RawEntityId entity_id,
-                         IReferenceExplorerModel::ExpansionMode mode);
+  void InitializeWidgets(
+      const Index &index, const FileLocationCache &file_location_cache,
+      RawEntityId entity_id,
+      const IReferenceExplorerModel::ExpansionMode &expansion_mode);
 
   //! Used to emit the SaveAll signal
   void EmitSaveSignal(const bool &as_new_tab);
@@ -89,14 +89,14 @@ class QuickReferenceExplorer final : public QWidget {
   void CancelRunningRequest();
 
   //! Generate a new window name for the given entity name
-  static QString
-  GenerateWindowName(const QString &entity_name,
-                     const IReferenceExplorerModel::ExpansionMode &mode);
+  static QString GenerateWindowName(
+      const QString &entity_name,
+      const IReferenceExplorerModel::ExpansionMode &expansion_mode);
 
   //! Generate a new window name for the given entity id
-  static QString
-  GenerateWindowName(const RawEntityId &entity_id,
-                     const IReferenceExplorerModel::ExpansionMode &mode);
+  static QString GenerateWindowName(
+      const RawEntityId &entity_id,
+      const IReferenceExplorerModel::ExpansionMode &expansion_mode);
 
  private slots:
   //! Restores the widget visibility when the application gains focus

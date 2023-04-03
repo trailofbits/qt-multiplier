@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IReferenceExplorerModel.h>
+#include <multiplier/ui/IReferenceExplorer.h>
 
 #include <QWidget>
 
