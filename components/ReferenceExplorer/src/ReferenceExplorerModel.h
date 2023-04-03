@@ -67,6 +67,7 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   virtual int columnCount(const QModelIndex &parent) const override;
 
   //! Returns the index data for the specified role
+  //! \todo Fix role=TokenCategoryRole support
   virtual QVariant data(const QModelIndex &index, int role) const override;
 
   //! Returns the specified model items as a mime data object
@@ -112,8 +113,8 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
                          QObject *parent);
 
   //! Returns the category for the given decl
-  static TokenCategory
-  GetTokenCategory(const Index &index, RawEntityId entity_id);
+  static TokenCategory GetTokenCategory(const Index &index,
+                                        RawEntityId entity_id);
 
   //! Returns the label for the specified decl category
   static const QString &GetTokenCategoryIconLabel(TokenCategory tok_category);

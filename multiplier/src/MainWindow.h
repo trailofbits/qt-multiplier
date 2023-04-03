@@ -43,8 +43,9 @@ class MainWindow final : public QMainWindow {
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
   void OpenTokenTaintExplorer(CodeModelIndex index);
-  void OpenReferenceExplorer(RawEntityId entity_id,
-                             IReferenceExplorerModel::ExpansionMode mode);
+  void OpenReferenceExplorer(
+      RawEntityId entity_id,
+      const IReferenceExplorerModel::ExpansionMode &expansion_mode);
   void CloseTokenReferenceExplorer();
   ICodeView *CreateNewCodeView(RawEntityId file_entity_id, QString tab_name);
 

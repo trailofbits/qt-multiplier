@@ -60,6 +60,9 @@ class IReferenceExplorerModel : public QAbstractItemModel {
 
     //! Returns the column number id as an unsigned value
     ColumnNumberRole,
+
+    //! Returns the token category
+    TokenCategoryRole,
   };
 
   //! Factory method
