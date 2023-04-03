@@ -9,16 +9,18 @@
 #pragma once
 
 #include <multiplier/ui/IReferenceExplorer.h>
+#include <multiplier/ui/ISearchWidget.h>
+#include <multiplier/ui/ICodeView.h>
 
 namespace mx::gui {
 
-//! The main implementation for the IReferenceExplorer interface
-class ReferenceExplorer final : public IReferenceExplorer {
+//! A text-based implementation for the IReferenceExplorer interface
+class TextBasedReferenceExplorer final : public IReferenceExplorer {
   Q_OBJECT
 
  public:
   //! Destructor
-  virtual ~ReferenceExplorer() override;
+  virtual ~TextBasedReferenceExplorer() override;
 
   //! \copybrief IReferenceExplorer::Model
   virtual IReferenceExplorerModel *Model() override;
@@ -28,12 +30,17 @@ class ReferenceExplorer final : public IReferenceExplorer {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  ReferenceExplorer(IReferenceExplorerModel *model, QWidget *parent);
+  TextBasedReferenceExplorer(IReferenceExplorerModel *model, QWidget *parent);
 
   //! Initializes the internalwidgets
   void InitializeWidgets(IReferenceExplorerModel *model);
 
-  friend class IReferenceExplorer;
+ private slots:
+  //! Code view event handler
+  void OnTokenTriggered(const ICodeView::TokenAction &token_action,
+                        const CodeModelIndex &index);
+
+  friend class ReferenceExplorer;
 };
 
 }  // namespace mx::gui

@@ -66,7 +66,7 @@ class IDatabase {
 
   //! The output of an entity information request
   using EntityInformationResult =
-      pasta::Result<EntityInformation, RPCErrorCode>;
+      Result<EntityInformation, RPCErrorCode>;
 
   //! Requests detailed information about a particular entity given its ID.
   virtual QFuture<EntityInformationResult> RequestEntityInformation(

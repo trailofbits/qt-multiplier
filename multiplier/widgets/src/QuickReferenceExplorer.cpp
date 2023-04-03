@@ -28,7 +28,7 @@ namespace mx::gui {
 struct QuickReferenceExplorer::PrivateData final {
   IReferenceExplorerModel *model{nullptr};
   bool closed{false};
-  const IReferenceExplorerModel::ExpansionMode mode;
+  IReferenceExplorerModel::ExpansionMode expansion_mode;
 
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
@@ -36,24 +36,22 @@ struct QuickReferenceExplorer::PrivateData final {
   IDatabase::Ptr database;
   QFuture<std::optional<QString>> entity_name_future;
   QFutureWatcher<std::optional<QString>> future_watcher;
-
-  inline PrivateData(IReferenceExplorerModel::ExpansionMode mode_)
-      : mode(mode_) {}
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode,
+    RawEntityId entity_id,
+    const IReferenceExplorerModel::ExpansionMode &expansion_mode,
     QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData(mode)) {
+      d(new PrivateData) {
 
   d->database = IDatabase::Create(index, file_location_cache);
   connect(&d->future_watcher,
           &QFutureWatcher<QFuture<std::optional<QString>>>::finished, this,
           &QuickReferenceExplorer::EntityNameFutureStatusChanged);
 
-  InitializeWidgets(index, file_location_cache, entity_id, mode);
+  InitializeWidgets(index, file_location_cache, entity_id, expansion_mode);
 }
 
 QuickReferenceExplorer::~QuickReferenceExplorer() {
@@ -104,7 +102,8 @@ bool QuickReferenceExplorer::eventFilter(QObject *, QEvent *event) {
 
 void QuickReferenceExplorer::InitializeWidgets(
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode) {
+    RawEntityId entity_id,
+    const IReferenceExplorerModel::ExpansionMode &expansion_mode) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -120,7 +119,7 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   // Use a temporary window name at first. This won't be shown at all if the
   // name resolution is fast enough
-  auto window_name = GenerateWindowName(entity_id, mode);
+  auto window_name = GenerateWindowName(entity_id, expansion_mode);
   d->window_title = new QLabel(window_name);
 
   // Start a request to fetch the real entity name
@@ -178,7 +177,7 @@ void QuickReferenceExplorer::InitializeWidgets(
   //
 
   d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
-  d->model->AppendEntityById(entity_id, mode, QModelIndex());
+  d->model->AppendEntityById(entity_id, expansion_mode, QModelIndex());
 
   auto reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, this);
@@ -273,7 +272,7 @@ void QuickReferenceExplorer::EntityNameFutureStatusChanged() {
 
   const auto &entity_name = opt_entity_name.value();
 
-  auto window_name = GenerateWindowName(entity_name, d->mode);
+  auto window_name = GenerateWindowName(entity_name, d->expansion_mode);
   d->window_title->setText(window_name);
 }
 
@@ -290,11 +289,11 @@ void QuickReferenceExplorer::CancelRunningRequest() {
 
 QString QuickReferenceExplorer::GenerateWindowName(
     const QString &entity_name,
-    const IReferenceExplorerModel::ExpansionMode &mode) {
+    const IReferenceExplorerModel::ExpansionMode &expansion_mode) {
 
   auto quoted_entity_name = QString("`") + entity_name + "`";
 
-  switch (mode) {
+  switch (expansion_mode) {
     case IReferenceExplorerModel::CallHierarchyMode:
       return tr("Call hierarchy of ") + quoted_entity_name;
 
@@ -305,10 +304,10 @@ QString QuickReferenceExplorer::GenerateWindowName(
 
 QString QuickReferenceExplorer::GenerateWindowName(
     const RawEntityId &entity_id,
-    const IReferenceExplorerModel::ExpansionMode &mode) {
+    const IReferenceExplorerModel::ExpansionMode &expansion_mode) {
 
   auto entity_name = tr("Entity ID #") + QString::number(entity_id);
-  return GenerateWindowName(entity_name, mode);
+  return GenerateWindowName(entity_name, expansion_mode);
 }
 
 }  // namespace mx::gui

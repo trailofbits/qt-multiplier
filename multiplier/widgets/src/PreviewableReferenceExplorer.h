@@ -8,7 +8,6 @@
 
 #include <multiplier/ui/IReferenceExplorerModel.h>
 #include <multiplier/ui/ICodeView.h>
-
 #include <QWidget>
 
 namespace mx::gui {
