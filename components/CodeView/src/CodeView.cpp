@@ -768,7 +768,7 @@ void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
   QPainter painter(d->gutter);
   painter.fillRect(event->rect(), d->theme.default_gutter_background);
 
-  painter.setPen(d->theme.default_gutter_foreground);
+  painter.setPen(d->theme.ForegroundColor(TokenCategory::LINE_NUMBER));
   painter.setFont(font());
 
   QTextBlock block = d->text_edit->firstVisibleBlock();
@@ -823,6 +823,12 @@ void CodeView::OnCursorMoved(void) {
   selection.cursor.clearSelection();
   extra_selections.append(selection);
   d->text_edit->setExtraSelections(extra_selections);
+
+  auto index = GetCodeModelIndexFromTextCursor(
+      d->token_map, d->text_edit->textCursor());
+  if (index.has_value()) {
+    emit CursorMoved(index.value());
+  }
 }
 
 void CodeView::OnSearchParametersChange(

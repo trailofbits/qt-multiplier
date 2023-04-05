@@ -258,7 +258,7 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
 
 void MainWindow::OpenReferenceExplorer(
     RawEntityId entity_id,
-    const IReferenceExplorerModel::ExpansionMode &expansion_mode) {
+    IReferenceExplorerModel::ExpansionMode expansion_mode) {
   CloseTokenReferenceExplorer();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(

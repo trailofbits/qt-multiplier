@@ -86,6 +86,9 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
     { TokenCategory::TEMPLATE_PARAMETER_TYPE, QColor::fromRgb(198, 117, 29) },
     { TokenCategory::TEMPLATE_PARAMETER_VALUE, QColor::fromRgb(174, 144, 65) },
     { TokenCategory::LABEL, QColor::fromRgb(149, 149, 149) },
+    { TokenCategory::FILE_NAME, QColor::fromRgb(23, 185, 152) },
+    { TokenCategory::LINE_NUMBER, QColor::fromRgb(109, 132, 140) },
+    { TokenCategory::COLUMN_NUMBER, QColor::fromRgb(109, 132, 140) },
   },
 
   // token_group_color_list

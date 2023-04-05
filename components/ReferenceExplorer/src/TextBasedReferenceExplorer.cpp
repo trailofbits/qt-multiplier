@@ -44,14 +44,33 @@ void TextBasedReferenceExplorer::InitializeWidgets(
   d->code_model = new RefExplorerToCodeViewModelAdapter(model, this);
   d->code_view = ICodeView::Create(d->code_model, this);
 
-  connect(d->code_view, &ICodeView::TokenTriggered, this,
-          &TextBasedReferenceExplorer::OnTokenTriggered);
+  connect(d->code_view, &ICodeView::TokenTriggered,
+          this, &TextBasedReferenceExplorer::OnTokenTriggered);
+
+  connect(d->code_view, &ICodeView::CursorMoved,
+          this, &TextBasedReferenceExplorer::OnCursorMoved);
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->code_view);
 
   setLayout(layout);
+}
+
+void TextBasedReferenceExplorer::OnCursorMoved(const CodeModelIndex &index) {
+  auto original_index_var = d->code_model->Data(
+      index, RefExplorerToCodeViewModelAdapter::OriginalModelIndex);
+
+  if (!original_index_var.isValid()) {
+    return;
+  }
+
+  auto original_index = qvariant_cast<QModelIndex>(original_index_var);
+  if (!original_index.isValid()) {
+    return;
+  }
+
+  emit SelectedItemChanged(original_index);
 }
 
 void TextBasedReferenceExplorer::OnTokenTriggered(

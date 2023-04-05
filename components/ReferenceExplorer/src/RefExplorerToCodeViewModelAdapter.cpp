@@ -24,22 +24,21 @@ void GenerateToken(
   token_list.push_back({data, token_category, ++id_generator});
 }
 
-void AppendIndentWhitespace(QString &buffer, const std::size_t &level_count) {
-  static const QString kIndent{"  "};
-
+void AppendIndentWhitespace(QString &buffer, std::size_t level_count) {
   for (std::size_t i{}; i < level_count; ++i) {
-    buffer.append(kIndent);
+    buffer.append(QChar::Space);
+    buffer.append(QChar::Space);
   }
 }
 
 void GenerateIndentToken(
     RefExplorerToCodeViewModelAdapter::Context::TokenList &token_list,
-    std::uint64_t &id_generator, const std::size_t &indent) {
+    std::uint64_t &id_generator, std::size_t indent) {
 
   QString token_data;
   AppendIndentWhitespace(token_data, indent);
-
-  GenerateToken(token_list, id_generator, TokenCategory::UNKNOWN, token_data);
+  GenerateToken(token_list, id_generator, TokenCategory::WHITESPACE,
+                token_data);
 }
 
 void ImportReferenceExplorerModelHelper(
@@ -86,22 +85,23 @@ void ImportReferenceExplorerModelHelper(
 
   GenerateIndentToken(row.token_list, id_generator, indent);
   GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT, symbol);
-  GenerateToken(row.token_list, id_generator, TokenCategory::UNKNOWN, " ");
+  GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
   GenerateToken(row.token_list, id_generator, token_category, node_name);
 
   auto location_var = root.data(IReferenceExplorerModel::LocationRole);
   if (location_var.isValid()) {
     const auto &location = qvariant_cast<Location>(location_var);
-
-    GenerateToken(row.token_list, id_generator, TokenCategory::UNKNOWN, " ");
-
     std::filesystem::path path{location.path.toStdString()};
-    auto location_token = path.filename().string() + "@" +
-                          std::to_string(location.line) + ":" +
-                          std::to_string(location.column);
 
-    GenerateToken(row.token_list, id_generator, TokenCategory::NAMESPACE,
-                  QString::fromStdString(location_token));
+    GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
+    GenerateToken(row.token_list, id_generator, TokenCategory::FILE_NAME,
+                  QString::fromStdString(path.filename().generic_string()));
+    GenerateToken(row.token_list, id_generator, TokenCategory::PUNCTUATION, ":");
+    GenerateToken(row.token_list, id_generator, TokenCategory::LINE_NUMBER,
+                  QString::number(location.line));
+    GenerateToken(row.token_list, id_generator, TokenCategory::PUNCTUATION, ":");
+    GenerateToken(row.token_list, id_generator, TokenCategory::COLUMN_NUMBER,
+                  QString::number(location.column));
   }
 
   auto show_expand_comment{true};
@@ -113,7 +113,7 @@ void ImportReferenceExplorerModelHelper(
   }
 
   if (show_expand_comment) {
-    GenerateToken(row.token_list, id_generator, TokenCategory::UNKNOWN, " ");
+    GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
     GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT, "[+]");
   }
 

@@ -110,6 +110,9 @@ class ICodeView : public QWidget {
   void TokenTriggered(const TokenAction &token_action,
                       const CodeModelIndex &index);
 
+  //! This signal is emitted when the cursor position has changed.
+  void CursorMoved(const CodeModelIndex &index);
+
   //! Emitted when the document is changed in response to a model reset
   void DocumentChanged();
 };
