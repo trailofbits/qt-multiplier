@@ -7,6 +7,7 @@
 #pragma once
 
 
+#include <multiplier/ui/EntityInformation.h>
 #include <multiplier/ui/IndexedTokenRangeData.h>
 #include <multiplier/ui/Result.h>
 #include <multiplier/ui/RPCErrorCode.h>
