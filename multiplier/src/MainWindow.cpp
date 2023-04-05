@@ -193,6 +193,9 @@ void MainWindow::CreateNewReferenceExplorer(QString window_title) {
   connect(reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
 
+  connect(reference_explorer, &PreviewableReferenceExplorer::TokenTriggered,
+          this, &MainWindow::OnTokenTriggered);
+
   d->ref_explorer_tab_widget->addTab(reference_explorer, window_title);
   d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
 

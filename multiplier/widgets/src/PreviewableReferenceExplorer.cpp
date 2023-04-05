@@ -57,19 +57,22 @@ void PreviewableReferenceExplorer::InitializeWidgets(
       d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
       &PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged);
 
-  connect(d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
-          &PreviewableReferenceExplorer::SelectedItemChanged);
+  connect(d->reference_explorer, &IReferenceExplorer::SelectedItemChanged,
+          this, &PreviewableReferenceExplorer::SelectedItemChanged);
 
-  connect(d->reference_explorer, &IReferenceExplorer::ItemActivated, this,
-          &PreviewableReferenceExplorer::ItemActivated);
+  connect(d->reference_explorer, &IReferenceExplorer::ItemActivated,
+          this, &PreviewableReferenceExplorer::ItemActivated);
 
   d->code_model = ICodeModel::Create(file_location_cache, index, this);
 
   d->code_view = ICodeView::Create(d->code_model);
   d->code_view->hide();
 
-  connect(d->code_view, &ICodeView::DocumentChanged, this,
-          &PreviewableReferenceExplorer::OnCodeViewDocumentChange);
+  connect(d->code_view, &ICodeView::DocumentChanged,
+          this, &PreviewableReferenceExplorer::OnCodeViewDocumentChange);
+
+  connect(d->code_view, &ICodeView::TokenTriggered,
+          this, &PreviewableReferenceExplorer::TokenTriggered);
 
   d->splitter = new QSplitter(this);
   d->splitter->addWidget(d->reference_explorer);

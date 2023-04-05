@@ -18,16 +18,16 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
   "Source Code Pro",
 
   // selected_line_background_color
-  QColor::fromRgb(5, 5, 5),
+  QColor::fromRgb(0x1e, 0x1e, 0x1e),
 
   // default_background_color
-  QColor::fromRgb(20, 20, 20),
+  QColor::fromRgb(0x1e, 0x1e, 0x1e).darker(),
 
   // default_foreground_color
   QColor::fromRgb(255, 255, 255),
 
   // default_gutter_background
-  QColor::fromRgb(20, 20, 20),
+  QColor::fromRgb(0x1e, 0x1e, 0x1e).darker(),
 
   // default_gutter_foreground
   QColor::fromRgb(128, 128, 128),
