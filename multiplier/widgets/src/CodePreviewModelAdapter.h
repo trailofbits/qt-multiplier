@@ -43,10 +43,10 @@ class CodePreviewModelAdapter final : public ICodeModel {
   virtual void SetEntity(RawEntityId id) Q_DECL_FINAL;
 
   //! How many rows are accessible from this model
-  virtual int RowCount() const Q_DECL_FINAL;
+  virtual Count RowCount() const Q_DECL_FINAL;
 
   //! How many tokens are accessible on the specified column
-  virtual int TokenCount(int row) const Q_DECL_FINAL;
+  virtual Count TokenCount(Count row) const Q_DECL_FINAL;
 
   //! Returns the data role contents for the specified model index
   virtual QVariant Data(const CodeModelIndex &index,

@@ -196,18 +196,18 @@ void RefExplorerToCodeViewModelAdapter::SetEntity(RawEntityId) {
   __builtin_unreachable();
 }
 
-int RefExplorerToCodeViewModelAdapter::RowCount() const {
-  return static_cast<int>(d->context.row_list.size());
+Count RefExplorerToCodeViewModelAdapter::RowCount() const {
+  return static_cast<Count>(d->context.row_list.size());
 }
 
-int RefExplorerToCodeViewModelAdapter::TokenCount(int row) const {
-  auto row_number = static_cast<std::size_t>(row);
-  if (row_number >= d->context.row_list.size()) {
+Count RefExplorerToCodeViewModelAdapter::TokenCount(
+    Count row) const {
+  if (row >= d->context.row_list.size()) {
     return 0;
   }
 
-  const auto &r = d->context.row_list[row_number];
-  return static_cast<int>(r.token_list.size());
+  const auto &r = d->context.row_list[row];
+  return static_cast<Count>(r.token_list.size());
 }
 
 QVariant RefExplorerToCodeViewModelAdapter::Data(const CodeModelIndex &index,
@@ -239,6 +239,9 @@ QVariant RefExplorerToCodeViewModelAdapter::Data(const CodeModelIndex &index,
 
   } else if (role == RefExplorerToCodeViewModelAdapter::OriginalModelIndex) {
     value.setValue(row.original_model_index);
+
+  } else if (role == RefExplorerToCodeViewModelAdapter::IsExpandButton) {
+    value.setValue(token.data == kExpandText);
   }
 
   return value;

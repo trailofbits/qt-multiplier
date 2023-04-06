@@ -46,12 +46,12 @@ void CodePreviewModelAdapter::SetEntity(RawEntityId id) {
 }
 
 //! How many rows are accessible from this model
-int CodePreviewModelAdapter::RowCount() const {
+Count CodePreviewModelAdapter::RowCount() const {
   return next->RowCount();
 }
 
 //! How many tokens are accessible on the specified column
-int CodePreviewModelAdapter::TokenCount(int row) const {
+Count CodePreviewModelAdapter::TokenCount(Count row) const {
   return next->TokenCount(row);
 }
 

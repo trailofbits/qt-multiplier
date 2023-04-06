@@ -428,7 +428,6 @@ void CodeView::UpdateTokenGroupColors() {
 }
 
 std::uint64_t CodeView::GetUniqueTokenIdentifier(const CodeModelIndex &index) {
-
   return (static_cast<std::uint64_t>(index.row) << 32) |
          static_cast<std::uint64_t>(index.token_index);
 }
@@ -504,7 +503,7 @@ QTextDocument *CodeView::CreateTextDocument(
   auto document_layout = new QPlainTextDocumentLayout(document);
   document->setDocumentLayout(document_layout);
 
-  int row_count = model.RowCount();
+  Count row_count = model.RowCount();
   if (!row_count) {
     return document;
   }
@@ -512,7 +511,7 @@ QTextDocument *CodeView::CreateTextDocument(
   QTextCursor cursor(document);
   cursor.beginEditBlock();
 
-  auto L_updateProgress = [&](int current_row) -> bool {
+  auto L_updateProgress = [&](std::uint64_t current_row) -> bool {
     if (!opt_progress_callback.has_value()) {
       return true;
     }
@@ -528,26 +527,27 @@ QTextDocument *CodeView::CreateTextDocument(
       return true;
     }
 
-    auto current_progress = (current_row * 100) / row_count;
-    return progress_callback(current_progress);
+    auto current_progress = (current_row * 100u) / row_count;
+    return progress_callback(static_cast<int>(current_progress));
   };
 
-  for (int row_index = 0; row_index < row_count; ++row_index) {
+  for (Count row_index = 0u; row_index < row_count; ++row_index) {
     if (!L_updateProgress(row_index)) {
       break;
     }
 
     CodeModelIndex model_index = {&model, row_index, 0};
     auto line_mappings_need_update{true};
-    auto token_count = model.TokenCount(row_index);
+    Count token_count = model.TokenCount(row_index);
 
-    for (int token_index = 0; token_index < token_count; ++token_index) {
+    for (Count token_index = 0; token_index < token_count;
+         ++token_index) {
       // Update the highest line number value
       const auto &line_number_var =
           model.Data(model_index, ICodeModel::LineNumberRole);
 
       if (line_number_var.isValid()) {
-        auto line_number = qvariant_cast<unsigned>(line_number_var);
+        auto line_number = qvariant_cast<Count>(line_number_var);
 
         token_map.highest_line_number =
             std::max(line_number, token_map.highest_line_number);
@@ -685,14 +685,15 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
   QTextEdit::ExtraSelection selection;
 
   std::unordered_set<std::uint64_t> visited_model_index_list;
-  std::unordered_set<int> colored_line_list;
+  std::unordered_set<Count> colored_line_list;
 
-  for (const auto &colored_line : colored_line_list) {
+  for (const Count &colored_line : colored_line_list) {
     auto column_count = model.TokenCount(colored_line);
 
-    for (int column = 0; column < column_count; ++column) {
-      auto unique_token_id =
-          GetUniqueTokenIdentifier({&model, colored_line, column});
+    for (Count column = 0; column < column_count; ++column) {
+      auto unique_token_id = GetUniqueTokenIdentifier(
+          {&model, colored_line, column});
+
       if (visited_model_index_list.count(unique_token_id) > 0) {
         continue;
       }

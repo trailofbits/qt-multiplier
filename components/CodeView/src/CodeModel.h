@@ -30,8 +30,8 @@ class CodeModel final : public ICodeModel {
 
   virtual void SetEntity(RawEntityId id) override;
 
-  virtual int RowCount() const override;
-  virtual int TokenCount(int row) const override;
+  virtual Count RowCount() const override;
+  virtual Count TokenCount(Count row) const override;
   virtual bool IsReady() const override;
 
   virtual QVariant Data(const CodeModelIndex &index,

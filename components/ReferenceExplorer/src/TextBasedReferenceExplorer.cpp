@@ -89,7 +89,16 @@ void TextBasedReferenceExplorer::OnTokenTriggered(
   }
 
   if (token_action.type == ICodeView::TokenAction::Type::Primary) {
-    emit ItemActivated(original_index);
+
+    auto is_expand_var = d->code_model->Data(
+        index, RefExplorerToCodeViewModelAdapter::IsExpandButton);
+
+    if (is_expand_var.isValid() && qvariant_cast<bool>(is_expand_var)) {
+      d->model->ExpandEntity(original_index);
+
+    } else {
+      emit ItemActivated(original_index);
+    }
 
   } else if (token_action.type == ICodeView::TokenAction::Type::Keyboard) {
 
