@@ -61,7 +61,7 @@ jobs:
 
       - name: Install cxx-common
         run: |
-          folder_name="vcpkg_macos-11_llvm-16-pasta_xcode-13.0_amd64"
+          folder_name="vcpkg_macos-12_llvm-16-pasta_xcode-14.2_amd64"
           archive_name="${folder_name}.tar.xz"
           cxx_common_url="https://github.com/lifting-bits/cxx-common/releases/download/${{ inputs.cxx_common_tag }}/${archive_name}"
 
