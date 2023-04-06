@@ -254,11 +254,11 @@ void CodeView::InitializeWidgets() {
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
 
-  connect(d->text_edit, &QPlainTextEditMod::updateRequest,
-          this, &CodeView::OnTextEditUpdateRequest);
+  connect(d->text_edit, &QPlainTextEditMod::updateRequest, this,
+          &CodeView::OnTextEditUpdateRequest);
 
-  connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged,
-          this, &CodeView::OnCursorMoved);
+  connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged, this,
+          &CodeView::OnCursorMoved);
 
   // Gutter
   d->gutter = new QWidget();
@@ -634,6 +634,32 @@ QTextDocument *CodeView::CreateTextDocument(
         unique_token_id_list.push_back(unique_token_id);
       }
 
+      // Add the entry to the related entity id index
+      const auto &related_entity_id_var =
+          model.Data(model_index, ICodeModel::TokenRelatedEntityIdRole);
+
+      if (related_entity_id_var.isValid()) {
+        auto related_entity_id =
+            qvariant_cast<std::uint64_t>(related_entity_id_var);
+
+        auto unique_token_id_list_it =
+            token_map.related_entity_id_to_unique_token_id_list.find(
+                related_entity_id);
+
+        if (unique_token_id_list_it ==
+            token_map.related_entity_id_to_unique_token_id_list.end()) {
+
+          auto insert_status =
+              token_map.related_entity_id_to_unique_token_id_list.insert(
+                  {related_entity_id, {}});
+
+          unique_token_id_list_it = insert_status.first;
+        }
+
+        auto &unique_token_id_list = unique_token_id_list_it->second;
+        unique_token_id_list.push_back(unique_token_id);
+      }
+
       // Add the token to the document
       auto token_category_var =
           model.Data(model_index, ICodeModel::TokenCategoryRole);
@@ -713,6 +739,32 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
   }
 
   return extra_selection_list;
+}
+
+void CodeView::HighlightTokensForRelatedEntityID(
+    const TokenMap &token_map, const QTextCursor &text_cursor,
+    RawEntityId related_entity_id,
+    QList<QTextEdit::ExtraSelection> &selection_list,
+    const CodeViewTheme &theme) {
+  auto unique_token_id_list =
+      token_map.related_entity_id_to_unique_token_id_list.at(related_entity_id);
+
+  QTextEdit::ExtraSelection selection;
+  for (auto unique_token_id : unique_token_id_list) {
+    const auto &token_map_entry = token_map.data.at(unique_token_id);
+
+    selection = {};
+    selection.format.setBackground(theme.highlighted_entity_background_color);
+
+    selection.cursor = text_cursor;
+
+    selection.cursor.setPosition(token_map_entry.cursor_start,
+                                 QTextCursor::MoveMode::MoveAnchor);
+    selection.cursor.setPosition(token_map_entry.cursor_end,
+                                 QTextCursor::MoveMode::KeepAnchor);
+
+    selection_list.append(std::move(selection));
+  }
 }
 
 void CodeView::OnModelReset() {
@@ -822,6 +874,24 @@ void CodeView::OnCursorMoved(void) {
   selection.cursor = d->text_edit->textCursor();
   selection.cursor.clearSelection();
   extra_selections.append(selection);
+
+  auto opt_model_index =
+      GetCodeModelIndexFromTextCursor(d->token_map, d->text_edit->textCursor());
+  if (opt_model_index.has_value()) {
+    auto unique_token_id = GetUniqueTokenIdentifier(opt_model_index.value());
+    const auto &token_map_entry = d->token_map.data.at(unique_token_id);
+    const auto &related_entity_id_var = d->model->Data(
+        token_map_entry.model_index, ICodeModel::TokenRelatedEntityIdRole);
+
+    if (related_entity_id_var.isValid()) {
+      auto related_entity_id =
+          qvariant_cast<std::uint64_t>(related_entity_id_var);
+      HighlightTokensForRelatedEntityID(
+          d->token_map, d->text_edit->textCursor(), related_entity_id,
+          extra_selections, d->theme);
+    }
+  }
+
   d->text_edit->setExtraSelections(extra_selections);
 }
 
