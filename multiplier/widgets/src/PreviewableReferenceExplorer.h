@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <multiplier/ui/IReferenceExplorer.h>
+#include <multiplier/ui/IReferenceExplorerModel.h>
+#include <multiplier/ui/ICodeView.h>
 
 #include <QWidget>
 
@@ -71,6 +72,9 @@ class PreviewableReferenceExplorer final : public QWidget {
 
   //! The forwarded IReferenceExplorer::ItemActivated signal
   void ItemActivated(const QModelIndex &index);
+
+  void TokenTriggered(const ICodeView::TokenAction &token_action,
+                      const CodeModelIndex &index);
 };
 
 }  // namespace mx::gui

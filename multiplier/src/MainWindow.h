@@ -33,19 +33,21 @@ class MainWindow final : public QMainWindow {
   std::unique_ptr<PrivateData> d;
 
   void InitializeWidgets();
-  void CreateFileTreeDock();
+  void CreateProjectExplorerDock();
   void CreateEntityExplorerDock();
+  void CreateInfoExplorerDock();
   void CreateReferenceExplorerDock();
   void CreateNewReferenceExplorer(QString window_title);
   void CreateCodeView();
   void OpenEntityRelatedToToken(const CodeModelIndex &index);
-  void OpenEntityRelatedToEntityId(const RawEntityId &entity_id);
+  void OpenEntityCode(RawEntityId entity_id);
+  void OpenEntityInfo(RawEntityId entity_id, bool force=false);
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
   void OpenTokenTaintExplorer(CodeModelIndex index);
-  void OpenReferenceExplorer(
-      RawEntityId entity_id,
-      const IReferenceExplorerModel::ExpansionMode &expansion_mode);
+  void OpenTokenEntityInfo(CodeModelIndex index);
+  void OpenReferenceExplorer(RawEntityId entity_id,
+                             IReferenceExplorerModel::ExpansionMode mode);
   void CloseTokenReferenceExplorer();
   ICodeView *CreateNewCodeView(RawEntityId file_entity_id, QString tab_name);
 

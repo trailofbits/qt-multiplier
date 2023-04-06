@@ -16,14 +16,18 @@ class Database final : public IDatabase {
   //! Destructor
   virtual ~Database() override;
 
+  //! \copybrief IDatabase::RequestEntityInformation
+  virtual QFuture<EntityInformationResult> RequestEntityInformation(
+      RawEntityId entity_id) override;
+
   //! \copybrief IDatabase::RequestIndexedTokenRangeData
   virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
-      const RawEntityId &entity_id,
-      const IndexedTokenRangeDataRequestType &request_type) override;
+      RawEntityId entity_id,
+      IndexedTokenRangeDataRequestType request_type) override;
 
   //! \copybrief IDatabase::RequestEntityName
   virtual QFuture<OptionalName>
-  RequestEntityName(const RawEntityId &fragment_id) override;
+  RequestEntityName(RawEntityId fragment_id) override;
 
   //! \copybrief IDatabase::QueryEntities
   virtual QFuture<bool> QueryEntities(QueryEntitiesReceiver &receiver,

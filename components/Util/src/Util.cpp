@@ -47,11 +47,11 @@ skip_name_match:
 }
 
 //! Return the optional nearest file token associated with this declaration.
-std::optional<Token> DeclFileToken(const Decl &decl) {
+Token DeclFileToken(const Decl &decl) {
   if (auto frag_tok = DeclFragmentToken(decl)) {
     return TokenRange(frag_tok.value()).file_tokens().front();
   } else {
-    return std::nullopt;
+    return Token();
   }
 }
 
@@ -69,13 +69,7 @@ TokenRange FileTokens(const VariantEntity &ent) {
       [](const Token &entity) { return TokenRange(entity).file_tokens(); },
 
       [](const Macro &entity) {
-        for (Token tok : entity.expansion_tokens()) {
-          return TokenRange(tok).file_tokens();
-        }
-        for (Token tok : entity.generate_use_tokens()) {
-          return TokenRange(tok).file_tokens();
-        }
-        return TokenRange();
+        return entity.use_tokens().file_tokens();
       },
       [](const Designator &entity) { return entity.tokens().file_tokens(); },
       [](const CXXBaseSpecifier &entity) {
@@ -99,7 +93,7 @@ TokenRange FileTokens(const VariantEntity &ent) {
 Token FirstFileToken(const VariantEntity &ent) {
   if (std::holds_alternative<Decl>(ent)) {
     if (auto ftok = DeclFileToken(std::get<Decl>(ent))) {
-      return ftok.value();
+      return ftok;
     }
   }
   return FileTokens(ent).front();

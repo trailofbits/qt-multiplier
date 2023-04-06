@@ -6,9 +6,10 @@
 
 #pragma once
 
+#include <multiplier/ui/EntityInformation.h>
+#include <multiplier/ui/IndexedTokenRangeData.h>
 #include <multiplier/ui/Result.h>
 #include <multiplier/ui/RPCErrorCode.h>
-#include <multiplier/ui/IndexedTokenRangeData.h>
 
 #include <multiplier/Index.h>
 
@@ -62,6 +63,15 @@ class IDatabase {
   static Ptr Create(const Index &index,
                     const FileLocationCache &file_location_cache);
 
+
+  //! The output of an entity information request
+  using EntityInformationResult =
+      Result<EntityInformation, RPCErrorCode>;
+
+  //! Requests detailed information about a particular entity given its ID.
+  virtual QFuture<EntityInformationResult> RequestEntityInformation(
+      RawEntityId entity_id) = 0;
+
   //! The output of a file or fragment request
   using IndexedTokenRangeDataResult =
       Result<IndexedTokenRangeData, RPCErrorCode>;
@@ -74,15 +84,15 @@ class IDatabase {
 
   //! Requests the specified file
   virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
-      const RawEntityId &entity_id,
-      const IndexedTokenRangeDataRequestType &request_type) = 0;
+      RawEntityId entity_id,
+      IndexedTokenRangeDataRequestType request_type) = 0;
 
   //! An optional name
   using OptionalName = std::optional<QString>;
 
   //! Starts a name resolution request for the given entity
   virtual QFuture<OptionalName>
-  RequestEntityName(const RawEntityId &fragment_id) = 0;
+  RequestEntityName(RawEntityId fragment_id) = 0;
 
   //! A single entity query result
   struct EntityQueryResult final {

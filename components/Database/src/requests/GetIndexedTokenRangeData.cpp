@@ -435,8 +435,8 @@ static IndexedTokenRangeDataOrError IndexTokenRange(
 void GetIndexedTokenRangeData(
     QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
     const Index &index, const FileLocationCache &file_location_cache,
-    const RawEntityId &entity_id,
-    const IDatabase::IndexedTokenRangeDataRequestType &request_type) {
+    RawEntityId entity_id,
+    IDatabase::IndexedTokenRangeDataRequestType request_type) {
 
   auto token_range_data_res =
       DownloadEntityTokens(result_promise, index, request_type, entity_id);

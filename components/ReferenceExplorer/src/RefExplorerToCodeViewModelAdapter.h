@@ -24,7 +24,10 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
  public:
   //! Additional item data roles
   //! \note Make sure this is not overlapping the ICodeModel roles
-  enum ItemDataRole { OriginalModelIndex = Qt::UserRole + 100 };
+  enum ItemDataRole {
+    OriginalModelIndex = Qt::UserRole + 100,
+    IsExpandButton
+  };
 
   //! Constructor
   RefExplorerToCodeViewModelAdapter(IReferenceExplorerModel *model,
@@ -51,10 +54,10 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
   [[noreturn]] virtual void SetEntity(RawEntityId id) override;
 
   //! \copybrief ICodeModel::RowCount
-  virtual int RowCount() const override;
+  virtual Count RowCount() const override;
 
   //! \copybrief ICodeModel::TokenCount
-  virtual int TokenCount(int row) const override;
+  virtual Count TokenCount(Count row) const override;
 
   //! \copybrief ICodeModel::Data
   virtual QVariant Data(const CodeModelIndex &index,

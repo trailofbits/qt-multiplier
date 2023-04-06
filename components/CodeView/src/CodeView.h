@@ -117,10 +117,10 @@ class CodeView final : public ICodeView {
         block_number_to_unique_token_id_list;
 
     //! This maps a line number to a block number
-    std::unordered_map<std::size_t, int> line_number_to_block_number;
+    std::unordered_map<Count, int> line_number_to_block_number;
 
     //! This maps a block number to a line number
-    std::unordered_map<int, std::size_t> block_number_to_line_number;
+    std::unordered_map<int, Count> block_number_to_line_number;
 
     //! This maps a token group to a list of unique token identifiers
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>

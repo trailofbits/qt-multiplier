@@ -29,8 +29,11 @@ add_executable("Multiplier" MACOSX_BUNDLE
   src/meta_types.h
   src/meta_types.cpp
 
-  src/themes.h
-  src/themes.cpp
+  src/Theme.h
+  src/Theme.cpp
+  
+  src/Style.h
+  src/Style.cpp
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

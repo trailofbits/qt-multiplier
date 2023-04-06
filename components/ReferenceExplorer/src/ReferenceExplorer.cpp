@@ -37,8 +37,6 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
 }
 
 void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model) {
-
-
   d->text_view = new TextBasedReferenceExplorer(model, this);
 
   connect(d->text_view, &TextBasedReferenceExplorer::SelectedItemChanged, this,
@@ -65,10 +63,8 @@ void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model) {
   const auto &primary_screen = *QGuiApplication::primaryScreen();
   auto screen_height = primary_screen.virtualSize().height();
 
-  auto treeview_size = (screen_height / 3) * 2;
-  auto textview_size = screen_height - treeview_size;
-
-  splitter->setSizes({treeview_size, textview_size});
+  // By default, hide the text view.
+  splitter->setSizes({screen_height, 0});
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);

@@ -60,6 +60,10 @@ void IndexView::InitializeWidgets() {
   d->tree_view->setSortingEnabled(true);
   d->tree_view->setAlternatingRowColors(true);
 
+  d->tree_view->setSelectionBehavior(QAbstractItemView::SelectRows);
+  d->tree_view->setAllColumnsShowFocus(true);
+  d->tree_view->setTreePosition(0);
+
   auto indent_width = fontMetrics().horizontalAdvance("_");
   d->tree_view->setIndentation(indent_width);
 
@@ -99,9 +103,6 @@ void IndexView::InitializeWidgets() {
   layout->addWidget(d->alternative_root_warning);
   setLayout(layout);
 
-  connect(d->tree_view, &QTreeView::pressed, this,
-          &IndexView::OnFileTreeItemClicked);
-
   // Setup che custom context menu
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
 
@@ -135,10 +136,22 @@ void IndexView::InstallModel(IFileTreeModel *model) {
 
   d->tree_view->setModel(d->model_proxy);
 
+  // Note: this needs to happen after the model has been set in the
+  // tree view!
+  auto tree_selection_model = d->tree_view->selectionModel();
+  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
+          this, &IndexView::SelectionChanged);
+
   connect(d->model, &QAbstractItemModel::modelReset, this,
           &IndexView::OnModelReset);
 
   OnModelReset();
+}
+
+//! Try to open the file related to a specific model index.
+void IndexView::SelectionChanged(const QModelIndex &index,
+                                 const QModelIndex &) {
+  OnFileTreeItemClicked(index);
 }
 
 void IndexView::OnFileTreeItemClicked(const QModelIndex &index) {

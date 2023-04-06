@@ -35,6 +35,10 @@ class IndexView final : public IIndexView {
   void InstallModel(IFileTreeModel *model);
 
  private slots:
+
+  //! Try to open the file related to a specific model index.
+  void SelectionChanged(const QModelIndex &index, const QModelIndex &previous);
+
   //! Called when an item has been clicked in the tree view
   void OnFileTreeItemClicked(const QModelIndex &index);
 

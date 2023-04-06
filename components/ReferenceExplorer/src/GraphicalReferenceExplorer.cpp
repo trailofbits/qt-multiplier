@@ -104,7 +104,10 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   // Disallow multiple selection. If we have grouping by file enabled, then when
   // a user clicks on a file name, we instead jump down to the first entry
   // grouped under that file. This is to make using the up/down arrows easier.
+  d->tree_view->setSelectionBehavior(QAbstractItemView::SelectRows);
   d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
+  d->tree_view->setAllColumnsShowFocus(true);
+  d->tree_view->setTreePosition(0);
 
   d->tree_view->setAlternatingRowColors(true);
   d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);

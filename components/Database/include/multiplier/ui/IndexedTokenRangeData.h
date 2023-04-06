@@ -6,13 +6,11 @@
 
 #pragma once
 
+#include <multiplier/Entities/TokenCategory.h>
 #include <multiplier/Types.h>
-#include <multiplier/Index.h>
-
-#include <QString>
-
-#include <vector>
 #include <optional>
+#include <vector>
+#include <QString>
 
 namespace mx::gui {
 
