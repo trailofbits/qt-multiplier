@@ -126,6 +126,10 @@ class CodeView final : public ICodeView {
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>
         token_group_id_to_unique_token_id_list;
 
+    //! This maps related entity ids to a list of unique token identifiers
+    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>
+        related_entity_id_to_unique_token_id_list;
+
     //! The highest line number that we have encountered
     unsigned highest_line_number{};
   };
@@ -165,6 +169,13 @@ class CodeView final : public ICodeView {
   static QList<QTextEdit::ExtraSelection>
   GenerateExtraSelections(const TokenMap &token_map, QPlainTextEdit &text_edit,
                           const ICodeModel &model, const CodeViewTheme &theme);
+
+  //! Adds highlights for tokens to an existing extra selection list
+  static void HighlightTokensForRelatedEntityID(
+      const TokenMap &token_map, const QTextCursor &text_cursor,
+      RawEntityId related_entity_id,
+      QList<QTextEdit::ExtraSelection> &selection_list,
+      const CodeViewTheme &theme);
 
  private slots:
   //! This slot regenerates the code view contents using CreateTextDocument

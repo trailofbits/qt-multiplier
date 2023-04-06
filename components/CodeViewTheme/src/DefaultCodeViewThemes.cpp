@@ -20,6 +20,9 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
   // selected_line_background_color
   QColor::fromRgb(0x1e, 0x1e, 0x1e),
 
+  // highlighted_entity_background_color
+  QColor::fromRgb(34, 48, 66),
+
   // default_background_color
   QColor::fromRgb(0x1e, 0x1e, 0x1e).darker(),
 
