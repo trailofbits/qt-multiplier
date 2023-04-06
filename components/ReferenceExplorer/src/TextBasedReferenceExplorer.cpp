@@ -89,7 +89,6 @@ void TextBasedReferenceExplorer::OnTokenTriggered(
   }
 
   if (token_action.type == ICodeView::TokenAction::Type::Primary) {
-
     auto is_expand_var = d->code_model->Data(
         index, RefExplorerToCodeViewModelAdapter::IsExpandButton);
 

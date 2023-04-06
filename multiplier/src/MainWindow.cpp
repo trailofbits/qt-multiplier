@@ -125,8 +125,8 @@ void MainWindow::CreateEntityExplorerDock() {
   d->entity_explorer_dock = new QDockWidget(tr("Entity Explorer"), this);
   d->entity_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
 
-  connect(d->entity_explorer, &IEntityExplorer::EntityAction, this,
-          &MainWindow::OnEntityExplorerEntityClicked);
+  connect(d->entity_explorer, &IEntityExplorer::EntityAction,
+          this, &MainWindow::OnEntityExplorerEntityClicked);
 
   d->view_menu->addAction(d->entity_explorer_dock->toggleViewAction());
 
