@@ -22,6 +22,6 @@ namespace mx::gui {
 using OptionalName = std::optional<QString>;
 
 void GetEntityName(QPromise<OptionalName> &entity_name_promise,
-                   const Index &index, const RawEntityId &entity_id);
+                   const Index &index, RawEntityId entity_id);
 
 }  // namespace mx::gui

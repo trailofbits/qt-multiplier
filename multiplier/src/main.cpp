@@ -6,7 +6,8 @@
 
 #include "MainWindow.h"
 #include "meta_types.h"
-#include "themes.h"
+#include "Style.h"
+#include "Theme.h"
 
 #ifdef __APPLE__
 #  include "macos_utils.h"
@@ -15,11 +16,15 @@
 #include <multiplier/ui/FontDatabase.h>
 
 #include <QApplication>
+#include <QProxyStyle>
+#include <QTabBar>
 
 #include <phantom/phantomstyle.h>
 
 int main(int argc, char *argv[]) {
-  QApplication::setStyle(new PhantomStyle());
+  QStyle *phantom_style = new PhantomStyle;
+  QStyle *mx_style = new mx::gui::MultiplierStyle(phantom_style);
+  QApplication::setStyle(mx_style);
   QApplication application(argc, argv);
 
 #ifdef __APPLE__

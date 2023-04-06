@@ -18,19 +18,19 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
   "Source Code Pro",
 
   // selected_line_background_color
-  QColor::fromRgb(5, 5, 5),
+  QColor::fromRgb(0x1e, 0x1e, 0x1e),
 
   // highlighted_entity_background_color
   QColor::fromRgb(34, 48, 66),
 
   // default_background_color
-  QColor::fromRgb(20, 20, 20),
+  QColor::fromRgb(0x1e, 0x1e, 0x1e).darker(),
 
   // default_foreground_color
   QColor::fromRgb(255, 255, 255),
 
   // default_gutter_background
-  QColor::fromRgb(20, 20, 20),
+  QColor::fromRgb(0x1e, 0x1e, 0x1e).darker(),
 
   // default_gutter_foreground
   QColor::fromRgb(128, 128, 128),
@@ -89,6 +89,9 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
     { TokenCategory::TEMPLATE_PARAMETER_TYPE, QColor::fromRgb(198, 117, 29) },
     { TokenCategory::TEMPLATE_PARAMETER_VALUE, QColor::fromRgb(174, 144, 65) },
     { TokenCategory::LABEL, QColor::fromRgb(149, 149, 149) },
+    { TokenCategory::FILE_NAME, QColor::fromRgb(23, 185, 152) },
+    { TokenCategory::LINE_NUMBER, QColor::fromRgb(109, 132, 140) },
+    { TokenCategory::COLUMN_NUMBER, QColor::fromRgb(109, 132, 140) },
   },
 
   // token_group_color_list

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2022-present, Trail of Bits, Inc.
+  Copyright (c) 2023-present, Trail of Bits, Inc.
   All rights reserved.
 
   This source code is licensed in accordance with the terms specified in
@@ -14,10 +14,9 @@
 
 namespace mx::gui {
 
-void GetIndexedTokenRangeData(
-    QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+void GetEntityInformation(
+    QPromise<IDatabase::EntityInformationResult> &result_promise,
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id,
-    IDatabase::IndexedTokenRangeDataRequestType request_type);
+    RawEntityId entity_id);
 
 }  // namespace mx::gui

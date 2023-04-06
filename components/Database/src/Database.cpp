@@ -8,6 +8,7 @@
 
 #include <requests/GetIndexedTokenRangeData.h>
 #include <requests/GetEntityName.h>
+#include <requests/GetEntityInformation.h>
 #include <requests/GetEntityList.h>
 
 #include <QThreadPool>
@@ -19,45 +20,46 @@ namespace mx::gui {
 struct Database::PrivateData {
   PrivateData(const Index &index_,
               const FileLocationCache &file_location_cache_)
-      : index(std::move(index_)),
+      : index(index_),
         file_location_cache(file_location_cache_) {}
 
   const Index index;
   const FileLocationCache file_location_cache;
-
-  QThreadPool thread_pool;
 };
 
 Database::~Database() {}
 
+QFuture<IDatabase::EntityInformationResult> Database::RequestEntityInformation(
+    RawEntityId entity_id) {
+  return QtConcurrent::run(
+      QThreadPool::globalInstance(), GetEntityInformation, d->index,
+      d->file_location_cache, entity_id);
+}
+
 QFuture<IDatabase::IndexedTokenRangeDataResult>
 Database::RequestIndexedTokenRangeData(
-    const RawEntityId &entity_id,
-    const IndexedTokenRangeDataRequestType &request_type) {
-
-  return QtConcurrent::run(&d->thread_pool, GetIndexedTokenRangeData, d->index,
-                           d->file_location_cache, entity_id, request_type);
+    RawEntityId entity_id, IndexedTokenRangeDataRequestType request_type) {
+  return QtConcurrent::run(
+      QThreadPool::globalInstance(), GetIndexedTokenRangeData, d->index,
+      d->file_location_cache, entity_id, request_type);
 }
 
 QFuture<OptionalName>
-Database::RequestEntityName(const RawEntityId &fragment_id) {
-  return QtConcurrent::run(&d->thread_pool, GetEntityName, d->index,
-                           fragment_id);
+Database::RequestEntityName(RawEntityId fragment_id) {
+  return QtConcurrent::run(
+      QThreadPool::globalInstance(), GetEntityName, d->index, fragment_id);
 }
 
 QFuture<bool> Database::QueryEntities(QueryEntitiesReceiver &receiver,
                                       const QString &name,
                                       const bool &exact_name) {
-  return QtConcurrent::run(&d->thread_pool, GetEntityList, d->index, &receiver,
-                           name, exact_name);
+  return QtConcurrent::run(
+      QThreadPool::globalInstance(), GetEntityList, d->index, &receiver,
+      name, exact_name);
 }
 
 Database::Database(const Index &index,
                    const FileLocationCache &file_location_cache)
-    : d(new PrivateData(index, file_location_cache)) {
-
-  d->thread_pool.setMaxThreadCount(
-      static_cast<int>(std::thread::hardware_concurrency()));
-}
+    : d(new PrivateData(index, file_location_cache)) {}
 
 }  // namespace mx::gui

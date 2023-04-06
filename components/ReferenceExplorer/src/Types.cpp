@@ -134,6 +134,7 @@ QDataStream &operator<<(QDataStream &stream, const Node &node) {
   stream << node.expansion_mode;
   stream << node.entity_id;
   stream << node.referenced_entity_id;
+  stream << node.expanded;
 
   if (node.opt_name.has_value()) {
     stream << true;
@@ -169,6 +170,7 @@ QDataStream &operator>>(QDataStream &stream, Node &node) {
   stream >> node.expansion_mode;
   stream >> node.entity_id;
   stream >> node.referenced_entity_id;
+  stream >> node.expanded;
 
   bool has_optional_field = false;
 

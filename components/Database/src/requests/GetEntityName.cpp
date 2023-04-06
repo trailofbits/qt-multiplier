@@ -16,7 +16,7 @@
 namespace mx::gui {
 
 void GetEntityName(QPromise<OptionalName> &entity_name_promise,
-                   const Index &index, const RawEntityId &entity_id) {
+                   const Index &index, RawEntityId entity_id) {
 
   auto variant_entity = index.entity(entity_id);
 

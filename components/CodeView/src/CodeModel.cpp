@@ -33,7 +33,7 @@ struct TokenColumn final {
 using TokenColumnList = std::vector<TokenColumn>;
 
 struct TokenRow final {
-  std::size_t line_number{};
+  Count line_number{};
   TokenColumnList column_list;
 };
 
@@ -114,26 +114,25 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   d->future_watcher.setFuture(d->future_result);
 }
 
-int CodeModel::RowCount() const {
+Count CodeModel::RowCount() const {
   if (d->model_state != ModelState::Ready) {
-    return 1;
+    return 1u;
   }
 
-  return static_cast<int>(d->token_row_list.size());
+  return static_cast<Count>(d->token_row_list.size());
 }
 
-int CodeModel::TokenCount(int row) const {
+Count CodeModel::TokenCount(Count row) const {
   if (d->model_state != ModelState::Ready) {
-    return (row == 0 ? 1 : 0);
+    return (row == 0 ? 1u : 0u);
   }
 
-  auto row_index = static_cast<std::size_t>(row);
-  if (row_index >= d->token_row_list.size()) {
-    return 0;
+  if (row >= d->token_row_list.size()) {
+    return 0u;
   }
 
-  const auto &token_row = d->token_row_list.at(row_index);
-  return static_cast<int>(token_row.column_list.size());
+  const auto &token_row = d->token_row_list[row];
+  return static_cast<Count>(token_row.column_list.size());
 }
 
 bool CodeModel::IsReady() const {
@@ -197,7 +196,7 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
       return static_cast<std::uint64_t>(column.token_id);
 
     case LineNumberRole:
-      return static_cast<std::uint64_t>(token_row.line_number);
+      return token_row.line_number;
 
     case TokenGroupIdRole:
       if (column.opt_token_group_id.has_value()) {
@@ -272,10 +271,10 @@ void CodeModel::FutureResultStateChanged() {
     return;
   }
 
-  auto indexed_token_range_data = future_result.TakeValue();
+  IndexedTokenRangeData indexed_token_range_data = future_result.TakeValue();
   d->entity_id = indexed_token_range_data.requested_id;
 
-  auto token_count = indexed_token_range_data.start_of_token.size() - 1;
+  auto token_count = indexed_token_range_data.start_of_token.size() - 1u;
 
   TokenRow row;
   TokenColumn col;

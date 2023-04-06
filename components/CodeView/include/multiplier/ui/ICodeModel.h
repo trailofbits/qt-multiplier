@@ -22,11 +22,13 @@ namespace mx::gui {
 
 class ICodeModel;
 
+using Count = unsigned;
+
 //! A model index used to reference a single token
 struct CodeModelIndex final {
   const ICodeModel *model{nullptr};
-  int row{};
-  int token_index{};
+  Count row{};
+  Count token_index{};
 };
 
 //! A code model interface inspired by Qt, used by the ICodeView widget
@@ -34,6 +36,7 @@ class ICodeModel : public QObject {
   Q_OBJECT
 
  public:
+
   //! Compatible data roles that can be used in addition to Qt::DisplayRole
   enum {
     //! Token category, used for syntax coloring
@@ -73,10 +76,10 @@ class ICodeModel : public QObject {
   virtual void SetEntity(RawEntityId id) = 0;
 
   //! How many rows are accessible from this model
-  virtual int RowCount() const = 0;
+  virtual Count RowCount() const = 0;
 
   //! How many tokens are accessible on the specified column
-  virtual int TokenCount(int row) const = 0;
+  virtual Count TokenCount(Count row) const = 0;
 
   //! Returns the data role contents for the specified model index
   virtual QVariant Data(const CodeModelIndex &index,

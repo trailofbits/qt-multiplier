@@ -7,6 +7,7 @@
 #
 
 add_library("mx_database"
+  include/multiplier/ui/EntityInformation.h
   include/multiplier/ui/IndexedTokenRangeData.h
   include/multiplier/ui/RPCErrorCode.h
   include/multiplier/ui/Result.h
@@ -25,6 +26,9 @@ add_library("mx_database"
 
   src/requests/GetEntityList.h
   src/requests/GetEntityList.cpp
+
+  src/requests/GetEntityInformation.h
+  src/requests/GetEntityInformation.cpp
 )
 
 target_link_libraries("mx_database"
