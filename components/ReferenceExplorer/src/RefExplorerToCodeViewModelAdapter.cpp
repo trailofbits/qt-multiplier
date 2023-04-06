@@ -14,8 +14,9 @@
 #include <filesystem>
 
 namespace mx::gui {
-
 namespace {
+
+static const QString kExpandText = "[+]";
 
 void GenerateToken(
     RefExplorerToCodeViewModelAdapter::Context::TokenList &token_list,
@@ -114,7 +115,8 @@ void ImportReferenceExplorerModelHelper(
 
   if (show_expand_comment) {
     GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
-    GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT, "[+]");
+    GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT,
+                  kExpandText);
   }
 
   context.row_list.push_back(std::move(row));
@@ -146,14 +148,14 @@ RefExplorerToCodeViewModelAdapter::RefExplorerToCodeViewModelAdapter(
 
   d->model = model;
 
-  connect(d->model, &QAbstractItemModel::modelReset, this,
-          &RefExplorerToCodeViewModelAdapter::OnModelChange);
+  connect(d->model, &QAbstractItemModel::modelReset,
+          this, &RefExplorerToCodeViewModelAdapter::OnModelChange);
 
-  connect(d->model, &QAbstractItemModel::dataChanged, this,
-          &RefExplorerToCodeViewModelAdapter::OnModelChange);
+  connect(d->model, &QAbstractItemModel::dataChanged,
+          this, &RefExplorerToCodeViewModelAdapter::OnModelChange);
 
-  connect(d->model, &QAbstractItemModel::rowsInserted, this,
-          &RefExplorerToCodeViewModelAdapter::OnModelChange);
+  connect(d->model, &QAbstractItemModel::rowsInserted,
+          this, &RefExplorerToCodeViewModelAdapter::OnModelChange);
 
   OnModelChange();
 }

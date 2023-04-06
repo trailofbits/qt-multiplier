@@ -39,7 +39,6 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
 void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model) {
   d->text_view = new TextBasedReferenceExplorer(model, this);
 
-
   connect(d->text_view, &TextBasedReferenceExplorer::SelectedItemChanged, this,
           &IReferenceExplorer::SelectedItemChanged);
 

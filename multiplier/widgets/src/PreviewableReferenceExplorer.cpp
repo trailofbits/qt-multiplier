@@ -15,6 +15,8 @@
 
 #include <optional>
 
+#include "CodePreviewModelAdapter.h"
+
 namespace mx::gui {
 
 struct PreviewableReferenceExplorer::PrivateData final {
@@ -63,8 +65,8 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   connect(d->reference_explorer, &IReferenceExplorer::ItemActivated,
           this, &PreviewableReferenceExplorer::ItemActivated);
 
-  d->code_model = ICodeModel::Create(file_location_cache, index, this);
-
+  d->code_model = new CodePreviewModelAdapter(
+      ICodeModel::Create(file_location_cache, index), this);
   d->code_view = ICodeView::Create(d->code_model);
   d->code_view->hide();
 
