@@ -145,8 +145,8 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
       return QVariant();
     }
 
-    if (role == LineNumberRole || role == TokenRawEntityIdRole ||
-        role == TokenRelatedEntityIdRole ||
+    if (role == LineNumberRole || role == TokenIdRole ||
+        role == RelatedEntityIdRole || role == RealRelatedEntityIdRole ||
         role == EntityIdOfStmtContainingTokenRole) {
       return 1;
 
@@ -192,7 +192,7 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
     case TokenCategoryRole:
       return static_cast<std::uint32_t>(column.token_category);
 
-    case TokenRawEntityIdRole:
+    case TokenIdRole:
       return static_cast<std::uint64_t>(column.token_id);
 
     case LineNumberRole:
@@ -205,7 +205,8 @@ QVariant CodeModel::Data(const CodeModelIndex &index, int role) const {
         return QVariant();
       }
 
-    case TokenRelatedEntityIdRole:
+    case RelatedEntityIdRole:
+    case RealRelatedEntityIdRole:
       if (column.related_entity_id == kInvalidEntityId) {
         return QVariant();
       } else {

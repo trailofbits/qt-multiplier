@@ -27,11 +27,21 @@
 namespace mx::gui {
 
 struct EntityInformation final {
+  struct Location {
+    File file;
+    unsigned line;
+    unsigned column;
+
+    inline Location(File file_, unsigned line_, unsigned column_)
+        : file(std::move(file_)),
+          line(line_),
+          column(column_) {}
+  };
 
   struct Selection {
     VariantEntity entity;
     TokenRange tokens;
-    std::optional<std::tuple<File, unsigned, unsigned>> location;
+    std::optional<Location> location;
   };
 
   //! The entity ID which was requested.

@@ -26,6 +26,9 @@ RawEntityId IdOfEntity(const VariantEntity &ent);
 //! Return the file containing an entity.
 std::optional<File> FileOfEntity(const VariantEntity &ent);
 
+//! Get the token range associated with an entity.
+TokenRange Tokens(const VariantEntity &ent);
+
 //! Get the file token range associated with an entity.
 TokenRange FileTokens(const VariantEntity &ent);
 

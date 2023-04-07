@@ -58,8 +58,8 @@ Count CodePreviewModelAdapter::TokenCount(Count row) const {
 //! Returns the data role contents for the specified model index
 QVariant CodePreviewModelAdapter::Data(const CodeModelIndex &index,
                                        int role = Qt::DisplayRole) const {
-  if (role == ICodeModel::TokenRelatedEntityIdRole) {
-    return next->Data(index, ICodeModel::TokenRawEntityIdRole);
+  if (role == ICodeModel::RelatedEntityIdRole) {
+    return next->Data(index, ICodeModel::TokenIdRole);
   } else {
     return next->Data(index, role);
   }

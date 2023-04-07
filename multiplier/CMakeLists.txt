@@ -51,6 +51,8 @@ target_sources("Multiplier" PRIVATE
 
 add_subdirectory("widgets")
 
+find_package(zstd CONFIG REQUIRED)
+
 target_link_libraries("Multiplier"
   PRIVATE
     "qtmx_cxx_flags"
@@ -67,6 +69,7 @@ target_link_libraries("Multiplier"
     "mx_referenceexplorer"
     "mx_entityexplorer"
     "mx_widgets"
+    zstd::libzstd_static
 )
 
 enable_qt_properties("Multiplier")
