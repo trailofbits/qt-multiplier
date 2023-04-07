@@ -6,10 +6,12 @@
 
 #pragma once
 
-#include <multiplier/Index.h>
+#include "Types.h"
 
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IReferenceExplorerModel.h>
+
+#include <multiplier/Index.h>
 
 #include <QMainWindow>
 #include <QMimeData>
@@ -33,6 +35,7 @@ class MainWindow final : public QMainWindow {
   std::unique_ptr<PrivateData> d;
 
   void InitializeWidgets();
+  void InitializeToolBar();
   void CreateProjectExplorerDock();
   void CreateEntityExplorerDock();
   void CreateInfoExplorerDock();
@@ -41,7 +44,7 @@ class MainWindow final : public QMainWindow {
   void CreateCodeView();
   void OpenEntityRelatedToToken(const CodeModelIndex &index);
   void OpenEntityCode(RawEntityId entity_id);
-  void OpenEntityInfo(RawEntityId entity_id, bool force=false);
+  void OpenEntityInfo(RawEntityId entity_id, bool force = false);
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
   void OpenTokenTaintExplorer(CodeModelIndex index);
@@ -54,6 +57,12 @@ class MainWindow final : public QMainWindow {
   ICodeView *
   GetOrCreateFileCodeView(RawEntityId file_id,
                           std::optional<QString> opt_tab_name = std::nullopt);
+
+  void UpdateHistoryMenus();
+  void AddToHistory(const std::optional<RawEntityId> &opt_file_id,
+                    const std::optional<RawEntityId> &opt_entity_id);
+
+  void NavigateToHistoryItem(History::ItemList::iterator item_it);
 
  private slots:
   void OnIndexViewFileClicked(RawEntityId file_id, QString file_name,
@@ -74,6 +83,10 @@ class MainWindow final : public QMainWindow {
   void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
   void OnEntityExplorerEntityClicked(RawEntityId entity_id);
+
+  void OnNavigateBack();
+  void OnNavigateForward();
+  void OnNavigateToHistoryItem(QAction *action);
 };
 
 }  // namespace mx::gui
