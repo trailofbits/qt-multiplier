@@ -33,6 +33,7 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
     : IReferenceExplorer(parent),
       d(new PrivateData) {
 
+  model->setParent(this);
   InitializeWidgets(model);
 }
 

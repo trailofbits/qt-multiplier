@@ -465,8 +465,7 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id) {
   }
 
   if (Token opt_tok = FirstFileToken(entity)) {
-    const FileLocationCache loc_cache = code_model->GetFileLocationCache();
-    auto maybe_loc = opt_tok.location(loc_cache);
+    auto maybe_loc = opt_tok.location(d->file_location_cache);
     if (!maybe_loc.has_value()) {
       return;
     }

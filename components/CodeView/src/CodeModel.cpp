@@ -63,14 +63,6 @@ CodeModel::~CodeModel() {
   CancelRunningRequest();
 }
 
-const FileLocationCache &CodeModel::GetFileLocationCache() const {
-  return d->file_location_cache;
-}
-
-Index &CodeModel::GetIndex() {
-  return d->index;
-}
-
 //! Asks the model for the currently showing entity. This is usually a file
 //! id or a fragment id.
 std::optional<RawEntityId> CodeModel::GetEntity(void) const {

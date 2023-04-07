@@ -39,7 +39,6 @@ void TextBasedReferenceExplorer::InitializeWidgets(
   setContentsMargins(0, 0, 0, 0);
 
   d->model = model;
-  d->model->setParent(this);
 
   d->code_model = new RefExplorerToCodeViewModelAdapter(model, this);
   d->code_view = ICodeView::Create(d->code_model, this);

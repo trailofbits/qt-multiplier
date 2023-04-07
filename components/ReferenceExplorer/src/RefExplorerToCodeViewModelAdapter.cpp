@@ -162,23 +162,6 @@ RefExplorerToCodeViewModelAdapter::RefExplorerToCodeViewModelAdapter(
 
 RefExplorerToCodeViewModelAdapter::~RefExplorerToCodeViewModelAdapter() {}
 
-const FileLocationCache &
-RefExplorerToCodeViewModelAdapter::GetFileLocationCache() const {
-  Assert(
-      false,
-      "Invalid virtual method call: RefExplorerToCodeViewModelAdapter::GetFileLocationCache");
-
-  __builtin_unreachable();
-}
-
-Index &RefExplorerToCodeViewModelAdapter::GetIndex() {
-  Assert(
-      false,
-      "Invalid virtual method call: RefExplorerToCodeViewModelAdapter::GetIndex");
-
-  __builtin_unreachable();
-}
-
 std::optional<RawEntityId>
 RefExplorerToCodeViewModelAdapter::GetEntity() const {
   Assert(

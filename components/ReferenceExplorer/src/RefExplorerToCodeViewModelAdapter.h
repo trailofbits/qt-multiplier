@@ -36,15 +36,6 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
   //! Destructor
   virtual ~RefExplorerToCodeViewModelAdapter() override;
 
-  //! \copybrief ICodeModel::GetFileLocationCache
-  //! \todo This method needs to be removed from the interface
-  [[noreturn]] virtual const FileLocationCache &
-  GetFileLocationCache() const override;
-
-  //! \copybrief ICodeModel::GetIndex
-  //! \todo This method needs to be removed from the interface
-  [[noreturn]] virtual Index &GetIndex() override;
-
   //! \copybrief ICodeModel::GetEntity
   //! \todo This method needs to be removed from the interface
   [[noreturn]] virtual std::optional<RawEntityId> GetEntity() const override;
