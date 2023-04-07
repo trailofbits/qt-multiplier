@@ -55,38 +55,32 @@ Token DeclFileToken(const Decl &decl) {
   }
 }
 
-//! Get the file token range associated with an entity.
-//!
-//! NOTE(pag): We prefer `TokenRange::file_tokens` as that walks up macros.
-TokenRange FileTokens(const VariantEntity &ent) {
+//! Get the token range associated with an entity.
+TokenRange Tokens(const VariantEntity &ent) {
   const auto VariantEntityVisitor = Overload{
-      [](const Decl &entity) { return entity.tokens().file_tokens(); },
-      [](const Stmt &entity) { return entity.tokens().file_tokens(); },
-      [](const Type &) { return TokenRange(); },
+    [](const Decl &entity) { return entity.tokens(); },
+    [](const Stmt &entity) { return entity.tokens(); },
+    [](const Type &) { return TokenRange(); },
+    [](const Token &entity) { return TokenRange(entity); },
+    [](const Macro &entity) { return entity.use_tokens(); },
+    [](const Designator &entity) { return entity.tokens(); },
+    [](const CXXBaseSpecifier &entity) { return entity.tokens(); },
+    [](const TemplateArgument &) { return TokenRange(); },
+    [](const TemplateParameterList &entity) { return entity.tokens(); },
 
-      // Find the containing file usage of this, not necessarily the derived filed
-      // token.
-      [](const Token &entity) { return TokenRange(entity).file_tokens(); },
-
-      [](const Macro &entity) {
-        return entity.use_tokens().file_tokens();
-      },
-      [](const Designator &entity) { return entity.tokens().file_tokens(); },
-      [](const CXXBaseSpecifier &entity) {
-        return entity.tokens().file_tokens();
-      },
-      [](const TemplateArgument &) { return TokenRange(); },
-      [](const TemplateParameterList &entity) {
-        return entity.tokens().file_tokens();
-      },
-
-      // NOTE(pag): We don't do `entity.parsed_tokens().file_tokens()` because
-      //            if it's a pure macro fragment, then it might not have any
-      //            parsed tokens.
-      [](const Fragment &entity) { return entity.file_tokens(); },
-      [](const File &entity) { return entity.tokens(); },
-      [](auto) { return TokenRange(); }};
+    // NOTE(pag): We don't do `entity.parsed_tokens().file_tokens()` because
+    //            if it's a pure macro fragment, then it might not have any
+    //            parsed tokens.
+    [](const Fragment &entity) { return entity.parsed_tokens(); },
+    [](const File &entity) { return entity.tokens(); },
+    [](auto) { return TokenRange(); }
+  };
   return std::visit<TokenRange>(VariantEntityVisitor, ent);
+}
+
+//! Get the file token range associated with an entity.
+TokenRange FileTokens(const VariantEntity &ent) {
+  return Tokens(ent).file_tokens();
 }
 
 //! Get the first file token associated with an entity.

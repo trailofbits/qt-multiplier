@@ -43,7 +43,7 @@ class ICodeModel : public QObject {
     TokenCategoryRole = Qt::UserRole + 1,
 
     //! The RawEntityId value for the specified model index
-    TokenRawEntityIdRole,
+    TokenIdRole,
 
     //! A line number integer for the specified model index
     LineNumberRole,
@@ -51,8 +51,15 @@ class ICodeModel : public QObject {
     //! Returns the group id (if any) of the specified model index
     TokenGroupIdRole,
 
-    //! The RawEntityId value associated with the "related entity" of this token.
-    TokenRelatedEntityIdRole,
+    //! The RawEntityId value associated with the "related entity" of this
+    //! token.
+    RelatedEntityIdRole,
+
+    //! The real related entity id associated with this token. In the case of
+    //! code previews, we hide the related entity ID, and return the token ID
+    //! instead. But internal to the `CodeView`, we like to be able to access
+    //! the real related entity ID so that we can highlight other uses.
+    RealRelatedEntityIdRole,
 
     //! The raw form of the `StmtId` for the statement containing this token.
     EntityIdOfStmtContainingTokenRole,
@@ -61,12 +68,6 @@ class ICodeModel : public QObject {
   //! Factory function
   static ICodeModel *Create(const FileLocationCache &file_location_cache,
                             const Index &index, QObject *parent = nullptr);
-
-  //! Returns the internal mx::FileLocationCache object
-  virtual const FileLocationCache &GetFileLocationCache(void) const = 0;
-
-  //! Returns the internal mx::Index object
-  virtual Index &GetIndex() = 0;
 
   //! Asks the model for the currently showing entity. This is usually a file
   //! id or a fragment id.

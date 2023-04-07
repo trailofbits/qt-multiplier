@@ -127,7 +127,7 @@ class CodeView final : public ICodeView {
         token_group_id_to_unique_token_id_list;
 
     //! This maps related entity ids to a list of unique token identifiers
-    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>
+    std::unordered_map<RawEntityId, std::vector<std::uint64_t>>
         related_entity_id_to_unique_token_id_list;
 
     //! The highest line number that we have encountered

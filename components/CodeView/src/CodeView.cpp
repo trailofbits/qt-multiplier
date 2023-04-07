@@ -428,8 +428,8 @@ void CodeView::UpdateTokenGroupColors() {
 }
 
 std::uint64_t CodeView::GetUniqueTokenIdentifier(const CodeModelIndex &index) {
-  return (static_cast<std::uint64_t>(index.row) << 32) |
-         static_cast<std::uint64_t>(index.token_index);
+  return (static_cast<std::uint64_t>(index.row) << 32u) |
+          static_cast<std::uint64_t>(index.token_index);
 }
 
 std::optional<std::size_t>
@@ -588,75 +588,37 @@ QTextDocument *CodeView::CreateTextDocument(
 
       token_map.data.insert({unique_token_id, std::move(entry)});
 
-      // Add the entry to the block number index
+      // Add the entry to the block number index.
       {
         auto block_number = cursor.blockNumber();
-
-        auto unique_token_id_list_it =
-            token_map.block_number_to_unique_token_id_list.find(block_number);
-
-        if (unique_token_id_list_it ==
-            token_map.block_number_to_unique_token_id_list.end()) {
-
-          auto insert_status =
-              token_map.block_number_to_unique_token_id_list.insert(
-                  {block_number, {}});
-
-          unique_token_id_list_it = insert_status.first;
-        }
-
-        auto &unique_token_id_list = unique_token_id_list_it->second;
+        auto &unique_token_id_list =
+            token_map.block_number_to_unique_token_id_list[block_number];
         unique_token_id_list.push_back(unique_token_id);
       }
 
-      // Add the entry to the token group index
+      // Add the entry to the token group index.
       const auto &token_group_id_var =
           model.Data(model_index, ICodeModel::TokenGroupIdRole);
 
       if (token_group_id_var.isValid()) {
         auto token_group_id = qvariant_cast<std::uint64_t>(token_group_id_var);
-
-        auto unique_token_id_list_it =
-            token_map.token_group_id_to_unique_token_id_list.find(
-                token_group_id);
-
-        if (unique_token_id_list_it ==
-            token_map.token_group_id_to_unique_token_id_list.end()) {
-
-          auto insert_status =
-              token_map.token_group_id_to_unique_token_id_list.insert(
-                  {token_group_id, {}});
-
-          unique_token_id_list_it = insert_status.first;
-        }
-
-        auto &unique_token_id_list = unique_token_id_list_it->second;
+        auto &unique_token_id_list =
+            token_map.token_group_id_to_unique_token_id_list[token_group_id];
         unique_token_id_list.push_back(unique_token_id);
       }
 
-      // Add the entry to the related entity id index
+      // Add the entry to the related entity id index. We use this to highlight
+      // other tokens sharing the same related entity id.
       const auto &related_entity_id_var =
-          model.Data(model_index, ICodeModel::TokenRelatedEntityIdRole);
+          model.Data(model_index, ICodeModel::RealRelatedEntityIdRole);
 
       if (related_entity_id_var.isValid()) {
         auto related_entity_id =
-            qvariant_cast<std::uint64_t>(related_entity_id_var);
+            qvariant_cast<RawEntityId>(related_entity_id_var);
 
-        auto unique_token_id_list_it =
-            token_map.related_entity_id_to_unique_token_id_list.find(
-                related_entity_id);
+        auto &unique_token_id_list =
+            token_map.related_entity_id_to_unique_token_id_list[related_entity_id];
 
-        if (unique_token_id_list_it ==
-            token_map.related_entity_id_to_unique_token_id_list.end()) {
-
-          auto insert_status =
-              token_map.related_entity_id_to_unique_token_id_list.insert(
-                  {related_entity_id, {}});
-
-          unique_token_id_list_it = insert_status.first;
-        }
-
-        auto &unique_token_id_list = unique_token_id_list_it->second;
         unique_token_id_list.push_back(unique_token_id);
       }
 
@@ -747,6 +709,7 @@ void CodeView::HighlightTokensForRelatedEntityID(
     RawEntityId related_entity_id,
     QList<QTextEdit::ExtraSelection> &selection_list,
     const CodeViewTheme &theme) {
+
   auto unique_token_id_list =
       token_map.related_entity_id_to_unique_token_id_list.at(related_entity_id);
 
@@ -771,6 +734,7 @@ void CodeView::HighlightTokensForRelatedEntityID(
 void CodeView::OnModelReset() {
   d->search_widget->Deactivate();
   d->go_to_line_widget->Deactivate();
+  d->opt_prev_hovered_model_index.reset();
 
   QProgressDialog progress(tr("Generating rows..."), tr("Abort"), 0, 100, this);
   progress.setWindowModality(Qt::WindowModal);
@@ -870,6 +834,7 @@ void CodeView::OnCursorMoved(void) {
   QList<QTextEdit::ExtraSelection> extra_selections;
   QTextEdit::ExtraSelection selection;
 
+  // Highlight the current line where the cursor is.
   selection.format.setBackground(d->theme.selected_line_background_color);
   selection.format.setProperty(QTextFormat::FullWidthSelection, true);
   selection.cursor = d->text_edit->textCursor();
@@ -878,11 +843,18 @@ void CodeView::OnCursorMoved(void) {
 
   auto opt_model_index =
       GetCodeModelIndexFromTextCursor(d->token_map, d->text_edit->textCursor());
+
+  // Try to highlight all entities related to the entity on which the cursor
+  // is hovering.
+  //
+  // NOTE(pag): We use `RealRelatedEntityIdRole` instead of the usual
+  //            `RelatedEntityIdRole` because the code preview alters
+  //            the related entity ID to be the token ID via a proxy model.
   if (opt_model_index.has_value()) {
     auto unique_token_id = GetUniqueTokenIdentifier(opt_model_index.value());
     const auto &token_map_entry = d->token_map.data.at(unique_token_id);
-    const auto &related_entity_id_var = d->model->Data(
-        token_map_entry.model_index, ICodeModel::TokenRelatedEntityIdRole);
+    QVariant related_entity_id_var = d->model->Data(
+        token_map_entry.model_index, ICodeModel::RealRelatedEntityIdRole);
 
     if (related_entity_id_var.isValid()) {
       auto related_entity_id =
@@ -895,10 +867,9 @@ void CodeView::OnCursorMoved(void) {
 
   d->text_edit->setExtraSelections(extra_selections);
 
-  auto index = GetCodeModelIndexFromTextCursor(
-      d->token_map, d->text_edit->textCursor());
-  if (index.has_value()) {
-    emit CursorMoved(index.value());
+  // Tell users of the code view when the cursor moves.
+  if (opt_model_index.has_value()) {
+    emit CursorMoved(opt_model_index.value());
   }
 }
 

@@ -13,6 +13,7 @@
 #include <multiplier/Index.h>
 #include <multiplier/Token.h>
 #include <multiplier/ui/IDatabase.h>
+#include <multiplier/ui/Util.h>
 #include <optional>
 
 #include <QPushButton>
@@ -20,10 +21,56 @@
 #include <QFutureWatcher>
 #include <QGridLayout>
 #include <QString>
-#include <QTreeView>
+#include <QTreeWidget>
 #include <vector>
 
 namespace mx::gui {
+namespace {
+
+static void RemoveChildren(QTreeWidgetItem *item) {
+  for (QTreeWidgetItem *child : item->takeChildren()) {
+    delete child;
+  }
+}
+
+struct FillConfig {
+  bool add_name{true};
+  bool add_location{true};
+};
+
+static void FillChild(QTreeWidgetItem *child, FillConfig config,
+                      const EntityInformation::Selection &sel) {
+  int col = 0;
+  if (config.add_name) {
+    if (std::optional<QString> name = NameOfEntity(sel.entity)) {
+      child->setText(col++, name.value());
+    }
+  }
+
+  if (config.add_location && sel.location.has_value()) {
+    for (std::filesystem::path path : sel.location->file.paths()) {
+      child->setText(
+          col++,
+          QString("%1:%2:%3")
+              .arg(QString::fromStdString(path.generic_string()))
+              .arg(sel.location->line)
+              .arg(sel.location->column));
+      break;  // Take the first path.
+    }
+  }
+}
+
+static void FillChildren(
+    QTreeWidgetItem *parent, FillConfig config,
+    const std::vector<EntityInformation::Selection> &sels) {
+  for (const EntityInformation::Selection &sel : sels) {
+    QTreeWidgetItem *child = new QTreeWidgetItem(parent);
+    FillChild(child, config, sel);
+    parent->addChild(child);
+  }
+}
+
+}  // namespace
 
 struct InformationExplorer::PrivateData {
   const Index index;
@@ -51,7 +98,24 @@ struct InformationExplorer::PrivateData {
   std::unique_ptr<QComboBox> history_view;
   std::unique_ptr<QPushButton> prev_item;
   std::unique_ptr<QPushButton> next_item;
-  std::unique_ptr<QTreeView> current_view;
+  std::unique_ptr<QTreeWidget> tree_view;
+
+  QTreeWidgetItem *entity{nullptr};
+
+#define FOR_EACH_ITEM(m) \
+    m(redeclarations, "Redeclarations") \
+    m(macros_used, "Macros used") \
+    m(callees, "Callees") \
+    m(callers, "Callers") \
+    m(includes, "Includes") \
+    m(include_bys, "Included by") \
+    m(top_level_entities, "Top level entities")
+
+#define DECLARE_ITEM(x, name) QTreeWidgetItem *x{nullptr};
+
+  FOR_EACH_ITEM(DECLARE_ITEM)
+
+#undef DECLARE_ITEM
 
   inline PrivateData(const Index &index_,
                      const FileLocationCache &file_location_cache_)
@@ -131,7 +195,23 @@ void InformationExplorer::PrivateData::CullOldHistory(void) {
 }
 
 void InformationExplorer::PrivateData::Render(void) {
+  FillConfig config;
 
+  FillChild(entity, config, current->entity);
+  entity->setHidden(false);
+
+#define POPULATE_ITEM(x, name) \
+    RemoveChildren(x); \
+    if (current->x.empty()) { \
+      x->setHidden(true); \
+    } else { \
+      FillChildren(x, config, current->x); \
+      x->setHidden(false); \
+      x->setExpanded(true); \
+    }
+
+  FOR_EACH_ITEM(POPULATE_ITEM)
+#undef POPULATE_ITEM
 }
 
 void InformationExplorer::InitializeWidgets(void) {
@@ -142,16 +222,38 @@ void InformationExplorer::InitializeWidgets(void) {
   d->history_view = std::make_unique<QComboBox>(this);
   d->prev_item = std::make_unique<QPushButton>(this);
   d->next_item = std::make_unique<QPushButton>(this);
-  d->current_view = std::make_unique<QTreeView>(this);
+  d->tree_view = std::make_unique<QTreeWidget>(this);
+
+  // Hide the headers, the "labels" are the top-level items in the tree.
+  d->tree_view->setHeaderHidden(true);
+
+  // For long names, put `...` on the left.
+  d->tree_view->setWordWrap(false);
+  d->tree_view->setTextElideMode(Qt::ElideMiddle);
 
   layout->addWidget(d->history_view.get(), 0, 0, 1, 1);
   layout->addWidget(d->prev_item.get(), 0, 1, 1, 1);
   layout->addWidget(d->next_item.get(), 0, 2, 1, 1);
-  layout->addWidget(d->current_view.get(), 1, 0, 1, 3);
+  layout->addWidget(d->tree_view.get(), 1, 0, 1, 3);
   layout->setColumnStretch(0, 1);
 
   d->prev_item->setEnabled(false);
   d->next_item->setEnabled(false);
+
+  d->entity = new QTreeWidgetItem(d->tree_view.get());
+  d->tree_view->addTopLevelItem(d->entity);
+  d->entity->setHidden(true);
+
+#define ADD_ITEM(x, name) \
+    do { \
+      d->x = new QTreeWidgetItem(d->tree_view.get()); \
+      d->x->setText(0, tr(name)); \
+      d->tree_view->addTopLevelItem(d->x); \
+      d->x->setHidden(true); \
+    } while (false);
+
+  FOR_EACH_ITEM(ADD_ITEM)
+#undef ADD_ITEM
 }
 
 void InformationExplorer::CancelRunningRequest(void) {

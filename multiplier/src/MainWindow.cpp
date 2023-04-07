@@ -247,7 +247,7 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
   }
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
 
   // Only enable the references browser if the token is related to an entity.
   d->code_view_context_menu.show_ref_explorer_action->setEnabled(
@@ -289,7 +289,7 @@ void MainWindow::OpenReferenceExplorer(
 void MainWindow::OpenTokenReferenceExplorer(CodeModelIndex index) {
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     CloseTokenReferenceExplorer();
@@ -316,7 +316,7 @@ void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
   }
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
 
   if (related_entity_id_var.isValid()) {
     OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
@@ -330,7 +330,7 @@ void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
 void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     return;
@@ -371,9 +371,6 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
 ICodeView *
 MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
                                     std::optional<QString> opt_tab_name) {
-
-  OpenEntityInfo(file_id);
-
   ICodeView *tab_code_view = nullptr;
   ICodeModel *tab_model = nullptr;
   QTabWidget &tab_widget = *static_cast<QTabWidget *>(centralWidget());
@@ -416,7 +413,7 @@ MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
 
 void MainWindow::OpenEntityRelatedToToken(const CodeModelIndex &index) {
   auto entity_id_var =
-      index.model->Data(index, ICodeModel::TokenRelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
 
   if (!entity_id_var.isValid()) {
     return;
@@ -446,6 +443,8 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id) {
     return;
   }
 
+  OpenEntityInfo(entity_id);
+
   if (std::holds_alternative<Decl>(entity)) {
     entity = std::get<Decl>(entity).canonical_declaration();
   }
@@ -466,8 +465,7 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id) {
   }
 
   if (Token opt_tok = FirstFileToken(entity)) {
-    const FileLocationCache loc_cache = code_model->GetFileLocationCache();
-    auto maybe_loc = opt_tok.location(loc_cache);
+    auto maybe_loc = opt_tok.location(d->file_location_cache);
     if (!maybe_loc.has_value()) {
       return;
     }
@@ -481,6 +479,7 @@ void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
                                         Qt::KeyboardModifiers,
                                         Qt::MouseButtons) {
   CloseTokenReferenceExplorer();
+  OpenEntityInfo(file_id);
   static_cast<void>(GetOrCreateFileCodeView(file_id, tab_name));
 }
 

@@ -248,8 +248,6 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
 
 void GraphicalReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
   d->model = model;
-  d->model->setParent(this);
-
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);

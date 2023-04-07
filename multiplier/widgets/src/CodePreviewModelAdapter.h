@@ -29,12 +29,6 @@ class CodePreviewModelAdapter final : public ICodeModel {
   //! Destructor
   virtual ~CodePreviewModelAdapter(void) = default;
 
-  //! Returns the internal mx::FileLocationCache object
-  virtual const FileLocationCache &GetFileLocationCache(void) const Q_DECL_FINAL;
-
-  //! Returns the internal mx::Index object
-  virtual Index &GetIndex() Q_DECL_FINAL;
-
   //! Asks the model for the currently showing entity. This is usually a file
   //! id or a fragment id.
   virtual std::optional<RawEntityId> GetEntity(void) const Q_DECL_FINAL;

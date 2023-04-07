@@ -23,17 +23,6 @@ CodePreviewModelAdapter::CodePreviewModelAdapter(ICodeModel *model,
           this, &ICodeModel::ModelResetSkipped);
 }
 
-//! Returns the internal mx::FileLocationCache object
-const FileLocationCache &
-CodePreviewModelAdapter::GetFileLocationCache(void) const {
-  return next->GetFileLocationCache();
-}
-
-//! Returns the internal mx::Index object
-Index &CodePreviewModelAdapter::GetIndex() {
-  return next->GetIndex();
-}
-
 //! Asks the model for the currently showing entity. This is usually a file
 //! id or a fragment id.
 std::optional<RawEntityId> CodePreviewModelAdapter::GetEntity(void) const {
@@ -58,8 +47,8 @@ Count CodePreviewModelAdapter::TokenCount(Count row) const {
 //! Returns the data role contents for the specified model index
 QVariant CodePreviewModelAdapter::Data(const CodeModelIndex &index,
                                        int role = Qt::DisplayRole) const {
-  if (role == ICodeModel::TokenRelatedEntityIdRole) {
-    return next->Data(index, ICodeModel::TokenRawEntityIdRole);
+  if (role == ICodeModel::RelatedEntityIdRole) {
+    return next->Data(index, ICodeModel::TokenIdRole);
   } else {
     return next->Data(index, role);
   }
