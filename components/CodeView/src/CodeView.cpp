@@ -56,7 +56,8 @@ struct CodeView::PrivateData final {
   ICodeModel *model{nullptr};
 
   int version{0};
-  int last_press_version{0};
+  int last_press_version{-1};
+  int last_press_position{-1};
 
   QPlainTextEditMod *text_edit{nullptr};
   QWidget *gutter{nullptr};
@@ -119,7 +120,6 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
   d->version++;
   do {
     QSignalBlocker blocker(d->text_edit);
-    qDebug() << "SetCursorPosition" << start;
 
     auto text_cursor = d->text_edit->textCursor();
     text_cursor.movePosition(QTextCursor::End);
@@ -186,8 +186,6 @@ bool CodeView::ScrollToLineNumber(unsigned line) {
     return false;
   }
 
-  qDebug() << "ScrollToLineNumber" << line;
-
   return SetCursorPosition(text_block.position(), std::nullopt);
 }
 
@@ -202,9 +200,10 @@ CodeView::CodeView(ICodeModel *model, QWidget *parent)
 }
 
 bool CodeView::eventFilter(QObject *obj, QEvent *event) {
-  if (dynamic_cast<QMouseEvent *>(event) && obj == d->text_edit->viewport()) {
-    qDebug() << "eventFilter" << event->type() << d->text_edit->textCursor().position();
-  }
+  //if (dynamic_cast<QMouseEvent *>(event) && obj == d->text_edit->viewport()) {
+  //  qDebug() << "eventFilter" << event->type()
+  //           << d->text_edit->textCursor().position();
+  //}
 
   switch (event->type()) {
     case QEvent::Paint:
@@ -224,18 +223,37 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
       if (obj == d->text_edit->viewport()) {
         auto mouse_event = dynamic_cast<QMouseEvent *>(event);
         d->last_press_version = d->version;
+        d->last_press_position = d->text_edit->textCursor().position();
         OnTextEditViewportMouseButtonPress(mouse_event);
       }
       break;
     case QEvent::MouseButtonRelease:
       if (obj == d->text_edit->viewport()) {
+        auto prev_version = d->last_press_version;
+        auto prev_position = d->last_press_position;
+        d->last_press_version = -1;
+        d->last_press_position = -1;
 
         // If between the last press and now the "cursor version" changed, i.e.
         // external code forced us to scroll to a different line, or the model
         // was reset, then ignore the mouse release.
-        if (d->last_press_version != d->version) {
+        if (prev_version != d->version) {
           event->ignore();
-          qDebug() << "Ignored";
+
+          // Sometimes a model reset as a reuslt of a mouse press triggers a
+          // selection of everything from the beginning of the text to where
+          // the cursor is upon mouse press release (usually following a minor
+          // mouse move). If we observe a selection at this point, and if the
+          // beginning or ending of the selection matches our pre-model reset
+          // position, then the position must still be valid, and so we'll move
+          // the cursor back to where it was.
+          QTextCursor cursor = d->text_edit->textCursor();
+          if (cursor.selectionStart() != cursor.selectionEnd() &&
+              (prev_position == cursor.selectionStart() ||
+               prev_position == cursor.selectionEnd())) {
+
+            SetCursorPosition(prev_position, std::nullopt);
+          }
           return true;
         }
       }
@@ -872,8 +890,6 @@ void CodeView::OnCursorMoved(void) {
   selection.cursor = d->text_edit->textCursor();
   selection.cursor.clearSelection();
   extra_selections.append(selection);
-
-  qDebug() << "OnCursorMoved" << d->text_edit->textCursor().position();
 
   auto opt_model_index =
       GetCodeModelIndexFromTextCursor(d->token_map, d->text_edit->textCursor());
