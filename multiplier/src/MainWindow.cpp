@@ -902,16 +902,24 @@ void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
   OpenEntityInfo(file_id);
 
   auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
+  QWidget *current_tab = central_tab_widget->currentWidget();
   QWidget *next_tab = GetOrCreateFileCodeView(file_id, tab_name);
   if (!next_tab) {
     return;
   }
 
+  // If we're opening a file view, and if there is at least one other file
+  // view already open, then notify the system that we might need to add the
+  // last open tab's current position to the history. If there were no tabs
+  // open prior to this request, then we don't want to force the beginning of
+  // file location into history.
+  //
   // NOTE(pag): We *don't* change the `kLastLocationProperty` property. It is
   //            either initialized to the file ID, or it is whatever it was with
   //            the last click or cursor event.
-
-  AboutToChangeToCodeView(next_tab);
+  if (current_tab) {
+    AboutToChangeToCodeView(next_tab);
+  }
 
   central_tab_widget->setCurrentWidget(next_tab);
 }
