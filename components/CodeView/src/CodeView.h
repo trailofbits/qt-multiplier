@@ -177,6 +177,9 @@ class CodeView final : public ICodeView {
       QList<QTextEdit::ExtraSelection> &selection_list,
       const CodeViewTheme &theme);
 
+  void StopCursorTracking(void);
+  void ResumeCursorTracking(void);
+
  private slots:
   // Connect the cursor changed event.
   void ConnectCursorChangeEvent(void);

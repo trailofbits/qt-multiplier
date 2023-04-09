@@ -73,22 +73,15 @@ class MainWindow final : public QMainWindow {
   void NavigateBackToHistoryItem(History::ItemList::iterator item_it);
   void NavigateForwardToHistoryItem(History::ItemList::iterator item_it);
 
-  void OnTokenTriggered(const ICodeView::TokenAction &token_action,
-                        const CodeModelIndex &index);
-
  private slots:
   void OnIndexViewFileClicked(RawEntityId file_id, QString file_name,
                               Qt::KeyboardModifiers modifiers,
                               Qt::MouseButtons buttons);
 
-  void OnMainCodeViewTokenTriggered(const ICodeView::TokenAction &token_action,
-                                    const CodeModelIndex &index);
+  void OnTokenTriggered(const ICodeView::TokenAction &token_action,
+                        const CodeModelIndex &index);
 
   void OnMainCodeViewCursorMoved(const CodeModelIndex &index);
-
-  void OnPreviewCodeViewTokenTriggered(
-      const ICodeView::TokenAction &token_action,
-      const CodeModelIndex &index);
 
   void OnReferenceExplorerItemActivated(const QModelIndex &index);
 

@@ -30,7 +30,6 @@
 #include <QFontMetrics>
 #include <QWheelEvent>
 #include <QRegularExpression>
-#include <QSignalBlocker>
 #include <QShortcut>
 #include <QTimer>
 
@@ -119,50 +118,43 @@ int CodeView::GetCursorPosition() const {
 
 bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
   d->version++;
-  do {
-    QSignalBlocker blocker(d->text_edit);
 
-    auto text_cursor = d->text_edit->textCursor();
-    text_cursor.movePosition(QTextCursor::End);
+  auto text_cursor = d->text_edit->textCursor();
+  text_cursor.movePosition(QTextCursor::End);
 
-    auto max_position = text_cursor.position();
-    if (start >= max_position || opt_end.value_or(start) >= max_position) {
-      return false;
-    }
+  auto max_position = text_cursor.position();
+  if (start >= max_position || opt_end.value_or(start) >= max_position) {
+    return false;
+  }
 
-    text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
+  StopCursorTracking();
 
-    // We want to change the scroll in the viewport, so move us to the end of
-    // the document (trick from StackOverflow), then back to the text cursor,
-    // then center on the cursor.
-    if (auto next_block = text_cursor.block().blockNumber();
-        next_block != d->last_block) {
-      d->text_edit->moveCursor(QTextCursor::End);
-      d->text_edit->setTextCursor(text_cursor);
-      d->text_edit->ensureCursorVisible();
-      d->text_edit->centerCursor();
-      d->last_block = next_block;
+  text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
 
-    // The line on which we last clicked is likely visible. Don't center us on
-    // the target cursor.
-    } else {
-      d->text_edit->setTextCursor(text_cursor);
-    }
+  // We want to change the scroll in the viewport, so move us to the end of
+  // the document (trick from StackOverflow), then back to the text cursor,
+  // then center on the cursor.
+  if (auto next_block = text_cursor.block().blockNumber();
+      next_block != d->last_block) {
+    d->text_edit->moveCursor(QTextCursor::End);
+    d->text_edit->setTextCursor(text_cursor);
+    d->text_edit->ensureCursorVisible();
+    d->text_edit->centerCursor();
+    d->last_block = next_block;
 
-    if (opt_end.has_value()) {
-      text_cursor.setPosition(opt_end.value(), QTextCursor::MoveMode::KeepAnchor);
-      d->text_edit->setTextCursor(text_cursor);
-    }
-  } while (false);
+  // The line on which we last clicked is likely visible. Don't center us on
+  // the target cursor.
+  } else {
+    d->text_edit->setTextCursor(text_cursor);
+  }
 
-  // Disable cursor change tracking.
-  disconnect(d->cursor_change_signal);
+  if (opt_end.has_value()) {
+    text_cursor.setPosition(opt_end.value(), QTextCursor::MoveMode::KeepAnchor);
+    d->text_edit->setTextCursor(text_cursor);
+  }
 
   OnCursorMoved();
-
-  // Re-introduce cursor change tracking.
-  QTimer::singleShot(200, this, &CodeView::ConnectCursorChangeEvent);
-
+  ResumeCursorTracking();
   return true;
 }
 
@@ -218,15 +210,13 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
   switch (event->type()) {
     case QEvent::Paint:
       if (obj == d->gutter) {
-        auto paint_event = static_cast<QPaintEvent *>(event);
-        OnGutterPaintEvent(paint_event);
+        OnGutterPaintEvent(dynamic_cast<QPaintEvent *>(event));
         return true;
       }
       break;
     case QEvent::MouseMove:
       if (obj == d->text_edit->viewport()) {
-        auto mouse_event = static_cast<QMouseEvent *>(event);
-        OnTextEditViewportMouseMoveEvent(mouse_event);
+        OnTextEditViewportMouseMoveEvent(dynamic_cast<QMouseEvent *>(event));
       }
       break;
     case QEvent::MouseButtonPress:
@@ -360,6 +350,16 @@ void CodeView::InitializeWidgets() {
   // This will also cause a model reset update
   static const auto kRequestDarkTheme{true};
   SetTheme(GetDefaultCodeViewTheme(kRequestDarkTheme));
+}
+
+//! Disable cursor change tracking.
+void CodeView::StopCursorTracking(void) {
+  disconnect(d->cursor_change_signal);
+}
+
+//! Re-introduce cursor change tracking.
+void CodeView::ResumeCursorTracking(void) {
+  QTimer::singleShot(200, this, &CodeView::ConnectCursorChangeEvent);
 }
 
 // Connect the cursor changed event.
