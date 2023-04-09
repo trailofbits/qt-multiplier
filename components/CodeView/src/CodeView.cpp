@@ -58,6 +58,7 @@ struct CodeView::PrivateData final {
   int version{0};
   int last_press_version{-1};
   int last_press_position{-1};
+  int last_block{-1};
 
   QPlainTextEditMod *text_edit{nullptr};
   QWidget *gutter{nullptr};
@@ -131,13 +132,22 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
 
     text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
 
-    // We want to change the scroll in the viewport, so move us to the end of the
-    // document (trick from StackOverflow), then back to the text cursor, then
-    // center on the cursor.
-    d->text_edit->moveCursor(QTextCursor::End);
-    d->text_edit->setTextCursor(text_cursor);
-    d->text_edit->ensureCursorVisible();
-    d->text_edit->centerCursor();
+    // We want to change the scroll in the viewport, so move us to the end of
+    // the document (trick from StackOverflow), then back to the text cursor,
+    // then center on the cursor.
+    if (auto next_block = text_cursor.block().blockNumber();
+        next_block != d->last_block) {
+      d->text_edit->moveCursor(QTextCursor::End);
+      d->text_edit->setTextCursor(text_cursor);
+      d->text_edit->ensureCursorVisible();
+      d->text_edit->centerCursor();
+      d->last_block = next_block;
+
+    // The line on which we last clicked is likely visible. Don't center us on
+    // the target cursor.
+    } else {
+      d->text_edit->setTextCursor(text_cursor);
+    }
 
     if (opt_end.has_value()) {
       text_cursor.setPosition(opt_end.value(), QTextCursor::MoveMode::KeepAnchor);
@@ -222,8 +232,10 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
     case QEvent::MouseButtonPress:
       if (obj == d->text_edit->viewport()) {
         auto mouse_event = dynamic_cast<QMouseEvent *>(event);
+        QTextCursor cursor = d->text_edit->textCursor();
         d->last_press_version = d->version;
-        d->last_press_position = d->text_edit->textCursor().position();
+        d->last_press_position = cursor.position();
+        d->last_block = cursor.block().blockNumber();
         OnTextEditViewportMouseButtonPress(mouse_event);
       }
       break;
@@ -268,6 +280,7 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
       if (auto wheel_event = dynamic_cast<QWheelEvent *>(event);
           obj == d->text_edit->viewport() &&
           (wheel_event->modifiers() & Qt::ControlModifier) != 0) {
+        d->last_block = -1;
         OnTextEditTextZoom(wheel_event);
       }
       break;
@@ -783,6 +796,7 @@ void CodeView::HighlightTokensForRelatedEntityID(
 
 void CodeView::OnModelReset() {
   d->version++;
+  d->last_block = -1;
   d->search_widget->Deactivate();
   d->go_to_line_widget->Deactivate();
   d->opt_prev_hovered_model_index.reset();
