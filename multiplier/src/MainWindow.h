@@ -58,19 +58,37 @@ class MainWindow final : public QMainWindow {
   GetOrCreateFileCodeView(RawEntityId file_id,
                           std::optional<QString> opt_tab_name = std::nullopt);
 
-  void UpdateHistoryMenus();
-  void AddToHistory(const std::optional<RawEntityId> &opt_file_id,
-                    const std::optional<RawEntityId> &opt_entity_id);
+  void AboutToChangeToCodeView(QWidget *next_tab);
 
-  void NavigateToHistoryItem(History::ItemList::iterator item_it);
+  void UpdateHistoryMenus();
+
+  void UpdateCurrentCodeTabLocation(QVariant entity_id);
+
+  static std::optional<QString> HistoryLabel(
+      const FileLocationCache &file_location_cache,
+      const VariantEntity &entity);
+
+  void AddToHistory(QVariant entity_id);
+
+  void NavigateBackToHistoryItem(History::ItemList::iterator item_it);
+  void NavigateForwardToHistoryItem(History::ItemList::iterator item_it);
+
+  void OnTokenTriggered(const ICodeView::TokenAction &token_action,
+                        const CodeModelIndex &index);
 
  private slots:
   void OnIndexViewFileClicked(RawEntityId file_id, QString file_name,
                               Qt::KeyboardModifiers modifiers,
                               Qt::MouseButtons buttons);
 
-  void OnTokenTriggered(const ICodeView::TokenAction &token_action,
-                        const CodeModelIndex &index);
+  void OnMainCodeViewTokenTriggered(const ICodeView::TokenAction &token_action,
+                                    const CodeModelIndex &index);
+
+  void OnMainCodeViewCursorMoved(const CodeModelIndex &index);
+
+  void OnPreviewCodeViewTokenTriggered(
+      const ICodeView::TokenAction &token_action,
+      const CodeModelIndex &index);
 
   void OnReferenceExplorerItemActivated(const QModelIndex &index);
 
@@ -82,11 +100,13 @@ class MainWindow final : public QMainWindow {
   void OnReferenceExplorerTabBarClose(int index);
   void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
+  void OnCodeViewTabClicked(int index);
   void OnEntityExplorerEntityClicked(RawEntityId entity_id);
 
   void OnNavigateBack();
   void OnNavigateForward();
-  void OnNavigateToHistoryItem(QAction *action);
+  void OnNavigateBackToHistoryItem(QAction *action);
+  void OnNavigateForwardToHistoryItem(QAction *action);
 };
 
 }  // namespace mx::gui

@@ -15,19 +15,23 @@ namespace mx::gui {
 
 struct History final {
   struct Item final {
-    RawEntityId file_id{};
-    std::optional<RawEntityId> opt_entity_id{};
+    RawEntityId entity_id{kInvalidEntityId};
     QString name;
   };
 
   using ItemList = std::list<Item>;
 
   ItemList item_list;
+
+  // NOTE(pag): Normally, this points to `item_list.end()`, meaning that
+  //            everything in `item_list` is "in our past." We don't have an
+  //            active item that tracks our current location because that is
+  //            actively maintained by a property of the currently active
+  //            file code tab.
   ItemList::iterator current_item_it{};
 
-  History() {
-    current_item_it = item_list.end();
-  }
+  inline History(void)
+      : current_item_it(item_list.end()) {}
 };
 
 }  // namespace mx::gui
