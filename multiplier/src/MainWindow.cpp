@@ -512,10 +512,10 @@ void MainWindow::UpdateHistoryMenus() {
   for (QToolButton *button :
        {d->toolbar.history_back_button, d->toolbar.history_forward_button}) {
 
-    QMenu *menu = button->menu();
-    button->setMenu(nullptr);
-
-    menu->deleteLater();
+    if (QMenu *menu = button->menu()) {
+      button->setMenu(nullptr);
+      menu->deleteLater();
+    }
   }
 
   QMenu *history_back_menu = new QMenu(tr("Previous history menu"));
@@ -636,6 +636,15 @@ std::optional<QString> MainWindow::HistoryLabel(
 
   if (std::holds_alternative<Token>(entity)) {
 
+    // Due to the nature of cursor setting in code views, it's possible that
+    // our history stores more token IDs rather than entity IDs. If we can match
+    // a token to be the "location" of the an entity, then use that entity's
+    // name in our label.
+    if (VariantEntity related_entity = std::get<Token>(entity).related_entity();
+        file_loc == FirstFileToken(related_entity)) {
+      entity_label = NameOfEntity(related_entity);
+    }
+
   } else if (std::holds_alternative<Decl>(entity)) {
     entity_label = NameOfEntity(entity);
 
@@ -654,7 +663,8 @@ std::optional<QString> MainWindow::HistoryLabel(
 
   QString label = file_label + line_col_label;
   if (entity_label.has_value() && !entity_label->isEmpty()) {
-    if (in_label.has_value() && !in_label->isEmpty()) {
+    if (in_label.has_value() && !in_label->isEmpty() &&
+        in_label.value() != entity_label.value()) {
       label = entity_label.value() + tr(" at ") + label + tr(" in ") +
               in_label.value();
     } else {
