@@ -30,7 +30,7 @@ class CodeView final : public ICodeView {
 
  public:
   //! \copybrief ICodeView::Model
-  virtual ICodeModel *Model() override;
+  virtual ICodeModel *Model(void) override;
 
   //! \copybrief ICodeView::SetTheme
   virtual void SetTheme(const CodeViewTheme &theme) override;
@@ -39,23 +39,23 @@ class CodeView final : public ICodeView {
   virtual void SetTabWidth(std::size_t width) override;
 
   //! Destructor
-  virtual ~CodeView() override;
+  virtual ~CodeView(void) override;
 
   //! \copybrief ICodeView::GetCursorPosition
-  virtual int GetCursorPosition() const override;
+  virtual int GetCursorPosition(void) const override;
 
   //! \copybrief ICodeView::SetCursorPosition
   virtual bool SetCursorPosition(int start,
-                                 std::optional<int> opt_end) const override;
+                                 std::optional<int> opt_end) override;
 
   //! \copybrief ICodeView::Text
-  virtual QString Text() const override;
+  virtual QString Text(void) const override;
 
   //! \copybrief ICodeView::SetWordWrapping
   virtual void SetWordWrapping(bool enabled) override;
 
   //! Scrolls the view to the specified entity id
-  virtual bool ScrollToLineNumber(unsigned line) const override;
+  virtual bool ScrollToLineNumber(unsigned line) override;
 
  protected:
   //! Constructor
@@ -72,7 +72,7 @@ class CodeView final : public ICodeView {
   void InstallModel(ICodeModel *model);
 
   //! Initializes all the widgets in this component
-  void InitializeWidgets();
+  void InitializeWidgets(void);
 
   //! Returns the code model index for the token at the given coordinates
   std::optional<CodeModelIndex>
@@ -91,13 +91,13 @@ class CodeView final : public ICodeView {
   void OnTextEditTextZoom(QWheelEvent *event);
 
   //! Updates the tab stop distance based on the current font/settings
-  void UpdateTabStopDistance();
+  void UpdateTabStopDistance(void);
 
   //! Updates the gutter's minimum width based on the highest line number
-  void UpdateGutterWidth();
+  void UpdateGutterWidth(void);
 
   // Reapplies token group colors using the QPlainTextEdit extra selections
-  void UpdateTokenGroupColors();
+  void UpdateTokenGroupColors(void);
 
  public:
   //! Contains all the tokens that we have imported from the model
@@ -178,12 +178,15 @@ class CodeView final : public ICodeView {
       const CodeViewTheme &theme);
 
  private slots:
+  // Connect the cursor changed event.
+  void ConnectCursorChangeEvent(void);
+
   //! This slot regenerates the code view contents using CreateTextDocument
-  void OnModelReset();
+  void OnModelReset(void);
 
   //! This slot receives tells us when a request for a model reset is was
   //! skipped because the current model is already the right model to use.
-  void OnModelResetDone();
+  void OnModelResetDone(void);
 
   //! Repaints the line numbers on the gutter
   void OnGutterPaintEvent(QPaintEvent *event);
@@ -199,7 +202,7 @@ class CodeView final : public ICodeView {
   void OnShowSearchResult(const std::size_t &result_index);
 
   //! Called by the go-to-line QShortcut
-  void OnGoToLineTriggered();
+  void OnGoToLineTriggered(void);
 
   //! Called by the GoToLineWidget when a valid line number has been requested
   void OnGoToLine(unsigned line_number);
