@@ -71,3 +71,14 @@ target_link_libraries("Multiplier"
 
 enable_qt_properties("Multiplier")
 enable_appbundle_postbuild_steps("Multiplier")
+
+if(MXQT_ENABLE_INSTALL)
+  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/opt/multiplier" CACHE PATH "" FORCE)
+  endif()
+
+  install(
+    TARGETS "Multiplier"
+    DESTINATION "."
+  )
+endif()

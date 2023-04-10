@@ -6,8 +6,4 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_subdirectory("doctest")
-add_subdirectory("multiplier")
-add_subdirectory("qt")
-add_subdirectory("phantomstyle")
-add_subdirectory("vendored")
+set(QTMULTIPLIER_VERSION "1.0.4")
