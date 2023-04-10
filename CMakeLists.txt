@@ -12,7 +12,7 @@ include("cmake/ccache.cmake")
 
 project(qt-multiplier CXX)
 
-include("cmake/ccache.cmake")
+include("cmake/version.cmake")
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
 include("cmake/build_flags.cmake")
@@ -25,3 +25,11 @@ endif()
 add_subdirectory("libraries")
 add_subdirectory("components")
 add_subdirectory("multiplier")
+
+if(MXQT_ENABLE_INSTALL)
+  install(
+    FILES "LICENSE"
+    DESTINATION "control"
+    RENAME "LICENSE.txt"
+  )
+endif()

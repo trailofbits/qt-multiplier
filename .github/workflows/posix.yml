@@ -102,8 +102,11 @@ jobs:
         run: |
           mkdir build_vendored
 
-          mkdir install
-          echo "INSTALL_DIRECTORY=$(pwd)/install" >> $GITHUB_ENV
+          mkdir multiplier_install
+          echo "MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/multiplier_install" >> $GITHUB_ENV
+
+          mkdir qt_multiplier_install
+          echo "QT_MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/qt_multiplier_install" >> $GITHUB_ENV
 
       - name: Build weggli-native
         run: |
@@ -111,7 +114,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIRECTORY}" \
+            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
             -DVCPKG_HOST_TRIPLET=x64-osx-rel \
@@ -131,7 +134,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIRECTORY}" \
+            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
             -DVCPKG_HOST_TRIPLET=x64-osx-rel \
@@ -153,7 +156,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIRECTORY}" \
+            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -DVCPKG_ROOT="${VCPKG_ROOT}" \
             -DVCPKG_MANIFEST_MODE=OFF \
             -DCMAKE_C_COMPILER=$(which clang) \
@@ -177,7 +180,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIRECTORY}" \
+            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
             -DVCPKG_HOST_TRIPLET=x64-osx-rel \
@@ -202,13 +205,13 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIRECTORY}" \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
             -DVCPKG_HOST_TRIPLET=x64-osx-rel \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DMXQT_ENABLE_TESTS=true \
+            -DCMAKE_PREFIX_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -S . \
             -B build_qtmultiplier
 
@@ -216,11 +219,43 @@ jobs:
             --build build_qtmultiplier \
             -j $(sysctl -n hw.ncpu)
 
+          export DESTDIR="${QT_MULTIPLIER_INSTALL_DIRECTORY}"
+
+          cmake \
+            --build build_qtmultiplier \
+            --target install
+
       - name: Run the qt-multiplier tests
         run: |
           cmake \
             --build build_qtmultiplier \
             --target test
+
+      - name: Create the DMG package
+        id: dmg_package
+        run: |
+          cmake \
+            -S package \
+            -B package-build \
+            -DQT_MULTIPLIER_DATA_PATH="${QT_MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DMULTIPLIER_DATA_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DCPACK_GENERATOR=DragNDrop
+
+          cmake \
+            --build package-build \
+            --target package
+
+          rel_package_path="$(ls package-build/*.dmg)"
+          package_name="$(basename ${rel_package_path})"
+
+          echo "PATH=${rel_package_path}" >> $GITHUB_OUTPUT
+          echo "NAME=${package_name}" >> $GITHUB_OUTPUT
+
+      - name: Upload the DMG package
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.dmg_package.outputs.NAME }}
+          path: ${{ steps.dmg_package.outputs.PATH }}
 
       - name: Generate the sample database file
         run: |
@@ -233,7 +268,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=true
 
-          "${INSTALL_DIRECTORY}/bin/mx-index" \
+          "${MULTIPLIER_INSTALL_DIRECTORY}/bin/mx-index" \
             --target "build_ubpf/compile_commands.json" \
             --db /tmp/iovisor_ubpf.mx
 
@@ -241,26 +276,8 @@ jobs:
             /tmp/iovisor_ubpf.mx \
             .
 
-      - name: Create the .tar.gz package
-        run: |
-          cd "build_qtmultiplier/multiplier"
-          tar pcvzf Multiplier.app.tar.gz Multiplier.app
-
-      - name: Upload the .tar.gz package
-        uses: actions/upload-artifact@v3
-        with:
-          name: Multiplier.app.tar.gz
-          path: "build_qtmultiplier/multiplier/Multiplier.app.tar.gz"
-
-      - name: Package the sample database
-        run: |
-          zip \
-            -r9 \
-            iovisor_ubpf.mx.zip \
-            iovisor_ubpf.mx
-
       - name: Upload the sample database
         uses: actions/upload-artifact@v3
         with:
-          name: iovisor_ubpf.mx.zip
-          path: "iovisor_ubpf.mx.zip"
+          name: iovisor_ubpf.mx
+          path: iovisor_ubpf.mx

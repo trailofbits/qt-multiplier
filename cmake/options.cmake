@@ -8,3 +8,5 @@
 
 option(MXQT_ENABLE_TESTS "Set to true to enable tests" true)
 option(MXQT_ENABLE_MACDEPLOYQT "Set to true to build portable binaries" true)
+option(MXQT_ENABLE_INSTALL "Set to true to enable the install directives" true)
+option(MXQT_GENERATE_LIBRARY_MANIFEST "Set to true to generate the library manifest" true)
