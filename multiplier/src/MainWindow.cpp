@@ -607,8 +607,6 @@ void MainWindow::UpdateCurrentCodeTabLocation(QVariant entity_id) {
   if (entity_id.isValid()) {
     QTabWidget *tab_widget = static_cast<QTabWidget *>(centralWidget());
     if (QWidget *code_tab = tab_widget->currentWidget()) {
-      qDebug() << "Setting tab" << tab_widget->tabText(tab_widget->currentIndex())
-               << "location to" << qvariant_cast<RawEntityId>(entity_id);
       code_tab->setProperty(kLastLocationProperty, entity_id);
     }
   }
@@ -745,9 +743,6 @@ void MainWindow::AddToHistory(QVariant opt_entity_id) {
   } else if (!items.empty() && items.back().entity_id == entity_id) {
     return;
   }
-
-  qDebug() << "Adding" << maybe_label.value() << "for" << entity_id
-           << "to history";
 
   // Add the new item.
   items.emplace_back(
