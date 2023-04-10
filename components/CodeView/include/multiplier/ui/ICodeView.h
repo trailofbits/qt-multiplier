@@ -87,8 +87,7 @@ class ICodeView : public QWidget {
 
   //! Sets the new cursor position, returning false in case of an error
   virtual bool
-  SetCursorPosition(int start,
-                    std::optional<int> opt_end = std::nullopt) const = 0;
+  SetCursorPosition(int start, std::optional<int> opt_end = std::nullopt) = 0;
 
   //! Returns the current code view contents in plain text format
   virtual QString Text() const = 0;
@@ -97,7 +96,7 @@ class ICodeView : public QWidget {
   virtual void SetWordWrapping(bool enabled) = 0;
 
   //! Scrolls the view to the specified entity id
-  virtual bool ScrollToLineNumber(unsigned line) const = 0;
+  virtual bool ScrollToLineNumber(unsigned line) = 0;
 
   //! Disable the copy constructor
   ICodeView(const ICodeView &) = delete;

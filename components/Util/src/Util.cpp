@@ -93,6 +93,39 @@ Token FirstFileToken(const VariantEntity &ent) {
   return FileTokens(ent).front();
 }
 
+//! Return the named declaration containing `thing`, or `NotAnEntity`.
+VariantEntity NamedDeclContaining(const VariantEntity &ent) {
+  const auto VariantEntityVisitor = Overload{
+      [](const Decl &entity) { return NamedDeclContaining(entity); },
+      [](const Stmt &entity) { return NamedDeclContaining(entity); },
+      [](const Token &entity) { return NamedDeclContaining(entity); },
+      [](const Macro &entity) -> VariantEntity {
+        for (Token tok : entity.root().generate_use_tokens()) {
+          if (auto cont = NamedDeclContaining(tok);
+              !std::holds_alternative<NotAnEntity>(cont)) {
+            return cont;
+          }
+        }
+        return NotAnEntity{};
+      },
+      [](const auto &entity) -> VariantEntity {
+        for (Token tok : entity.tokens()) {
+          if (auto cont = NamedDeclContaining(tok);
+              !std::holds_alternative<NotAnEntity>(cont)) {
+            return cont;
+          }
+        }
+        return NotAnEntity{};
+      },
+      [](const Fragment &) -> VariantEntity { return NotAnEntity{}; },
+      [](const File &) -> VariantEntity { return NotAnEntity{}; },
+      [](const Type &) -> VariantEntity { return NotAnEntity{}; },
+      [](const TemplateArgument &) -> VariantEntity { return NotAnEntity{}; },
+      [](const NotAnEntity &) -> VariantEntity { return NotAnEntity{}; }
+  };
+  return std::visit<VariantEntity>(VariantEntityVisitor, ent);
+}
+
 //! Return the entity ID associated with `ent`.
 RawEntityId IdOfEntity(const VariantEntity &ent) {
   const auto VariantEntityVisitor =
@@ -160,14 +193,14 @@ std::optional<QString> NameOfEntity(const VariantEntity &ent) {
 
       [](const File &file) -> std::optional<QString> {
         for (std::filesystem::path path : file.paths()) {
-          return QString::fromStdString(path.generic_string());
+          return QString::fromStdString(path.filename().generic_string());
         }
         return std::nullopt;
       },
 
-      [](const Token &token) -> std::optional<QString> {
-        return QString::fromUtf8(token.data().data(),
-                                 static_cast<qsizetype>(token.data().size()));
+      [] (const Token &token) -> std::optional<QString> {
+        std::string_view d = token.data();
+        return QString::fromUtf8(d.data(), static_cast<qsizetype>(d.size()));
       },
 
       [](auto) -> std::optional<QString> { return std::nullopt; }};

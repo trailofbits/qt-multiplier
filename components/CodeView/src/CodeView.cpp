@@ -31,6 +31,7 @@
 #include <QWheelEvent>
 #include <QRegularExpression>
 #include <QShortcut>
+#include <QTimer>
 
 #include <unordered_set>
 #include <vector>
@@ -53,8 +54,15 @@ class QPlainTextEditMod final : public QPlainTextEdit {
 struct CodeView::PrivateData final {
   ICodeModel *model{nullptr};
 
+  int version{0};
+  int last_press_version{-1};
+  int last_press_position{-1};
+  int last_block{-1};
+
   QPlainTextEditMod *text_edit{nullptr};
   QWidget *gutter{nullptr};
+
+  QMetaObject::Connection cursor_change_signal;
 
   ISearchWidget *search_widget{nullptr};
   std::vector<std::pair<int, int>> search_result_list;
@@ -108,7 +116,8 @@ int CodeView::GetCursorPosition() const {
   return text_cursor.position();
 }
 
-bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) const {
+bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
+  d->version++;
 
   auto text_cursor = d->text_edit->textCursor();
   text_cursor.movePosition(QTextCursor::End);
@@ -118,21 +127,34 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) const {
     return false;
   }
 
+  StopCursorTracking();
+
   text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
 
-  // We want to change the scroll in the viewport, so move us to the end of the
-  // document (trick from StackOverflow), then back to the text cursor, then
-  // center on the cursor.
-  d->text_edit->moveCursor(QTextCursor::End);
-  d->text_edit->setTextCursor(text_cursor);
-  d->text_edit->ensureCursorVisible();
-  d->text_edit->centerCursor();
+  // We want to change the scroll in the viewport, so move us to the end of
+  // the document (trick from StackOverflow), then back to the text cursor,
+  // then center on the cursor.
+  if (auto next_block = text_cursor.block().blockNumber();
+      next_block != d->last_block) {
+    d->text_edit->moveCursor(QTextCursor::End);
+    d->text_edit->setTextCursor(text_cursor);
+    d->text_edit->ensureCursorVisible();
+    d->text_edit->centerCursor();
+    d->last_block = next_block;
+
+  // The line on which we last clicked is likely visible. Don't center us on
+  // the target cursor.
+  } else {
+    d->text_edit->setTextCursor(text_cursor);
+  }
 
   if (opt_end.has_value()) {
     text_cursor.setPosition(opt_end.value(), QTextCursor::MoveMode::KeepAnchor);
     d->text_edit->setTextCursor(text_cursor);
   }
 
+  OnCursorMoved();
+  ResumeCursorTracking();
   return true;
 }
 
@@ -145,7 +167,9 @@ void CodeView::SetWordWrapping(bool enabled) {
                                         : QTextOption::NoWrap);
 }
 
-bool CodeView::ScrollToLineNumber(unsigned line) const {
+bool CodeView::ScrollToLineNumber(unsigned line) {
+  d->deferred_scroll_to_line.reset();
+
   if (!d->model->IsReady()) {
     d->deferred_scroll_to_line = line;
     return false;
@@ -178,58 +202,81 @@ CodeView::CodeView(ICodeModel *model, QWidget *parent)
 }
 
 bool CodeView::eventFilter(QObject *obj, QEvent *event) {
-  if (event->type() == QEvent::Paint) {
-    auto paint_event = static_cast<QPaintEvent *>(event);
+  //if (dynamic_cast<QMouseEvent *>(event) && obj == d->text_edit->viewport()) {
+  //  qDebug() << "eventFilter" << event->type()
+  //           << d->text_edit->textCursor().position();
+  //}
 
-    if (obj == d->gutter) {
-      OnGutterPaintEvent(paint_event);
-      return true;
-    }
+  switch (event->type()) {
+    case QEvent::Paint:
+      if (obj == d->gutter) {
+        OnGutterPaintEvent(dynamic_cast<QPaintEvent *>(event));
+        return true;
+      }
+      break;
+    case QEvent::MouseMove:
+      if (obj == d->text_edit->viewport()) {
+        OnTextEditViewportMouseMoveEvent(dynamic_cast<QMouseEvent *>(event));
+      }
+      break;
+    case QEvent::MouseButtonPress:
+      if (obj == d->text_edit->viewport()) {
+        auto mouse_event = dynamic_cast<QMouseEvent *>(event);
+        QTextCursor cursor = d->text_edit->textCursor();
+        d->last_press_version = d->version;
+        d->last_press_position = cursor.position();
+        d->last_block = cursor.block().blockNumber();
+        OnTextEditViewportMouseButtonPress(mouse_event);
+      }
+      break;
+    case QEvent::MouseButtonRelease:
+      if (obj == d->text_edit->viewport()) {
+        auto prev_version = d->last_press_version;
+        auto prev_position = d->last_press_position;
+        d->last_press_version = -1;
+        d->last_press_position = -1;
 
-    return false;
+        // If between the last press and now the "cursor version" changed, i.e.
+        // external code forced us to scroll to a different line, or the model
+        // was reset, then ignore the mouse release.
+        if (prev_version != d->version) {
+          event->ignore();
 
-  } else if (event->type() == QEvent::MouseMove) {
-    auto mouse_event = static_cast<QMouseEvent *>(event);
+          // Sometimes a model reset as a reuslt of a mouse press triggers a
+          // selection of everything from the beginning of the text to where
+          // the cursor is upon mouse press release (usually following a minor
+          // mouse move). If we observe a selection at this point, and if the
+          // beginning or ending of the selection matches our pre-model reset
+          // position, then the position must still be valid, and so we'll move
+          // the cursor back to where it was.
+          QTextCursor cursor = d->text_edit->textCursor();
+          if (cursor.selectionStart() != cursor.selectionEnd() &&
+              (prev_position == cursor.selectionStart() ||
+               prev_position == cursor.selectionEnd())) {
 
-    if (obj == d->text_edit->viewport()) {
-      OnTextEditViewportMouseMoveEvent(mouse_event);
-      return false;
-    }
-
-    return false;
-
-  } else if (event->type() == QEvent::MouseButtonPress) {
-    auto mouse_event = static_cast<QMouseEvent *>(event);
-
-    if (obj == d->text_edit->viewport()) {
-      OnTextEditViewportMouseButtonPress(mouse_event);
-      return false;
-    }
-
-    return false;
-
-  } else if (event->type() == QEvent::KeyPress) {
-    auto key_event = static_cast<QKeyEvent *>(event);
-
-    if (obj == d->text_edit) {
-      OnTextEditViewportKeyboardButtonPress(key_event);
-      return false;
-    }
-
-    return false;
-
-  } else if (event->type() == QEvent::Wheel) {
-    auto wheel_event = static_cast<QWheelEvent *>(event);
-
-    if (obj == d->text_edit->viewport() &&
-        (wheel_event->modifiers() & Qt::ControlModifier) != 0) {
-
-      OnTextEditTextZoom(wheel_event);
-    }
-
-    return false;
+            SetCursorPosition(prev_position, std::nullopt);
+          }
+          return true;
+        }
+      }
+      break;
+    case QEvent::KeyPress:
+      if (obj == d->text_edit) {
+        auto key_event = dynamic_cast<QKeyEvent *>(event);
+        OnTextEditViewportKeyboardButtonPress(key_event);
+      }
+      break;
+    case QEvent::Wheel:
+      if (auto wheel_event = dynamic_cast<QWheelEvent *>(event);
+          obj == d->text_edit->viewport() &&
+          (wheel_event->modifiers() & Qt::ControlModifier) != 0) {
+        d->last_block = -1;
+        OnTextEditTextZoom(wheel_event);
+      }
+      break;
+    default:
+      break;
   }
-
   return false;
 }
 
@@ -254,11 +301,10 @@ void CodeView::InitializeWidgets() {
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
 
-  connect(d->text_edit, &QPlainTextEditMod::updateRequest, this,
-          &CodeView::OnTextEditUpdateRequest);
+  connect(d->text_edit, &QPlainTextEditMod::updateRequest,
+          this, &CodeView::OnTextEditUpdateRequest);
 
-  connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged, this,
-          &CodeView::OnCursorMoved);
+  ConnectCursorChangeEvent();
 
   // Gutter
   d->gutter = new QWidget();
@@ -266,11 +312,11 @@ void CodeView::InitializeWidgets() {
 
   // Search widget
   d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Search, this);
-  connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
-          &CodeView::OnSearchParametersChange);
+  connect(d->search_widget, &ISearchWidget::SearchParametersChanged,
+          this, &CodeView::OnSearchParametersChange);
 
-  connect(d->search_widget, &ISearchWidget::ShowSearchResult, this,
-          &CodeView::OnShowSearchResult);
+  connect(d->search_widget, &ISearchWidget::ShowSearchResult,
+          this, &CodeView::OnShowSearchResult);
 
   // Layout for the gutter and code view
   auto code_layout = new QHBoxLayout();
@@ -304,6 +350,23 @@ void CodeView::InitializeWidgets() {
   // This will also cause a model reset update
   static const auto kRequestDarkTheme{true};
   SetTheme(GetDefaultCodeViewTheme(kRequestDarkTheme));
+}
+
+//! Disable cursor change tracking.
+void CodeView::StopCursorTracking(void) {
+  disconnect(d->cursor_change_signal);
+}
+
+//! Re-introduce cursor change tracking.
+void CodeView::ResumeCursorTracking(void) {
+  QTimer::singleShot(200, this, &CodeView::ConnectCursorChangeEvent);
+}
+
+// Connect the cursor changed event.
+void CodeView::ConnectCursorChangeEvent(void) {
+  d->cursor_change_signal =
+      connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged,
+              this, &CodeView::OnCursorMoved);
 }
 
 std::optional<CodeModelIndex>
@@ -732,6 +795,8 @@ void CodeView::HighlightTokensForRelatedEntityID(
 }
 
 void CodeView::OnModelReset() {
+  d->version++;
+  d->last_block = -1;
   d->search_widget->Deactivate();
   d->go_to_line_widget->Deactivate();
   d->opt_prev_hovered_model_index.reset();
@@ -775,7 +840,6 @@ void CodeView::OnModelResetDone() {
   // at the time of the request, then enact the scroll now.
   if (d->deferred_scroll_to_line.has_value()) {
     ScrollToLineNumber(d->deferred_scroll_to_line.value());
-    d->deferred_scroll_to_line.reset();
   }
 
   emit DocumentChanged();

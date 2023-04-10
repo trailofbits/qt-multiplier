@@ -6,10 +6,12 @@
 
 #pragma once
 
-#include <multiplier/Index.h>
+#include "Types.h"
 
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IReferenceExplorerModel.h>
+
+#include <multiplier/Index.h>
 
 #include <QMainWindow>
 #include <QMimeData>
@@ -33,6 +35,7 @@ class MainWindow final : public QMainWindow {
   std::unique_ptr<PrivateData> d;
 
   void InitializeWidgets();
+  void InitializeToolBar();
   void CreateProjectExplorerDock();
   void CreateEntityExplorerDock();
   void CreateInfoExplorerDock();
@@ -41,7 +44,7 @@ class MainWindow final : public QMainWindow {
   void CreateCodeView();
   void OpenEntityRelatedToToken(const CodeModelIndex &index);
   void OpenEntityCode(RawEntityId entity_id);
-  void OpenEntityInfo(RawEntityId entity_id, bool force=false);
+  void OpenEntityInfo(RawEntityId entity_id, bool force = false);
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
   void OpenTokenTaintExplorer(CodeModelIndex index);
@@ -55,6 +58,21 @@ class MainWindow final : public QMainWindow {
   GetOrCreateFileCodeView(RawEntityId file_id,
                           std::optional<QString> opt_tab_name = std::nullopt);
 
+  void AboutToChangeToCodeView(QWidget *next_tab);
+
+  void UpdateHistoryMenus();
+
+  void UpdateCurrentCodeTabLocation(QVariant entity_id);
+
+  static std::optional<QString> HistoryLabel(
+      const FileLocationCache &file_location_cache,
+      const VariantEntity &entity);
+
+  void AddToHistory(QVariant entity_id);
+
+  void NavigateBackToHistoryItem(History::ItemList::iterator item_it);
+  void NavigateForwardToHistoryItem(History::ItemList::iterator item_it);
+
  private slots:
   void OnIndexViewFileClicked(RawEntityId file_id, QString file_name,
                               Qt::KeyboardModifiers modifiers,
@@ -62,6 +80,8 @@ class MainWindow final : public QMainWindow {
 
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
                         const CodeModelIndex &index);
+
+  void OnMainCodeViewCursorMoved(const CodeModelIndex &index);
 
   void OnReferenceExplorerItemActivated(const QModelIndex &index);
 
@@ -73,7 +93,13 @@ class MainWindow final : public QMainWindow {
   void OnReferenceExplorerTabBarClose(int index);
   void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
+  void OnCodeViewTabClicked(int index);
   void OnEntityExplorerEntityClicked(RawEntityId entity_id);
+
+  void OnNavigateBack();
+  void OnNavigateForward();
+  void OnNavigateBackToHistoryItem(QAction *action);
+  void OnNavigateForwardToHistoryItem(QAction *action);
 };
 
 }  // namespace mx::gui

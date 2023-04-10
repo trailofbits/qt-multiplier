@@ -5,37 +5,61 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MainWindow.h"
-
-#include <multiplier/Entities/StmtKind.h>
-#include <multiplier/ui/IIndexView.h>
-#include <multiplier/ui/IReferenceExplorer.h>
-#include <multiplier/ui/IEntityExplorer.h>
-#include <multiplier/ui/Util.h>
-
-#include <QDockWidget>
-#include <QTreeView>
-#include <QFileDialog>
-#include <QDir>
-#include <QTabWidget>
-#include <QMenu>
-#include <QMenuBar>
-#include <QSortFilterProxyModel>
-#include <QCursor>
-#include <QSplitter>
-#include <QTabBar>
-
 #include "InformationExplorer.h"
 #include "PreviewableReferenceExplorer.h"
 #include "QuickReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
 
+#include <multiplier/ui/IIndexView.h>
+#include <multiplier/ui/IReferenceExplorer.h>
+#include <multiplier/ui/IEntityExplorer.h>
+#include <multiplier/ui/Util.h>
+#include <multiplier/ui/Assert.h>
+#include <multiplier/ui/IDatabase.h>
+
+#include <multiplier/Entities/StmtKind.h>
+
+#include <QDockWidget>
+#include <QFileDialog>
+#include <QDir>
+#include <QTabWidget>
+#include <QMenu>
+#include <QCursor>
+#include <QTabBar>
+#include <QToolBar>
+#include <QMenuBar>
+#include <QToolButton>
+
 namespace mx::gui {
 
 namespace {
 
+const std::size_t kMaxHistorySize{30};
+
+//! The file id associated with a code view.
+static const char *kFileIdProperty = "mx:fileId";
+
+//! The last cursor location in a code view.
+static const char *kLastLocationProperty = "mx:lastLocation";
+
+static const char * const kBackButtonToolTip =
+    "Go back in the navigation history";
+
+static const char * const kForwardButtonToolTip =
+    "Go forward in the navigation history";
+
+
 struct CodeViewContextMenu final {
   QMenu *menu{nullptr};
   QAction *show_ref_explorer_action{nullptr};
+};
+
+struct ToolBar final {
+  QAction *history_back_action{nullptr};
+  QAction *history_forward_action{nullptr};
+
+  QToolButton *history_back_button{nullptr};
+  QToolButton *history_forward_button{nullptr};
 };
 
 }  // namespace
@@ -43,6 +67,8 @@ struct CodeViewContextMenu final {
 struct MainWindow::PrivateData final {
   mx::Index index;
   mx::FileLocationCache file_location_cache;
+
+  IDatabase::Ptr database;
 
   IIndexView *index_view{nullptr};
   IEntityExplorer *entity_explorer{nullptr};
@@ -65,6 +91,8 @@ struct MainWindow::PrivateData final {
   bool info_explorer_opened_before{false};
 
   QMenu *view_menu{nullptr};
+  ToolBar toolbar;
+  History history;
 };
 
 MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
@@ -77,7 +105,11 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
   d->index = mx::EntityProvider::in_memory_cache(
       mx::EntityProvider::from_database(database_path.toStdString()));
 
+  d->database = IDatabase::Create(d->index, d->file_location_cache);
+
   InitializeWidgets();
+  InitializeToolBar();
+
   resize(1280, 800);
 }
 
@@ -103,12 +135,56 @@ void MainWindow::InitializeWidgets() {
   setDocumentMode(false);
 }
 
+void MainWindow::InitializeToolBar() {
+  d->toolbar.history_back_action = new QAction(tr("Back"), this);
+  d->toolbar.history_forward_action = new QAction(tr("Forward"), this);
+
+  d->toolbar.history_back_action->setToolTip(tr(kBackButtonToolTip));
+  d->toolbar.history_forward_action->setToolTip(tr(kForwardButtonToolTip));
+
+  d->toolbar.history_back_button = new QToolButton(this);
+  d->toolbar.history_back_button->setPopupMode(QToolButton::MenuButtonPopup);
+  d->toolbar.history_back_button->setDefaultAction(
+      d->toolbar.history_back_action);
+
+  d->toolbar.history_forward_button = new QToolButton(this);
+  d->toolbar.history_forward_button->setPopupMode(QToolButton::MenuButtonPopup);
+  d->toolbar.history_forward_button->setDefaultAction(
+      d->toolbar.history_forward_action);
+
+  d->toolbar.history_back_button->setIcon(
+      QIcon(":/Icons/MainWindow/HistoryBack"));
+
+  d->toolbar.history_forward_button->setIcon(
+      QIcon(":/Icons/MainWindow/HistoryForward"));
+
+  connect(d->toolbar.history_back_action, &QAction::triggered,
+          this, &MainWindow::OnNavigateBack);
+
+  connect(d->toolbar.history_forward_action, &QAction::triggered,
+          this, &MainWindow::OnNavigateForward);
+
+  auto toolbar = new QToolBar(tr("Main Toolbar"), this);
+  toolbar->setIconSize(QSize(32, 32));
+  d->view_menu->addAction(toolbar->toggleViewAction());
+
+  toolbar->addWidget(d->toolbar.history_back_button);
+  toolbar->addWidget(d->toolbar.history_forward_button);
+
+  addToolBar(toolbar);
+
+  // By default, there is no history, so there is nowhere for these buttons to
+  // navigate.
+  d->toolbar.history_back_button->setEnabled(false);
+  d->toolbar.history_forward_button->setEnabled(false);
+}
+
 void MainWindow::CreateProjectExplorerDock() {
   auto file_tree_model = IFileTreeModel::Create(d->index, this);
   d->index_view = IIndexView::Create(file_tree_model, this);
 
-  connect(d->index_view, &IIndexView::FileClicked, this,
-          &MainWindow::OnIndexViewFileClicked);
+  connect(d->index_view, &IIndexView::FileClicked,
+          this, &MainWindow::OnIndexViewFileClicked);
 
   d->project_explorer_dock = new QDockWidget(tr("Project Explorer"), this);
   d->project_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
@@ -214,6 +290,9 @@ void MainWindow::CreateCodeView() {
 
   connect(tab_widget->tabBar(), &QTabBar::tabCloseRequested,
           this, &MainWindow::OnCodeViewTabBarClose);
+
+  connect(tab_widget->tabBar(), &QTabBar::tabBarClicked,
+          this, &MainWindow::OnCodeViewTabClicked);
 
   auto toggle_word_wrap_action = new QAction(tr("Enable word wrap"));
   toggle_word_wrap_action->setCheckable(true);
@@ -337,7 +416,7 @@ void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
   }
 
   OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var),
-                 true  /* force */);
+                 true /* force */);
 }
 
 void MainWindow::CloseTokenReferenceExplorer() {
@@ -352,47 +431,59 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   auto model = ICodeModel::Create(d->file_location_cache, d->index, this);
   auto code_view = ICodeView::Create(model);
 
+  model->SetEntity(file_entity_id);
+
   code_view->SetWordWrapping(false);
   code_view->setAttribute(Qt::WA_DeleteOnClose);
 
-  auto &central_tab_widget = *static_cast<QTabWidget *>(centralWidget());
-  central_tab_widget.addTab(code_view, tab_name);
+  // Make it so that the initial last location for a given view is the file ID.
+  code_view->setProperty(kLastLocationProperty, file_entity_id);
+  code_view->setProperty(kFileIdProperty, file_entity_id);
 
-  auto tab_count = central_tab_widget.count();
-  central_tab_widget.setCurrentIndex(tab_count - 1);
+  auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
+  central_tab_widget->addTab(code_view, tab_name);
 
   connect(code_view, &ICodeView::TokenTriggered,
           this, &MainWindow::OnTokenTriggered);
 
-  model->SetEntity(file_entity_id);
+  connect(code_view, &ICodeView::CursorMoved,
+          this, &MainWindow::OnMainCodeViewCursorMoved);
+
   return code_view;
+}
+
+//! Tells us that we're about to change to `next_widget` in the central tab
+//! view of code views. If `next_widget` is different than the current widget
+//! then we want to add whatever the last location in it is to the history.
+//!
+//! NOTE(pag): Pass in `nullptr` for `next_widget` to force the last location
+//!            of the current tab into history.
+void MainWindow::AboutToChangeToCodeView(QWidget *next_widget) {
+  QTabWidget *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
+  QWidget *current_widget = central_tab_widget->currentWidget();
+
+  if (!current_widget || current_widget == next_widget) {
+    return;
+  }
+
+  AddToHistory(current_widget->property(kLastLocationProperty));
 }
 
 ICodeView *
 MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
                                     std::optional<QString> opt_tab_name) {
-  ICodeView *tab_code_view = nullptr;
-  ICodeModel *tab_model = nullptr;
-  QTabWidget &tab_widget = *static_cast<QTabWidget *>(centralWidget());
+  QTabWidget *tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
 
-  for (auto i = 0; i < tab_widget.count(); ++i) {
-    tab_code_view = dynamic_cast<ICodeView *>(tab_widget.widget(i));
-    if (!tab_code_view) {
+  for (auto i = 0; i < tab_widget->count(); ++i) {
+    QWidget *nth_widget = tab_widget->widget(i);
+    QVariant tab_file_id = nth_widget->property(kFileIdProperty);
+    if (!tab_file_id.isValid()) {
       continue;
     }
 
-    tab_model = tab_code_view->Model();
-    if (!tab_model) {
-      continue;
+    if (qvariant_cast<RawEntityId>(tab_file_id) == file_id) {
+      return dynamic_cast<ICodeView *>(nth_widget);
     }
-
-    std::optional<RawEntityId> tab_file_id = tab_model->GetEntity();
-    if (!tab_file_id.has_value() || tab_file_id.value() != file_id) {
-      continue;
-    }
-
-    tab_widget.setCurrentWidget(tab_code_view);
-    return tab_code_view;
   }
 
   if (opt_tab_name.has_value()) {
@@ -404,30 +495,343 @@ MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
       continue;
     }
 
-    return CreateNewCodeView(
-        file_id, QString::fromStdString(path.filename().generic_string()));
+    QString tab_name = QString::fromStdString(path.filename().generic_string());
+    return CreateNewCodeView(file_id, tab_name);
   }
 
   return nullptr;
 }
 
+void MainWindow::UpdateHistoryMenus() {
+
+  if (d->history.item_list.empty()) {
+    return;
+  }
+
+  // Seems like updating the existing menus does not always work. Sometimes
+  // they show up out of date when clicking the buttons.
+  //
+  // Create them from scratch for the time being
+  for (QToolButton *button :
+       {d->toolbar.history_back_button, d->toolbar.history_forward_button}) {
+
+    if (QMenu *menu = button->menu()) {
+      button->setMenu(nullptr);
+      menu->deleteLater();
+    }
+  }
+
+  QMenu *history_back_menu = new QMenu(tr("Previous history menu"));
+  connect(history_back_menu, &QMenu::triggered,
+          this, &MainWindow::OnNavigateBackToHistoryItem);
+
+  QMenu *history_forward_menu = new QMenu(tr("Next history menu"));
+  connect(history_forward_menu, &QMenu::triggered,
+          this, &MainWindow::OnNavigateForwardToHistoryItem);
+
+  int num_back_actions = 0;
+  int num_forward_actions = 0;
+  int item_index = 0;
+
+  // Populate everything up to the current item in the back button sub-menu.
+  std::vector<QAction *> back_history_action_list;
+  for (auto item_it = d->history.item_list.begin();
+       item_it != d->history.current_item_it; ++item_it) {
+
+    const History::Item &item = *item_it;
+    QAction *action = new QAction(item.name);
+    action->setData(item_index++);
+
+    back_history_action_list.push_back(action);
+    ++num_back_actions;
+  }
+
+  // NOTE(pag): Reverse the order of actions order so that the first added
+  //            action, which will be triggered on button click, also
+  //            corresponds to the most recent thing in the past.
+  std::reverse(back_history_action_list.begin(),
+               back_history_action_list.end());
+  for (QAction *action : back_history_action_list) {
+    history_back_menu->addAction(action);
+  }
+
+  // Populate everything after the current item into the forward button
+  // sub-menu.
+  if (d->history.current_item_it != d->history.item_list.end()) {
+    for (auto item_it = std::next(d->history.current_item_it, 1);
+         item_it != d->history.item_list.end(); ++item_it) {
+
+      const History::Item &item = *item_it;
+      QAction *action = new QAction(item.name);
+      action->setData(++item_index);
+
+      history_forward_menu->addAction(action);
+      ++num_forward_actions;
+    }
+  }
+
+  // Enable/disable and customize the tool tip for the backward button.
+  d->toolbar.history_back_button->setMenu(history_back_menu);
+  if (num_back_actions) {
+    d->toolbar.history_back_action->setToolTip(
+        tr("Go back to ") + history_back_menu->actions().first()->text());
+  } else {
+    d->toolbar.history_back_action->setToolTip(tr(kBackButtonToolTip));
+  }
+
+  // Enable/disable and customize the tool tip for the forward button.
+  d->toolbar.history_forward_button->setMenu(history_forward_menu);
+  if (num_forward_actions) {
+    d->toolbar.history_forward_action->setToolTip(
+        tr("Go forward to ") + history_forward_menu->actions().first()->text());
+  } else {
+    d->toolbar.history_forward_action->setToolTip(tr(kForwardButtonToolTip));
+  }
+
+  // NOTE(pag): For some reason, resetting the tooltips removes the icons,
+  //            so add them back in.
+
+  d->toolbar.history_back_button->setIcon(
+      QIcon(":/Icons/MainWindow/HistoryBack"));
+
+  d->toolbar.history_forward_button->setIcon(
+      QIcon(":/Icons/MainWindow/HistoryForward"));
+
+  // NOTE(pag): It seems like setting icones or tooltips also re-enables the
+  //            buttons, so we possible disable them here.
+  d->toolbar.history_back_button->setEnabled(0 < num_back_actions);
+  d->toolbar.history_forward_button->setEnabled(0 < num_forward_actions);
+}
+
+void MainWindow::UpdateCurrentCodeTabLocation(QVariant entity_id) {
+  if (entity_id.isValid()) {
+    QTabWidget *tab_widget = static_cast<QTabWidget *>(centralWidget());
+    if (QWidget *code_tab = tab_widget->currentWidget()) {
+      code_tab->setProperty(kLastLocationProperty, entity_id);
+    }
+  }
+}
+
+//! Formulate a nice label for the history item associated with `entity`. This
+//! label is shown in the back/forward drop-down menus beside the back/forward
+//! history navigation buttons.
+std::optional<QString> MainWindow::HistoryLabel(
+    const FileLocationCache &file_location_cache, const VariantEntity &entity) {
+
+  std::optional<QString> entity_label;
+  std::optional<QString> in_label;
+  QString line_col_label;
+  QString file_label;
+
+  std::optional<File> maybe_file = File::containing(entity);
+  if (!maybe_file.has_value()) {
+    return std::nullopt;
+  }
+
+  // Choose the first path associated with the containing file.
+  for (std::filesystem::path path : maybe_file->paths()) {
+    file_label = QString::fromStdString(path.filename().generic_string());
+    break;
+  }
+
+  Token file_loc = FirstFileToken(entity);
+
+  // Try to find a named entity that contains `entity`.
+  if (VariantEntity containing_entity = NamedDeclContaining(entity);
+      IdOfEntity(containing_entity) != IdOfEntity(entity)) {
+    in_label = NameOfEntity(containing_entity);
+  }
+
+  if (std::holds_alternative<Token>(entity)) {
+
+    // Due to the nature of cursor setting in code views, it's possible that
+    // our history stores more token IDs rather than entity IDs. If we can match
+    // a token to be the "location" of the an entity, then use that entity's
+    // name in our label.
+    if (VariantEntity related_entity = std::get<Token>(entity).related_entity();
+        file_loc == FirstFileToken(related_entity)) {
+      entity_label = NameOfEntity(related_entity);
+    }
+
+  } else if (std::holds_alternative<Decl>(entity)) {
+    entity_label = NameOfEntity(entity);
+
+  } else if (std::holds_alternative<File>(entity)) {
+
+  } else {
+    return std::nullopt;
+  }
+
+  // If the entity isn't a file, then formulate a `:line:column` suffix to
+  // append to the file name. We ignore the file case, because it would be
+  // noise to add in `:1:1`.
+  if (!std::holds_alternative<File>(entity)) {
+    if (auto maybe_line_col = file_loc.location(file_location_cache)) {
+      line_col_label = ":" + QString::number(maybe_line_col->first) +
+                       ":" + QString::number(maybe_line_col->second);
+    }
+  }
+
+  // Put all the sub-labels together. We have a few different forms:
+  //
+  //      FILE
+  //      FILE:LINE:COL
+  //      NAME at FILE:LINE:COL
+  //      FILE:LINE:COL in NAME
+  //      NAME1 at FILE:LINE:COL in NAME2
+  QString label = file_label + line_col_label;
+  if (entity_label.has_value() && !entity_label->isEmpty()) {
+    if (in_label.has_value() && !in_label->isEmpty() &&
+        in_label.value() != entity_label.value()) {
+      label = entity_label.value() + tr(" at ") + label + tr(" in ") +
+              in_label.value();
+    } else {
+      label = entity_label.value() + tr(" at ") + label;
+    }
+  } else if (in_label.has_value() && !in_label->isEmpty()) {
+    label += tr(" in ") + in_label.value();
+  }
+
+  if (label.isEmpty()) {
+    return std::nullopt;
+  }
+
+  return label;
+}
+
+void MainWindow::AddToHistory(QVariant opt_entity_id) {
+
+  if (!opt_entity_id.isValid()) {
+    return;
+  }
+
+  RawEntityId entity_id = qvariant_cast<RawEntityId>(opt_entity_id);
+  VariantId vid = EntityId(entity_id).Unpack();
+  if (std::holds_alternative<InvalidId>(vid)) {
+    return;
+  }
+
+  VariantEntity entity = d->index.entity(entity_id);
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
+
+  std::optional<QString> maybe_label = HistoryLabel(
+      d->file_location_cache, entity);
+
+  Assert(maybe_label.has_value(),
+         "Invalid parameter combination");
+
+  History::ItemList &items = d->history.item_list;
+  History::ItemList::iterator &curr_it = d->history.current_item_it;
+
+  // Check to see if we should
+  if (curr_it != items.end()) {
+
+    // If the next item to add matches the next item in our history, then
+    // advance us one spot through the history.
+    if (curr_it->entity_id == entity_id) {
+      curr_it = std::next(curr_it, 1);
+      return;
+    }
+
+    // Otherwise, truncate the "previous future" history.
+    items.erase(curr_it, items.end());
+
+  // Adding this item would cause a repeat of the most recently added item, so
+  // ignore it.
+  } else if (!items.empty() && items.back().entity_id == entity_id) {
+    return;
+  }
+
+  // Add the new item.
+  items.emplace_back(
+      History::Item{entity_id, maybe_label.value()});
+  curr_it = items.end();
+
+  // Cull overly old history.
+  if (auto num_items = items.size(); num_items > kMaxHistorySize) {
+    auto num_items_to_delete = static_cast<int>(num_items - kMaxHistorySize);
+    auto range_start = items.begin();
+    auto range_end = std::next(range_start, num_items_to_delete);
+    items.erase(range_start, range_end);
+  }
+
+  UpdateHistoryMenus();
+}
+
+void MainWindow::NavigateBackToHistoryItem(
+    History::ItemList::iterator next_item_it) {
+
+  RawEntityId entity_id = next_item_it->entity_id;
+
+  // If we're going back to some place in the past, and if we're starting from
+  // "the present," then we need to materialize a history item representing our
+  // present location so that when we go backward, we can always return to our
+  // current (soon to be former) present location.
+  if (d->history.current_item_it == d->history.item_list.end()) {
+    auto index = std::distance(d->history.item_list.begin(), next_item_it);
+    AboutToChangeToCodeView(nullptr);
+    next_item_it = std::next(d->history.item_list.begin(), index);
+  }
+
+  Assert(2u <= d->history.item_list.size(), "Invalid history list");
+
+  d->history.current_item_it = next_item_it;
+
+  UpdateHistoryMenus();
+  OpenEntityCode(entity_id);
+}
+
+void MainWindow::NavigateForwardToHistoryItem(
+    History::ItemList::iterator next_item_it) {
+
+  Assert(2u <= d->history.item_list.size(), "Invalid history list");
+  Assert(next_item_it != d->history.item_list.begin(), "Invalid history item");
+  Assert(next_item_it != d->history.item_list.end(), "Invalid history item");
+
+  RawEntityId entity_id = next_item_it->entity_id;
+
+  // If we're back to the present, then take off the previously materialized
+  // "present" value.
+  if (std::next(next_item_it, 1) == d->history.item_list.end()) {
+    d->history.item_list.pop_back();
+    d->history.current_item_it = d->history.item_list.end();
+
+  } else {
+    d->history.current_item_it = next_item_it;
+  }
+
+  UpdateHistoryMenus();
+  OpenEntityCode(entity_id);
+}
+
 void MainWindow::OpenEntityRelatedToToken(const CodeModelIndex &index) {
   auto entity_id_var =
       index.model->Data(index, ICodeModel::RelatedEntityIdRole);
-
   if (!entity_id_var.isValid()) {
     return;
   }
 
-  auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  VariantId vid = EntityId(entity_id).Unpack();
+  if (std::holds_alternative<InvalidId>(vid)) {
+    return;
+  }
+
+  // This function is called when a user does something like a primary click
+  // on an entity, either from inside of the main file code view, or from a
+  // reference browser code preview. Save wherever we were taken away from as
+  // the last thing in history for the current view.
+  AboutToChangeToCodeView(nullptr);
+
   OpenEntityInfo(entity_id);
   OpenEntityCode(entity_id);
 }
 
 void MainWindow::OpenEntityInfo(RawEntityId entity_id, bool force) {
   auto make_visible = !d->info_explorer_opened_before ||
-                      d->info_explorer_dock->isVisible() ||
-                      force;
+                      d->info_explorer_dock->isVisible() || force;
 
   if (make_visible && d->info_explorer->AddEntityId(entity_id)) {
     d->info_explorer_dock->toggleViewAction()->setEnabled(true);
@@ -443,10 +847,10 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id) {
     return;
   }
 
-  OpenEntityInfo(entity_id);
-
   if (std::holds_alternative<Decl>(entity)) {
-    entity = std::get<Decl>(entity).canonical_declaration();
+    Decl canon = std::get<Decl>(entity).canonical_declaration();
+    entity_id = canon.id().Pack();
+    entity = std::move(canon);
   }
 
   std::optional<File> opt_file = FileOfEntity(entity);
@@ -454,16 +858,25 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id) {
     return;
   }
 
+  auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
+  auto *current_tab = central_tab_widget->currentWidget();
   ICodeView *code_view = GetOrCreateFileCodeView(opt_file->id().Pack());
   if (!code_view) {
     return;
   }
 
-  ICodeModel *code_model = code_view->Model();
-  if (!code_model) {
-    return;
+  // We've asked to open a specific entity id. Record it as the last open
+  // entity ID in this view.
+  code_view->setProperty(kLastLocationProperty, entity_id);
+
+  // Change the tab.
+  if (current_tab != code_view) {
+    central_tab_widget->setCurrentWidget(code_view);
   }
 
+  // Scroll to the appropriate line.
+  //
+  // TODO(pag): Eventually support scrolling to a particular token.
   if (Token opt_tok = FirstFileToken(entity)) {
     auto maybe_loc = opt_tok.location(d->file_location_cache);
     if (!maybe_loc.has_value()) {
@@ -475,14 +888,50 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id) {
   }
 }
 
+//! Called wen a file name in the project explorer (list of indexed files) is
+//! clicked.
 void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
                                         Qt::KeyboardModifiers,
                                         Qt::MouseButtons) {
   CloseTokenReferenceExplorer();
   OpenEntityInfo(file_id);
-  static_cast<void>(GetOrCreateFileCodeView(file_id, tab_name));
+
+  auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
+  QWidget *current_tab = central_tab_widget->currentWidget();
+  QWidget *next_tab = GetOrCreateFileCodeView(file_id, tab_name);
+  if (!next_tab) {
+    return;
+  }
+
+  // If we're opening a file view, and if there is at least one other file
+  // view already open, then notify the system that we might need to add the
+  // last open tab's current position to the history. If there were no tabs
+  // open prior to this request, then we don't want to force the beginning of
+  // file location into history.
+  //
+  // NOTE(pag): We *don't* change the `kLastLocationProperty` property. It is
+  //            either initialized to the file ID, or it is whatever it was with
+  //            the last click or cursor event.
+  if (current_tab) {
+    AboutToChangeToCodeView(next_tab);
+  }
+
+  central_tab_widget->setCurrentWidget(next_tab);
 }
 
+//! Called when we user moves their cursor, or when an action triggered by the
+//! user causes the view itself to re-position the cursor in a file code view.
+//! Wherever the new cursor position is, we capture the token under the cursor
+//! and record it to the current file view's tab as its current location, so
+//! that if we switch away from the tab, then we can store that current location
+//! into the history.
+void MainWindow::OnMainCodeViewCursorMoved(const CodeModelIndex &index) {
+  UpdateCurrentCodeTabLocation(
+      index.model->Data(index, ICodeModel::TokenIdRole));
+}
+
+//! Called when we interact with a token in a main file view, or in a code
+//! preview, e.g. a reference browser code view.
 void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
                                   const CodeModelIndex &index) {
 
@@ -526,13 +975,71 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
   }
 }
 
+//! Called when an entity in the entity explorer / filter, which allows us to
+//! search for entities by name/type, is clicked.
 void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
+  AboutToChangeToCodeView(nullptr);
+  OpenEntityInfo(entity_id);
   OpenEntityCode(entity_id);
+}
+
+//! Called when the back button is pressed to navigate backward through history.
+//! We distinguish this from the forward menu case because if this is our first
+//! navigation away from our "present location" then we just-in-time materialize
+//! the present location into a history item.
+void MainWindow::OnNavigateBack() {
+  Assert(d->history.current_item_it != d->history.item_list.begin(),
+         "Too far back");
+
+  NavigateBackToHistoryItem(std::prev(d->history.current_item_it, 1));
+}
+
+//! Called when the forward button is pressed to navigate forward through
+//! history. We distinguish this from the back menu case, because if we navigate
+//! forward to our "original present" location (i.e. where we started from
+//! before engaging with the history menu) then we just-in-time remove that item
+//! from history. This is so that, upon returning to the present, the present
+//! is allowed to change (with followup clicks and such) without there being a
+//! random record of our "former present" stuck within the history menu.
+void MainWindow::OnNavigateForward() {
+  Assert(d->history.current_item_it != d->history.item_list.end(),
+         "Too far forward");
+
+  NavigateForwardToHistoryItem(std::next(d->history.current_item_it, 1));
+}
+
+//! Called when a specific history item in the back button's drop-down menu of
+//! history items is clicked. We distinguish this from the forward menu case
+//! because if this is our first navigation away from our "present location"
+//! then we just-in-time materialize the present location into a history item.
+void MainWindow::OnNavigateBackToHistoryItem(QAction *action) {
+  QVariant item_index_var = action->data();
+  if (item_index_var.isValid()) {
+    NavigateBackToHistoryItem(std::next(d->history.item_list.begin(),
+                                        item_index_var.toInt()));
+  }
+}
+
+//! Called when a specific history item in the forward button's drop-down menu
+//! of history items is clicked. We distinguish this from the back menu case,
+//! because if we navigate forward to our "original present" location (i.e.
+//! where we started from before engaging with the history menu) then we
+//! just-in-time remove that item from history. This is so that, upon returning
+//! to the present, the present is allowed to change (with followup clicks and
+//! such) without there being a random record of our "former present" stuck
+//! within the history menu.
+void MainWindow::OnNavigateForwardToHistoryItem(QAction *action) {
+  QVariant item_index_var = action->data();
+  if (item_index_var.isValid()) {
+    NavigateForwardToHistoryItem(std::next(d->history.item_list.begin(),
+                                           item_index_var.toInt()));
+  }
 }
 
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
   auto entity_id_role =
       index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
+
   if (!entity_id_role.isValid()) {
     entity_id_role = index.data(IReferenceExplorerModel::EntityIdRole);
     if (!entity_id_role.isValid()) {
@@ -541,6 +1048,8 @@ void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
   }
 
   auto entity_id = qvariant_cast<RawEntityId>(entity_id_role);
+  AboutToChangeToCodeView(nullptr);
+  OpenEntityInfo(entity_id);
   OpenEntityCode(entity_id);
 }
 
@@ -613,12 +1122,30 @@ void MainWindow::OnReferenceExplorerTabBarDoubleClick(int index) {
 }
 
 void MainWindow::OnCodeViewTabBarClose(int index) {
-  auto &central_tab_widget = *static_cast<QTabWidget *>(centralWidget());
+  QTabWidget *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
+  QWidget *current_widget = central_tab_widget->currentWidget();
+  QWidget *closing_widget = central_tab_widget->widget(index);
+  if (!closing_widget) {
+    return;
+  }
 
-  auto widget = central_tab_widget.widget(index);
-  central_tab_widget.removeTab(index);
+  // If the tab we're closing is the currently open tab, then we want to add
+  // its last location to the history. If they don't match, then it means we're
+  // closing some non-active tab, i.e. we didn't switch to go see that code
+  // first.
+  if (closing_widget == current_widget) {
+    AboutToChangeToCodeView(nullptr);
+  }
 
-  widget->close();
+  central_tab_widget->removeTab(index);
+  closing_widget->close();
+}
+
+void MainWindow::OnCodeViewTabClicked(int index) {
+  QTabWidget *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
+  if (QWidget *next_widget = central_tab_widget->widget(index)) {
+    AboutToChangeToCodeView(next_widget);
+  }
 }
 
 }  // namespace mx::gui

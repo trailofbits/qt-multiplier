@@ -7,6 +7,21 @@
 #pragma once
 
 #include <multiplier/Entity.h>
+#include <multiplier/Entities/Attr.h>
+#include <multiplier/Entities/CXXBaseSpecifier.h>
+#include <multiplier/Entities/DefineMacroDirective.h>
+#include <multiplier/Entities/Designator.h>
+#include <multiplier/Entities/FieldDecl.h>
+#include <multiplier/Entities/File.h>
+#include <multiplier/Entities/Fragment.h>
+#include <multiplier/Entities/FunctionDecl.h>
+#include <multiplier/Entities/IncludeLikeMacroDirective.h>
+#include <multiplier/Entities/Stmt.h>
+#include <multiplier/Entities/TemplateArgument.h>
+#include <multiplier/Entities/TemplateParameterList.h>
+#include <multiplier/Entities/Type.h>
+#include <multiplier/Entities/TypeDecl.h>
+#include <multiplier/Entities/VarDecl.h>
 #include <optional>
 #include <QString>
 #include <unordered_map>
@@ -19,6 +34,39 @@ class Index;
 class Token;
 class TokenRange;
 namespace gui {
+
+template <typename T>
+static VariantEntity NamedDeclContaining(const T &thing)
+requires (!std::is_same_v<T, VariantEntity>) {
+  for (FunctionDecl func : FunctionDecl::containing(thing)) {
+    return func;
+  }
+
+  for (FieldDecl field : FieldDecl::containing(thing)) {
+    return field;
+  }
+
+  for (VarDecl var : VarDecl::containing(thing)) {
+    if (var.is_local_variable_declaration_or_parm()) {
+      if (VariantEntity ent = NamedDeclContaining<Decl>(var);
+          !std::holds_alternative<NotAnEntity>(ent)) {
+        return ent;
+      }
+
+    } else {
+      return var;
+    }
+  }
+
+  for (NamedDecl nd : NamedDecl::containing(thing)) {
+    return nd;
+  }
+
+  return NotAnEntity{};
+}
+
+//! Return the named declaration containing `thing`, or `NotAnEntity`.
+VariantEntity NamedDeclContaining(const VariantEntity &thing);
 
 //! Return the entity ID associated with `ent`.
 RawEntityId IdOfEntity(const VariantEntity &ent);
