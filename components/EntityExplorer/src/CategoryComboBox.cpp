@@ -13,6 +13,8 @@
 #include <QComboBox>
 #include <QVBoxLayout>
 
+#include <unordered_map>
+
 namespace mx::gui {
 
 namespace {
