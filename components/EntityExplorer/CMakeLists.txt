@@ -21,6 +21,9 @@ add_library("mx_entityexplorer"
 
   src/EntityExplorerItemDelegate.h
   src/EntityExplorerItemDelegate.cpp
+
+  src/CategoryComboBox.h
+  src/CategoryComboBox.cpp
 )
 
 target_link_libraries("mx_entityexplorer"
