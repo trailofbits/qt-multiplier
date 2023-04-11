@@ -55,6 +55,9 @@ class EntityExplorer final : public IEntityExplorer {
   //! Called whenever the query parameters are changed
   void QueryParametersChanged();
 
+  //! Called when the token category filter changes
+  void OnCategoryChange(const std::optional<TokenCategory> &opt_token_category);
+
   friend class IEntityExplorer;
 };
 

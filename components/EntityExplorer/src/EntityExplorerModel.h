@@ -24,6 +24,17 @@ class EntityExplorerModel final : public IEntityExplorerModel,
   //! Destructor
   virtual ~EntityExplorerModel() override;
 
+  //! \copybrief IEntityExplorerModel::SetSortingMethod
+  virtual void SetSortingMethod(const SortingMethod &sorting_method) override;
+
+  //! \copybrief IEntityExplorerModel::SetFilterRegularExpression
+  virtual void
+  SetFilterRegularExpression(const QRegularExpression &regex) override;
+
+  //! \copybrief IEntityExplorerModel::SetTokenCategoryFilter
+  virtual void SetTokenCategoryFilter(
+      const std::optional<TokenCategorySet> &opt_token_category_set) override;
+
   //! Returns the amount of rows in the model
   virtual int rowCount(const QModelIndex &parent) const override;
 
@@ -59,12 +70,12 @@ class EntityExplorerModel final : public IEntityExplorerModel,
                       const FileLocationCache &file_location_cache,
                       QObject *parent);
 
+  //! Receives data batches from the IDatabase class
   virtual void
   OnDataBatch(IDatabase::QueryEntitiesReceiver::DataBatch data_batch) override;
 
- private slots:
-  //! Called when the database query future changes status
-  void RequestFutureStatusChanged();
+  //! Regenerates the rows based on the active filters
+  void GenerateRows();
 
   friend class IEntityExplorerModel;
 };

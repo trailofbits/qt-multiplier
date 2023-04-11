@@ -12,6 +12,10 @@
 #include <multiplier/Types.h>
 
 #include <QAbstractItemModel>
+#include <QRegularExpression>
+
+#include <optional>
+#include <unordered_set>
 
 namespace mx::gui {
 
@@ -36,6 +40,25 @@ class IEntityExplorerModel : public QAbstractItemModel {
 
   //! Destructor
   virtual ~IEntityExplorerModel() override = default;
+
+  //! Sorting method
+  enum class SortingMethod {
+    Ascending,
+    Descending,
+  };
+
+  //! Sets the sorting method
+  virtual void SetSortingMethod(const SortingMethod &sorting_method) = 0;
+
+  //! Sets the given regular expression as a filter
+  virtual void SetFilterRegularExpression(const QRegularExpression &regex) = 0;
+
+  //! Token category set used as filter
+  using TokenCategorySet = std::unordered_set<TokenCategory>;
+
+  //! Sets the token category filter
+  virtual void SetTokenCategoryFilter(
+      const std::optional<TokenCategorySet> &opt_token_category_set) = 0;
 
   //! Disabled copy constructor
   IEntityExplorerModel(const IEntityExplorerModel &) = delete;

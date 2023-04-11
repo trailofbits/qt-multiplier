@@ -8,6 +8,7 @@
 
 #include "EntityExplorer.h"
 #include "EntityExplorerItemDelegate.h"
+#include "CategoryComboBox.h"
 
 #include <multiplier/ui/Assert.h>
 
@@ -24,7 +25,6 @@ namespace mx::gui {
 
 struct EntityExplorer::PrivateData final {
   ISearchWidget *filter_widget{nullptr};
-  QSortFilterProxyModel *model_proxy{nullptr};
 
   IEntityExplorerModel *model{nullptr};
   QListView *list_view{nullptr};
@@ -48,11 +48,6 @@ EntityExplorer::EntityExplorer(IEntityExplorerModel *model, QWidget *parent)
 }
 
 void EntityExplorer::InitializeWidgets() {
-  setContentsMargins(0, 0, 0, 0);
-
-  auto layout = new QVBoxLayout();
-  layout->setContentsMargins(0, 0, 0, 0);
-
   static const auto kRequestDarkTheme{true};
   CodeViewTheme theme = GetDefaultCodeViewTheme(kRequestDarkTheme);
 
@@ -61,10 +56,11 @@ void EntityExplorer::InitializeWidgets() {
   d->list_view = new QListView(this);
   d->list_view->setSelectionMode(
       QAbstractItemView::SelectionMode::SingleSelection);
+
   d->list_view->setSelectionBehavior(
       QAbstractItemView::SelectionBehavior::SelectRows);
+
   d->list_view->setItemDelegate(list_view_item_delegate);
-  layout->addWidget(d->list_view);
 
   QPalette p = d->list_view->palette();
   auto changed_palette = false;
@@ -89,8 +85,6 @@ void EntityExplorer::InitializeWidgets() {
   connect(d->filter_widget, &ISearchWidget::SearchParametersChanged, this,
           &EntityExplorer::OnSearchParametersChange);
 
-  layout->addWidget(d->filter_widget);
-
   auto search_parameters_layout = new QHBoxLayout();
 
   d->search_input = new QLineEdit(this);
@@ -109,31 +103,34 @@ void EntityExplorer::InitializeWidgets() {
 
   search_parameters_layout->addWidget(d->exact_search);
 
-  layout->addLayout(search_parameters_layout);
+  auto layout = new QVBoxLayout();
+  layout->setContentsMargins(0, 0, 0, 0);
 
+  auto category_combo_box = new CategoryComboBox(this);
+  connect(category_combo_box, &CategoryComboBox::CategoryChanged, this,
+          &EntityExplorer::OnCategoryChange);
+
+  layout->addLayout(search_parameters_layout);
+  layout->addWidget(category_combo_box);
+  layout->addWidget(d->list_view);
+  layout->addWidget(d->filter_widget);
+
+  setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
 }
 
 void EntityExplorer::InstallModel(IEntityExplorerModel *model) {
   d->model = model;
-
-  d->model_proxy = new QSortFilterProxyModel(this);
-  d->model->setParent(d->model_proxy);
-
-  d->model_proxy->setSourceModel(d->model);
-  d->model_proxy->setRecursiveFilteringEnabled(false);
-  d->model_proxy->setFilterRole(Qt::DisplayRole);
-
-  d->list_view->setModel(d->model_proxy);
+  d->list_view->setModel(d->model);
 
   // Note: this needs to happen after the model has been set in the
   // list view!
   auto list_selection_model = d->list_view->selectionModel();
 
-  connect(list_selection_model, &QItemSelectionModel::currentChanged,
-          this, &EntityExplorer::SelectionChanged);
+  connect(list_selection_model, &QItemSelectionModel::currentChanged, this,
+          &EntityExplorer::SelectionChanged);
 
-  connect(d->model_proxy, &QAbstractListModel::modelReset, this,
+  connect(d->model, &QAbstractListModel::modelReset, this,
           &EntityExplorer::OnModelReset);
 
   OnModelReset();
@@ -147,13 +144,7 @@ void EntityExplorer::SelectionChanged(const QModelIndex &index,
     return;
   }
 
-  auto model_index = d->model_proxy->mapToSource(index);
-  if (!model_index.isValid()) {
-    qDebug() << "invalid mapped index";
-    return;
-  }
-
-  QVariant token_var = model_index.data(IEntityExplorerModel::TokenRole);
+  QVariant token_var = index.data(IEntityExplorerModel::TokenRole);
   if (!token_var.isValid()) {
     qDebug() << "invalid tok";
     return;
@@ -189,7 +180,7 @@ void EntityExplorer::OnSearchParametersChange(
   Assert(regex.isValid(),
          "Invalid regex found in CodeView::OnSearchParametersChange");
 
-  d->model_proxy->setFilterRegularExpression(regex);
+  d->model->SetFilterRegularExpression(regex);
 }
 
 void EntityExplorer::QueryParametersChanged() {
@@ -202,5 +193,30 @@ void EntityExplorer::QueryParametersChanged() {
   d->model->Search(d->search_input->text(), d->exact_search->isChecked());
 }
 
+void EntityExplorer::OnCategoryChange(
+    const std::optional<TokenCategory> &opt_token_category) {
+  if (!opt_token_category.has_value()) {
+    d->model->SetTokenCategoryFilter(std::nullopt);
+    return;
+  }
+
+  const auto &token_category = opt_token_category.value();
+
+  IEntityExplorerModel::TokenCategorySet token_category_set;
+  if (token_category == TokenCategory::UNKNOWN) {
+    token_category_set = {
+        TokenCategory::UNKNOWN,           TokenCategory::IDENTIFIER,
+        TokenCategory::KEYWORD,           TokenCategory::OBJECTIVE_C_KEYWORD,
+        TokenCategory::BUILTIN_TYPE_NAME, TokenCategory::PUNCTUATION,
+        TokenCategory::LITERAL,           TokenCategory::COMMENT,
+        TokenCategory::NAMESPACE,         TokenCategory::WHITESPACE,
+        TokenCategory::FILE_NAME,         TokenCategory::LINE_NUMBER,
+        TokenCategory::COLUMN_NUMBER};
+  } else {
+    token_category_set = {token_category};
+  }
+
+  d->model->SetTokenCategoryFilter(token_category_set);
+}
 
 }  // namespace mx::gui
