@@ -725,17 +725,8 @@ void MainWindow::AddToHistory(QVariant opt_entity_id) {
   History::ItemList &items = d->history.item_list;
   History::ItemList::iterator &curr_it = d->history.current_item_it;
 
-  // Check to see if we should
+  // Truncate the "previous future" history.
   if (curr_it != items.end()) {
-
-    // If the next item to add matches the next item in our history, then
-    // advance us one spot through the history.
-    if (curr_it->entity_id == entity_id) {
-      curr_it = std::next(curr_it, 1);
-      return;
-    }
-
-    // Otherwise, truncate the "previous future" history.
     items.erase(curr_it, items.end());
 
   // Adding this item would cause a repeat of the most recently added item, so
