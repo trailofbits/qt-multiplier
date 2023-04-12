@@ -211,7 +211,9 @@ void EntityExplorer::OnCategoryChange(
         TokenCategory::LITERAL,           TokenCategory::COMMENT,
         TokenCategory::NAMESPACE,         TokenCategory::WHITESPACE,
         TokenCategory::FILE_NAME,         TokenCategory::LINE_NUMBER,
-        TokenCategory::COLUMN_NUMBER};
+        TokenCategory::COLUMN_NUMBER,     TokenCategory::MACRO_PARAMETER_NAME,
+        TokenCategory::LOCAL_VARIABLE,
+    };
   } else {
     token_category_set = {token_category};
   }
