@@ -22,10 +22,9 @@ namespace {
 void EnumerateTokenCategories(
     const std::function<void(const TokenCategory &token_category)> &callback) {
 
-  for (const auto &token_category : {TokenCategory::MACRO_NAME,
-                                     TokenCategory::MACRO_PARAMETER_NAME,
+  for (const auto &token_category : {TokenCategory::UNKNOWN,
+                                     TokenCategory::MACRO_NAME,
                                      TokenCategory::MACRO_DIRECTIVE_NAME,
-                                     TokenCategory::LOCAL_VARIABLE,
                                      TokenCategory::GLOBAL_VARIABLE,
                                      TokenCategory::PARAMETER_VARIABLE,
                                      TokenCategory::FUNCTION,
@@ -52,7 +51,7 @@ void EnumerateTokenCategories(
 const QString &GetTokenCategoryLabel(const TokenCategory &token_category) {
 
   static const std::unordered_map<TokenCategory, QString> kLabelMap = {
-      {TokenCategory::UNKNOWN, QObject::tr("Unknown")},
+      {TokenCategory::UNKNOWN, QObject::tr("Unknown/Other")},
       {TokenCategory::IDENTIFIER, QObject::tr("Identifier")},
       {TokenCategory::MACRO_NAME, QObject::tr("Macro name")},
       {TokenCategory::MACRO_PARAMETER_NAME,
