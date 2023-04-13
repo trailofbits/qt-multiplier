@@ -8,6 +8,8 @@
 
 #include "HistoryLabelBuilder.h"
 
+#include <QDebug>
+
 #include <filesystem>
 #include <multiplier/Index.h>
 #include <multiplier/ui/Util.h>
