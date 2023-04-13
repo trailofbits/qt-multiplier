@@ -1,0 +1,40 @@
+#
+# Copyright (c) 2022-present, Trail of Bits, Inc.
+# All rights reserved.
+#
+# This source code is licensed in accordance with the terms specified in
+# the LICENSE file found in the root directory of this source tree.
+#
+
+add_library("mx_historywidget"
+  include/multiplier/ui/HistoryWidget.h
+  src/HistoryWidget.cpp
+
+  src/HistoryLabelBuilder.h
+  src/HistoryLabelBuilder.cpp
+)
+
+target_sources("mx_historywidget" INTERFACE
+  Resources/Resources.qrc
+)
+
+target_link_libraries("mx_historywidget"
+  PRIVATE
+    "qtmx_cxx_flags"
+
+  PUBLIC
+    "thirdparty_qt"
+    "multiplier::mx-api"
+    "mx_util"
+    "mx_assert"
+)
+
+target_include_directories("mx_historywidget" PRIVATE
+  "include"
+)
+
+target_include_directories("mx_historywidget" SYSTEM INTERFACE
+  "include"
+)
+
+enable_qt_properties("mx_historywidget")

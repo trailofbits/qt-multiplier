@@ -12,6 +12,7 @@ add_library("mx_util"
   src/Util.h
   src/Util.cpp
   src/TokenPainter.cpp
+  
 )
 
 target_link_libraries("mx_util" PRIVATE
