@@ -54,11 +54,6 @@ dep_flags() {
 deps="weggli-native pasta gap multiplier"
 [[ $# -gt 0 ]] && deps=$1
 
-# linker_flags="-fuse-ld=`which ld64.lld`"
-# -DCMAKE_EXE_LINKER_FLAGS="${linker_flags}" \
-# -DCMAKE_MODULE_LINKER_FLAGS="${linker_flags}" \
-# -DCMAKE_SHARED_LINKER_FLAGS="${linker_flags}" \
-
 for dep in $deps; do
     echo $dep
 
