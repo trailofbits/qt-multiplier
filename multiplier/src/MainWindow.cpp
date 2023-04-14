@@ -5,7 +5,6 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MainWindow.h"
-#include "InformationExplorer.h"
 #include "PreviewableReferenceExplorer.h"
 #include "QuickReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
@@ -17,6 +16,7 @@
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/Util.h>
+#include <multiplier/ui/IInformationExplorer.h>
 
 #include <multiplier/Entities/StmtKind.h>
 
@@ -65,7 +65,6 @@ struct MainWindow::PrivateData final {
   IEntityExplorer *entity_explorer{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
-  std::unique_ptr<InformationExplorer> info_explorer;
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
 
   QTabWidget *ref_explorer_tab_widget{nullptr};
@@ -74,12 +73,7 @@ struct MainWindow::PrivateData final {
   QDockWidget *project_explorer_dock{nullptr};
   QDockWidget *entity_explorer_dock{nullptr};
   QDockWidget *info_explorer_dock{nullptr};
-
-  //! Tracks whether or not the information explorer has ever been opened. If
-  //! it has not been opened, then we make it visible on the first request to
-  //! open it. However, if the user has closed it then we only want to re-open
-  //! it if it was closed.
-  bool info_explorer_opened_before{false};
+  IInformationExplorerModel *info_explorer_model{nullptr};
 
   QMenu *view_menu{nullptr};
   ToolBar toolbar;
@@ -146,8 +140,8 @@ void MainWindow::CreateProjectExplorerDock() {
   auto file_tree_model = IFileTreeModel::Create(d->index, this);
   d->index_view = IIndexView::Create(file_tree_model, this);
 
-  connect(d->index_view, &IIndexView::FileClicked,
-          this, &MainWindow::OnIndexViewFileClicked);
+  connect(d->index_view, &IIndexView::FileClicked, this,
+          &MainWindow::OnIndexViewFileClicked);
 
   d->project_explorer_dock = new QDockWidget(tr("Project Explorer"), this);
   d->project_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
@@ -164,8 +158,8 @@ void MainWindow::CreateEntityExplorerDock() {
   d->entity_explorer_dock = new QDockWidget(tr("Entity Explorer"), this);
   d->entity_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
 
-  connect(d->entity_explorer, &IEntityExplorer::EntityAction,
-          this, &MainWindow::OnEntityExplorerEntityClicked);
+  connect(d->entity_explorer, &IEntityExplorer::EntityAction, this,
+          &MainWindow::OnEntityExplorerEntityClicked);
 
   d->view_menu->addAction(d->entity_explorer_dock->toggleViewAction());
 
@@ -175,21 +169,19 @@ void MainWindow::CreateEntityExplorerDock() {
 }
 
 void MainWindow::CreateInfoExplorerDock() {
+  d->info_explorer_model =
+      IInformationExplorerModel::Create(d->index, d->file_location_cache, this);
+
+  auto info_explorer =
+      IInformationExplorer::Create(d->info_explorer_model, this);
+
   d->info_explorer_dock = new QDockWidget(tr("Information Explorer"), this);
-  d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
-  d->info_explorer_dock->toggleViewAction()->setEnabled(false);
+  d->info_explorer_dock->setWidget(info_explorer);
   d->info_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-  d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
-
-  d->info_explorer = std::make_unique<InformationExplorer>(
-      d->index, d->file_location_cache, this);
-
-  d->info_explorer_dock->setWidget(d->info_explorer.get());
-
-  addDockWidget(Qt::LeftDockWidgetArea, d->info_explorer_dock);
-
-  // Default is hidden until we click on an entity.
   d->info_explorer_dock->hide();
+
+  d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
+  addDockWidget(Qt::LeftDockWidgetArea, d->info_explorer_dock);
 }
 
 void MainWindow::CreateReferenceExplorerDock() {
@@ -251,18 +243,18 @@ void MainWindow::CreateCodeView() {
 
   setCentralWidget(tab_widget);
 
-  connect(tab_widget->tabBar(), &QTabBar::tabCloseRequested,
-          this, &MainWindow::OnCodeViewTabBarClose);
+  connect(tab_widget->tabBar(), &QTabBar::tabCloseRequested, this,
+          &MainWindow::OnCodeViewTabBarClose);
 
-  connect(tab_widget->tabBar(), &QTabBar::tabBarClicked,
-          this, &MainWindow::OnCodeViewTabClicked);
+  connect(tab_widget->tabBar(), &QTabBar::tabBarClicked, this,
+          &MainWindow::OnCodeViewTabClicked);
 
   auto toggle_word_wrap_action = new QAction(tr("Enable word wrap"));
   toggle_word_wrap_action->setCheckable(true);
   toggle_word_wrap_action->setChecked(false);
 
-  connect(toggle_word_wrap_action, &QAction::triggered,
-          this, &MainWindow::OnToggleWordWrap);
+  connect(toggle_word_wrap_action, &QAction::triggered, this,
+          &MainWindow::OnToggleWordWrap);
 
   d->view_menu->addAction(toggle_word_wrap_action);
 
@@ -270,8 +262,8 @@ void MainWindow::CreateCodeView() {
   d->code_view_context_menu.menu = new QMenu(tr("Token menu"));
 
   // TODO(alessandro): Only show this when there is a related entity.
-  connect(d->code_view_context_menu.menu, &QMenu::triggered,
-          this, &MainWindow::OnCodeViewContextMenuActionTriggered);
+  connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
+          &MainWindow::OnCodeViewContextMenuActionTriggered);
 
   d->code_view_context_menu.show_ref_explorer_action =
       new QAction(tr("Show Reference Explorer"));
@@ -306,8 +298,8 @@ void MainWindow::OpenReferenceExplorer(
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache, entity_id, expansion_mode, this);
 
-  connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll,
-          this, &MainWindow::OnQuickRefExplorerSaveAllClicked);
+  connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
+          &MainWindow::OnQuickRefExplorerSaveAllClicked);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
@@ -378,8 +370,7 @@ void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
     return;
   }
 
-  OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var),
-                 true /* force */);
+  OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var));
 }
 
 void MainWindow::CloseTokenReferenceExplorer() {
@@ -406,11 +397,11 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
   central_tab_widget->addTab(code_view, tab_name);
 
-  connect(code_view, &ICodeView::TokenTriggered,
-          this, &MainWindow::OnTokenTriggered);
+  connect(code_view, &ICodeView::TokenTriggered, this,
+          &MainWindow::OnTokenTriggered);
 
-  connect(code_view, &ICodeView::CursorMoved,
-          this, &MainWindow::OnMainCodeViewCursorMoved);
+  connect(code_view, &ICodeView::CursorMoved, this,
+          &MainWindow::OnMainCodeViewCursorMoved);
 
   return code_view;
 }
@@ -471,15 +462,8 @@ void MainWindow::OpenEntityRelatedToToken(const CodeModelIndex &index) {
   OpenEntityCode(entity_id);
 }
 
-void MainWindow::OpenEntityInfo(RawEntityId entity_id, bool force) {
-  auto make_visible = !d->info_explorer_opened_before ||
-                      d->info_explorer_dock->isVisible() || force;
-
-  if (make_visible && d->info_explorer->AddEntityId(entity_id)) {
-    d->info_explorer_dock->toggleViewAction()->setEnabled(true);
-    d->info_explorer_dock->show();
-    d->info_explorer_opened_before = true;
-  }
+void MainWindow::OpenEntityInfo(RawEntityId entity_id) {
+  d->info_explorer_model->RequestEntityInformation(entity_id);
 }
 
 void MainWindow::OpenEntityCode(RawEntityId entity_id) {
@@ -624,6 +608,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 
     if (keyboard_button.key == Qt::Key_I && !keyboard_button.shift_modifier &&
         !keyboard_button.control_modifier) {
+      d->info_explorer_dock->show();
       OpenTokenEntityInfo(index);
     }
 
