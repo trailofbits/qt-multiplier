@@ -34,8 +34,6 @@ add_executable("Multiplier" MACOSX_BUNDLE
   
   src/Style.h
   src/Style.cpp
-
-  src/Types.h
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -68,6 +66,7 @@ target_link_libraries("Multiplier"
     "mx_indexview"
     "mx_referenceexplorer"
     "mx_entityexplorer"
+    "mx_historywidget"
     "mx_widgets"
 )
 

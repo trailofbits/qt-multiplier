@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "Types.h"
-
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
@@ -52,26 +50,12 @@ class MainWindow final : public QMainWindow {
   void OpenReferenceExplorer(RawEntityId entity_id,
                              IReferenceExplorerModel::ExpansionMode mode);
   void CloseTokenReferenceExplorer();
+  void UpdateLocatiomFromWidget(QWidget *widget);
   ICodeView *CreateNewCodeView(RawEntityId file_entity_id, QString tab_name);
 
   ICodeView *
   GetOrCreateFileCodeView(RawEntityId file_id,
                           std::optional<QString> opt_tab_name = std::nullopt);
-
-  void AboutToChangeToCodeView(QWidget *next_tab);
-
-  void UpdateHistoryMenus();
-
-  void UpdateCurrentCodeTabLocation(QVariant entity_id);
-
-  static std::optional<QString> HistoryLabel(
-      const FileLocationCache &file_location_cache,
-      const VariantEntity &entity);
-
-  void AddToHistory(QVariant entity_id);
-
-  void NavigateBackToHistoryItem(History::ItemList::iterator item_it);
-  void NavigateForwardToHistoryItem(History::ItemList::iterator item_it);
 
  private slots:
   void OnIndexViewFileClicked(RawEntityId file_id, QString file_name,
@@ -95,11 +79,7 @@ class MainWindow final : public QMainWindow {
   void OnCodeViewTabBarClose(int index);
   void OnCodeViewTabClicked(int index);
   void OnEntityExplorerEntityClicked(RawEntityId entity_id);
-
-  void OnNavigateBack();
-  void OnNavigateForward();
-  void OnNavigateBackToHistoryItem(QAction *action);
-  void OnNavigateForwardToHistoryItem(QAction *action);
+  void OnHistoryNavigationEntitySelected(RawEntityId entity_id);
 };
 
 }  // namespace mx::gui

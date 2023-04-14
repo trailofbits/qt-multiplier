@@ -127,6 +127,9 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
     return false;
   }
 
+  // NOTE(pag): We stop cursor tracking so that the individual cursor
+  //            manipulations here that are needed to center the view on the
+  //            cursor don't bubble up to higher levels.
   StopCursorTracking();
 
   text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
@@ -153,7 +156,6 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
     d->text_edit->setTextCursor(text_cursor);
   }
 
-  OnCursorMoved();
   ResumeCursorTracking();
   return true;
 }
@@ -304,8 +306,6 @@ void CodeView::InitializeWidgets() {
   connect(d->text_edit, &QPlainTextEditMod::updateRequest,
           this, &CodeView::OnTextEditUpdateRequest);
 
-  ConnectCursorChangeEvent();
-
   // Gutter
   d->gutter = new QWidget();
   d->gutter->installEventFilter(this);
@@ -350,11 +350,17 @@ void CodeView::InitializeWidgets() {
   // This will also cause a model reset update
   static const auto kRequestDarkTheme{true};
   SetTheme(GetDefaultCodeViewTheme(kRequestDarkTheme));
+
+  // NOTE(pag): This has to go last, as it requires all things to be
+  //            initialized.
+  ConnectCursorChangeEvent();
 }
 
 //! Disable cursor change tracking.
 void CodeView::StopCursorTracking(void) {
-  disconnect(d->cursor_change_signal);
+  if (disconnect(d->cursor_change_signal)) {
+    QMetaObject::Connection().swap(d->cursor_change_signal);
+  }
 }
 
 //! Re-introduce cursor change tracking.
@@ -362,11 +368,13 @@ void CodeView::ResumeCursorTracking(void) {
   QTimer::singleShot(200, this, &CodeView::ConnectCursorChangeEvent);
 }
 
-// Connect the cursor changed event.
+//! Connect the cursor changed event. This will also trigger a cursor event.
 void CodeView::ConnectCursorChangeEvent(void) {
   d->cursor_change_signal =
       connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged,
               this, &CodeView::OnCursorMoved);
+
+  OnCursorMoved();
 }
 
 std::optional<CodeModelIndex>
