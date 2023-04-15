@@ -200,7 +200,7 @@ void EntityExplorer::OnCategoryChange(
     return;
   }
 
-  const auto &token_category = opt_token_category.value();
+  TokenCategory token_category = opt_token_category.value();
 
   IEntityExplorerModel::TokenCategorySet token_category_set;
   if (token_category == TokenCategory::UNKNOWN) {
