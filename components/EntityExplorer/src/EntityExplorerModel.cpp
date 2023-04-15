@@ -16,18 +16,15 @@ namespace mx::gui {
 namespace {
 
 struct EntityQueryResultCmp final {
-  bool operator()(const IDatabase::EntityQueryResult &lhs,
-                  const IDatabase::EntityQueryResult &rhs) const {
+  bool operator()(const IDatabase::EntityQueryResult *lhs,
+                  const IDatabase::EntityQueryResult *rhs) const {
 
-    const auto &lhs_string_view = lhs.name_token.data();
-    const auto &rhs_string_view = rhs.name_token.data();
+    const auto &lhs_string_view = lhs->name_token.data();
+    const auto &rhs_string_view = rhs->name_token.data();
 
     return lhs_string_view < rhs_string_view;
   }
 };
-
-using EntityQueryResultSet =
-    std::set<IDatabase::EntityQueryResult, EntityQueryResultCmp>;
 
 bool RegexMatchesEntityName(
     const IDatabase::EntityQueryResult &entity,
@@ -71,13 +68,13 @@ struct EntityExplorerModel::PrivateData final {
   QFuture<bool> request_status_future;
   QFutureWatcher<bool> future_watcher;
 
-  EntityQueryResultSet entity_set;
+  std::deque<IDatabase::EntityQueryResult> results;
 
   std::optional<TokenCategorySet> opt_token_category_set{};
   SortingMethod sorting_method{SortingMethod::Ascending};
   std::optional<QRegularExpression> opt_regex;
 
-  std::vector<EntityQueryResultSet::iterator> row_list;
+  std::vector<const IDatabase::EntityQueryResult *> row_list;
 };
 
 EntityExplorerModel::~EntityExplorerModel() {
@@ -86,11 +83,13 @@ EntityExplorerModel::~EntityExplorerModel() {
 
 void EntityExplorerModel::SetSortingMethod(
     const SortingMethod &sorting_method) {
-  emit beginResetModel();
 
-  d->sorting_method = sorting_method;
-
-  emit endResetModel();
+  if (sorting_method != d->sorting_method) {
+    emit beginResetModel();
+    d->sorting_method = sorting_method;
+    std::reverse(d->row_list.begin(), d->row_list.end());
+    emit endResetModel();
+  }
 }
 
 void EntityExplorerModel::SetFilterRegularExpression(
@@ -99,7 +98,7 @@ void EntityExplorerModel::SetFilterRegularExpression(
 
   d->opt_regex = regex;
   GenerateRows();
-
+  SortRows();
   emit endResetModel();
 }
 
@@ -110,7 +109,7 @@ void EntityExplorerModel::SetTokenCategoryFilter(
 
   d->opt_token_category_set = opt_token_category_set;
   GenerateRows();
-
+  SortRows();
   emit endResetModel();
 }
 
@@ -125,37 +124,22 @@ QVariant EntityExplorerModel::data(const QModelIndex &index, int role) const {
   }
 
   auto row_index = static_cast<unsigned>(index.row());
-
-  std::optional<IDatabase::EntityQueryResult> opt_row;
-  if (d->sorting_method == SortingMethod::Ascending) {
-    auto row_list_it = std::next(d->row_list.begin(), row_index);
-    if (row_list_it == d->row_list.end()) {
-      return value;
-    }
-
-    const auto &entity_set_it = *row_list_it;
-    opt_row = *entity_set_it;
-
-  } else {
-    auto row_list_it = std::next(d->row_list.rbegin(), row_index);
-    if (row_list_it == d->row_list.rend()) {
-      return value;
-    }
-
-    const auto &entity_set_it = *row_list_it;
-    opt_row = *entity_set_it;
+  if (row_index >= d->row_list.size()) {
+    return value;
   }
 
-  const auto &row = opt_row.value();
+  const IDatabase::EntityQueryResult *row = d->row_list[row_index];
+  if (!row) {
+    return value;  // Shouldn't happen.
+  }
 
   if (role == Qt::DisplayRole) {
-    const auto &string_view = row.name_token.data();
-    auto string_view_size = static_cast<qsizetype>(string_view.size());
-
-    value.setValue(QString::fromUtf8(string_view.data(), string_view_size));
+    std::string_view name = row->name_token.data();
+    qsizetype name_len = static_cast<qsizetype>(name.size());
+    value.setValue(QString::fromUtf8(name.data(), name_len));
 
   } else if (role == EntityExplorerModel::TokenRole) {
-    value.setValue(row.name_token);
+    value.setValue(row->name_token);
   }
 
   return value;
@@ -199,7 +183,7 @@ void EntityExplorerModel::CancelSearch() {
 
   emit beginResetModel();
 
-  d->entity_set.clear();
+  d->results.clear();
   d->row_list.clear();
 
   emit endResetModel();
@@ -231,10 +215,9 @@ void EntityExplorerModel::OnDataBatch(
   }
 
   for (auto &data_batch_entity : data_batch) {
-    auto insert_status = d->entity_set.insert(std::move(data_batch_entity));
-    auto entity_set_it = insert_status.first;
+    const IDatabase::EntityQueryResult &entity =
+        d->results.emplace_back(std::move(data_batch_entity));
 
-    const auto &entity = *entity_set_it;
     if (!EntityIncludedInTokenCategorySet(entity, d->opt_token_category_set)) {
       continue;
     }
@@ -243,19 +226,18 @@ void EntityExplorerModel::OnDataBatch(
       continue;
     }
 
-    d->row_list.push_back(entity_set_it);
+    d->row_list.push_back(&entity);
   }
+
+  SortRows();
 
   emit endResetModel();
 }
 
-void EntityExplorerModel::GenerateRows() {
+void EntityExplorerModel::GenerateRows(void) {
   d->row_list.clear();
 
-  for (auto entity_set_it = d->entity_set.begin();
-       entity_set_it != d->entity_set.end(); ++entity_set_it) {
-
-    const auto &entity = *entity_set_it;
+  for (const IDatabase::EntityQueryResult &entity : d->results) {
     if (!EntityIncludedInTokenCategorySet(entity, d->opt_token_category_set)) {
       continue;
     }
@@ -264,7 +246,14 @@ void EntityExplorerModel::GenerateRows() {
       continue;
     }
 
-    d->row_list.push_back(entity_set_it);
+    d->row_list.push_back(&entity);
+  }
+}
+
+void EntityExplorerModel::SortRows(void) {
+  std::sort(d->row_list.begin(), d->row_list.end(), EntityQueryResultCmp{});
+  if (d->sorting_method == SortingMethod::Descending) {
+    std::reverse(d->row_list.begin(), d->row_list.end());
   }
 }
 

@@ -41,8 +41,8 @@ class MainWindow final : public QMainWindow {
   void CreateNewReferenceExplorer(QString window_title);
   void CreateCodeView();
   void OpenEntityRelatedToToken(const CodeModelIndex &index);
-  void OpenEntityCode(RawEntityId entity_id);
-  void OpenEntityInfo(RawEntityId entity_id, bool force = false);
+  void OpenEntityCode(RawEntityId entity_id, bool canonicalize=true);
+  void OpenEntityInfo(RawEntityId entity_id);
   void OpenTokenContextMenu(CodeModelIndex index);
   void OpenTokenReferenceExplorer(CodeModelIndex index);
   void OpenTokenTaintExplorer(CodeModelIndex index);

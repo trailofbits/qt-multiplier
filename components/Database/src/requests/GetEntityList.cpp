@@ -33,8 +33,8 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
       return;
     }
 
-    if (std::holds_alternative<mx::NamedDecl>(named_entity)) {
-      const auto &named_decl = std::get<mx::NamedDecl>(named_entity);
+    if (std::holds_alternative<NamedDecl>(named_entity)) {
+      NamedDecl &named_decl = std::get<NamedDecl>(named_entity);
       std::string_view decl_name = named_decl.name();
       if (decl_name.empty() ||
           (exact_name && decl_name != name_as_std_string)) {
@@ -46,8 +46,7 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
         continue;
       }
 
-      auto fragment = Fragment::containing(named_decl);
-
+      Fragment fragment = Fragment::containing(named_decl);
       data_batch.push_back(IDatabase::EntityQueryResult{
           fragment,
           File::containing(fragment),
@@ -55,8 +54,8 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
           std::move(named_decl),
       });
 
-    } else if (std::holds_alternative<mx::DefineMacroDirective>(named_entity)) {
-      const auto &macro = std::get<mx::DefineMacroDirective>(named_entity);
+    } else if (std::holds_alternative<DefineMacroDirective>(named_entity)) {
+      DefineMacroDirective &macro = std::get<DefineMacroDirective>(named_entity);
 
       Token name_token = macro.name();
       std::string_view macro_name = name_token.data();
@@ -65,8 +64,7 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
         continue;
       }
 
-      auto fragment = Fragment::containing(macro);
-
+      Fragment fragment = Fragment::containing(macro);
       data_batch.push_back(IDatabase::EntityQueryResult{
           fragment,
           File::containing(fragment),

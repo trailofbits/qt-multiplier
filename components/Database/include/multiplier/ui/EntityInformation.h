@@ -20,8 +20,10 @@
 #include <multiplier/Entities/Token.h>
 #include <multiplier/Entities/Type.h>
 #include <multiplier/Entity.h>
-#include <optional>
+
 #include <QString>
+
+#include <optional>
 #include <tuple>
 
 namespace mx::gui {

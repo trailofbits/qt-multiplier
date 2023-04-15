@@ -68,6 +68,7 @@ target_link_libraries("Multiplier"
     "mx_entityexplorer"
     "mx_historywidget"
     "mx_widgets"
+    "mx_informationexplorer"
 )
 
 enable_qt_properties("Multiplier")
