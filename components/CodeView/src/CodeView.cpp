@@ -117,28 +117,30 @@ int CodeView::GetCursorPosition() const {
 }
 
 bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
-  d->version++;
-
-  auto text_cursor = d->text_edit->textCursor();
-  text_cursor.movePosition(QTextCursor::End);
-
-  auto max_position = text_cursor.position();
-  if (start >= max_position || opt_end.value_or(start) >= max_position) {
-    return false;
-  }
+  QTextCursor text_cursor = d->text_edit->textCursor();
+  auto prev_position = text_cursor.position();
 
   // NOTE(pag): We stop cursor tracking so that the individual cursor
   //            manipulations here that are needed to center the view on the
   //            cursor don't bubble up to higher levels.
   StopCursorTracking();
 
+  text_cursor.movePosition(QTextCursor::End);
+  auto max_position = text_cursor.position();
+
+  if (start >= max_position || opt_end.value_or(start) >= max_position) {
+    text_cursor.setPosition(prev_position, QTextCursor::MoveAnchor);
+    ResumeCursorTracking();
+    return false;
+  }
+
   text_cursor.setPosition(start, QTextCursor::MoveMode::MoveAnchor);
 
   // We want to change the scroll in the viewport, so move us to the end of
   // the document (trick from StackOverflow), then back to the text cursor,
   // then center on the cursor.
-  if (auto next_block = text_cursor.block().blockNumber();
-      next_block != d->last_block) {
+  auto next_block = text_cursor.block().blockNumber();
+  if (next_block != d->last_block) {
     d->text_edit->moveCursor(QTextCursor::End);
     d->text_edit->setTextCursor(text_cursor);
     d->text_edit->ensureCursorVisible();
@@ -150,6 +152,10 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
   } else {
     d->text_edit->setTextCursor(text_cursor);
   }
+
+  // Update these to pretend a press and suppress a mouse release.
+  d->last_press_position = text_cursor.position();
+  d->last_block = next_block;
 
   if (opt_end.has_value()) {
     text_cursor.setPosition(opt_end.value(), QTextCursor::MoveMode::KeepAnchor);
@@ -204,10 +210,13 @@ CodeView::CodeView(ICodeModel *model, QWidget *parent)
 }
 
 bool CodeView::eventFilter(QObject *obj, QEvent *event) {
-  //if (dynamic_cast<QMouseEvent *>(event) && obj == d->text_edit->viewport()) {
-  //  qDebug() << "eventFilter" << event->type()
-  //           << d->text_edit->textCursor().position();
-  //}
+//  if (dynamic_cast<QMouseEvent *>(event) && obj == d->text_edit->viewport()) {
+//    qDebug() << "eventFilter" << event->type()
+//             << "position" << d->text_edit->textCursor().position()
+//             << "version" << d->version
+//             << "last_press_version" << d->last_press_version
+//             << "last_press_position" << d->last_press_position;
+//  }
 
   switch (event->type()) {
     case QEvent::Paint:
@@ -224,10 +233,6 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
     case QEvent::MouseButtonPress:
       if (obj == d->text_edit->viewport()) {
         auto mouse_event = dynamic_cast<QMouseEvent *>(event);
-        QTextCursor cursor = d->text_edit->textCursor();
-        d->last_press_version = d->version;
-        d->last_press_position = cursor.position();
-        d->last_block = cursor.block().blockNumber();
         OnTextEditViewportMouseButtonPress(mouse_event);
       }
       break;
@@ -244,18 +249,14 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
         if (prev_version != d->version) {
           event->ignore();
 
-          // Sometimes a model reset as a reuslt of a mouse press triggers a
+          // Sometimes a model reset as a result of a mouse press triggers a
           // selection of everything from the beginning of the text to where
           // the cursor is upon mouse press release (usually following a minor
           // mouse move). If we observe a selection at this point, and if the
           // beginning or ending of the selection matches our pre-model reset
           // position, then the position must still be valid, and so we'll move
           // the cursor back to where it was.
-          QTextCursor cursor = d->text_edit->textCursor();
-          if (cursor.selectionStart() != cursor.selectionEnd() &&
-              (prev_position == cursor.selectionStart() ||
-               prev_position == cursor.selectionEnd())) {
-
+          if (prev_position != -1 && d->last_block != -1) {
             SetCursorPosition(prev_position, std::nullopt);
           }
           return true;
@@ -365,6 +366,7 @@ void CodeView::StopCursorTracking(void) {
 
 //! Re-introduce cursor change tracking.
 void CodeView::ResumeCursorTracking(void) {
+  d->version++;
   QTimer::singleShot(200, this, &CodeView::ConnectCursorChangeEvent);
 }
 
@@ -407,6 +409,12 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
 }
 
 void CodeView::OnTextEditViewportMouseButtonPress(QMouseEvent *event) {
+
+  QTextCursor cursor = d->text_edit->cursorForPosition(event->pos());
+  d->last_press_version = d->version;
+  d->last_press_position = cursor.position();
+  d->last_block = cursor.block().blockNumber();
+
   auto opt_model_index = GetCodeModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
     return;

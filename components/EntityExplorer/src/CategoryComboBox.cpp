@@ -24,15 +24,12 @@ void EnumerateTokenCategories(
 
   for (const auto &token_category : {TokenCategory::UNKNOWN,
                                      TokenCategory::MACRO_NAME,
-                                     TokenCategory::MACRO_DIRECTIVE_NAME,
                                      TokenCategory::GLOBAL_VARIABLE,
-                                     TokenCategory::PARAMETER_VARIABLE,
                                      TokenCategory::FUNCTION,
                                      TokenCategory::INSTANCE_METHOD,
                                      TokenCategory::INSTANCE_MEMBER,
                                      TokenCategory::CLASS_METHOD,
                                      TokenCategory::CLASS_MEMBER,
-                                     TokenCategory::THIS,
                                      TokenCategory::CLASS,
                                      TokenCategory::STRUCT,
                                      TokenCategory::UNION,
@@ -40,10 +37,7 @@ void EnumerateTokenCategories(
                                      TokenCategory::INTERFACE,
                                      TokenCategory::ENUM,
                                      TokenCategory::ENUMERATOR,
-                                     TokenCategory::NAMESPACE,
-                                     TokenCategory::TYPE_ALIAS,
-                                     TokenCategory::TEMPLATE_PARAMETER_TYPE,
-                                     TokenCategory::TEMPLATE_PARAMETER_VALUE}) {
+                                     TokenCategory::TYPE_ALIAS}) {
     callback(token_category);
   }
 }

@@ -75,7 +75,10 @@ class EntityExplorerModel final : public IEntityExplorerModel,
   OnDataBatch(IDatabase::QueryEntitiesReceiver::DataBatch data_batch) override;
 
   //! Regenerates the rows based on the active filters
-  void GenerateRows();
+  void GenerateRows(void);
+
+  //! Sort the rows.
+  void SortRows(void);
 
   friend class IEntityExplorerModel;
 };

@@ -466,14 +466,14 @@ void MainWindow::OpenEntityInfo(RawEntityId entity_id) {
   d->info_explorer_model->RequestEntityInformation(entity_id);
 }
 
-void MainWindow::OpenEntityCode(RawEntityId entity_id) {
+void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
   // TODO(pag): Make this fetch the entity via a QFuture or something like that.
   VariantEntity entity = d->index.entity(entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     return;
   }
 
-  if (std::holds_alternative<Decl>(entity)) {
+  if (canonicalize && std::holds_alternative<Decl>(entity)) {
     Decl canon = std::get<Decl>(entity).canonical_declaration();
     entity_id = canon.id().Pack();
     entity = std::move(canon);
@@ -627,7 +627,7 @@ void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
   CloseTokenReferenceExplorer();
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
   OpenEntityInfo(entity_id);
-  OpenEntityCode(entity_id);
+  OpenEntityCode(entity_id, false  /* don't canonicalize entity IDs */);
 }
 
 //! Called when the history menu is used to go back/forward to some specific
