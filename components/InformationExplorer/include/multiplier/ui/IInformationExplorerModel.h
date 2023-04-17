@@ -19,6 +19,12 @@ class IInformationExplorerModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
+  //! Additional item data roles for this model
+  enum ItemDataRole {
+    //! Returns a QString containing the file path and cursor position
+    LocationRole = Qt::UserRole + 1,
+  };
+
   //! Factory method
   static IInformationExplorerModel *
   Create(Index index, FileLocationCache file_location_cache,

@@ -178,7 +178,6 @@ void MainWindow::CreateInfoExplorerDock() {
   d->info_explorer_dock = new QDockWidget(tr("Information Explorer"), this);
   d->info_explorer_dock->setWidget(info_explorer);
   d->info_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-  d->info_explorer_dock->hide();
 
   d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
   addDockWidget(Qt::LeftDockWidgetArea, d->info_explorer_dock);
