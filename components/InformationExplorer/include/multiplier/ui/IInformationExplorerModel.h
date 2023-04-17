@@ -23,6 +23,9 @@ class IInformationExplorerModel : public QAbstractItemModel {
   enum ItemDataRole {
     //! Returns a QString containing the file path and cursor position
     LocationRole = Qt::UserRole + 1,
+
+    //! Returns the RawEntityId value
+    EntityIdRole,
   };
 
   //! Factory method

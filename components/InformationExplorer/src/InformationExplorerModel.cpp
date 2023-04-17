@@ -330,6 +330,7 @@ void InformationExplorerModel::ImportEntityInformation(
 
   struct Property final {
     QString display_role;
+    RawEntityId entity_id{};
     std::optional<QString> opt_location_role;
   };
 
@@ -372,6 +373,7 @@ void InformationExplorerModel::ImportEntityInformation(
       }
 
       property.opt_location_role = std::move(opt_location);
+      property.entity_id = IdOfEntity(selection.entity);
 
       auto property_path = filler.base_path + property.display_role;
       if (property_list.count(property_path) == 1) {
@@ -398,6 +400,9 @@ void InformationExplorerModel::ImportEntityInformation(
     const auto &property = property_list_p.second;
 
     std::unordered_map<int, QVariant> value_map = {};
+    value_map.insert(
+        {IInformationExplorerModel::EntityIdRole, property.entity_id});
+
     if (property.opt_location_role.has_value()) {
       auto &location = property.opt_location_role.value();
       value_map.insert(

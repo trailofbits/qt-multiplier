@@ -68,6 +68,10 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model) {
 
   connect(d->model, &QAbstractItemModel::modelReset, this,
           &InformationExplorer::OnModelReset);
+
+  auto tree_selection_model = d->tree_view->selectionModel();
+  connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
+          &InformationExplorer::OnCurrentItemChanged);
 }
 
 void InformationExplorer::ExpandAllNodes() {
@@ -109,6 +113,11 @@ void InformationExplorer::OnSearchParametersChange(
 
   d->model_proxy->setFilterRegularExpression(regex);
   ExpandAllNodes();
+}
+
+void InformationExplorer::OnCurrentItemChanged(const QModelIndex &current_index,
+                                               const QModelIndex &) {
+  emit SelectedItemChanged(current_index);
 }
 
 }  // namespace mx::gui

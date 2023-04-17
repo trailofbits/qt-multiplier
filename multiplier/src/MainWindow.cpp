@@ -121,10 +121,10 @@ void MainWindow::InitializeWidgets() {
 
 void MainWindow::InitializeToolBar() {
   QSize icon_size(32, 32);
-  d->toolbar.back_forward = new HistoryWidget(d->index, d->file_location_cache,
-                                              kMaxHistorySize);
-  connect(d->toolbar.back_forward, &HistoryWidget::GoToEntity,
-          this, &MainWindow::OnHistoryNavigationEntitySelected);
+  d->toolbar.back_forward =
+      new HistoryWidget(d->index, d->file_location_cache, kMaxHistorySize);
+  connect(d->toolbar.back_forward, &HistoryWidget::GoToEntity, this,
+          &MainWindow::OnHistoryNavigationEntitySelected);
 
   auto toolbar = new QToolBar(tr("Main Toolbar"), this);
   toolbar->setIconSize(icon_size);
@@ -174,6 +174,9 @@ void MainWindow::CreateInfoExplorerDock() {
 
   auto info_explorer =
       IInformationExplorer::Create(d->info_explorer_model, this);
+
+  connect(info_explorer, &IInformationExplorer::SelectedItemChanged, this,
+          &MainWindow::OnInformationExplorerSelectionChange);
 
   d->info_explorer_dock = new QDockWidget(tr("Information Explorer"), this);
   d->info_explorer_dock->setWidget(info_explorer);
@@ -626,7 +629,7 @@ void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
   CloseTokenReferenceExplorer();
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
   OpenEntityInfo(entity_id);
-  OpenEntityCode(entity_id, false  /* don't canonicalize entity IDs */);
+  OpenEntityCode(entity_id, false /* don't canonicalize entity IDs */);
 }
 
 //! Called when the history menu is used to go back/forward to some specific
@@ -635,6 +638,19 @@ void MainWindow::OnHistoryNavigationEntitySelected(RawEntityId entity_id) {
   CloseTokenReferenceExplorer();
   OpenEntityInfo(entity_id);
   OpenEntityCode(entity_id);
+}
+
+void MainWindow::OnInformationExplorerSelectionChange(
+    const QModelIndex &index) {
+  auto entity_id_var = index.data(IInformationExplorerModel::EntityIdRole);
+  if (!entity_id_var.isValid()) {
+    return;
+  }
+
+  auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+
+  d->toolbar.back_forward->CommitCurrentLocationToHistory();
+  OpenEntityCode(entity_id, false /* don't canonicalize entity IDs */);
 }
 
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
