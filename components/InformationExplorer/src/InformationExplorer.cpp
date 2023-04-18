@@ -9,6 +9,7 @@
 
 #include "InformationExplorer.h"
 #include "InformationExplorerTreeView.h"
+#include "Utils.h"
 
 #include <multiplier/ui/Assert.h>
 
@@ -75,7 +76,27 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model) {
 }
 
 void InformationExplorer::ExpandAllNodes() {
-  d->tree_view->expandAll();
+  std::vector<QModelIndex> next_queue{QModelIndex()};
+
+  while (!next_queue.empty()) {
+    auto queue = std::move(next_queue);
+    next_queue.clear();
+
+    for (const auto &index : queue) {
+      if (!ShouldAutoExpand(index)) {
+        continue;
+      }
+
+      d->tree_view->expand(index);
+
+      auto row_count = d->model_proxy->rowCount(index);
+      for (int row{}; row < row_count; ++row) {
+        auto child_index = d->model_proxy->index(row, 0, index);
+        next_queue.push_back(child_index);
+      }
+    }
+  }
+
   d->tree_view->resizeColumnToContents(0);
 }
 

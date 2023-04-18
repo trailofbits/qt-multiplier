@@ -26,6 +26,9 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   enum ItemDataRole {
     //! Returns true if tokens should never be painted for an index
     ForceTextPaintRole = Qt::UserRole + 100,
+
+    //! Returns a boolean that tells the view whether to auto-expand
+    AutoExpandRole,
   };
 
   //! \copybrief IInformationExplorerModel::RequestEntityInformation

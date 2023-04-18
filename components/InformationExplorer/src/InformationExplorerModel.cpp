@@ -419,12 +419,15 @@ void InformationExplorerModel::ImportEntityInformation(
 
         if (fix_previous_entry) {
           // Keep the old entry as is; it will become the root
-          // of our duplicated entities
+          // of our duplicated entities.
           //
           // Then, duplicate this property with a different path
           // and turn off token painting for it
-          auto old_property = property_map[property_key];
+          auto &root_property = property_map[property_key];
+          root_property.value_map.insert(
+              {InformationExplorerModel::AutoExpandRole, false});
 
+          auto old_property = root_property;
           old_property.value_map.insert(
               {InformationExplorerModel::ForceTextPaintRole, true});
 

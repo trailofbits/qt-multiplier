@@ -13,5 +13,6 @@
 namespace mx::gui {
 
 bool ShouldPaintAsTokens(const QModelIndex &index);
+bool ShouldAutoExpand(const QModelIndex &index);
 
 }  // namespace mx::gui

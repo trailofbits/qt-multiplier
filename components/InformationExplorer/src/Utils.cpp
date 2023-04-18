@@ -31,4 +31,17 @@ bool ShouldPaintAsTokens(const QModelIndex &index) {
   return true;
 }
 
+bool ShouldAutoExpand(const QModelIndex &index) {
+  if (!index.isValid()) {
+    return true;
+  }
+
+  auto auto_expand_var = index.data(InformationExplorerModel::AutoExpandRole);
+  if (!auto_expand_var.isValid()) {
+    return true;
+  }
+
+  return auto_expand_var.toBool();
+}
+
 }  // namespace mx::gui
