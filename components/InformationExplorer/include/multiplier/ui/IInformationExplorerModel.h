@@ -26,6 +26,9 @@ class IInformationExplorerModel : public QAbstractItemModel {
 
     //! Returns the RawEntityId value
     EntityIdRole,
+
+    //! Returns the TokenRange data
+    TokenRangeRole,
   };
 
   //! Factory method

@@ -22,6 +22,12 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   Q_OBJECT
 
  public:
+  //! Additional internal item data roles for this model
+  enum ItemDataRole {
+    //! Returns true if tokens should never be painted for an index
+    ForceTextPaintRole = Qt::UserRole + 100,
+  };
+
   //! \copybrief IInformationExplorerModel::RequestEntityInformation
   virtual void RequestEntityInformation(const RawEntityId &entity_id) override;
 

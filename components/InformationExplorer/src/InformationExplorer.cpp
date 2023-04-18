@@ -8,18 +8,18 @@
 */
 
 #include "InformationExplorer.h"
+#include "InformationExplorerTreeView.h"
 
 #include <multiplier/ui/Assert.h>
 
 #include <QVBoxLayout>
-#include <QTreeView>
 #include <QSortFilterProxyModel>
 
 namespace mx::gui {
 
 struct InformationExplorer::PrivateData final {
   IInformationExplorerModel *model{nullptr};
-  QTreeView *tree_view{nullptr};
+  InformationExplorerTreeView *tree_view{nullptr};
 
   QSortFilterProxyModel *model_proxy{nullptr};
   ISearchWidget *search_widget{nullptr};
@@ -40,7 +40,7 @@ void InformationExplorer::InitializeWidgets() {
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
 
-  d->tree_view = new QTreeView(this);
+  d->tree_view = new InformationExplorerTreeView(this);
   d->tree_view->setHeaderHidden(true);
   d->tree_view->setAlternatingRowColors(true);
   layout->addWidget(d->tree_view);

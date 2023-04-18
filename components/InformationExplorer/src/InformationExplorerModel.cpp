@@ -359,8 +359,8 @@ void InformationExplorerModel::ImportEntityInformation(
     } else {
       const auto &entity_id_role_var =
           property.value_map[IInformationExplorerModel::EntityIdRole];
-      auto entity_id = qvariant_cast<RawEntityId>(entity_id_role_var);
 
+      auto entity_id = qvariant_cast<RawEntityId>(entity_id_role_var);
       property.path.append(QString::number(entity_id));
     }
   };
@@ -399,6 +399,14 @@ void InformationExplorerModel::ImportEntityInformation(
       property.value_map.insert({IInformationExplorerModel::EntityIdRole,
                                  IdOfEntity(selection.entity)});
 
+      {
+        QVariant token_range_var;
+        token_range_var.setValue(selection.tokens);
+
+        property.value_map.insert({IInformationExplorerModel::TokenRangeRole,
+                                   std::move(token_range_var)});
+      }
+
       if (opt_location.has_value()) {
         auto &location = opt_location.value();
         property.value_map.insert(
@@ -415,11 +423,17 @@ void InformationExplorerModel::ImportEntityInformation(
           auto old_property = property_map[property_key];
           property_map.erase(property_key);
 
+          old_property.value_map.insert(
+              {InformationExplorerModel::ForceTextPaintRole, true});
+
           L_recalculatePath(old_property);
           fix_previous_entry = false;
 
           property_map.insert({PathToString(old_property.path), old_property});
         }
+
+        property.value_map.insert(
+            {InformationExplorerModel::ForceTextPaintRole, true});
 
         L_recalculatePath(property);
         property_key = PathToString(property.path);

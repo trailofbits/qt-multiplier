@@ -18,6 +18,15 @@ add_library("mx_informationexplorer"
 
   src/InformationExplorer.h
   src/InformationExplorer.cpp
+
+  src/InformationExplorerTreeView.h
+  src/InformationExplorerTreeView.cpp
+
+  src/InformationExplorerItemDelegate.h
+  src/InformationExplorerItemDelegate.cpp
+
+  src/Utils.h
+  src/Utils.cpp
 )
 
 target_link_libraries("mx_informationexplorer"
@@ -30,6 +39,8 @@ target_link_libraries("mx_informationexplorer"
     "mx_assert"
     "mx_database"
     "mx_searchwidget"
+    "mx_codeviewtheme"
+    "mx_util"
 )
 
 target_include_directories("mx_informationexplorer" PRIVATE
