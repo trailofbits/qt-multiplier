@@ -57,12 +57,21 @@ void CreatePropertyHelper(
   path.pop_front();
 
   if (path.isEmpty()) {
+    for (const auto &child_id : current_node.child_id_list) {
+      auto &child_node = context.node_map[child_id];
+
+      if (child_node.display_role == current_component) {
+        child_node.value_map = std::move(value_map);
+        return;
+      }
+    }
+
     auto child_id = InformationExplorerModel::GenerateNodeID(context);
 
     InformationExplorerModel::Context::Node property_node;
     property_node.parent_node_id = parent_node_id;
-    property_node.data = InformationExplorerModel::Context::Node::PropertyData{
-        current_component, value_map};
+    property_node.display_role = current_component;
+    property_node.value_map = value_map;
 
     current_node.child_id_list.push_back(child_id);
     context.node_map.insert({child_id, std::move(property_node)});
@@ -75,17 +84,7 @@ void CreatePropertyHelper(
   for (const auto &child_id : current_node.child_id_list) {
     const auto &child_node = context.node_map[child_id];
 
-    if (!std::holds_alternative<
-            InformationExplorerModel::Context::Node::SectionData>(
-            child_node.data)) {
-      continue;
-    }
-
-    const auto &section_data =
-        std::get<InformationExplorerModel::Context::Node::SectionData>(
-            child_node.data);
-
-    if (section_data.name == current_component) {
+    if (child_node.display_role == current_component) {
       opt_child_id = child_id;
       break;
     }
@@ -97,8 +96,7 @@ void CreatePropertyHelper(
 
     InformationExplorerModel::Context::Node section_node;
     section_node.parent_node_id = parent_node_id;
-    section_node.data =
-        InformationExplorerModel::Context::Node::SectionData{current_component};
+    section_node.display_role = current_component;
 
     current_node.child_id_list.push_back(child_id);
     context.node_map.insert({child_id, std::move(section_node)});
@@ -313,7 +311,7 @@ void InformationExplorerModel::ResetContext(Context &context) {
   context = {};
 
   Context::Node root_node;
-  root_node.data = Context::Node::SectionData{tr("ROOT")};
+  root_node.display_role = tr("ROOT");
   context.node_map.insert({0, std::move(root_node)});
 }
 
@@ -420,8 +418,12 @@ void InformationExplorerModel::ImportEntityInformation(
         auto &fix_previous_entry = visited_name_map_it->second;
 
         if (fix_previous_entry) {
+          // Keep the old entry as is; it will become the root
+          // of our duplicated entities
+          //
+          // Then, duplicate this property with a different path
+          // and turn off token painting for it
           auto old_property = property_map[property_key];
-          property_map.erase(property_key);
 
           old_property.value_map.insert(
               {InformationExplorerModel::ForceTextPaintRole, true});
@@ -432,6 +434,9 @@ void InformationExplorerModel::ImportEntityInformation(
           property_map.insert({PathToString(old_property.path), old_property});
         }
 
+        // Disable token painting for this item. Since the name was duplicated, we
+        // either have a file location or (if one is not available) an entity id
+        // number
         property.value_map.insert(
             {InformationExplorerModel::ForceTextPaintRole, true});
 
@@ -502,36 +507,16 @@ QVariant InformationExplorerModel::Data(const Context &context,
   }
 
   const auto &node = node_map_it->second;
-
-  if (std::holds_alternative<
-          InformationExplorerModel::Context::Node::SectionData>(node.data)) {
-
-    const auto &section_data =
-        std::get<InformationExplorerModel::Context::Node::SectionData>(
-            node.data);
-
-    if (role != Qt::DisplayRole) {
-      return QVariant();
-    }
-
-    return section_data.name;
-
-  } else {
-    const auto &property_data =
-        std::get<InformationExplorerModel::Context::Node::PropertyData>(
-            node.data);
-
-    if (role == Qt::DisplayRole) {
-      return property_data.display_role;
-    }
-
-    auto value_map_it = property_data.value_map.find(role);
-    if (value_map_it == property_data.value_map.end()) {
-      return QVariant();
-    }
-
-    return value_map_it->second;
+  if (role == Qt::DisplayRole) {
+    return node.display_role;
   }
+
+  auto value_map_it = node.value_map.find(role);
+  if (value_map_it == node.value_map.end()) {
+    return QVariant();
+  }
+
+  return value_map_it->second;
 }
 
 }  // namespace mx::gui

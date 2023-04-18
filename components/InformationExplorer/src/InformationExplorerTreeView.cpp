@@ -22,9 +22,6 @@ InformationExplorerTreeView::InformationExplorerTreeView(QWidget *parent)
     : QTreeView(parent) {
 
   setItemDelegate(new InformationExplorerItemDelegate());
-
-  // With multiline items, it's best to use per-pixel scrolling
-  setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
 }
 
 InformationExplorerTreeView::~InformationExplorerTreeView() {}

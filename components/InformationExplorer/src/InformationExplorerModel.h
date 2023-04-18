@@ -78,26 +78,11 @@ class InformationExplorerModel final : public IInformationExplorerModel {
 
     //! A node representing either a section or a property
     struct Node final {
-      //! Section data
-      struct SectionData final {
-        //! The mandatory section name
-        QString name;
-      };
+      //! The property value
+      QString display_role;
 
-      //! Property data
-      struct PropertyData final {
-        //! The property value
-        QString display_role;
-
-        //! Additional data roles
-        std::unordered_map<int, QVariant> value_map;
-      };
-
-      //! Either a SectionData or a PropertyData object
-      using NodeData = std::variant<SectionData, PropertyData>;
-
-      //! Node data
-      NodeData data;
+      //! Additional data roles
+      std::unordered_map<int, QVariant> value_map;
 
       //! Parent node id
       NodeID parent_node_id{};
