@@ -15,6 +15,10 @@ namespace mx::gui {
 
 namespace {
 
+QString PathToString(const QStringList &path) {
+  return path.join(".");
+}
+
 std::optional<QString>
 GetFileName(const std::optional<EntityInformation::Location> &opt_location) {
 
@@ -45,15 +49,14 @@ GetFileName(const std::optional<EntityInformation::Location> &opt_location) {
 void CreatePropertyHelper(
     InformationExplorerModel::Context &context,
     const InformationExplorerModel::Context::NodeID &parent_node_id,
-    QStringList path_component_list,
-    const std::unordered_map<int, QVariant> &value_map) {
+    QStringList path, const std::unordered_map<int, QVariant> &value_map) {
 
   auto &current_node = context.node_map[parent_node_id];
 
-  QString current_component = path_component_list.front();
-  path_component_list.pop_front();
+  QString current_component = path.front();
+  path.pop_front();
 
-  if (path_component_list.isEmpty()) {
+  if (path.isEmpty()) {
     auto child_id = InformationExplorerModel::GenerateNodeID(context);
 
     InformationExplorerModel::Context::Node property_node;
@@ -101,8 +104,7 @@ void CreatePropertyHelper(
     context.node_map.insert({child_id, std::move(section_node)});
   }
 
-  CreatePropertyHelper(context, opt_child_id.value(), path_component_list,
-                       value_map);
+  CreatePropertyHelper(context, opt_child_id.value(), path, value_map);
 }
 
 }  // namespace
@@ -138,10 +140,10 @@ void InformationExplorerModel::RequestEntityInformation(
       !(std::holds_alternative<MacroId>(vid) &&
         std::get<MacroId>(vid).kind == MacroKind::DEFINE_DIRECTIVE)) {
 
-    CreateProperty(d->context, tr("Update Failed"));
+    CreateProperty(d->context, {tr("Update Failed")});
 
   } else {
-    CreateProperty(d->context, tr("Updating"));
+    CreateProperty(d->context, {tr("Updating")});
 
     d->opt_active_entity_id = entity_id;
 
@@ -242,7 +244,7 @@ void InformationExplorerModel::FutureResultStateChanged() {
   ResetContext(d->context);
 
   if (d->future_result.isCanceled()) {
-    CreateProperty(d->context, tr("Interrupted"));
+    CreateProperty(d->context, {tr("Interrupted")});
     emit endResetModel();
 
     return;
@@ -250,7 +252,7 @@ void InformationExplorerModel::FutureResultStateChanged() {
 
   auto future_result = d->future_result.takeResult();
   if (!future_result.Succeeded()) {
-    CreateProperty(d->context, tr("Failed"));
+    CreateProperty(d->context, {tr("Failed")});
     emit endResetModel();
 
     return;
@@ -288,12 +290,12 @@ void InformationExplorerModel::CancelRunningRequest() {
 }
 
 void InformationExplorerModel::CreateProperty(
-    Context &context, const QString &path,
+    Context &context, const QStringList &path,
     const std::unordered_map<int, QVariant> &value_map) {
 
   Assert(!path.isEmpty(), "The path should not be empty");
 
-  CreatePropertyHelper(context, 0, path.split("|"), value_map);
+  CreatePropertyHelper(context, 0, path, value_map);
 }
 
 quintptr InformationExplorerModel::GenerateNodeID(Context &context) {
@@ -312,45 +314,57 @@ void InformationExplorerModel::ImportEntityInformation(
     Context &context, const EntityInformation &entity_information) {
 
   struct Filler final {
-    QString base_path;
+    QStringList base_path;
     const std::vector<EntityInformation::Selection> &source_container;
   };
 
   const std::vector<Filler> filler_list{
-      {tr("Redeclarations") + "|", entity_information.redeclarations},
-      {tr("Macros used") + "|", entity_information.macros_used},
-      {tr("Callees") + "|", entity_information.callees},
-      {tr("Callers") + "|", entity_information.callers},
-      {tr("Assigned to") + "|", entity_information.assigned_tos},
-      {tr("Assignements") + "|", entity_information.assignments},
-      {tr("Includes") + "|", entity_information.includes},
-      {tr("Included by") + "|", entity_information.include_bys},
-      {tr("Top level entities") + "|", entity_information.top_level_entities},
+      {{tr("Redeclarations")}, entity_information.redeclarations},
+      {{tr("Macros used")}, entity_information.macros_used},
+      {{tr("Callees")}, entity_information.callees},
+      {{tr("Callers")}, entity_information.callers},
+      {{tr("Assigned to")}, entity_information.assigned_tos},
+      {{tr("Assignements")}, entity_information.assignments},
+      {{tr("Includes")}, entity_information.includes},
+      {{tr("Included by")}, entity_information.include_bys},
+      {{tr("Top level entities")}, entity_information.top_level_entities},
   };
 
   struct Property final {
+    QStringList path;
     QString display_role;
-    RawEntityId entity_id{};
-    std::optional<QString> opt_location_role;
+    std::unordered_map<int, QVariant> value_map;
   };
 
-  std::unordered_map<QString, Property> property_list;
+  std::vector<Property> property_list;
 
-  auto L_recalculatePath = [](const QString &original_path,
-                              const Property &property) -> QString {
-    auto new_property_path = original_path + "|";
-    if (property.opt_location_role.has_value()) {
-      const auto &location_role = property.opt_location_role.value();
-      new_property_path += location_role;
+  auto L_recalculatePath = [](Property &property) {
+    // If we are here, the display name is already the same. Attempt to use
+    // the location role and use the entity id as fallback. Additional strategies
+    // can be added here.
+    if (property.value_map.count(IInformationExplorerModel::LocationRole) ==
+        1) {
+      const auto &location_role_var =
+          property.value_map[IInformationExplorerModel::LocationRole];
+
+      property.path.append(location_role_var.toString());
+
     } else {
-      new_property_path += property.display_role;
-    }
+      const auto &entity_id_role_var =
+          property.value_map[IInformationExplorerModel::EntityIdRole];
+      auto entity_id = qvariant_cast<RawEntityId>(entity_id_role_var);
 
-    return new_property_path;
+      property.path.append(QString::number(entity_id));
+    }
   };
 
   for (const auto &filler : filler_list) {
-    std::unordered_set<QString> grouped_names;
+    // Items will only be reparented once at the first display
+    // name conflict and only in the first level.
+    // Additional entries that can't be made unique
+    // by recalculating the path will be discarded.
+    std::unordered_map<QString, Property> property_map = {};
+    std::unordered_map<QString, bool> visited_name_map = {};
 
     for (const auto &selection : filler.source_container) {
       auto opt_name = NameOfEntity(selection.entity);
@@ -372,44 +386,58 @@ void InformationExplorerModel::ImportEntityInformation(
         continue;
       }
 
-      property.opt_location_role = std::move(opt_location);
-      property.entity_id = IdOfEntity(selection.entity);
+      property.path = filler.base_path;
+      property.path.append(property.display_role);
 
-      auto property_path = filler.base_path + property.display_role;
-      if (property_list.count(property_path) == 1) {
-        auto old_property = property_list[property_path];
-        property_list.erase(property_path);
+      property.value_map.insert({IInformationExplorerModel::EntityIdRole,
+                                 IdOfEntity(selection.entity)});
 
-        auto new_property_path = L_recalculatePath(property_path, old_property);
-
-        grouped_names.insert(property_path);
-        property_list.insert(
-            {std::move(new_property_path), std::move(old_property)});
+      if (opt_location.has_value()) {
+        auto &location = opt_location.value();
+        property.value_map.insert(
+            {IInformationExplorerModel::LocationRole, std::move(location)});
       }
 
-      if (grouped_names.count(property_path) == 1) {
-        property_path = L_recalculatePath(property_path, property);
+      auto property_key = PathToString(property.path);
+
+      auto visited_name_map_it = visited_name_map.find(property_key);
+      if (visited_name_map_it != visited_name_map.end()) {
+        auto &fix_previous_entry = visited_name_map_it->second;
+
+        if (fix_previous_entry) {
+          auto old_property = property_map[property_key];
+          property_map.erase(property_key);
+
+          L_recalculatePath(old_property);
+          fix_previous_entry = false;
+
+          property_map.insert({PathToString(old_property.path), old_property});
+        }
+
+        L_recalculatePath(property);
+        property_key = PathToString(property.path);
+
+      } else {
+        visited_name_map.insert({property_key, true});
       }
 
-      property_list.insert({std::move(property_path), std::move(property)});
+      property_map.insert({std::move(property_key), std::move(property)});
+    }
+
+    for (auto &property_map_p : property_map) {
+      auto &property = property_map_p.second;
+
+      auto &value_map = property.value_map;
+      value_map.insert({Qt::DisplayRole, property.display_role});
+      property.display_role.clear();
+
+      property_list.push_back(std::move(property));
     }
   }
 
-  for (auto &property_list_p : property_list) {
-    const auto &path = property_list_p.first;
-    const auto &property = property_list_p.second;
-
-    std::unordered_map<int, QVariant> value_map = {};
-    value_map.insert(
-        {IInformationExplorerModel::EntityIdRole, property.entity_id});
-
-    if (property.opt_location_role.has_value()) {
-      auto &location = property.opt_location_role.value();
-      value_map.insert(
-          {IInformationExplorerModel::LocationRole, std::move(location)});
-    }
-
-    CreateProperty(context, path, std::move(value_map));
+  for (auto &property : property_list) {
+    auto &value_map = property.value_map;
+    CreateProperty(context, property.path, std::move(value_map));
   }
 
   context.entity_name = entity_information.name;

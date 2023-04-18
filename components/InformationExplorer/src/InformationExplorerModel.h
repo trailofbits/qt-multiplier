@@ -111,7 +111,7 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   };
 
   static void
-  CreateProperty(Context &context, const QString &path,
+  CreateProperty(Context &context, const QStringList &path,
                  const std::unordered_map<int, QVariant> &value_map = {});
 
   //! Generates a unique node ID
