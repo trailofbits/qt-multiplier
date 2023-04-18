@@ -296,6 +296,7 @@ void InformationExplorerModel::ImportEntityInformation(
     Context::Node::SectionData data;
     group_node.id = group_id;
     group_node.parent_node_id = node.parent_node_id;
+    group_node.depth = 2;
 
     data.name = path;
     group_node.data = std::move(data);
@@ -316,7 +317,7 @@ void InformationExplorerModel::ImportEntityInformation(
     Context::Node::SectionData section;
     section.name = filler.name;
     category_node.id = category_id;
-    category_node.depth = 0;
+    category_node.depth = 1;
     category_node.data = std::move(section);
 
     path_to_node_id.clear();
