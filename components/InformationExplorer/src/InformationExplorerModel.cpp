@@ -217,11 +217,18 @@ QModelIndex InformationExplorerModel::parent(const QModelIndex &child) const {
 
   const auto &parent_node = node_map_it->second;
 
-  auto it =
-      std::find(parent_node.child_id_list.begin(),
-                parent_node.child_id_list.end(), child_node.parent_node_id);
+  node_map_it = d->context.node_map.find(parent_node.parent_node_id);
+  if (node_map_it == d->context.node_map.end()) {
+    return QModelIndex();
+  }
 
-  auto row = std::distance(parent_node.child_id_list.begin(), it);
+  const auto &grandparent_node = node_map_it->second;
+
+  auto it = std::find(grandparent_node.child_id_list.begin(),
+                      grandparent_node.child_id_list.end(),
+                      child_node.parent_node_id);
+
+  auto row = std::distance(grandparent_node.child_id_list.begin(), it);
 
   return createIndex(static_cast<int>(row), 0, child_node.parent_node_id);
 }
