@@ -26,9 +26,6 @@ class IInformationExplorerModel : public QAbstractItemModel {
 
     //! Returns the RawEntityId value
     EntityIdRole,
-
-    //! Name of the entity, as a QString.
-    NameRole,
   };
 
   //! Factory method

@@ -76,20 +76,19 @@ class InformationExplorerModel final : public IInformationExplorerModel {
       struct SectionData final {
         //! The mandatory section name
         QString name;
-
-        //! Child nodes
-        NodeIDList child_id_list;
       };
 
       //! Property data
       struct PropertyData final {
+        //! The property value
+        QString display_role;
 
         //! Additional data roles
         std::unordered_map<int, QVariant> value_map;
       };
 
       //! Either a SectionData or a PropertyData object
-      using NodeData = std::variant<std::monostate, SectionData, PropertyData>;
+      using NodeData = std::variant<SectionData, PropertyData>;
 
       //! Node data
       NodeData data;
@@ -97,11 +96,8 @@ class InformationExplorerModel final : public IInformationExplorerModel {
       //! Parent node id
       NodeID parent_node_id{};
 
-      //! This node's id.
-      NodeID id{};
-
-      //! Depth of this node.
-      int depth{0};
+      //! Child nodes
+      NodeIDList child_id_list;
     };
 
     //! Node id generator, starting from the last top-level node ID
@@ -115,7 +111,8 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   };
 
   static void
-  CreateStatusProperty(Context &context, const QString &path);
+  CreateProperty(Context &context, const QString &path,
+                 const std::unordered_map<int, QVariant> &value_map = {});
 
   //! Generates a unique node ID
   static quintptr GenerateNodeID(Context &context);
@@ -126,7 +123,7 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   //! Imports the given entity information data
   static void
   ImportEntityInformation(Context &context,
-                          EntityInformation entity_information);
+                          const EntityInformation &entity_information);
 
   //! Returns the row count for the given model index
   static int RowCount(const Context &context, const QModelIndex &parent);

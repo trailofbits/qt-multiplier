@@ -17,16 +17,92 @@ namespace {
 
 std::optional<QString>
 GetFileName(const std::optional<EntityInformation::Location> &opt_location) {
-  if (opt_location.has_value()) {
-    for (std::filesystem::path path : opt_location->file.paths()) {
-      return QString("%1:%2:%3")
-          .arg(QString::fromStdString(path.generic_string()))
-          .arg(opt_location->line)
-          .arg(opt_location->column);
+
+  if (!opt_location.has_value()) {
+    return std::nullopt;
+  }
+
+  const auto &location = opt_location.value();
+
+  std::optional<QString> opt_name;
+  for (std::filesystem::path path : location.file.paths()) {
+
+    auto name = QString("%1:%2:%3")
+                    .arg(QString::fromStdString(path.generic_string()))
+                    .arg(location.line)
+                    .arg(location.column);
+
+    if (!name.isEmpty()) {
+      opt_name = std::move(name);
+    }
+
+    break;
+  }
+
+  return opt_name;
+}
+
+void CreatePropertyHelper(
+    InformationExplorerModel::Context &context,
+    const InformationExplorerModel::Context::NodeID &parent_node_id,
+    QStringList path_component_list,
+    const std::unordered_map<int, QVariant> &value_map) {
+
+  auto &current_node = context.node_map[parent_node_id];
+
+  QString current_component = path_component_list.front();
+  path_component_list.pop_front();
+
+  if (path_component_list.isEmpty()) {
+    auto child_id = InformationExplorerModel::GenerateNodeID(context);
+
+    InformationExplorerModel::Context::Node property_node;
+    property_node.parent_node_id = parent_node_id;
+    property_node.data = InformationExplorerModel::Context::Node::PropertyData{
+        current_component, value_map};
+
+    current_node.child_id_list.push_back(child_id);
+    context.node_map.insert({child_id, std::move(property_node)});
+
+    return;
+  }
+
+  std::optional<InformationExplorerModel::Context::NodeID> opt_child_id;
+
+  for (const auto &child_id : current_node.child_id_list) {
+    const auto &child_node = context.node_map[child_id];
+
+    if (!std::holds_alternative<
+            InformationExplorerModel::Context::Node::SectionData>(
+            child_node.data)) {
+      continue;
+    }
+
+    const auto &section_data =
+        std::get<InformationExplorerModel::Context::Node::SectionData>(
+            child_node.data);
+
+    if (section_data.name == current_component) {
+      opt_child_id = child_id;
+      break;
     }
   }
 
-  return std::nullopt;
+  if (!opt_child_id.has_value()) {
+    opt_child_id = InformationExplorerModel::GenerateNodeID(context);
+    const auto &child_id = opt_child_id.value();
+
+    InformationExplorerModel::Context::Node section_node;
+    section_node.parent_node_id = parent_node_id;
+    section_node.data =
+        InformationExplorerModel::Context::Node::SectionData{current_component};
+
+    current_node.child_id_list.push_back(child_id);
+    context.node_map.insert({child_id, std::move(section_node)});
+  }
+
+  CreatePropertyHelper(context, opt_child_id.value(), path_component_list,
+                       value_map);
 }
 
 }  // namespace
@@ -62,10 +138,10 @@ void InformationExplorerModel::RequestEntityInformation(
       !(std::holds_alternative<MacroId>(vid) &&
         std::get<MacroId>(vid).kind == MacroKind::DEFINE_DIRECTIVE)) {
 
-    CreateStatusProperty(d->context, tr("Update Failed"));
+    CreateProperty(d->context, tr("Update Failed"));
 
   } else {
-    CreateStatusProperty(d->context, tr("Updating"));
+    CreateProperty(d->context, tr("Updating"));
 
     d->opt_active_entity_id = entity_id;
 
@@ -87,10 +163,6 @@ QModelIndex InformationExplorerModel::index(int row, int column,
     return QModelIndex();
   }
 
-  if (0 > row || 0 > column) {
-    return QModelIndex();
-  }
-
   Context::NodeID parent_node_id{};
   if (parent.isValid()) {
     parent_node_id = parent.internalId();
@@ -101,22 +173,22 @@ QModelIndex InformationExplorerModel::index(int row, int column,
     return QModelIndex();
   }
 
-  const Context::Node &parent_node = node_map_it->second;
-  if (!std::holds_alternative<Context::Node::SectionData>(parent_node.data)) {
+  const auto &node = node_map_it->second;
+  const auto &node_id_list = node.child_id_list;
+
+  if (static_cast<std::size_t>(row) >= node_id_list.size()) {
     return QModelIndex();
   }
 
-  const Context::Node::SectionData &parent_data =
-      std::get<Context::Node::SectionData>(parent_node.data);
+  auto node_id_list_it = node_id_list.begin();
+  node_id_list_it = std::next(node_id_list_it, row);
 
-  const std::size_t node_index = static_cast<std::size_t>(row);
-  const Context::NodeIDList &node_id_list = parent_data.child_id_list;
-  if (node_index >= node_id_list.size()) {
+  if (node_id_list_it == node_id_list.end()) {
     return QModelIndex();
   }
 
-  Context::NodeID node_id = node_id_list[node_index];
-  return createIndex(row, column, static_cast<quintptr>(node_id));
+  const auto &node_id = *node_id_list_it;
+  return createIndex(row, column, node_id);
 }
 
 QModelIndex InformationExplorerModel::parent(const QModelIndex &child) const {
@@ -131,31 +203,23 @@ QModelIndex InformationExplorerModel::parent(const QModelIndex &child) const {
     return QModelIndex();
   }
 
-  const Context::Node &child_node = node_map_it->second;
-  if (!child_node.id || !child_node.parent_node_id) {
+  const auto &child_node = node_map_it->second;
+  if (child_node.parent_node_id == 0) {
     return QModelIndex();
   }
-
-  Assert(child_node_id == child_node.id, "Inconsistent IDs.");
 
   node_map_it = d->context.node_map.find(child_node.parent_node_id);
   if (node_map_it == d->context.node_map.end()) {
     return QModelIndex();
   }
 
-  const Context::Node &parent_node = node_map_it->second;
-  if (!std::holds_alternative<Context::Node::SectionData>(parent_node.data)) {
-    return QModelIndex();
-  }
-
-  const Context::Node::SectionData &parent_data =
-      std::get<Context::Node::SectionData>(parent_node.data);
+  const auto &parent_node = node_map_it->second;
 
   auto it =
-      std::find(parent_data.child_id_list.begin(),
-                parent_data.child_id_list.end(), child_node_id);
+      std::find(parent_node.child_id_list.begin(),
+                parent_node.child_id_list.end(), child_node.parent_node_id);
 
-  auto row = std::distance(parent_data.child_id_list.begin(), it);
+  auto row = std::distance(parent_node.child_id_list.begin(), it);
 
   return createIndex(static_cast<int>(row), 0, child_node.parent_node_id);
 }
@@ -178,7 +242,7 @@ void InformationExplorerModel::FutureResultStateChanged() {
   ResetContext(d->context);
 
   if (d->future_result.isCanceled()) {
-    CreateStatusProperty(d->context, tr("Interrupted"));
+    CreateProperty(d->context, tr("Interrupted"));
     emit endResetModel();
 
     return;
@@ -186,13 +250,14 @@ void InformationExplorerModel::FutureResultStateChanged() {
 
   auto future_result = d->future_result.takeResult();
   if (!future_result.Succeeded()) {
-    CreateStatusProperty(d->context, tr("Failed"));
+    CreateProperty(d->context, tr("Failed"));
     emit endResetModel();
 
     return;
   }
 
-  ImportEntityInformation(d->context, future_result.TakeValue());
+  auto entity_information = future_result.TakeValue();
+  ImportEntityInformation(d->context, entity_information);
 
   emit endResetModel();
 }
@@ -222,17 +287,13 @@ void InformationExplorerModel::CancelRunningRequest() {
   d->future_result = {};
 }
 
-void InformationExplorerModel::CreateStatusProperty(
-    Context &context, const QString &path) {
+void InformationExplorerModel::CreateProperty(
+    Context &context, const QString &path,
+    const std::unordered_map<int, QVariant> &value_map) {
 
   Assert(!path.isEmpty(), "The path should not be empty");
 
-  Context::NodeID simple_id = GenerateNodeID(context);
-  Context::Node &node = context.node_map[simple_id];
-  Context::Node::PropertyData data;
-  data.value_map.emplace(NameRole, path);
-  data.value_map.emplace(LocationRole, path);
-  node.data = std::move(data);
+  CreatePropertyHelper(context, 0, path.split("|"), value_map);
 }
 
 quintptr InformationExplorerModel::GenerateNodeID(Context &context) {
@@ -243,127 +304,112 @@ void InformationExplorerModel::ResetContext(Context &context) {
   context = {};
 
   Context::Node root_node;
-  root_node.data = Context::Node::SectionData{tr("ROOT"), {}};
+  root_node.data = Context::Node::SectionData{tr("ROOT")};
   context.node_map.insert({0, std::move(root_node)});
 }
 
 void InformationExplorerModel::ImportEntityInformation(
-    Context &context, EntityInformation entity_information) {
+    Context &context, const EntityInformation &entity_information) {
 
-  struct Category final {
-    QString name;
+  struct Filler final {
+    QString base_path;
     const std::vector<EntityInformation::Selection> &source_container;
   };
 
-  const std::vector<Category> filler_list{
-      {tr("Redeclarations"), entity_information.redeclarations},
-      {tr("Macros used"), entity_information.macros_used},
-      {tr("Callees"), entity_information.callees},
-      {tr("Callers"), entity_information.callers},
-      {tr("Assigned to"), entity_information.assigned_tos},
-      {tr("Assignements"), entity_information.assignments},
-      {tr("Includes"), entity_information.includes},
-      {tr("Included by"), entity_information.include_bys},
-      {tr("Top level entities"), entity_information.top_level_entities},
+  const std::vector<Filler> filler_list{
+      {tr("Redeclarations") + "|", entity_information.redeclarations},
+      {tr("Macros used") + "|", entity_information.macros_used},
+      {tr("Callees") + "|", entity_information.callees},
+      {tr("Callers") + "|", entity_information.callers},
+      {tr("Assigned to") + "|", entity_information.assigned_tos},
+      {tr("Assignements") + "|", entity_information.assignments},
+      {tr("Includes") + "|", entity_information.includes},
+      {tr("Included by") + "|", entity_information.include_bys},
+      {tr("Top level entities") + "|", entity_information.top_level_entities},
   };
 
-  std::unordered_map<QString, Context::NodeID> path_to_node_id;
-
-  auto L_get_parent_id = [&] (const QString &loc, const QString &name,
-                              Context::NodeID sel_id,
-                              Context::NodeID category_id) {
-
-    const QString &path = name.isEmpty() ? loc : name;
-    auto id_it = path_to_node_id.find(path);
-    if (id_it == path_to_node_id.end()) {
-      path_to_node_id.emplace(path, sel_id);
-      return category_id;
-    }
-
-    Context::NodeID parent_or_prev_id = id_it->second;
-    Context::Node &node = context.node_map[parent_or_prev_id];
-    if (node.parent_node_id != category_id) {
-      Assert(parent_or_prev_id == node.id, "Invalid node ID");
-      Assert(std::holds_alternative<Context::Node::SectionData>(node.data),
-             "Invalid section ID");
-      return node.id;  // It's a group node.
-    }
-
-    // Need to make an intermediate node, change a child id of `node` into
-    // this new group node, then reparent `node` into this new group node.
-    Context::NodeID group_id = GenerateNodeID(context);
-    Context::Node &group_node = context.node_map[group_id];
-    Context::Node::SectionData data;
-    group_node.id = group_id;
-    group_node.parent_node_id = node.parent_node_id;
-
-    data.name = path;
-    group_node.data = std::move(data);
-
-    // Reparent the old non-section node into the section.
-    node.parent_node_id = group_id;
-
-    // Make the next one look in the right spot.
-    id_it->second = group_id;
-
-    return group_id;
+  struct Property final {
+    QString display_role;
+    RawEntityId entity_id{};
+    std::optional<QString> opt_location_role;
   };
 
-  for (const Category &filler : filler_list) {
+  std::unordered_map<QString, Property> property_list;
 
-    Context::NodeID category_id = GenerateNodeID(context);
-    Context::Node &category_node = context.node_map[category_id];
-    Context::Node::SectionData section;
-    section.name = filler.name;
-    category_node.id = category_id;
-    category_node.depth = 0;
-    category_node.data = std::move(section);
-
-    path_to_node_id.clear();
-
-    for (const EntityInformation::Selection &sel :
-             filler.source_container) {
-      Context::NodeID sel_id = GenerateNodeID(context);
-      Context::Node &sel_node = context.node_map[sel_id];
-      Context::Node::PropertyData data;
-      QString location;
-      QString name;
-
-      if (auto opt_name = NameOfEntity(sel.entity)) {
-        name = std::move(opt_name.value());
-        data.value_map.emplace(NameRole, name);
-      }
-
-      if(auto opt_location = GetFileName(sel.location)) {
-        location = std::move(opt_location.value());
-        data.value_map.emplace(LocationRole, location);
-      }
-
-      data.value_map.emplace(EntityIdRole, IdOfEntity(sel.entity));
-
-      sel_node.id = sel_id;
-      sel_node.parent_node_id = L_get_parent_id(location, name, sel_id,
-                                                category_id);
-      sel_node.data = std::move(data);
+  auto L_recalculatePath = [](const QString &original_path,
+                              const Property &property) -> QString {
+    auto new_property_path = original_path + "|";
+    if (property.opt_location_role.has_value()) {
+      const auto &location_role = property.opt_location_role.value();
+      new_property_path += location_role;
+    } else {
+      new_property_path += property.display_role;
     }
 
-    // Unlink this catrgory, we didn't add anything under it.
-    if (path_to_node_id.empty()) {
-      context.node_map.erase(category_id);
-      continue;
+    return new_property_path;
+  };
+
+  for (const auto &filler : filler_list) {
+    std::unordered_set<QString> grouped_names;
+
+    for (const auto &selection : filler.source_container) {
+      auto opt_name = NameOfEntity(selection.entity);
+
+      std::optional<QString> opt_location;
+      if (selection.location.has_value()) {
+        const auto &location = selection.location.value();
+        opt_location = GetFileName(location);
+      }
+
+      Property property;
+      if (opt_name.has_value()) {
+        property.display_role = opt_name.value();
+
+      } else if (opt_location.has_value()) {
+        property.display_role = opt_location.value();
+
+      } else {
+        continue;
+      }
+
+      property.opt_location_role = std::move(opt_location);
+      property.entity_id = IdOfEntity(selection.entity);
+
+      auto property_path = filler.base_path + property.display_role;
+      if (property_list.count(property_path) == 1) {
+        auto old_property = property_list[property_path];
+        property_list.erase(property_path);
+
+        auto new_property_path = L_recalculatePath(property_path, old_property);
+
+        grouped_names.insert(property_path);
+        property_list.insert(
+            {std::move(new_property_path), std::move(old_property)});
+      }
+
+      if (grouped_names.count(property_path) == 1) {
+        property_path = L_recalculatePath(property_path, property);
+      }
+
+      property_list.insert({std::move(property_path), std::move(property)});
     }
   }
 
-  for (auto &entry : context.node_map) {
-    Context::Node &node = entry.second;
-    Assert(entry.first == node.id, "Invalid node id");
-    if (node.id) {
-      Context::Node &parent_node = context.node_map[node.parent_node_id];
-      Context::Node::SectionData &parent_data =
-          std::get<Context::Node::SectionData>(parent_node.data);
-      parent_data.child_id_list.push_back(node.id);
-      node.depth = parent_node.depth + 1;
+  for (auto &property_list_p : property_list) {
+    const auto &path = property_list_p.first;
+    const auto &property = property_list_p.second;
+
+    std::unordered_map<int, QVariant> value_map = {};
+    value_map.insert(
+        {IInformationExplorerModel::EntityIdRole, property.entity_id});
+
+    if (property.opt_location_role.has_value()) {
+      auto &location = property.opt_location_role.value();
+      value_map.insert(
+          {IInformationExplorerModel::LocationRole, std::move(location)});
     }
+
+    CreateProperty(context, path, std::move(value_map));
   }
 
   context.entity_name = entity_information.name;
@@ -388,20 +434,8 @@ int InformationExplorerModel::RowCount(const Context &context,
     return 0;
   }
 
-  const Context::Node &node = node_map_it->second;
-
-  if (std::holds_alternative<Context::Node::PropertyData>(node.data)) {
-    return 0;  // No children.
-
-  } else if (std::holds_alternative<Context::Node::SectionData>(node.data)) {
-    const Context::Node::SectionData &data =
-        std::get<Context::Node::SectionData>(node.data);
-
-    return static_cast<int>(data.child_id_list.size());
-
-  } else {
-    return 0;
-  }
+  const auto &node = node_map_it->second;
+  return static_cast<int>(node.child_id_list.size());
 }
 
 QVariant InformationExplorerModel::Data(const Context &context,
@@ -418,12 +452,14 @@ QVariant InformationExplorerModel::Data(const Context &context,
     return QVariant();
   }
 
-  const Context::Node &node = node_map_it->second;
+  const auto &node = node_map_it->second;
 
-  if (std::holds_alternative<Context::Node::SectionData>(node.data)) {
+  if (std::holds_alternative<
+          InformationExplorerModel::Context::Node::SectionData>(node.data)) {
 
-    const Context::Node::SectionData &section_data =
-        std::get<Context::Node::SectionData>(node.data);
+    const auto &section_data =
+        std::get<InformationExplorerModel::Context::Node::SectionData>(
+            node.data);
 
     if (role != Qt::DisplayRole) {
       return QVariant();
@@ -431,30 +467,13 @@ QVariant InformationExplorerModel::Data(const Context &context,
 
     return section_data.name;
 
-  } else if (std::holds_alternative<Context::Node::PropertyData>(node.data)) {
-    const Context::Node::PropertyData &property_data =
-        std::get<Context::Node::PropertyData>(node.data);
+  } else {
+    const auto &property_data =
+        std::get<InformationExplorerModel::Context::Node::PropertyData>(
+            node.data);
 
-    // If we're at depth 1, then we haven't merged anything, so the display
-    // role is the name, but otherwise, we've merged things, and so to
-    // disambiguate the name, we return the location.
     if (role == Qt::DisplayRole) {
-      QVariant name;
-      if (auto it = property_data.value_map.find(NameRole);
-          it != property_data.value_map.end()) {
-        if (node.depth <= 2) {
-          return it->second;
-        }
-
-        name.setValue(it->second);
-      }
-
-      if (auto it = property_data.value_map.find(LocationRole);
-          it != property_data.value_map.end()) {
-        return it->second;
-      }
-
-      return name;
+      return property_data.display_role;
     }
 
     auto value_map_it = property_data.value_map.find(role);
@@ -464,8 +483,6 @@ QVariant InformationExplorerModel::Data(const Context &context,
 
     return value_map_it->second;
   }
-
-  return QVariant();
 }
 
 }  // namespace mx::gui
