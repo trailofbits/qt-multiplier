@@ -9,6 +9,7 @@
 #include "SearchWidget.h"
 
 #include <multiplier/ui/Assert.h>
+#include <multiplier/ui/ILineEdit.h>
 
 #include <QIcon>
 #include <QLineEdit>
@@ -52,7 +53,7 @@ struct SearchWidget::PrivateData final {
   QIcon disabled_whole_word_search;
   QAction *whole_word_search_action{nullptr};
 
-  QLineEdit *search_input{nullptr};
+  ILineEdit *search_input{nullptr};
   QLineEdit *search_input_error_display{nullptr};
 
   QShortcut *enable_search_shortcut{nullptr};
@@ -122,7 +123,7 @@ void SearchWidget::InitializeWidgets() {
   search_widget_layout->setContentsMargins(0, 0, 0, 0);
   search_widget_layout->setSpacing(0);
 
-  d->search_input = new QLineEdit();
+  d->search_input = ILineEdit::Create(this);
   d->search_input->setClearButtonEnabled(true);
   d->search_input->setPlaceholderText(d->mode == Mode::Search ? tr("Search")
                                                               : tr("Filter"));
