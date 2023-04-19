@@ -22,6 +22,19 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   Q_OBJECT
 
  public:
+  //! Data for RawLocationRole
+  //! \todo An mx_common header-only library with these types?
+  struct RawLocation final {
+    //! File path
+    QString path;
+
+    //! Line number
+    unsigned line_number{};
+
+    //! Column number
+    unsigned column_number{};
+  };
+
   //! Additional internal item data roles for this model
   enum ItemDataRole {
     //! Returns true if tokens should never be painted for an index
@@ -29,6 +42,9 @@ class InformationExplorerModel final : public IInformationExplorerModel {
 
     //! Returns a boolean that tells the view whether to auto-expand
     AutoExpandRole,
+
+    //! Returns a RawLocation structure
+    RawLocationRole,
   };
 
   //! \copybrief IInformationExplorerModel::RequestEntityInformation
@@ -130,3 +146,6 @@ class InformationExplorerModel final : public IInformationExplorerModel {
 };
 
 }  // namespace mx::gui
+
+//! Used to store internal sorting data in a QVariant object
+Q_DECLARE_METATYPE(mx::gui::InformationExplorerModel::RawLocation);

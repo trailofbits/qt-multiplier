@@ -44,7 +44,8 @@ static std::optional<QString> GetName(const QVariant &display_role) {
 }
 
 std::optional<QString>
-GetFileName(const std::optional<EntityInformation::Location> &opt_location) {
+GetFileName(const std::optional<EntityInformation::Location> &opt_location,
+            bool path_only) {
 
   if (!opt_location.has_value()) {
     return std::nullopt;
@@ -54,11 +55,14 @@ GetFileName(const std::optional<EntityInformation::Location> &opt_location) {
 
   std::optional<QString> opt_name;
   for (std::filesystem::path path : location.file.paths()) {
+    if (path_only) {
+      return QString::fromStdString(path.generic_string());
+    }
 
     return QString("%1:%2:%3")
-                    .arg(QString::fromStdString(path.generic_string()))
-                    .arg(location.line)
-                    .arg(location.column);
+        .arg(QString::fromStdString(path.generic_string()))
+        .arg(location.line)
+        .arg(location.column);
   }
 
   return std::nullopt;
@@ -376,10 +380,11 @@ void InformationExplorerModel::ImportEntityInformation(
     std::unordered_map<QString, bool> visited_name_map = {};
 
     for (const EntityInformation::Selection &selection :
-             filler.source_container) {
+         filler.source_container) {
 
       std::optional<QString> opt_name = GetName(selection.display_role);
-      std::optional<QString> opt_location = GetFileName(selection.location);
+      std::optional<QString> opt_location =
+          GetFileName(selection.location, false);
 
       Property property;
       if (opt_name.has_value()) {
@@ -413,6 +418,18 @@ void InformationExplorerModel::ImportEntityInformation(
       if (opt_location.has_value()) {
         property.value_map.emplace(IInformationExplorerModel::LocationRole,
                                    std::move(opt_location.value()));
+
+
+        RawLocation raw_location;
+        raw_location.path = GetFileName(selection.location, true).value();
+        raw_location.line_number = selection.location->line;
+        raw_location.column_number = selection.location->column;
+
+        QVariant value;
+        value.setValue(raw_location);
+
+        property.value_map.insert(
+            {InformationExplorerModel::RawLocationRole, std::move(value)});
       }
 
       QString property_key = PathToString(property.path);

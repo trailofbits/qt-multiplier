@@ -27,6 +27,9 @@ add_library("mx_informationexplorer"
 
   src/Utils.h
   src/Utils.cpp
+
+  src/SortFilterProxyModel.h
+  src/SortFilterProxyModel.cpp
 )
 
 target_link_libraries("mx_informationexplorer"

@@ -10,11 +10,12 @@
 #include "InformationExplorer.h"
 #include "InformationExplorerTreeView.h"
 #include "Utils.h"
+#include "SortFilterProxyModel.h"
+#include "InformationExplorerModel.h"
 
 #include <multiplier/ui/Assert.h>
 
 #include <QVBoxLayout>
-#include <QSortFilterProxyModel>
 
 namespace mx::gui {
 
@@ -22,7 +23,7 @@ struct InformationExplorer::PrivateData final {
   IInformationExplorerModel *model{nullptr};
   InformationExplorerTreeView *tree_view{nullptr};
 
-  QSortFilterProxyModel *model_proxy{nullptr};
+  SortFilterProxyModel *model_proxy{nullptr};
   ISearchWidget *search_widget{nullptr};
 };
 
@@ -66,9 +67,13 @@ void InformationExplorer::InitializeWidgets() {
 void InformationExplorer::InstallModel(IInformationExplorerModel *model) {
   d->model = model;
 
-  d->model_proxy = new QSortFilterProxyModel(this);
+  d->model_proxy = new SortFilterProxyModel(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);
+
+  d->model_proxy->setSortRole(InformationExplorerModel::RawLocationRole);
+  d->model_proxy->sort(0);
+  d->model_proxy->setDynamicSortFilter(true);
 
   d->tree_view->setModel(d->model_proxy);
 
