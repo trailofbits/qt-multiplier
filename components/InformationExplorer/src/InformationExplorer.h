@@ -47,6 +47,10 @@ class InformationExplorer final : public IInformationExplorer {
   void OnSearchParametersChange(
       const ISearchWidget::SearchParameters &search_parameters);
 
+  //! Called when the seletion in the tree view changes
+  void OnCurrentItemChanged(const QModelIndex &current_index,
+                            const QModelIndex &);
+
   friend class IInformationExplorer;
 };
 

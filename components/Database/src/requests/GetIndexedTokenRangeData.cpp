@@ -453,7 +453,7 @@ void GetIndexedTokenRangeData(
       result_promise, file_location_cache, std::move(token_range_data));
 
   if (std::holds_alternative<RPCErrorCode>(indexed_tokens_res)) {
-    result_promise.addResult(std::get<RPCErrorCode>(token_range_data_res));
+    result_promise.addResult(std::get<RPCErrorCode>(indexed_tokens_res));
     return;
   }
 

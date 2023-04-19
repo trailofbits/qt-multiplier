@@ -22,6 +22,31 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   Q_OBJECT
 
  public:
+  //! Data for RawLocationRole
+  //! \todo An mx_common header-only library with these types?
+  struct RawLocation final {
+    //! File path
+    QString path;
+
+    //! Line number
+    unsigned line_number{};
+
+    //! Column number
+    unsigned column_number{};
+  };
+
+  //! Additional internal item data roles for this model
+  enum ItemDataRole {
+    //! Returns true if tokens should never be painted for an index
+    ForceTextPaintRole = Qt::UserRole + 100,
+
+    //! Returns a boolean that tells the view whether to auto-expand
+    AutoExpandRole,
+
+    //! Returns a RawLocation structure
+    RawLocationRole,
+  };
+
   //! \copybrief IInformationExplorerModel::RequestEntityInformation
   virtual void RequestEntityInformation(const RawEntityId &entity_id) override;
 
@@ -62,53 +87,48 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   void CancelRunningRequest();
 
  public:
-  //! Top level nodes
-  enum TopLevelNodeID : quintptr {
-    kEntityInformationNodeId,
-    kRedeclarationsNodeId,
-    kMacrosUsedNodeId,
-    kCalleesNodeId,
-    kCallersNodeId,
-    kAssignedTo,
-    kAssignment,
-    kIncludesNodeId,
-    kIncludeBysNodeId,
-    kTopLevelEntitiesNodeId,
-    kTopLevelNodeIDMax,
-  };
-
   //! Model data
   struct Context final {
     //! A node id, matching the QModelIndex::internalId type
     using NodeID = quintptr;
 
-    //! Data for a single node
-    struct Node final {
-      //! Id of the top level node
-      NodeID parent_node;
-
-      //! Node name (Qt::DisplayRole)
-      QString name;
-    };
-
     //! A list of node IDs
     using NodeIDList = std::vector<NodeID>;
+
+    //! A node representing either a section or a property
+    struct Node final {
+      //! The property value
+      QString display_role;
+
+      //! Additional data roles
+      std::unordered_map<int, QVariant> value_map;
+
+      //! Parent node id
+      NodeID parent_node_id{};
+
+      //! Child nodes
+      NodeIDList child_id_list;
+    };
+
+    //! Node id generator, starting from the last top-level node ID
+    NodeID node_id_generator{};
 
     //! The name of the active entity
     QString entity_name;
 
-    //! Node id generator, starting from the last top-level node ID
-    NodeID node_id_generator{kTopLevelNodeIDMax};
-
-    //! All the non-top level nodes in the model
+    //! All the nodes in the model
     std::unordered_map<NodeID, Node> node_map;
-
-    //! Maps a top level node `TopLevelNodeID` to its children
-    std::unordered_map<NodeID, NodeIDList> root_node_map;
   };
+
+  static void
+  CreateProperty(Context &context, const QStringList &path,
+                 const std::unordered_map<int, QVariant> &value_map = {});
 
   //! Generates a unique node ID
   static quintptr GenerateNodeID(Context &context);
+
+  //! Resets the context structure
+  static void ResetContext(Context &context);
 
   //! Imports the given entity information data
   static void
@@ -126,3 +146,6 @@ class InformationExplorerModel final : public IInformationExplorerModel {
 };
 
 }  // namespace mx::gui
+
+//! Used to store internal sorting data in a QVariant object
+Q_DECLARE_METATYPE(mx::gui::InformationExplorerModel::RawLocation);

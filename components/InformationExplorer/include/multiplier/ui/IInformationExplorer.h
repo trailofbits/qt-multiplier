@@ -34,6 +34,10 @@ class IInformationExplorer : public QWidget {
 
   //! Disable copy assignment
   IInformationExplorer &operator=(const IInformationExplorer &) = delete;
+
+ signals:
+  //! Emitted whenever the selected item changes
+  void SelectedItemChanged(const QModelIndex &current_index);
 };
 
 }  // namespace mx::gui

@@ -109,7 +109,7 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   d->tree_view->setAllColumnsShowFocus(true);
   d->tree_view->setTreePosition(0);
 
-  d->tree_view->setAlternatingRowColors(true);
+  d->tree_view->setAlternatingRowColors(false);
   d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree_view->setExpandsOnDoubleClick(false);
