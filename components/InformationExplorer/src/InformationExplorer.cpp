@@ -1,4 +1,3 @@
-
 /*
   Copyright (c) 2022-present, Trail of Bits, Inc.
   All rights reserved.
@@ -14,10 +13,18 @@
 #include "InformationExplorerModel.h"
 
 #include <multiplier/ui/Assert.h>
+#include <multiplier/ui/HistoryWidget.h>
 
 #include <QVBoxLayout>
+#include <QToolBar>
 
 namespace mx::gui {
+
+namespace {
+
+const std::size_t kMaxHistorySize{30};
+
+}
 
 struct InformationExplorer::PrivateData final {
   IInformationExplorerModel *model{nullptr};
@@ -25,6 +32,9 @@ struct InformationExplorer::PrivateData final {
 
   SortFilterProxyModel *model_proxy{nullptr};
   ISearchWidget *search_widget{nullptr};
+
+  HistoryWidget *history_widget{nullptr};
+  bool enable_history_updates{true};
 };
 
 InformationExplorer::~InformationExplorer() {}
@@ -34,13 +44,27 @@ InformationExplorer::InformationExplorer(IInformationExplorerModel *model,
     : IInformationExplorer(parent),
       d(new PrivateData) {
 
-  InitializeWidgets();
+  InitializeWidgets(model);
   InstallModel(model);
 }
 
-void InformationExplorer::InitializeWidgets() {
+void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model) {
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
+
+  auto toolbar = new QToolBar(this);
+  layout->addWidget(toolbar);
+
+  d->history_widget = new HistoryWidget(
+      model->GetIndex(), model->GetFileLocationCache(), kMaxHistorySize, this);
+
+  toolbar->addWidget(d->history_widget);
+  toolbar->setIconSize(QSize(16, 16));
+
+  d->history_widget->SetIconSize(toolbar->iconSize());
+
+  connect(d->history_widget, &HistoryWidget::GoToEntity, this,
+          &InformationExplorer::OnHistoryNavigationEntitySelected);
 
   d->tree_view = new InformationExplorerTreeView(this);
   d->tree_view->setHeaderHidden(true);
@@ -60,8 +84,6 @@ void InformationExplorer::InitializeWidgets() {
 
   setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
-
-  setEnabled(false);
 }
 
 void InformationExplorer::InstallModel(IInformationExplorerModel *model) {
@@ -109,10 +131,22 @@ void InformationExplorer::ExpandAllNodes() {
 }
 
 void InformationExplorer::OnModelReset() {
-  auto enable = d->model->rowCount(QModelIndex()) != 0;
-  setEnabled(enable);
-
   ExpandAllNodes();
+
+  auto opt_current_entity_id = d->model->GetCurrentEntityID();
+  if (!opt_current_entity_id.has_value()) {
+    return;
+  }
+
+  const auto &current_entity_id = opt_current_entity_id.value();
+
+  if (d->enable_history_updates) {
+    d->history_widget->CommitCurrentLocationToHistory();
+  } else {
+    d->enable_history_updates = true;
+  }
+
+  d->history_widget->SetCurrentLocation(current_entity_id);
 }
 
 void InformationExplorer::OnSearchParametersChange(
@@ -147,6 +181,13 @@ void InformationExplorer::OnSearchParametersChange(
 void InformationExplorer::OnCurrentItemChanged(const QModelIndex &current_index,
                                                const QModelIndex &) {
   emit SelectedItemChanged(current_index);
+}
+
+void InformationExplorer::OnHistoryNavigationEntitySelected(
+    RawEntityId original_id, RawEntityId) {
+
+  d->enable_history_updates = false;
+  d->model->RequestEntityInformation(original_id);
 }
 
 }  // namespace mx::gui

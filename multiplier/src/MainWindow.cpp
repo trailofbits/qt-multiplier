@@ -680,10 +680,11 @@ void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
 
 //! Called when the history menu is used to go back/forward to some specific
 //! entity ID.
-void MainWindow::OnHistoryNavigationEntitySelected(RawEntityId entity_id) {
+void MainWindow::OnHistoryNavigationEntitySelected(RawEntityId,
+                                                   RawEntityId canonical_id) {
   CloseAllPopups();
-  OpenEntityInfo(entity_id);
-  OpenEntityCode(entity_id);
+  OpenEntityInfo(canonical_id);
+  OpenEntityCode(canonical_id);
 }
 
 void MainWindow::OnInformationExplorerSelectionChange(

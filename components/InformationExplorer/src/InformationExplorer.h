@@ -31,7 +31,7 @@ class InformationExplorer final : public IInformationExplorer {
   InformationExplorer(IInformationExplorerModel *model, QWidget *parent);
 
   //! Initializes the internal widgets
-  void InitializeWidgets();
+  void InitializeWidgets(IInformationExplorerModel *model);
 
   //! Installs the specified model
   void InstallModel(IInformationExplorerModel *model);
@@ -50,6 +50,10 @@ class InformationExplorer final : public IInformationExplorer {
   //! Called when the seletion in the tree view changes
   void OnCurrentItemChanged(const QModelIndex &current_index,
                             const QModelIndex &);
+
+  //! Called when the history widget is interacted with
+  void OnHistoryNavigationEntitySelected(RawEntityId original_id,
+                                         RawEntityId canonical_id);
 
   friend class IInformationExplorer;
 };

@@ -35,17 +35,20 @@ static const char * const kForwardButtonToolTip =
 
 struct Item final {
   std::uint64_t item_id;
-  RawEntityId entity_id;
+  RawEntityId original_id;
+  RawEntityId canonical_id;
   QString name;
 
-  Item(RawEntityId entity_id_)
+  Item(RawEntityId original_id_, RawEntityId canonical_id_)
       : item_id(gNextItemId.fetch_add(1u)),
-        entity_id(entity_id_),
-        name(QString("Entity %1").arg(entity_id)) {}
+        original_id(original_id_),
+        canonical_id(canonical_id_),
+        name(QString("Entity %1").arg(canonical_id)) {}
 
-  Item(RawEntityId entity_id_, const QString &name_)
+  Item(RawEntityId original_id_, RawEntityId canonical_id_, const QString &name_)
       : item_id(gNextItemId.fetch_add(1u)),
-        entity_id(entity_id_),
+        original_id(original_id_),
+        canonical_id(canonical_id_),
         name(name_) {}
 };
 
@@ -148,6 +151,9 @@ void HistoryWidget::PrivateData::AddToHistory(
   // events and from open file events, so it's nice if we can make the file
   // events and cursor events "look the same" so that we don't end up with a
   // file and a file's first token beside one another in history.
+  RawEntityId original_id{entity_id};
+  RawEntityId canonical_id{entity_id};
+
   if (std::holds_alternative<FileId>(vid)) {
     auto file = index.file(std::get<FileId>(vid));
     if (!file) {
@@ -155,7 +161,7 @@ void HistoryWidget::PrivateData::AddToHistory(
     }
 
     if (TokenRange file_tokens = file->tokens()) {
-      entity_id = file_tokens.front().id().Pack();
+      canonical_id = file_tokens.front().id().Pack();
     }
   }
 
@@ -173,17 +179,17 @@ void HistoryWidget::PrivateData::AddToHistory(
   }
 
   // Don't add repeat items to the end.
-  if (item_list.empty() || item_list.back().entity_id != entity_id) {
+  if (item_list.empty() || item_list.back().canonical_id != canonical_id) {
 
     // If we're given a label then we're done.
     if (opt_label.has_value()) {
-      item_list.emplace_back(entity_id, opt_label.value());
+      item_list.emplace_back(original_id, canonical_id, opt_label.value());
 
     // If we weren't given a label, then compute a label on a background thread.
     } else {
-      Item &item = item_list.emplace_back(entity_id);
+      Item &item = item_list.emplace_back(original_id, canonical_id);
 
-      auto labeller = new HistoryLabelBuilder(index, file_cache, entity_id,
+      auto labeller = new HistoryLabelBuilder(index, file_cache, canonical_id,
                                               item.item_id);
       labeller->setAutoDelete(true);
 
@@ -391,7 +397,9 @@ void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
   }
   ItemList::iterator it = std::next(d->item_list.begin(),
                                     item_index_var.toInt());
-  RawEntityId entity_id = it->entity_id;
+
+  RawEntityId original_id = it->original_id;
+  RawEntityId canonical_id = it->canonical_id;
 
   // If we're going back to some place in the past, and if we're starting from
   // "the present," then we need to materialize a history item representing our
@@ -406,7 +414,7 @@ void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
 
   d->NavigateBackToHistoryItem(it);
   UpdateMenus();
-  emit GoToEntity(entity_id);
+  emit GoToEntity(original_id, canonical_id);
 }
 
 //! Called when a specific history item in the forward button's drop-down menu
@@ -425,10 +433,13 @@ void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
 
   ItemList::iterator it = std::next(d->item_list.begin(),
                                     item_index_var.toInt());
-  RawEntityId entity_id = it->entity_id;
+
+  RawEntityId original_id = it->original_id;
+  RawEntityId canonical_id = it->canonical_id;
+
   d->NavigateForwardToHistoryItem(it);
   UpdateMenus();
-  emit GoToEntity(entity_id);
+  emit GoToEntity(original_id, canonical_id);
 }
 
 

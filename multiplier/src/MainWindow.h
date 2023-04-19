@@ -80,7 +80,8 @@ class MainWindow final : public QMainWindow {
   void OnCodeViewTabBarClose(int index);
   void OnCodeViewTabClicked(int index);
   void OnEntityExplorerEntityClicked(RawEntityId entity_id);
-  void OnHistoryNavigationEntitySelected(RawEntityId entity_id);
+  void OnHistoryNavigationEntitySelected(RawEntityId original_id,
+                                         RawEntityId canonical_id);
   void OnInformationExplorerSelectionChange(const QModelIndex &index);
 };
 
