@@ -9,7 +9,6 @@
 #include "InformationExplorerTreeView.h"
 #include "InformationExplorerModel.h"
 #include "InformationExplorerItemDelegate.h"
-#include "Utils.h"
 
 #include <multiplier/ui/IInformationExplorerModel.h>
 #include <multiplier/ui/CodeViewTheme.h>
@@ -30,15 +29,12 @@ void InformationExplorerTreeView::drawRow(QPainter *painter,
                                           const QStyleOptionViewItem &option,
                                           const QModelIndex &index) const {
 
-  if (ShouldPaintAsTokens(index)) {
-    auto code_view_theme = GetDefaultCodeViewTheme(true);
-    auto background_color = (option.state & QStyle::State_Selected) != 0
-                                ? code_view_theme.selected_line_background_color
-                                : code_view_theme.default_background_color;
+  auto code_view_theme = GetDefaultCodeViewTheme(true);
+  auto background_color = (option.state & QStyle::State_Selected) != 0
+                              ? code_view_theme.selected_line_background_color
+                              : code_view_theme.default_background_color;
 
-    painter->fillRect(option.rect, QBrush(background_color));
-  }
-
+  painter->fillRect(option.rect, QBrush(background_color));
   QTreeView::drawRow(painter, option, index);
 }
 
