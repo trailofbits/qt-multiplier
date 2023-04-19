@@ -19,6 +19,30 @@ QString PathToString(const QStringList &path) {
   return path.join(".");
 }
 
+static std::optional<QString> GetName(const QVariant &display_role) {
+  if (!display_role.isValid()) {
+    return std::nullopt;
+  }
+
+  std::string_view data;
+
+  if (display_role.canConvert<QString>()) {
+    return qvariant_cast<QString>(display_role);
+  } else if (display_role.canConvert<TokenRange>()) {
+    data = qvariant_cast<TokenRange>(display_role).data();
+  } else if (display_role.canConvert<Token>()) {
+    data = qvariant_cast<Token>(display_role).data();
+  } else {
+    return std::nullopt;
+  }
+
+  if (data.empty()) {
+    return std::nullopt;
+  }
+
+  return QString::fromUtf8(data.data(), static_cast<qsizetype>(data.size()));
+}
+
 std::optional<QString>
 GetFileName(const std::optional<EntityInformation::Location> &opt_location) {
 
@@ -31,19 +55,13 @@ GetFileName(const std::optional<EntityInformation::Location> &opt_location) {
   std::optional<QString> opt_name;
   for (std::filesystem::path path : location.file.paths()) {
 
-    auto name = QString("%1:%2:%3")
+    return QString("%1:%2:%3")
                     .arg(QString::fromStdString(path.generic_string()))
                     .arg(location.line)
                     .arg(location.column);
-
-    if (!name.isEmpty()) {
-      opt_name = std::move(name);
-    }
-
-    break;
   }
 
-  return opt_name;
+  return std::nullopt;
 }
 
 void CreatePropertyHelper(
@@ -132,22 +150,11 @@ void InformationExplorerModel::RequestEntityInformation(
   ResetContext(d->context);
   d->opt_active_entity_id = std::nullopt;
 
-  VariantId vid = EntityId(entity_id).Unpack();
-  if (!std::holds_alternative<DeclId>(vid) &&
-      !std::holds_alternative<FileId>(vid) &&
-      !(std::holds_alternative<MacroId>(vid) &&
-        std::get<MacroId>(vid).kind == MacroKind::DEFINE_DIRECTIVE)) {
+  CreateProperty(d->context, {tr("Updating...")});
 
-    CreateProperty(d->context, {tr("Update Failed")});
-
-  } else {
-    CreateProperty(d->context, {tr("Updating")});
-
-    d->opt_active_entity_id = entity_id;
-
-    d->future_result = d->database->RequestEntityInformation(entity_id);
-    d->future_watcher.setFuture(d->future_result);
-  }
+  d->opt_active_entity_id = entity_id;
+  d->future_result = d->database->RequestEntityInformation(entity_id);
+  d->future_watcher.setFuture(d->future_result);
 
   emit endResetModel();
 }
@@ -251,7 +258,6 @@ void InformationExplorerModel::FutureResultStateChanged() {
   if (d->future_result.isCanceled()) {
     CreateProperty(d->context, {tr("Interrupted")});
     emit endResetModel();
-
     return;
   }
 
@@ -259,7 +265,6 @@ void InformationExplorerModel::FutureResultStateChanged() {
   if (!future_result.Succeeded()) {
     CreateProperty(d->context, {tr("Failed")});
     emit endResetModel();
-
     return;
   }
 
@@ -290,7 +295,6 @@ void InformationExplorerModel::CancelRunningRequest() {
 
   d->future_result.cancel();
   d->future_result.waitForFinished();
-
   d->future_result = {};
 }
 
@@ -323,15 +327,15 @@ void InformationExplorerModel::ImportEntityInformation(
     const std::vector<EntityInformation::Selection> &source_container;
   };
 
-  const std::vector<Filler> filler_list{
+  const Filler filler_list[] = {
       {{tr("Redeclarations")}, entity_information.redeclarations},
-      {{tr("Macros used")}, entity_information.macros_used},
       {{tr("Callees")}, entity_information.callees},
       {{tr("Callers")}, entity_information.callers},
       {{tr("Assigned to")}, entity_information.assigned_tos},
       {{tr("Assignements")}, entity_information.assignments},
       {{tr("Includes")}, entity_information.includes},
       {{tr("Included by")}, entity_information.include_bys},
+      {{tr("Macros used")}, entity_information.macros_used},
       {{tr("Top level entities")}, entity_information.top_level_entities},
   };
 
@@ -345,8 +349,8 @@ void InformationExplorerModel::ImportEntityInformation(
 
   auto L_recalculatePath = [](Property &property) {
     // If we are here, the display name is already the same. Attempt to use
-    // the location role and use the entity id as fallback. Additional strategies
-    // can be added here.
+    // the location role and use the entity id as fallback. Additional
+    // strategies can be added here.
     if (property.value_map.count(IInformationExplorerModel::LocationRole) ==
         1) {
       const auto &location_role_var =
@@ -363,22 +367,19 @@ void InformationExplorerModel::ImportEntityInformation(
     }
   };
 
-  for (const auto &filler : filler_list) {
-    // Items will only be reparented once at the first display
+  for (const Filler &filler : filler_list) {
+    // Items will only be re-parented once at the first display
     // name conflict and only in the first level.
     // Additional entries that can't be made unique
     // by recalculating the path will be discarded.
     std::unordered_map<QString, Property> property_map = {};
     std::unordered_map<QString, bool> visited_name_map = {};
 
-    for (const auto &selection : filler.source_container) {
-      auto opt_name = NameOfEntity(selection.entity);
+    for (const EntityInformation::Selection &selection :
+             filler.source_container) {
 
-      std::optional<QString> opt_location;
-      if (selection.location.has_value()) {
-        const auto &location = selection.location.value();
-        opt_location = GetFileName(location);
-      }
+      std::optional<QString> opt_name = GetName(selection.display_role);
+      std::optional<QString> opt_location = GetFileName(selection.location);
 
       Property property;
       if (opt_name.has_value()) {
@@ -394,35 +395,38 @@ void InformationExplorerModel::ImportEntityInformation(
       property.path = filler.base_path;
       property.path.append(property.display_role);
 
-      property.value_map.insert({IInformationExplorerModel::EntityIdRole,
-                                 IdOfEntity(selection.entity)});
+      property.value_map.emplace(IInformationExplorerModel::EntityIdRole,
+                                 IdOfEntity(selection.entity_role));
 
-      {
-        QVariant token_range_var;
-        token_range_var.setValue(selection.tokens);
+      if (selection.display_role.canConvert<TokenRange>()) {
+        property.value_map.emplace(IInformationExplorerModel::TokenRangeRole,
+                                   selection.display_role);
 
-        property.value_map.insert({IInformationExplorerModel::TokenRangeRole,
-                                   std::move(token_range_var)});
+      } else if (selection.display_role.canConvert<Token>()) {
+        TokenRange range(qvariant_cast<Token>(selection.display_role));
+        QVariant res;
+        res.setValue(std::move(range));
+        property.value_map.emplace(IInformationExplorerModel::TokenRangeRole,
+                                   std::move(res));
       }
 
       if (opt_location.has_value()) {
-        auto &location = opt_location.value();
-        property.value_map.insert(
-            {IInformationExplorerModel::LocationRole, std::move(location)});
+        property.value_map.emplace(IInformationExplorerModel::LocationRole,
+                                   std::move(opt_location.value()));
       }
 
-      auto property_key = PathToString(property.path);
+      QString property_key = PathToString(property.path);
 
       auto visited_name_map_it = visited_name_map.find(property_key);
       if (visited_name_map_it != visited_name_map.end()) {
         auto &fix_previous_entry = visited_name_map_it->second;
 
         if (fix_previous_entry) {
-          // Keep the old entry as is; it will become the root
-          // of our duplicated entities.
+          // Keep the old entry as is; it will become the root of our duplicated
+          // entities.
           //
-          // Then, duplicate this property with a different path
-          // and turn off token painting for it
+          // Then, duplicate this property with a different path and turn off
+          // token painting for it.
           auto &root_property = property_map[property_key];
           root_property.value_map.insert(
               {InformationExplorerModel::AutoExpandRole, false});
@@ -434,12 +438,12 @@ void InformationExplorerModel::ImportEntityInformation(
           L_recalculatePath(old_property);
           fix_previous_entry = false;
 
-          property_map.insert({PathToString(old_property.path), old_property});
+          property_map.emplace(PathToString(old_property.path), old_property);
         }
 
-        // Disable token painting for this item. Since the name was duplicated, we
-        // either have a file location or (if one is not available) an entity id
-        // number
+        // Disable token painting for this item. Since the name was duplicated,
+        // we either have a file location or (if one is not available) an
+        // entity id number.
         property.value_map.insert(
             {InformationExplorerModel::ForceTextPaintRole, true});
 

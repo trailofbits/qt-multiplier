@@ -22,6 +22,7 @@
 #include <multiplier/Entity.h>
 
 #include <QString>
+#include <QVariant>
 
 #include <optional>
 #include <tuple>
@@ -41,9 +42,20 @@ struct EntityInformation final {
   };
 
   struct Selection {
-    VariantEntity entity;
-    TokenRange tokens;
+
+    //! Used when computing the entity id for where clicking on this selection
+    //! should take us.
+    VariantEntity entity_role;
+
+    //! This value is used to present the file:line:col of this selection. This
+    //! might be different than where `entity_role` takes us. This can instead
+    //! represent the "usage location." This is primarily used for
+    //! deduplication.
     std::optional<Location> location;
+
+    //! What should be displayed for this selection. This can be a `TokenRange`,
+    //! a `Token`, or a `QString`.
+    QVariant display_role;
   };
 
   //! The entity ID which was requested.

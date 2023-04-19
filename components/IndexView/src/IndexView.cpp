@@ -58,7 +58,7 @@ void IndexView::InitializeWidgets() {
   d->tree_view = new QTreeView();
   d->tree_view->setHeaderHidden(true);
   d->tree_view->setSortingEnabled(true);
-  d->tree_view->setAlternatingRowColors(true);
+  d->tree_view->setAlternatingRowColors(false);
 
   d->tree_view->setSelectionBehavior(QAbstractItemView::SelectRows);
   d->tree_view->setAllColumnsShowFocus(true);

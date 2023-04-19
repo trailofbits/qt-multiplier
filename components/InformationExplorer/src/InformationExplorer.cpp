@@ -43,7 +43,12 @@ void InformationExplorer::InitializeWidgets() {
 
   d->tree_view = new InformationExplorerTreeView(this);
   d->tree_view->setHeaderHidden(true);
-  d->tree_view->setAlternatingRowColors(true);
+  d->tree_view->setAlternatingRowColors(false);
+  d->tree_view->setSelectionBehavior(QAbstractItemView::SelectRows);
+  d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
+  d->tree_view->setAllColumnsShowFocus(true);
+  d->tree_view->setTreePosition(0);
+  d->tree_view->setTextElideMode(Qt::TextElideMode::ElideMiddle);
   layout->addWidget(d->tree_view);
 
   d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);

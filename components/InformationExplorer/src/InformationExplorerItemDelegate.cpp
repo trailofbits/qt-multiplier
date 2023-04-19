@@ -58,9 +58,8 @@ void InformationExplorerItemDelegate::paint(QPainter *painter,
   }
 
   auto token_range_var = index.data(InformationExplorerModel::TokenRangeRole);
-  const auto &token_range = qvariant_cast<TokenRange>(token_range_var);
-
-  d->token_painter->Paint(painter, option, token_range);
+  d->token_painter->Paint(painter, option,
+                          qvariant_cast<TokenRange>(token_range_var));
 }
 
 bool InformationExplorerItemDelegate::editorEvent(QEvent *,

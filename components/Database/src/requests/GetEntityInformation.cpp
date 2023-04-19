@@ -15,43 +15,30 @@
 #include <multiplier/Entities/Fragment.h>
 #include <multiplier/Entities/FunctionDecl.h>
 #include <multiplier/Entities/IncludeLikeMacroDirective.h>
+#include <multiplier/Entities/MacroExpansion.h>
 #include <multiplier/Entities/NamedDecl.h>
 #include <multiplier/ui/Util.h>
+
+#include <iostream>
 
 namespace mx::gui {
 namespace {
 
-static void FillSelectionLocation(
-    EntityInformation::Selection &sel,
-    const FileLocationCache &file_location_cache) {
-  if (!sel.tokens) {
-    return;
-  }
-  Token tok = sel.tokens.file_tokens().front();
-  if (!tok) {
-    return;
-  }
+static std::optional<EntityInformation::Location> GetLocation(
+    const TokenRange &toks, const FileLocationCache &file_location_cache) {
+  for (Token tok : toks.file_tokens()) {
+    auto file = File::containing(tok);
+    if (!file) {
+      continue;
+    }
 
-  auto file = File::containing(tok);
-  if (!file) {
-    return;
+    if (auto line_col = tok.location(file_location_cache)) {
+      return EntityInformation::Location(file.value(), line_col->first,
+                                         line_col->second);
+    }
   }
 
-  if (auto line_col = tok.location(file_location_cache)) {
-    sel.location.emplace(file.value(), line_col->first, line_col->second);
-  }
-}
-
-template <typename EntType>
-static EntityInformation::Selection CreateSelection(
-    const FileLocationCache &file_location_cache, const EntType &entity) {
-
-  EntityInformation::Selection sel;
-  sel.entity = entity;
-  sel.tokens = FileTokens(entity);
-  FillSelectionLocation(sel, file_location_cache);
-
-  return sel;
+  return std::nullopt;
 }
 
 // Fill in the macros used within a given token range.
@@ -61,26 +48,38 @@ static void FillUsedMacros(const FileLocationCache &file_location_cache,
 
   for (Token tok : tokens) {
     for (Macro macro : Macro::containing(tok)) {
+      macro = macro.root();
       if (macro.kind() != MacroKind::EXPANSION) {
-        continue;
+        break;
       }
 
       PackedMacroId macro_id = macro.id();
       if (std::find(seen.begin(), seen.end(), macro_id) != seen.end()) {
-        continue;
+        break;
       }
 
       seen.push_back(macro_id);
-      auto def = MacroExpansion::from(macro)->definition();
-      if (!def) {
-        continue;
+      std::optional<MacroExpansion> exp = MacroExpansion::from(macro);
+      if (!exp) {
+        break;
       }
 
-      EntityInformation::Selection &sel = info.macros_used.emplace_back();
-      sel.entity = std::move(def.value());
-      sel.tokens = macro.use_tokens();
+      auto def = exp->definition();
+      if (!def) {
+        break;
+      }
 
-      FillSelectionLocation(sel, file_location_cache);
+      TokenRange use_tokens = exp->use_tokens();
+      for (Token use_tok : use_tokens) {
+        if (use_tok.category() == TokenCategory::MACRO_NAME) {
+          EntityInformation::Selection &sel = info.macros_used.emplace_back();
+          sel.display_role.setValue(use_tok);
+          sel.entity_role = std::move(exp.value());
+          sel.location = GetLocation(use_tokens, file_location_cache);
+          break;
+        }
+      }
+      break;
     }
   }
 }
@@ -89,13 +88,16 @@ static void FillUsedMacros(const FileLocationCache &file_location_cache,
 static EntityInformation GetDeclInformation(
     const FileLocationCache &file_location_cache, NamedDecl entity) {
 
-  EntityInformation info;
-  info.entity = CreateSelection(file_location_cache, entity);
-  info.id = entity.id().Pack();
-
   std::string_view name = entity.name();
-  info.name = QString::fromUtf8(name.data(),
-                                static_cast<qsizetype>(name.size()));
+
+  EntityInformation info;
+  info.id = entity.id().Pack();
+  info.entity.entity_role = entity;
+  info.entity.location = GetLocation(entity.tokens(), file_location_cache);
+
+  if (!name.empty()) {
+    info.entity.display_role.setValue(entity.token());
+  }
 
   // Fill all redeclarations.
   for (NamedDecl redecl : entity.redeclarations()) {
@@ -103,15 +105,16 @@ static EntityInformation GetDeclInformation(
     // Collect all macros used by all redeclarations.
     FillUsedMacros(file_location_cache, info, redecl.tokens());
 
-    if (redecl != entity) {
-      info.redeclarations.emplace_back(
-          CreateSelection<NamedDecl>(file_location_cache, redecl));
+    EntityInformation::Selection &sel = info.redeclarations.emplace_back();
+    sel.display_role.setValue(redecl.token());
+    sel.entity_role = redecl;
+    sel.location = GetLocation(redecl.tokens(), file_location_cache);
 
-      // Try to get a name from elsewhere if we're missing it.
-      if (info.name.isEmpty()) {
-        name = redecl.name();
-        info.name = QString::fromUtf8(name.data(),
-                                      static_cast<qsizetype>(name.size()));
+    // Try to get a name from elsewhere if we're missing it.
+    if (!info.entity.display_role.isValid()) {
+      name = redecl.name();
+      if (!name.empty()) {
+        info.entity.display_role.setValue(redecl.token());
       }
     }
   }
@@ -120,9 +123,10 @@ static EntityInformation GetDeclInformation(
   if (auto func = FunctionDecl::from(entity)) {
     for (CallExpr call : func->callers()) {
       for (FunctionDecl caller_func : FunctionDecl::containing(call)) {
-        auto &sel = info.callers.emplace_back(
-            CreateSelection(file_location_cache, call));
-        sel.entity = std::move(caller_func);
+        EntityInformation::Selection &sel = info.callers.emplace_back();
+        sel.display_role.setValue(caller_func.token());
+        sel.entity_role = call;
+        sel.location = GetLocation(call.tokens(), file_location_cache);
         break;
       }
     }
@@ -138,13 +142,17 @@ static EntityInformation GetDeclInformation(
         continue;  // TODO(pag): Look at how SciTools renders indirect callees.
       }
 
-      for (FunctionDecl caller_of_call : FunctionDecl::containing(call)) {
-        if (caller_of_call == func.value()) {
-          auto &sel = info.callees.emplace_back(
-              CreateSelection(file_location_cache, call));
-          sel.entity = std::move(callee.value());
-          break;
+      // Make sure the callee is nested inside of `entity` (i.e. `func`).
+      for (FunctionDecl callee_func : FunctionDecl::containing(call)) {
+        if (callee_func != func.value()) {
+          continue;
         }
+
+        EntityInformation::Selection &sel = info.callees.emplace_back();
+        sel.display_role.setValue(call.expression_token());
+        sel.entity_role = call;
+        sel.location = GetLocation(call.tokens(), file_location_cache);
+        break;
       }
     }
   }
@@ -158,12 +166,10 @@ static EntityInformation GetMacroInformation(
     const DefineMacroDirective &entity) {
 
   EntityInformation info;
-  info.entity = CreateSelection(file_location_cache, entity);
   info.id = entity.id().Pack();
-
-  std::string_view name = entity.name().data();
-  info.name = QString::fromUtf8(name.data(),
-                                static_cast<qsizetype>(name.size()));
+  info.entity.display_role.setValue(entity.name());
+  info.entity.location = GetLocation(entity.use_tokens(), file_location_cache);
+  info.entity.entity_role = entity;
 
   return info;
 }
@@ -174,34 +180,57 @@ static EntityInformation GetFileInformation(
     const File &entity) {
 
   EntityInformation info;
-  info.entity = CreateSelection(file_location_cache, entity);
   info.id = entity.id().Pack();
+  info.entity.entity_role = entity;
 
   for (std::filesystem::path path : entity.paths()) {
-    info.name = QString::fromStdString(path.generic_string());
+    info.entity.display_role.setValue(
+        QString::fromStdString(path.generic_string()));
     break;
   }
 
   for (IncludeLikeMacroDirective inc : IncludeLikeMacroDirective::in(entity)) {
-    info.includes.emplace_back(CreateSelection(file_location_cache, inc));
+    if (std::optional<File> file = inc.included_file()) {
+      EntityInformation::Selection &sel = info.includes.emplace_back();
+      TokenRange tokens = inc.use_tokens();
+      sel.entity_role = std::move(inc);
+      sel.location = GetLocation(tokens, file_location_cache);
+      sel.display_role.setValue(tokens.strip_whitespace());
+    }
   }
 
   for (Reference ref : entity.references()) {
     if (auto inc = IncludeLikeMacroDirective::from(ref.as_macro())) {
-      info.include_bys.emplace_back(CreateSelection(file_location_cache,
-                                                    inc.value()));
+      if (auto file = File::containing(inc.value())) {
+        TokenRange tokens = inc->use_tokens();
+        EntityInformation::Selection &sel = info.include_bys.emplace_back();
+        sel.location = GetLocation(tokens, file_location_cache);
+        sel.entity_role = inc.value();
+
+        for (std::filesystem::path path : file->paths()) {
+          sel.display_role.setValue(
+              QString::fromStdString(path.generic_string()));
+          break;
+        }
+      }
     }
   }
 
   for (Fragment frag : entity.fragments()) {
     for (DefineMacroDirective def : DefineMacroDirective::in(frag)) {
-      info.top_level_entities.emplace_back(CreateSelection(file_location_cache,
-                                                           def));
+      EntityInformation::Selection &sel = info.top_level_entities.emplace_back();
+      sel.display_role.setValue(def.name());
+      sel.entity_role = def;
+      sel.location = GetLocation(def.use_tokens(), file_location_cache);
     }
+
     for (Decl decl : frag.top_level_declarations()) {
       if (auto nd = NamedDecl::from(decl); nd && !nd->name().empty()) {
-        info.top_level_entities.emplace_back(CreateSelection(file_location_cache,
-                                                             nd.value()));
+        EntityInformation::Selection &sel =
+            info.top_level_entities.emplace_back();
+        sel.display_role.setValue(nd->token());
+        sel.location = GetLocation(nd->tokens(), file_location_cache);
+        sel.entity_role = nd.value();
       }
     }
   }
@@ -223,6 +252,10 @@ void GetEntityInformation(
   }
 
   std::optional<EntityInformation> info;
+
+  if (std::holds_alternative<Token>(entity)) {
+    entity = std::get<Token>(entity).related_entity();
+  }
 
   if (std::holds_alternative<Decl>(entity)) {
     if (auto named = NamedDecl::from(std::get<Decl>(entity))) {
