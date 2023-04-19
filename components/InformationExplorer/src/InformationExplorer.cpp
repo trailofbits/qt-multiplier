@@ -106,8 +106,6 @@ void InformationExplorer::ExpandAllNodes() {
       }
     }
   }
-
-  d->tree_view->resizeColumnToContents(0);
 }
 
 void InformationExplorer::OnModelReset() {
