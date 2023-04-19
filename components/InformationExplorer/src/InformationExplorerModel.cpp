@@ -132,6 +132,9 @@ void CreatePropertyHelper(
 struct InformationExplorerModel::PrivateData final {
   IDatabase::Ptr database;
 
+  Index index;
+  FileLocationCache file_location_cache;
+
   std::optional<RawEntityId> opt_active_entity_id;
 
   QFuture<IDatabase::EntityInformationResult> future_result;
@@ -139,6 +142,14 @@ struct InformationExplorerModel::PrivateData final {
 
   Context context;
 };
+
+Index InformationExplorerModel::GetIndex() const {
+  return d->index;
+}
+
+FileLocationCache InformationExplorerModel::GetFileLocationCache() const {
+  return d->file_location_cache;
+}
 
 void InformationExplorerModel::RequestEntityInformation(
     const RawEntityId &entity_id) {
@@ -156,11 +167,15 @@ void InformationExplorerModel::RequestEntityInformation(
 
   CreateProperty(d->context, {tr("Updating...")});
 
-  d->opt_active_entity_id = entity_id;
   d->future_result = d->database->RequestEntityInformation(entity_id);
   d->future_watcher.setFuture(d->future_result);
 
   emit endResetModel();
+}
+
+std::optional<RawEntityId>
+InformationExplorerModel::GetCurrentEntityID() const {
+  return d->opt_active_entity_id;
 }
 
 InformationExplorerModel::~InformationExplorerModel() {
@@ -275,6 +290,10 @@ void InformationExplorerModel::FutureResultStateChanged() {
   auto entity_information = future_result.TakeValue();
   ImportEntityInformation(d->context, entity_information);
 
+  if (d->context.node_map.size() > 1) {
+    d->opt_active_entity_id = entity_information.requested_id;
+  }
+
   emit endResetModel();
 }
 
@@ -284,6 +303,9 @@ InformationExplorerModel::InformationExplorerModel(
       d(new PrivateData) {
 
   d->database = IDatabase::Create(index, file_location_cache);
+
+  d->index = index;
+  d->file_location_cache = file_location_cache;
 
   connect(&d->future_watcher,
           &QFutureWatcher<IDatabase::EntityInformationResult>::finished, this,

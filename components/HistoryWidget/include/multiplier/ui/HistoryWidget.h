@@ -51,7 +51,7 @@ class HistoryWidget final : public QWidget {
   void CommitCurrentLocationToHistory(void);
 
  signals:
-  void GoToEntity(RawEntityId id);
+  void GoToEntity(RawEntityId original_id, RawEntityId canonical_id);
 
  private slots:
   void OnNavigateBack(void);

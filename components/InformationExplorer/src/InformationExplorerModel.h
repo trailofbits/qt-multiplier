@@ -47,8 +47,17 @@ class InformationExplorerModel final : public IInformationExplorerModel {
     RawLocationRole,
   };
 
+  //! \copybrief IInformationExplorerModel::GetIndex
+  virtual Index GetIndex() const override;
+
+  //! \copybrief IInformationExplorerModel::GetFileLocationCache
+  virtual FileLocationCache GetFileLocationCache() const override;
+
   //! \copybrief IInformationExplorerModel::RequestEntityInformation
   virtual void RequestEntityInformation(const RawEntityId &entity_id) override;
+
+  //! \copybrief IInformationExplorerModel::GetCurrentEntityID
+  virtual std::optional<RawEntityId> GetCurrentEntityID() const override;
 
   //! Destructor
   virtual ~InformationExplorerModel() override;

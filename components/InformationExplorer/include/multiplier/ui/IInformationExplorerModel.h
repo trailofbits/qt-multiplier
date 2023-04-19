@@ -42,8 +42,17 @@ class IInformationExplorerModel : public QAbstractItemModel {
   //! Destructor
   virtual ~IInformationExplorerModel() override = default;
 
+  //! Returns the internal multipler index
+  virtual Index GetIndex() const = 0;
+
+  //! Returns the internal multiplier file location cache
+  virtual FileLocationCache GetFileLocationCache() const = 0;
+
   //! Populates the model with the information for the given entity
   virtual void RequestEntityInformation(const RawEntityId &entity_id) = 0;
+
+  //! Returns the currenty entity, if any
+  virtual std::optional<RawEntityId> GetCurrentEntityID() const = 0;
 
   //! Disabled copy constructor
   IInformationExplorerModel(const IInformationExplorerModel &) = delete;
