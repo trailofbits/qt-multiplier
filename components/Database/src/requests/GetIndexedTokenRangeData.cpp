@@ -283,9 +283,19 @@ RenderFragmentToken(const TokenRange &input_toks, unsigned &file_tok_index,
     break;
   }
 
+  EntityId related_entity_id = frag_tok.related_entity_id();
+  VariantId vid = related_entity_id.Unpack();
+  if (std::holds_alternative<DeclId>(vid) &&
+      !std::get<DeclId>(vid).is_definition) {
+    VariantEntity re = frag_tok.related_entity();
+    if (std::holds_alternative<Decl>(re)) {
+      related_entity_id = std::get<Decl>(re).canonical_declaration().id();
+    }
+  }
+
   // Render out the file token data, annotated with fragment token info.
   RenderToken(file_tok.data(), frag_tok.category(), frag_tok.id().Pack(),
-              frag_tok.related_entity_id().Pack(), statement_id, line_number,
+              related_entity_id.Pack(), statement_id, line_number,
               fragment_index, output);
 
   frag_toks.pop_back();
