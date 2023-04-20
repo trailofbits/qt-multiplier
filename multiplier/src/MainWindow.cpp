@@ -401,13 +401,13 @@ void MainWindow::OpenCodePreview(const CodeModelIndex &index) {
 
   auto margin = fontMetrics().height();
   auto max_width = margin + (width() / 3);
-  auto max_height = margin + (height() / 3);
+  auto max_height = margin + (height() / 4);
 
-  auto size_hint = d->quick_code_view->sizeHint();
-  auto width = std::min(max_width, size_hint.width());
-  auto height = std::min(max_height, size_hint.height());
+//  auto size_hint = d->quick_code_view->sizeHint();
+//  auto width = std::min(max_width, size_hint.width());
+//  auto height = std::min(max_height, size_hint.height());
 
-  d->quick_code_view->resize(width, height);
+  d->quick_code_view->resize(max_width, max_height);
   d->quick_code_view->show();
 }
 
