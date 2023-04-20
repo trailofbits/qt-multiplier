@@ -150,7 +150,7 @@ static EntityInformation GetDeclInformation(
         }
 
         EntityInformation::Selection &sel = info.callees.emplace_back();
-        sel.display_role.setValue(callee_func.token());
+        sel.display_role.setValue(callee->token());
         sel.entity_role = call;
         sel.location = GetLocation(call.tokens(), file_location_cache);
         break;
