@@ -40,6 +40,8 @@ namespace mx::gui {
 
 namespace {
 
+const int kHoverMsecsTimer{2000};
+
 class QPlainTextEditMod final : public QPlainTextEdit {
  public:
   QPlainTextEditMod(QWidget *parent = nullptr) : QPlainTextEdit(parent) {}
@@ -73,6 +75,7 @@ struct CodeView::PrivateData final {
   std::size_t tab_width{4};
 
   std::optional<CodeModelIndex> opt_prev_hovered_model_index;
+  QTimer hover_timer;
 
   QShortcut *go_to_line_shortcut{nullptr};
   GoToLineWidget *go_to_line_widget{nullptr};
@@ -147,8 +150,8 @@ bool CodeView::SetCursorPosition(int start, std::optional<int> opt_end) {
     d->text_edit->centerCursor();
     d->last_block = next_block;
 
-  // The line on which we last clicked is likely visible. Don't center us on
-  // the target cursor.
+    // The line on which we last clicked is likely visible. Don't center us on
+    // the target cursor.
   } else {
     d->text_edit->setTextCursor(text_cursor);
   }
@@ -210,13 +213,13 @@ CodeView::CodeView(ICodeModel *model, QWidget *parent)
 }
 
 bool CodeView::eventFilter(QObject *obj, QEvent *event) {
-//  if (dynamic_cast<QMouseEvent *>(event) && obj == d->text_edit->viewport()) {
-//    qDebug() << "eventFilter" << event->type()
-//             << "position" << d->text_edit->textCursor().position()
-//             << "version" << d->version
-//             << "last_press_version" << d->last_press_version
-//             << "last_press_position" << d->last_press_position;
-//  }
+  //  if (dynamic_cast<QMouseEvent *>(event) && obj == d->text_edit->viewport()) {
+  //    qDebug() << "eventFilter" << event->type()
+  //             << "position" << d->text_edit->textCursor().position()
+  //             << "version" << d->version
+  //             << "last_press_version" << d->last_press_version
+  //             << "last_press_position" << d->last_press_position;
+  //  }
 
   switch (event->type()) {
     case QEvent::Paint:
@@ -277,8 +280,7 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
         OnTextEditTextZoom(wheel_event);
       }
       break;
-    default:
-      break;
+    default: break;
   }
   return false;
 }
@@ -294,6 +296,11 @@ void CodeView::InstallModel(ICodeModel *model) {
 }
 
 void CodeView::InitializeWidgets() {
+  //! Initialize the hover timer
+  d->hover_timer.setSingleShot(true);
+  connect(&d->hover_timer, &QTimer::timeout, this,
+          &CodeView::OnHoverTimerTimeout);
+
   // Code viewer
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setReadOnly(true);
@@ -304,8 +311,8 @@ void CodeView::InitializeWidgets() {
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
 
-  connect(d->text_edit, &QPlainTextEditMod::updateRequest,
-          this, &CodeView::OnTextEditUpdateRequest);
+  connect(d->text_edit, &QPlainTextEditMod::updateRequest, this,
+          &CodeView::OnTextEditUpdateRequest);
 
   // Gutter
   d->gutter = new QWidget();
@@ -313,11 +320,11 @@ void CodeView::InitializeWidgets() {
 
   // Search widget
   d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Search, this);
-  connect(d->search_widget, &ISearchWidget::SearchParametersChanged,
-          this, &CodeView::OnSearchParametersChange);
+  connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
+          &CodeView::OnSearchParametersChange);
 
-  connect(d->search_widget, &ISearchWidget::ShowSearchResult,
-          this, &CodeView::OnShowSearchResult);
+  connect(d->search_widget, &ISearchWidget::ShowSearchResult, this,
+          &CodeView::OnShowSearchResult);
 
   // Layout for the gutter and code view
   auto code_layout = new QHBoxLayout();
@@ -373,8 +380,8 @@ void CodeView::ResumeCursorTracking(void) {
 //! Connect the cursor changed event. This will also trigger a cursor event.
 void CodeView::ConnectCursorChangeEvent(void) {
   d->cursor_change_signal =
-      connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged,
-              this, &CodeView::OnCursorMoved);
+      connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged, this,
+              &CodeView::OnCursorMoved);
 
   OnCursorMoved();
 }
@@ -405,6 +412,29 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
   }
 
   d->opt_prev_hovered_model_index = model_index;
+  d->hover_timer.start(kHoverMsecsTimer);
+}
+
+void CodeView::OnHoverTimerTimeout() {
+  if (!d->opt_prev_hovered_model_index.has_value()) {
+    return;
+  }
+
+  auto prev_hovered_model_index = d->opt_prev_hovered_model_index.value();
+  d->opt_prev_hovered_model_index = std::nullopt;
+
+  auto cursor_pos = d->text_edit->viewport()->mapFromGlobal(QCursor::pos());
+  auto opt_model_index = GetCodeModelIndexFromMousePosition(cursor_pos);
+  if (!opt_model_index.has_value()) {
+    return;
+  }
+
+  const auto &model_index = opt_model_index.value();
+  if (prev_hovered_model_index.row != model_index.row ||
+      prev_hovered_model_index.token_index != model_index.token_index) {
+    return;
+  }
+
   emit TokenTriggered({TokenAction::Type::Hover, std::nullopt}, model_index);
 }
 
@@ -508,7 +538,7 @@ void CodeView::UpdateTokenGroupColors() {
 
 std::uint64_t CodeView::GetUniqueTokenIdentifier(const CodeModelIndex &index) {
   return (static_cast<std::uint64_t>(index.row) << 32u) |
-          static_cast<std::uint64_t>(index.token_index);
+         static_cast<std::uint64_t>(index.token_index);
 }
 
 std::optional<std::size_t>
@@ -619,8 +649,7 @@ QTextDocument *CodeView::CreateTextDocument(
     auto line_mappings_need_update{true};
     Count token_count = model.TokenCount(row_index);
 
-    for (Count token_index = 0; token_index < token_count;
-         ++token_index) {
+    for (Count token_index = 0; token_index < token_count; ++token_index) {
       // Update the highest line number value
       const auto &line_number_var =
           model.Data(model_index, ICodeModel::LineNumberRole);
@@ -696,7 +725,8 @@ QTextDocument *CodeView::CreateTextDocument(
             qvariant_cast<RawEntityId>(related_entity_id_var);
 
         auto &unique_token_id_list =
-            token_map.related_entity_id_to_unique_token_id_list[related_entity_id];
+            token_map
+                .related_entity_id_to_unique_token_id_list[related_entity_id];
 
         unique_token_id_list.push_back(unique_token_id);
       }
@@ -758,8 +788,8 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
     auto column_count = model.TokenCount(colored_line);
 
     for (Count column = 0; column < column_count; ++column) {
-      auto unique_token_id = GetUniqueTokenIdentifier(
-          {&model, colored_line, column});
+      auto unique_token_id =
+          GetUniqueTokenIdentifier({&model, colored_line, column});
 
       if (visited_model_index_list.count(unique_token_id) > 0) {
         continue;
