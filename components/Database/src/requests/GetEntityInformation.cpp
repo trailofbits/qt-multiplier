@@ -17,6 +17,7 @@
 #include <multiplier/Entities/IncludeLikeMacroDirective.h>
 #include <multiplier/Entities/MacroExpansion.h>
 #include <multiplier/Entities/NamedDecl.h>
+#include <multiplier/ui/Assert.h>
 #include <multiplier/ui/Util.h>
 
 #include <iostream>
@@ -149,7 +150,7 @@ static EntityInformation GetDeclInformation(
         }
 
         EntityInformation::Selection &sel = info.callees.emplace_back();
-        sel.display_role.setValue(call.expression_token());
+        sel.display_role.setValue(callee_func.token());
         sel.entity_role = call;
         sel.location = GetLocation(call.tokens(), file_location_cache);
         break;
