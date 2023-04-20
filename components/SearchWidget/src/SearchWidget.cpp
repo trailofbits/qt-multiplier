@@ -229,6 +229,9 @@ void SearchWidget::InitializeKeyboardShortcuts(QWidget *parent) {
     d->search_next_shortcut = new QShortcut(
         QKeySequence::FindNext, parent, this, &SearchWidget::OnShowNextResult,
         Qt::WidgetWithChildrenShortcut);
+
+    connect(d->search_input, &QLineEdit::returnPressed, this,
+            &SearchWidget::OnShowNextResult);
   }
 }
 
