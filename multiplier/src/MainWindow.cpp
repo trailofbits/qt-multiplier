@@ -44,7 +44,6 @@ static const char *kFileIdProperty = "mx:fileId";
 //! The last cursor location in a code view.
 static const char *kLastLocationProperty = "mx:lastLocation";
 
-
 struct CodeViewContextMenu final {
   QMenu *menu{nullptr};
   QAction *show_ref_explorer_action{nullptr};
@@ -67,6 +66,8 @@ struct MainWindow::PrivateData final {
   CodeViewContextMenu code_view_context_menu;
 
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
+
+  QAction *enable_code_preview_action{nullptr};
   std::unique_ptr<QuickCodeView> quick_code_view;
 
   QTabWidget *ref_explorer_tab_widget{nullptr};
@@ -104,6 +105,11 @@ MainWindow::~MainWindow() {}
 void MainWindow::InitializeWidgets() {
   d->view_menu = new QMenu(tr("View"));
   menuBar()->addMenu(d->view_menu);
+
+  d->enable_code_preview_action = new QAction(tr("Code preview"));
+  d->enable_code_preview_action->setCheckable(true);
+  d->enable_code_preview_action->setChecked(false);
+  d->view_menu->addAction(d->enable_code_preview_action);
 
   setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
@@ -624,7 +630,9 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
     OpenTokenContextMenu(index);
 
   } else if (token_action.type == ICodeView::TokenAction::Type::Hover) {
-    OpenCodePreview(index);
+    if (d->enable_code_preview_action->isChecked()) {
+      OpenCodePreview(index);
+    }
 
   } else if (token_action.type == ICodeView::TokenAction::Type::Keyboard) {
     // Here to test keyboard events; Before we add more buttons, we should
