@@ -18,6 +18,9 @@ add_library("mx_widgets" STATIC
 
   src/CodePreviewModelAdapter.h
   src/CodePreviewModelAdapter.cpp
+
+  src/QuickCodeView.h
+  src/QuickCodeView.cpp
 )
 
 target_include_directories("mx_widgets" SYSTEM INTERFACE

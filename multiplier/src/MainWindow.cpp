@@ -8,6 +8,7 @@
 #include "PreviewableReferenceExplorer.h"
 #include "QuickReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
+#include "QuickCodeView.h"
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/HistoryWidget.h>
@@ -66,6 +67,7 @@ struct MainWindow::PrivateData final {
   CodeViewContextMenu code_view_context_menu;
 
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
+  std::unique_ptr<QuickCodeView> quick_code_view;
 
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
@@ -295,7 +297,7 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
 void MainWindow::OpenReferenceExplorer(
     RawEntityId entity_id,
     IReferenceExplorerModel::ExpansionMode expansion_mode) {
-  CloseTokenReferenceExplorer();
+  CloseAllPopups();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache, entity_id, expansion_mode, this);
@@ -328,7 +330,7 @@ void MainWindow::OpenTokenReferenceExplorer(CodeModelIndex index) {
       index.model->Data(index, ICodeModel::RelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
-    CloseTokenReferenceExplorer();
+    CloseAllPopups();
     return;
   }
 
@@ -360,7 +362,7 @@ void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
     return;
   }
 
-  CloseTokenReferenceExplorer();
+  CloseAllPopups();
 }
 
 void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
@@ -375,10 +377,43 @@ void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
   OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var));
 }
 
-void MainWindow::CloseTokenReferenceExplorer() {
+void MainWindow::OpenCodePreview(const CodeModelIndex &index) {
+  QVariant related_entity_id_var =
+      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
+
+  if (!related_entity_id_var.isValid()) {
+    return;
+  }
+
+  auto related_entity_id = qvariant_cast<RawEntityId>(related_entity_id_var);
+
+  d->quick_code_view = std::make_unique<QuickCodeView>(
+      d->index, d->file_location_cache, related_entity_id, this);
+
+  auto dialog_pos = QCursor::pos();
+  d->quick_code_view->move(dialog_pos.x() - 20, dialog_pos.y() - 20);
+
+  auto margin = fontMetrics().height();
+  auto max_width = margin + (width() / 3);
+  auto max_height = margin + (height() / 3);
+
+  auto size_hint = d->quick_code_view->sizeHint();
+  auto width = std::min(max_width, size_hint.width());
+  auto height = std::min(max_height, size_hint.height());
+
+  d->quick_code_view->resize(width, height);
+  d->quick_code_view->show();
+}
+
+void MainWindow::CloseAllPopups() {
   if (d->quick_ref_explorer != nullptr) {
     d->quick_ref_explorer->close();
     d->quick_ref_explorer.reset();
+  }
+
+  if (d->quick_code_view != nullptr) {
+    d->quick_code_view->close();
+    d->quick_code_view.reset();
   }
 }
 
@@ -526,7 +561,7 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
 void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
                                         Qt::KeyboardModifiers,
                                         Qt::MouseButtons) {
-  CloseTokenReferenceExplorer();
+  CloseAllPopups();
   OpenEntityInfo(file_id);
 
   auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
@@ -588,6 +623,9 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
   } else if (token_action.type == ICodeView::TokenAction::Type::Secondary) {
     OpenTokenContextMenu(index);
 
+  } else if (token_action.type == ICodeView::TokenAction::Type::Hover) {
+    OpenCodePreview(index);
+
   } else if (token_action.type == ICodeView::TokenAction::Type::Keyboard) {
     // Here to test keyboard events; Before we add more buttons, we should
     // find a better strategy to managed them.
@@ -626,7 +664,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 //! Called when an entity in the entity explorer / filter, which allows us to
 //! search for entities by name/type, is clicked.
 void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
-  CloseTokenReferenceExplorer();
+  CloseAllPopups();
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
   OpenEntityInfo(entity_id);
   OpenEntityCode(entity_id, false /* don't canonicalize entity IDs */);
@@ -635,7 +673,7 @@ void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
 //! Called when the history menu is used to go back/forward to some specific
 //! entity ID.
 void MainWindow::OnHistoryNavigationEntitySelected(RawEntityId entity_id) {
-  CloseTokenReferenceExplorer();
+  CloseAllPopups();
   OpenEntityInfo(entity_id);
   OpenEntityCode(entity_id);
 }
@@ -755,7 +793,7 @@ void MainWindow::UpdateLocatiomFromWidget(QWidget *widget) {
 }
 
 void MainWindow::OnCodeViewTabBarClose(int index) {
-  CloseTokenReferenceExplorer();
+  CloseAllPopups();
 
   QTabWidget *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
   QWidget *current_widget = central_tab_widget->currentWidget();
@@ -781,7 +819,7 @@ void MainWindow::OnCodeViewTabBarClose(int index) {
 }
 
 void MainWindow::OnCodeViewTabClicked(int index) {
-  CloseTokenReferenceExplorer();
+  CloseAllPopups();
 
   QTabWidget *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
   if (central_tab_widget->currentWidget() !=

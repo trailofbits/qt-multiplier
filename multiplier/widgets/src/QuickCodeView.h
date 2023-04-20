@@ -1,0 +1,73 @@
+// Copyright (c) 2021-present, Trail of Bits, Inc.
+// All rights reserved.
+//
+// This source code is licensed in accordance with the terms specified in
+// the LICENSE file found in the root directory of this source tree.
+
+#pragma once
+
+#include <QWidget>
+
+#include <multiplier/Index.h>
+
+namespace mx::gui {
+
+//! A top-most code view used for hover events
+class QuickCodeView final : public QWidget {
+  Q_OBJECT
+
+ public:
+  //! Constructor
+  QuickCodeView(const Index &index,
+                const FileLocationCache &file_location_cache,
+                RawEntityId entity_id, QWidget *parent = nullptr);
+
+  //! Destructor
+  virtual ~QuickCodeView() override;
+
+  //! Disabled copy constructor
+  QuickCodeView(const QuickCodeView &) = delete;
+
+  //! Disabled copy assignment operator
+  QuickCodeView &operator=(const QuickCodeView &) = delete;
+
+ protected:
+  //! Closes the widget when the escape key is pressed
+  virtual void keyPressEvent(QKeyEvent *event) override;
+
+  //! Helps determine if the widget should be restored on focus
+  virtual void showEvent(QShowEvent *event) override;
+
+  //! Helps determine if the widget should be restored on focus
+  virtual void closeEvent(QCloseEvent *event) override;
+
+  //! Used to handle window movements
+  virtual bool eventFilter(QObject *obj, QEvent *event) override;
+
+ private:
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
+
+  //! Initializes the internal widgets
+  void InitializeWidgets(const Index &index,
+                         const FileLocationCache &file_location_cache,
+                         RawEntityId entity_id);
+
+  //! Used to start window dragging
+  void OnTitleFrameMousePress(QMouseEvent *event);
+
+  //! Used to move the window by moving the title frame
+  void OnTitleFrameMouseMove(QMouseEvent *event);
+
+  //! Used to stop window dragging
+  void OnTitleFrameMouseRelease(QMouseEvent *event);
+
+ private slots:
+  //! Restores the widget visibility when the application gains focus
+  void OnApplicationStateChange(Qt::ApplicationState state);
+
+  //! Updates the window name with the entity name request output
+  void EntityNameFutureStatusChanged();
+};
+
+}  // namespace mx::gui

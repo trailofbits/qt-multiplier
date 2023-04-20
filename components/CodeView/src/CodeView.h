@@ -78,8 +78,11 @@ class CodeView final : public ICodeView {
   std::optional<CodeModelIndex>
   GetCodeModelIndexFromMousePosition(const QPoint &pos);
 
-  //! Implements support for token hover notifications
+  //! Starts tracking the mouse position for a possible hover event
   void OnTextEditViewportMouseMoveEvent(QMouseEvent *event);
+
+  //! Stops mouse tracking and optionally emits an hover token action
+  void OnHoverTimerTimeout();
 
   //! Utility function used to handle mouse press events
   void OnTextEditViewportMouseButtonPress(QMouseEvent *event);
