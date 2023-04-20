@@ -351,25 +351,33 @@ void InformationExplorerModel::ImportEntityInformation(
 
   std::vector<Property> property_list;
 
-  auto L_recalculatePath = [](Property &property) {
-    // If we are here, the display name is already the same. Attempt to use
-    // the location role and use the entity id as fallback. Additional
-    // strategies can be added here.
-    if (property.value_map.count(IInformationExplorerModel::LocationRole) ==
-        1) {
-      const auto &location_role_var =
-          property.value_map[IInformationExplorerModel::LocationRole];
+  auto L_recalculatePath =
+      [](const std::unordered_map<QString, Property> &property_map,
+         Property &property) {
+        const auto &entity_id_role_var =
+            property.value_map[IInformationExplorerModel::EntityIdRole];
 
-      property.path.append(location_role_var.toString());
+        auto entity_id = qvariant_cast<RawEntityId>(entity_id_role_var);
 
-    } else {
-      const auto &entity_id_role_var =
-          property.value_map[IInformationExplorerModel::EntityIdRole];
+        // If we are here, the display name is already the same. Attempt to add
+        // the location role to make it easier to read
+        if (property.value_map.count(IInformationExplorerModel::LocationRole) ==
+            1) {
+          const auto &location_role_var =
+              property.value_map[IInformationExplorerModel::LocationRole];
 
-      auto entity_id = qvariant_cast<RawEntityId>(entity_id_role_var);
-      property.path.append(QString::number(entity_id));
-    }
-  };
+          property.path.append(location_role_var.toString());
+
+          auto key = PathToString(property.path);
+          if (property_map.count(key) > 0) {
+            auto suffix = QString(" #") + QString::number(entity_id);
+            property.path.back().append(suffix);
+          }
+
+        } else {
+          property.path.back().append(QString::number(entity_id));
+        }
+      };
 
   for (const Filler &filler : filler_list) {
     // Items will only be re-parented once at the first display
@@ -452,7 +460,7 @@ void InformationExplorerModel::ImportEntityInformation(
           old_property.value_map.insert(
               {InformationExplorerModel::ForceTextPaintRole, true});
 
-          L_recalculatePath(old_property);
+          L_recalculatePath(property_map, old_property);
           fix_previous_entry = false;
 
           property_map.emplace(PathToString(old_property.path), old_property);
@@ -464,7 +472,7 @@ void InformationExplorerModel::ImportEntityInformation(
         property.value_map.insert(
             {InformationExplorerModel::ForceTextPaintRole, true});
 
-        L_recalculatePath(property);
+        L_recalculatePath(property_map, property);
         property_key = PathToString(property.path);
 
       } else {
