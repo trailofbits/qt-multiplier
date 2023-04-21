@@ -296,7 +296,7 @@ void CodeView::InstallModel(ICodeModel *model) {
 }
 
 void CodeView::InitializeWidgets() {
-  //! Initialize the hover timer
+  // Initialize the hover timer
   d->hover_timer.setSingleShot(true);
   connect(&d->hover_timer, &QTimer::timeout, this,
           &CodeView::OnHoverTimerTimeout);
@@ -364,20 +364,17 @@ void CodeView::InitializeWidgets() {
   ConnectCursorChangeEvent();
 }
 
-//! Disable cursor change tracking.
 void CodeView::StopCursorTracking(void) {
   if (disconnect(d->cursor_change_signal)) {
     QMetaObject::Connection().swap(d->cursor_change_signal);
   }
 }
 
-//! Re-introduce cursor change tracking.
 void CodeView::ResumeCursorTracking(void) {
   d->version++;
   QTimer::singleShot(200, this, &CodeView::ConnectCursorChangeEvent);
 }
 
-//! Connect the cursor changed event. This will also trigger a cursor event.
 void CodeView::ConnectCursorChangeEvent(void) {
   d->cursor_change_signal =
       connect(d->text_edit, &QPlainTextEditMod::cursorPositionChanged, this,
@@ -909,7 +906,7 @@ void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
 
   while (block.isValid() && top <= event->rect().bottom()) {
     if (block.isVisible() && bottom >= event->rect().top()) {
-      auto block_number = block.firstLineNumber();
+      auto block_number = block.blockNumber();
 
       auto opt_line_number =
           GetLineNumberFromBlockNumber(d->token_map, block_number);
@@ -935,7 +932,6 @@ void CodeView::OnTextEditUpdateRequest(const QRect &rect, int dy) {
   }
 }
 
-//! Called when the cursor position has changed.
 void CodeView::OnCursorMoved(void) {
   if (!d->model->IsReady()) {
     return;
