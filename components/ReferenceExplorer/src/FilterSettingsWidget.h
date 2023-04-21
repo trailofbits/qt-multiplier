@@ -25,18 +25,14 @@ class FilterSettingsWidget final : public QWidget {
   //! Destructor
   virtual ~FilterSettingsWidget() override;
 
-  //! Path filtering type
-  enum class PathFilterType {
-    None,
-    FullPath,
-    FileName,
-  };
-
-  //! Returns the selected path filtering type
-  PathFilterType GetPathFilterType() const;
+  //! Returns true if the entity name should be filtered
+  bool FilterByFileName() const;
 
   //! Returns true if the entity name should be filtered
   bool FilterByEntityName() const;
+
+  //! Returns true if the breadcrumbs should be filtered
+  bool FilterByBreadcrumbs() const;
 
   //! Returns true if the entity id should be filtered
   bool FilterByEntityID() const;

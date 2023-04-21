@@ -37,7 +37,8 @@ namespace gui {
 
 template <typename T>
 static VariantEntity NamedDeclContaining(const T &thing)
-requires (!std::is_same_v<T, VariantEntity>) {
+  requires(!std::is_same_v<T, VariantEntity>)
+{
   for (FunctionDecl func : FunctionDecl::containing(thing)) {
     return func;
   }
@@ -89,6 +90,13 @@ std::optional<QString> NameOfEntity(const VariantEntity &ent);
 //! Return the tokens of `ent` as a string.
 QString TokensToString(const VariantEntity &ent);
 
+//! Create a breadcrumbs string of the token contexts.
+QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
+
+//! Create a breadcrumbs string of the token contexts.
+std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
+                                         bool run_length_encode = true);
+
 //// Try to determine the declarations associated with this token.
 //std::optional<Decl> DeclForToken(const Token &token);
 //
@@ -116,9 +124,6 @@ QString TokensToString(const VariantEntity &ent);
 //// Return the file location of an entity.
 //RawEntityId EntityFileLocation(const Index &index, RawEntityId eid);
 //
-//// Return the optional nearest fragment token associated with this declaration.
-//std::optional<Token> DeclFragmentToken(const Decl &decl);
-//
 //// Return the optional nearest file token associated with this declaration.
 //std::optional<Token> DeclFileToken(const Decl &decl);
 //
@@ -131,8 +136,6 @@ QString TokensToString(const VariantEntity &ent);
 //// that.
 //std::optional<Decl> NearestDeclFor(const Index &index, RawEntityId id);
 //
-//// Create a breadcrumbs string of the token contexts.
-//QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 
 }  // namespace gui
 }  // namespace mx

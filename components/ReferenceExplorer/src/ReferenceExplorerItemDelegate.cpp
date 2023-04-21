@@ -23,11 +23,11 @@ namespace mx::gui {
 namespace {
 
 int GetMarginSize(const QFontMetrics &font_metrics) {
-  return font_metrics.height() / 3;
+  return font_metrics.height() / 4;
 }
 
 int GetIconSize(const QFontMetrics &font_metrics) {
-  return font_metrics.height() * 2;
+  return static_cast<int>(font_metrics.height() * 1.2);
 }
 
 }  // namespace
@@ -49,12 +49,12 @@ QSize ReferenceExplorerItemDelegate::sizeHint(
   }
 
   QFontMetrics font_metrics(option.font);
+  auto text_width = font_metrics.horizontalAdvance(label_var.toString());
+
   auto margin{GetMarginSize(font_metrics)};
   auto icon_size{GetIconSize(font_metrics)};
 
-  const auto &label = label_var.toString();
-  auto required_width{margin + icon_size + margin +
-                      font_metrics.horizontalAdvance(label) + margin};
+  auto required_width{margin + icon_size + margin + text_width + margin};
   auto required_height{margin + icon_size + margin};
 
   return QSize(required_width, required_height);
@@ -71,26 +71,6 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   }
 
   auto label = label_var.toString();
-
-  QString location;
-  QVariant location_info_var =
-      index.data(IReferenceExplorerModel::LocationRole);
-
-  if (location_info_var.isValid()) {
-    auto location_info = qvariant_cast<Location>(location_info_var);
-    auto filename =
-        std::filesystem::path(location_info.path.toStdString()).filename();
-
-    location = QString::fromStdString(filename);
-
-    if (0u < location_info.line) {
-      location += ":" + QString::number(location_info.line);
-
-      if (0u < location_info.column) {
-        location += ":" + QString::number(location_info.column);
-      }
-    }
-  }
 
   QString icon_label = "Unk";
   auto icon_label_var = index.data(ReferenceExplorerModel::IconLabelRole);
@@ -116,36 +96,29 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
     painter->fillRect(option.rect, option.palette.highlight());
   }
 
-  int translation{option.rect.x() + margin};
-  painter->translate(translation, option.rect.y() + margin);
+  painter->translate(option.rect.x() + margin, option.rect.y() + margin);
 
   DrawIcon(*painter, icon_size, icon_label, icon_bg);
 
-  translation += icon_size + margin;
-  painter->translate(icon_size + margin, 0);
+  painter->translate(icon_size + (margin * 2), 0);
 
-  auto rect_width{option.rect.width() - translation};
+  auto rect_width{option.rect.width() - icon_size - (margin * 2)};
 
   auto font = option.font;
   font.setBold(true);
   painter->setFont(font);
 
-  painter->setPen(option.palette.windowText().color());
-  painter->drawText(QRect(0, 0, rect_width, font_height), Qt::AlignVCenter,
-                    label);
-
-  font.setBold(false);
-  painter->setFont(font);
-
-  painter->setPen(option.palette.dark().color());
-  painter->drawText(QRect(0, icon_size - font_height, rect_width, font_height),
-                    Qt::AlignVCenter, location);
+  painter->setPen(option.palette.text().color());
+  painter->drawText(
+      QRect(0, (icon_size / 2) - (font_height / 2), rect_width, font_height),
+      Qt::AlignVCenter, label);
 
   painter->restore();
 }
 
-void ReferenceExplorerItemDelegate::DrawIcon(
-    QPainter &painter, const int &size, const QString &text, const QColor &bg) {
+void ReferenceExplorerItemDelegate::DrawIcon(QPainter &painter, const int &size,
+                                             const QString &text,
+                                             const QColor &bg) {
 
   painter.fillRect(0, 0, size, size, bg);
 

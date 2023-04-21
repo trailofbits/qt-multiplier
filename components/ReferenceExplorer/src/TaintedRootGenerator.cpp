@@ -22,9 +22,10 @@ void TaintedRootGenerator::run(void) {
   static const auto kAlreadyExpanded{true};
 
   QList<Node> nodes;
-  nodes.emplaceBack(Node::Create(FileCache(), entity, entity,
-                                 IReferenceExplorerModel::TaintMode,
-                                 kAlreadyExpanded));
+  nodes.emplaceBack(Node::Create(
+      FileCache(), entity, entity,
+      IReferenceExplorerModel::TaintMode,
+      kAlreadyExpanded, EntityBreadCrumbs(entity)));
   nodes.front().opt_name = TokensToString(entity);
 
   for (Node child_node : this->TaintedChildGenerator::GenerateNodes()) {

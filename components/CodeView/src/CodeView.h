@@ -186,6 +186,9 @@ class CodeView final : public ICodeView {
   //! Re-introduce cursor change tracking.
   void ResumeCursorTracking(void);
 
+  //! Handle a cursor move.
+  void HandleNewCursor(const QTextCursor &cursor);
+
  private slots:
   //! Connect the cursor changed event. This will also trigger a cursor event.
   void ConnectCursorChangeEvent(void);

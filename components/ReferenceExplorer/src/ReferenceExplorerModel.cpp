@@ -16,9 +16,11 @@
 #include <multiplier/Index.h>
 #include <multiplier/AST.h>
 
+#include <QApplication>
 #include <QByteArray>
 #include <QIODevice>
 #include <QMimeData>
+#include <QPalette>
 #include <QString>
 #include <QThreadPool>
 #include <QColor>
@@ -364,7 +366,7 @@ int ReferenceExplorerModel::columnCount(const QModelIndex &) const {
     return 0;
   }
 
-  return 1;
+  return 3;
 }
 
 QVariant ReferenceExplorerModel::data(const QModelIndex &index,
@@ -382,12 +384,47 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   const auto &node = node_it->second;
 
   QVariant value;
-  if (role == Qt::DisplayRole) {
-    if (node.opt_name.has_value()) {
-      value = node.opt_name.value();
 
+  // Make the text of the breadcrumbs and location slightly transparent, so that
+  // they don't draw too much attention.
+  if (role == Qt::ForegroundRole) {
+    QColor color = qApp->palette().text().color();
+    if (index.column() > 0) {
+      return QColor::fromRgbF(
+          color.redF(), color.greenF(), color.blueF(),
+          color.alphaF() * static_cast<float>(0.75));
     } else {
-      value = tr("Unnamed: ") + QString::number(node.entity_id);
+      return color;
+    }
+
+  } else if (role == Qt::DisplayRole) {
+    auto column_number = index.column();
+
+    if (column_number == 0) {
+      if (node.opt_name.has_value()) {
+        value = node.opt_name.value();
+
+      } else {
+        value = tr("Unnamed: ") + QString::number(node.entity_id);
+      }
+
+    } else if (column_number == 1) {
+      if (node.opt_location.has_value()) {
+        const auto &location = node.opt_location.value();
+
+        std::filesystem::path file_path{location.path.toStdString()};
+        auto file_name = QString::fromStdString(file_path.filename());
+
+        value.setValue(QString("%1:%2:%3")
+                           .arg(file_name, QString::number(location.line),
+                                QString::number(location.column)));
+      }
+
+    } else if (column_number == 2) {
+      if (node.opt_breadcrumbs.has_value()) {
+        const auto &breadcrumbs = node.opt_breadcrumbs.value();
+        value.setValue(breadcrumbs);
+      }
     }
 
   } else if (role == Qt::ToolTipRole) {
@@ -481,6 +518,25 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   }
 
   return value;
+}
+
+QVariant ReferenceExplorerModel::headerData(int section,
+                                            Qt::Orientation orientation,
+                                            int role) const {
+
+  if (orientation != Qt::Horizontal || role != Qt::DisplayRole) {
+    return QVariant();
+  }
+
+  if (section == 0) {
+    return tr("Entity");
+
+  } else if (section == 1) {
+    return tr("File name");
+
+  } else {
+    return tr("Breadcrumbs");
+  }
 }
 
 QMimeData *
@@ -828,30 +884,30 @@ ReferenceExplorerModel::GetTokenCategoryIconLabel(TokenCategory tok_category) {
   // clang-format on
   static const std::unordered_map<TokenCategory, QString> kLabelMap{
       {TokenCategory::UNKNOWN, kInvalidCategory},
-      {TokenCategory::LOCAL_VARIABLE, "Var"},
-      {TokenCategory::GLOBAL_VARIABLE, "GVar"},
-      {TokenCategory::PARAMETER_VARIABLE, "Parm"},
-      {TokenCategory::FUNCTION, "Func"},
-      {TokenCategory::INSTANCE_METHOD, "Meth"},
+      {TokenCategory::LOCAL_VARIABLE, "Vr"},
+      {TokenCategory::GLOBAL_VARIABLE, "GVa"},
+      {TokenCategory::PARAMETER_VARIABLE, "Par"},
+      {TokenCategory::FUNCTION, "Fn"},
+      {TokenCategory::INSTANCE_METHOD, "Mt"},
       {TokenCategory::INSTANCE_MEMBER, "Fld"},
-      {TokenCategory::CLASS_METHOD, "CFunc"},
-      {TokenCategory::CLASS_MEMBER, "CVar"},
-      {TokenCategory::THIS, "This"},
-      {TokenCategory::CLASS, "Class"},
+      {TokenCategory::CLASS_METHOD, "CFn"},
+      {TokenCategory::CLASS_MEMBER, "CVr"},
+      {TokenCategory::THIS, "t"},
+      {TokenCategory::CLASS, "Cls"},
       {TokenCategory::STRUCT, "Str"},
       {TokenCategory::UNION, "Un"},
-      {TokenCategory::CONCEPT, "Cept"},
+      {TokenCategory::CONCEPT, "Cpt"},
       {TokenCategory::INTERFACE, "Int"},
-      {TokenCategory::ENUM, "EnumT"},
-      {TokenCategory::ENUMERATOR, "Enum"},
+      {TokenCategory::ENUM, "EnT"},
+      {TokenCategory::ENUMERATOR, "En"},
       {TokenCategory::NAMESPACE, "Ns"},
-      {TokenCategory::TYPE_ALIAS, "Type"},
-      {TokenCategory::TEMPLATE_PARAMETER_TYPE, "TParm"},
-      {TokenCategory::TEMPLATE_PARAMETER_VALUE, "TParm"},
-      {TokenCategory::LABEL, "Labl"},
+      {TokenCategory::TYPE_ALIAS, "Typ"},
+      {TokenCategory::TEMPLATE_PARAMETER_TYPE, "TP"},
+      {TokenCategory::TEMPLATE_PARAMETER_VALUE, "TP"},
+      {TokenCategory::LABEL, "Lbl"},
       {TokenCategory::MACRO_DIRECTIVE_NAME, "Dir"},
-      {TokenCategory::MACRO_NAME, "Macro"},
-      {TokenCategory::MACRO_PARAMETER_NAME, "MParm"},
+      {TokenCategory::MACRO_NAME, "M"},
+      {TokenCategory::MACRO_PARAMETER_NAME, "MP"},
   };
   // clang-format on
 

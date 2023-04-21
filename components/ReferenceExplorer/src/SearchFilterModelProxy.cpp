@@ -15,11 +15,10 @@
 namespace mx::gui {
 
 struct SearchFilterModelProxy::PrivateData final {
-  FilterSettingsWidget::PathFilterType path_filter_type{
-      FilterSettingsWidget::PathFilterType::None};
-
+  bool enable_file_name_filter{false};
   bool enable_entity_name_filter{false};
   bool enable_entity_id_filter{false};
+  bool enable_breadcrumbs_filter{false};
 };
 
 SearchFilterModelProxy::SearchFilterModelProxy(QObject *parent)
@@ -28,9 +27,8 @@ SearchFilterModelProxy::SearchFilterModelProxy(QObject *parent)
 
 SearchFilterModelProxy::~SearchFilterModelProxy() {}
 
-void SearchFilterModelProxy::SetPathFilterType(
-    const FilterSettingsWidget::PathFilterType &path_filter_type) {
-  d->path_filter_type = path_filter_type;
+void SearchFilterModelProxy::EnableFileNameFilter(const bool &enable) {
+  d->enable_file_name_filter = enable;
   invalidateFilter();
 }
 
@@ -41,6 +39,11 @@ void SearchFilterModelProxy::EnableEntityNameFilter(const bool &enable) {
 
 void SearchFilterModelProxy::EnableEntityIDFilter(const bool &enable) {
   d->enable_entity_id_filter = enable;
+  invalidateFilter();
+}
+
+void SearchFilterModelProxy::EnableBreadcrumbsFilter(const bool &enable) {
+  d->enable_breadcrumbs_filter = enable;
   invalidateFilter();
 }
 
@@ -73,23 +76,26 @@ bool SearchFilterModelProxy::filterAcceptsRow(
     }
   }
 
-  if (d->path_filter_type != FilterSettingsWidget::PathFilterType::None) {
-    auto location_var = index.data(IReferenceExplorerModel::LocationRole);
-    if (location_var.isValid()) {
-      const Location &location = qvariant_cast<Location>(location_var);
+  if (d->enable_breadcrumbs_filter) {
+    auto breadcrumbs_index = sourceModel()->index(source_row, 2, source_parent);
+    if (auto breadcrumbs_var = breadcrumbs_index.data();
+        breadcrumbs_var.isValid()) {
+      const auto &breadcrumbs = breadcrumbs_var.toString();
 
-      QString path;
-      if (d->path_filter_type ==
-          FilterSettingsWidget::PathFilterType::FileName) {
-
-        std::filesystem::path full_path(location.path.toStdString());
-        path = QString::fromStdString(full_path.filename());
-
-      } else {
-        path = location.path;
+      if (breadcrumbs.contains(filterRegularExpression())) {
+        accept_row = true;
       }
+    }
+  }
 
-      if (path.contains(filterRegularExpression())) {
+  if (d->enable_file_name_filter) {
+    auto file_name_index = sourceModel()->index(source_row, 1, source_parent);
+
+    if (auto file_name_var = file_name_index.data();
+        file_name_index.isValid()) {
+      const auto &file_name = file_name_var.toString();
+
+      if (file_name.contains(filterRegularExpression())) {
         accept_row = true;
       }
     }
