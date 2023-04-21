@@ -113,7 +113,6 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   // so make sure they span to use all available space.
   QHeaderView *header = d->tree_view->header();
   header->setStretchLastSection(true);
-  header->setSectionResizeMode(QHeaderView::ResizeToContents);
 
   // Don't let double click expand things in three; we capture double click so
   // that we can make it open up the use in the code.
