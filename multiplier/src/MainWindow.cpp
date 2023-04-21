@@ -333,7 +333,7 @@ void MainWindow::OpenReferenceExplorer(
 void MainWindow::OpenTokenReferenceExplorer(CodeModelIndex index) {
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     CloseAllPopups();
@@ -360,7 +360,7 @@ void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
   }
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
 
   if (related_entity_id_var.isValid()) {
     OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
@@ -374,7 +374,7 @@ void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
 void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     return;
