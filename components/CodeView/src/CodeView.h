@@ -180,11 +180,14 @@ class CodeView final : public ICodeView {
       QList<QTextEdit::ExtraSelection> &selection_list,
       const CodeViewTheme &theme);
 
+  //! Disable cursor change tracking.
   void StopCursorTracking(void);
+
+  //! Re-introduce cursor change tracking.
   void ResumeCursorTracking(void);
 
  private slots:
-  // Connect the cursor changed event.
+  //! Connect the cursor changed event. This will also trigger a cursor event.
   void ConnectCursorChangeEvent(void);
 
   //! This slot regenerates the code view contents using CreateTextDocument
