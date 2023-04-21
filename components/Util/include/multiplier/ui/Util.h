@@ -93,6 +93,10 @@ QString TokensToString(const VariantEntity &ent);
 //! Create a breadcrumbs string of the token contexts.
 QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 
+//! Create a breadcrumbs string of the token contexts.
+std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
+                                         bool run_length_encode = true);
+
 //// Try to determine the declarations associated with this token.
 //std::optional<Decl> DeclForToken(const Token &token);
 //
@@ -119,9 +123,6 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 //
 //// Return the file location of an entity.
 //RawEntityId EntityFileLocation(const Index &index, RawEntityId eid);
-//
-//// Return the optional nearest fragment token associated with this declaration.
-//std::optional<Token> DeclFragmentToken(const Decl &decl);
 //
 //// Return the optional nearest file token associated with this declaration.
 //std::optional<Token> DeclFileToken(const Decl &decl);

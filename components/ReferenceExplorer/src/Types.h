@@ -57,11 +57,12 @@ struct Node final {
   // Create and initialize a node.
   //
   // NOTE(pag): This is a blocking operation.
-  static Node Create(const FileLocationCache &file_cache,
-                     const VariantEntity &entity,
-                     const VariantEntity &referenced_entity,
-                     IReferenceExplorerModel::ExpansionMode import_mode,
-                     const bool &expanded);
+  static Node
+  Create(const FileLocationCache &file_cache, const VariantEntity &entity,
+         const VariantEntity &referenced_entity,
+         IReferenceExplorerModel::ExpansionMode import_mode,
+         const bool &expanded,
+         const std::optional<QString> opt_breadcrumbs = std::nullopt);
 
   // Initialize this node with a specific parent id node.
   void AssignUniqueId(void);
@@ -88,9 +89,7 @@ struct Node final {
   std::vector<std::uint64_t> child_node_id_list;
 
   //! Optional breadcrumbs string
-  std::optional<QString> opt_breadcrumbs{
-      QString("This is a test breadcrumb output defined in Types.h@%1")
-          .arg(__LINE__)};
+  std::optional<QString> opt_breadcrumbs;
 };
 
 QDataStream &operator<<(QDataStream &stream, const Node &self);

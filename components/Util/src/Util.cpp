@@ -58,23 +58,22 @@ Token DeclFileToken(const Decl &decl) {
 //! Get the token range associated with an entity.
 TokenRange Tokens(const VariantEntity &ent) {
   const auto VariantEntityVisitor = Overload{
-    [](const Decl &entity) { return entity.tokens(); },
-    [](const Stmt &entity) { return entity.tokens(); },
-    [](const Type &) { return TokenRange(); },
-    [](const Token &entity) { return TokenRange(entity); },
-    [](const Macro &entity) { return entity.use_tokens(); },
-    [](const Designator &entity) { return entity.tokens(); },
-    [](const CXXBaseSpecifier &entity) { return entity.tokens(); },
-    [](const TemplateArgument &) { return TokenRange(); },
-    [](const TemplateParameterList &entity) { return entity.tokens(); },
+      [](const Decl &entity) { return entity.tokens(); },
+      [](const Stmt &entity) { return entity.tokens(); },
+      [](const Type &) { return TokenRange(); },
+      [](const Token &entity) { return TokenRange(entity); },
+      [](const Macro &entity) { return entity.use_tokens(); },
+      [](const Designator &entity) { return entity.tokens(); },
+      [](const CXXBaseSpecifier &entity) { return entity.tokens(); },
+      [](const TemplateArgument &) { return TokenRange(); },
+      [](const TemplateParameterList &entity) { return entity.tokens(); },
 
-    // NOTE(pag): We don't do `entity.parsed_tokens().file_tokens()` because
-    //            if it's a pure macro fragment, then it might not have any
-    //            parsed tokens.
-    [](const Fragment &entity) { return entity.parsed_tokens(); },
-    [](const File &entity) { return entity.tokens(); },
-    [](auto) { return TokenRange(); }
-  };
+      // NOTE(pag): We don't do `entity.parsed_tokens().file_tokens()` because
+      //            if it's a pure macro fragment, then it might not have any
+      //            parsed tokens.
+      [](const Fragment &entity) { return entity.parsed_tokens(); },
+      [](const File &entity) { return entity.tokens(); },
+      [](auto) { return TokenRange(); }};
   return std::visit<TokenRange>(VariantEntityVisitor, ent);
 }
 
@@ -121,8 +120,7 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
       [](const File &) -> VariantEntity { return NotAnEntity{}; },
       [](const Type &) -> VariantEntity { return NotAnEntity{}; },
       [](const TemplateArgument &) -> VariantEntity { return NotAnEntity{}; },
-      [](const NotAnEntity &) -> VariantEntity { return NotAnEntity{}; }
-  };
+      [](const NotAnEntity &) -> VariantEntity { return NotAnEntity{}; }};
   return std::visit<VariantEntity>(VariantEntityVisitor, ent);
 }
 
@@ -198,7 +196,7 @@ std::optional<QString> NameOfEntity(const VariantEntity &ent) {
         return std::nullopt;
       },
 
-      [] (const Token &token) -> std::optional<QString> {
+      [](const Token &token) -> std::optional<QString> {
         std::string_view d = token.data();
         return QString::fromUtf8(d.data(), static_cast<qsizetype>(d.size()));
       },
@@ -565,6 +563,27 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode) {
     }
   }
   return crumbs.Release();
+}
+
+std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
+                                         bool run_length_encode) {
+
+  std::optional<QString> output;
+
+  if (std::holds_alternative<Decl>(ent)) {
+    const auto &decl = std::get<Decl>(ent);
+    output = TokenBreadCrumbs(decl.token(), run_length_encode);
+
+  } else if (std::holds_alternative<Stmt>(ent)) {
+    //const auto &stmt = std::get<Stmt>(ent);
+    //output = TokenBreadCrumbs(stmt.token(), run_length_encode);
+
+  } else if (std::holds_alternative<Macro>(ent)) {
+    //const auto &macro = std::get<Macro>(ent);
+    //output = TokenBreadCrumbs(macro.token(), run_length_encode);
+  }
+
+  return output;
 }
 
 }  // namespace mx::gui

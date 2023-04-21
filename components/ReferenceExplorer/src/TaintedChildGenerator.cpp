@@ -79,6 +79,7 @@ static gap::generator<Node> Taint(const FileLocationCache &file_cache,
       node.referenced_entity_id = EntityId(ent).Pack();
       node.entity_id = node.referenced_entity_id;
       node.opt_location = Location::Create(file_cache, ent);
+      node.opt_breadcrumbs = EntityBreadCrumbs(ent);
 
       if (QString tokens = TokensToString(ent); !tokens.isEmpty()) {
         node.opt_name = tokens;
@@ -101,6 +102,7 @@ static gap::generator<Node> Taint(const FileLocationCache &file_cache,
       node.opt_name = QString::fromStdString(sink.message());
       node.referenced_entity_id = EntityId(ent).Pack();
       node.opt_location = Location::Create(file_cache, ent);
+      node.opt_breadcrumbs = EntityBreadCrumbs(ent);
       co_yield node;
     }
   }
@@ -157,6 +159,8 @@ TaintedChildGenerator::GenerateNodesAST(VariantEntity entity) {
       node.opt_name = QString::fromStdString(sink.message());
       node.referenced_entity_id = d->entity_id;
       node.opt_location = Location::Create(d->file_cache, sink.as_variant());
+      node.opt_breadcrumbs =
+          EntityBreadCrumbs(d->index.entity(node.referenced_entity_id));
 
     } else if (std::holds_alternative<TaintTrackingStep>(res)) {
       const TaintTrackingStep &step = std::get<TaintTrackingStep>(res);
@@ -164,6 +168,8 @@ TaintedChildGenerator::GenerateNodesAST(VariantEntity entity) {
       node.referenced_entity_id = step.id().Pack();
       node.entity_id = node.referenced_entity_id;
       node.opt_location = Location::Create(d->file_cache, step.as_variant());
+      node.opt_breadcrumbs =
+          EntityBreadCrumbs(d->index.entity(node.referenced_entity_id));
 
       if (QString tokens = TokensToString(step.as_variant());
           !tokens.isEmpty()) {

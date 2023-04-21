@@ -7,6 +7,8 @@
 #include "CallHierarchyRootGenerator.h"
 #include "Utils.h"
 
+#include <multiplier/ui/Util.h>
+
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
 
@@ -62,9 +64,10 @@ void CallHierarchyRootGenerator::run(void) {
   static const auto kAlreadyExpanded{true};
 
   for (VariantEntity root_entity : TopLevelEntities(entity)) {
+    auto opt_breadcrumbs = EntityBreadCrumbs(root_entity);
     nodes.emplaceBack(Node::Create(d->file_cache, root_entity, root_entity,
                                    IReferenceExplorerModel::CallHierarchyMode,
-                                   kAlreadyExpanded));
+                                   kAlreadyExpanded, opt_breadcrumbs));
 
     if (CancelRequested()) {
       break;
@@ -78,7 +81,11 @@ void CallHierarchyRootGenerator::run(void) {
       break;
     }
 
-    auto child_node = Node::Create(d->file_cache, ref.first, ref.second,
+    const auto &ent = ref.first;
+    const auto &referenced_entity = ref.second;
+
+    auto opt_breadcrumbs = EntityBreadCrumbs(ent);
+    auto child_node = Node::Create(d->file_cache, ent, referenced_entity,
                                    IReferenceExplorerModel::CallHierarchyMode,
                                    kNotYetExpanded);
 

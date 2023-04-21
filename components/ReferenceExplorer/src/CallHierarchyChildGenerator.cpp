@@ -44,9 +44,13 @@ gap::generator<Node> CallHierarchyChildGenerator::GenerateNodes(void) {
 
   for (const std::pair<VariantEntity, VariantEntity> &ref :
        References(entity)) {
-    co_yield Node::Create(d->file_cache, ref.first, ref.second,
+    const auto &ent = ref.first;
+    const auto &referenced_entity = ref.second;
+
+    auto opt_breadcrumbs = EntityBreadCrumbs(ent);
+    co_yield Node::Create(d->file_cache, ent, referenced_entity,
                           IReferenceExplorerModel::CallHierarchyMode,
-                          kNotYetExpanded);
+                          kNotYetExpanded, opt_breadcrumbs);
   }
 }
 
