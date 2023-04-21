@@ -586,10 +586,20 @@ std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
     }
 
   } else if (std::holds_alternative<Macro>(ent)) {
-    for (Token tok : std::get<Macro>(ent).generate_expansion_tokens()) {
+    const Macro &macro = std::get<Macro>(ent);
+    for (Token tok : macro.generate_expansion_tokens()) {
       if (Token ptok = tok.parsed_token()) {
         return TokenBreadCrumbs(tok, run_length_encode);
       }
+    }
+
+  } else if (std::holds_alternative<Designator>(ent)) {
+    const Designator &designator = std::get<Designator>(ent);
+    if (Token tok = designator.field_token()) {
+      return TokenBreadCrumbs(tok, run_length_encode);
+    }
+    for (Token tok : designator.tokens()) {
+      return TokenBreadCrumbs(tok, run_length_encode);
     }
   }
 
