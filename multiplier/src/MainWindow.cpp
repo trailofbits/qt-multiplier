@@ -385,7 +385,7 @@ void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
 
 void MainWindow::OpenCodePreview(const CodeModelIndex &index) {
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
+      index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     return;

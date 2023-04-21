@@ -13,6 +13,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDropEvent>
+#include <QHeaderView>
 #include <QLabel>
 #include <QMenu>
 #include <QPushButton>
@@ -97,8 +98,26 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   //            sort order into the model by re-ordering node children, then
   //            set the sort to a NOP sort based on this model data, that way
   //            when we drop things, they will land where they were dropped.
-  //  setSortingEnabled(true);
-  //  sortByColumn(0, Qt::AscendingOrder);
+  d->tree_view->setSortingEnabled(true);
+  d->tree_view->sortByColumn(0, Qt::AscendingOrder);
+
+  // When a user clicks on a cell, we don't want to randomly scroll to the
+  // beginning of a cell. That can be jarring.
+  d->tree_view->setAutoScroll(false);
+
+  // Smooth scrolling.
+  d->tree_view->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+  d->tree_view->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+
+  // We'll potentially have a bunch of columns depending on the configuration,
+  // so make sure they span to use all available space.
+  QHeaderView *header = d->tree_view->header();
+  header->setStretchLastSection(true);
+  header->setSectionResizeMode(QHeaderView::ResizeToContents);
+
+  // Don't let double click expand things in three; we capture double click so
+  // that we can make it open up the use in the code.
+  d->tree_view->setExpandsOnDoubleClick(false);
 
   // Disallow multiple selection. If we have grouping by file enabled, then when
   // a user clicks on a file name, we instead jump down to the first entry
@@ -111,7 +130,6 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   d->tree_view->setAlternatingRowColors(false);
   d->tree_view->setItemDelegateForColumn(0, new ReferenceExplorerItemDelegate);
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
-  d->tree_view->setExpandsOnDoubleClick(false);
   d->tree_view->installEventFilter(this);
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);

@@ -27,32 +27,7 @@ int GetMarginSize(const QFontMetrics &font_metrics) {
 }
 
 int GetIconSize(const QFontMetrics &font_metrics) {
-  return static_cast<int>(font_metrics.height() * 1.5);
-}
-
-QString GetLocationString(const QModelIndex &index) {
-  QString location;
-
-  QVariant location_info_var =
-      index.data(IReferenceExplorerModel::LocationRole);
-
-  if (location_info_var.isValid()) {
-    auto location_info = qvariant_cast<Location>(location_info_var);
-    auto filename =
-        std::filesystem::path(location_info.path.toStdString()).filename();
-
-    location = QString::fromStdString(filename);
-
-    if (0u < location_info.line) {
-      location += ":" + QString::number(location_info.line);
-
-      if (0u < location_info.column) {
-        location += ":" + QString::number(location_info.column);
-      }
-    }
-  }
-
-  return location;
+  return static_cast<int>(font_metrics.height() * 1.2);
 }
 
 }  // namespace
@@ -73,12 +48,8 @@ QSize ReferenceExplorerItemDelegate::sizeHint(
     return QStyledItemDelegate::sizeHint(option, index);
   }
 
-  const auto &label = label_var.toString();
-  auto location = GetLocationString(index);
-
   QFontMetrics font_metrics(option.font);
-  auto text_width = std::max(font_metrics.horizontalAdvance(label),
-                             font_metrics.horizontalAdvance(location));
+  auto text_width = font_metrics.horizontalAdvance(label_var.toString());
 
   auto margin{GetMarginSize(font_metrics)};
   auto icon_size{GetIconSize(font_metrics)};
@@ -137,7 +108,7 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   font.setBold(true);
   painter->setFont(font);
 
-  painter->setPen(option.palette.windowText().color());
+  painter->setPen(option.palette.text().color());
   painter->drawText(
       QRect(0, (icon_size / 2) - (font_height / 2), rect_width, font_height),
       Qt::AlignVCenter, label);

@@ -16,9 +16,11 @@
 #include <multiplier/Index.h>
 #include <multiplier/AST.h>
 
+#include <QApplication>
 #include <QByteArray>
 #include <QIODevice>
 #include <QMimeData>
+#include <QPalette>
 #include <QString>
 #include <QThreadPool>
 #include <QColor>
@@ -383,7 +385,19 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
 
   QVariant value;
 
-  if (role == Qt::DisplayRole) {
+  // Make the text of the breadcrumbs and location slightly transparent, so that
+  // they don't draw too much attention.
+  if (role == Qt::ForegroundRole) {
+    QColor color = qApp->palette().text().color();
+    if (index.column() > 0) {
+      return QColor::fromRgbF(
+          color.redF(), color.greenF(), color.blueF(),
+          color.alphaF() * static_cast<float>(0.75));
+    } else {
+      return color;
+    }
+
+  } else if (role == Qt::DisplayRole) {
     auto column_number = index.column();
 
     if (column_number == 0) {
