@@ -25,15 +25,17 @@ class SearchFilterModelProxy final : public QSortFilterProxyModel {
   //! Destructor
   virtual ~SearchFilterModelProxy() override;
 
-  //! Sets the path filtering type
-  void SetPathFilterType(
-      const FilterSettingsWidget::PathFilterType &path_filter_type);
+  //! Enables or disables file name filtering
+  void EnableFileNameFilter(const bool &enable);
 
   //! Enables or disables entity name-based filtering
   void EnableEntityNameFilter(const bool &enable);
 
   //! Enables or disables entity ID-based filtering
   void EnableEntityIDFilter(const bool &enable);
+
+  //! Enables or disables breadscrumbs-based filtering
+  void EnableBreadcrumbsFilter(const bool &enable);
 
  protected:
   //! Returns true if the specified row should be included in the view

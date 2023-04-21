@@ -23,11 +23,11 @@ namespace mx::gui {
 namespace {
 
 int GetMarginSize(const QFontMetrics &font_metrics) {
-  return font_metrics.height() / 3;
+  return font_metrics.height() / 4;
 }
 
 int GetIconSize(const QFontMetrics &font_metrics) {
-  return font_metrics.height() * 2;
+  return static_cast<int>(font_metrics.height() * 1.5);
 }
 
 QString GetLocationString(const QModelIndex &index) {
@@ -129,7 +129,7 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
 
   DrawIcon(*painter, icon_size, icon_label, icon_bg);
 
-  painter->translate(icon_size + margin, 0);
+  painter->translate(icon_size + (margin * 2), 0);
 
   auto rect_width{option.rect.width() - icon_size - (margin * 2)};
 
@@ -138,17 +138,9 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   painter->setFont(font);
 
   painter->setPen(option.palette.windowText().color());
-  painter->drawText(QRect(0, 0, rect_width, font_height), Qt::AlignVCenter,
-                    label);
-
-  font.setBold(false);
-  painter->setFont(font);
-
-  auto location = GetLocationString(index);
-
-  painter->setPen(option.palette.dark().color());
-  painter->drawText(QRect(0, icon_size - font_height, rect_width, font_height),
-                    Qt::AlignVCenter, location);
+  painter->drawText(
+      QRect(0, (icon_size / 2) - (font_height / 2), rect_width, font_height),
+      Qt::AlignVCenter, label);
 
   painter->restore();
 }

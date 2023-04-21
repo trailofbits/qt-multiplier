@@ -578,11 +578,15 @@ void GraphicalReferenceExplorer::OnSearchParametersChange(
 }
 
 void GraphicalReferenceExplorer::OnFilterParametersChange() {
-  d->model_proxy->SetPathFilterType(
-      d->filter_settings_widget->GetPathFilterType());
+  d->model_proxy->EnableFileNameFilter(
+      d->filter_settings_widget->FilterByFileName());
 
   d->model_proxy->EnableEntityNameFilter(
       d->filter_settings_widget->FilterByEntityName());
+
+  d->model_proxy->EnableBreadcrumbsFilter(
+      d->filter_settings_widget->FilterByBreadcrumbs());
+
 
   d->model_proxy->EnableEntityIDFilter(
       d->filter_settings_widget->FilterByEntityID());

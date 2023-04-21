@@ -395,15 +395,21 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
       }
 
     } else if (column_number == 1) {
-      if (node.opt_breadcrumbs.has_value()) {
-        const auto &breadcrumbs = node.opt_breadcrumbs.value();
-        value.setValue(breadcrumbs);
+      if (node.opt_location.has_value()) {
+        const auto &location = node.opt_location.value();
+
+        std::filesystem::path file_path{location.path.toStdString()};
+        auto file_name = QString::fromStdString(file_path.filename());
+
+        value.setValue(QString("%1:%2:%3")
+                           .arg(file_name, QString::number(location.line),
+                                QString::number(location.column)));
       }
 
     } else if (column_number == 2) {
-      if (node.opt_location.has_value()) {
-        const auto &location = node.opt_location.value();
-        value.setValue(location.path);
+      if (node.opt_breadcrumbs.has_value()) {
+        const auto &breadcrumbs = node.opt_breadcrumbs.value();
+        value.setValue(breadcrumbs);
       }
     }
 
@@ -512,10 +518,10 @@ QVariant ReferenceExplorerModel::headerData(int section,
     return tr("Entity");
 
   } else if (section == 1) {
-    return tr("Breadcrumbs");
+    return tr("File name");
 
   } else {
-    return tr("Path");
+    return tr("Breadcrumbs");
   }
 }
 
@@ -864,30 +870,30 @@ ReferenceExplorerModel::GetTokenCategoryIconLabel(TokenCategory tok_category) {
   // clang-format on
   static const std::unordered_map<TokenCategory, QString> kLabelMap{
       {TokenCategory::UNKNOWN, kInvalidCategory},
-      {TokenCategory::LOCAL_VARIABLE, "Var"},
-      {TokenCategory::GLOBAL_VARIABLE, "GVar"},
-      {TokenCategory::PARAMETER_VARIABLE, "Parm"},
-      {TokenCategory::FUNCTION, "Func"},
-      {TokenCategory::INSTANCE_METHOD, "Meth"},
+      {TokenCategory::LOCAL_VARIABLE, "Vr"},
+      {TokenCategory::GLOBAL_VARIABLE, "GVa"},
+      {TokenCategory::PARAMETER_VARIABLE, "Par"},
+      {TokenCategory::FUNCTION, "Fn"},
+      {TokenCategory::INSTANCE_METHOD, "Mt"},
       {TokenCategory::INSTANCE_MEMBER, "Fld"},
-      {TokenCategory::CLASS_METHOD, "CFunc"},
-      {TokenCategory::CLASS_MEMBER, "CVar"},
-      {TokenCategory::THIS, "This"},
-      {TokenCategory::CLASS, "Class"},
+      {TokenCategory::CLASS_METHOD, "CFn"},
+      {TokenCategory::CLASS_MEMBER, "CVr"},
+      {TokenCategory::THIS, "t"},
+      {TokenCategory::CLASS, "Cls"},
       {TokenCategory::STRUCT, "Str"},
       {TokenCategory::UNION, "Un"},
-      {TokenCategory::CONCEPT, "Cept"},
+      {TokenCategory::CONCEPT, "Cpt"},
       {TokenCategory::INTERFACE, "Int"},
-      {TokenCategory::ENUM, "EnumT"},
-      {TokenCategory::ENUMERATOR, "Enum"},
+      {TokenCategory::ENUM, "EnT"},
+      {TokenCategory::ENUMERATOR, "En"},
       {TokenCategory::NAMESPACE, "Ns"},
-      {TokenCategory::TYPE_ALIAS, "Type"},
-      {TokenCategory::TEMPLATE_PARAMETER_TYPE, "TParm"},
-      {TokenCategory::TEMPLATE_PARAMETER_VALUE, "TParm"},
-      {TokenCategory::LABEL, "Labl"},
+      {TokenCategory::TYPE_ALIAS, "Typ"},
+      {TokenCategory::TEMPLATE_PARAMETER_TYPE, "TP"},
+      {TokenCategory::TEMPLATE_PARAMETER_VALUE, "TP"},
+      {TokenCategory::LABEL, "Lbl"},
       {TokenCategory::MACRO_DIRECTIVE_NAME, "Dir"},
-      {TokenCategory::MACRO_NAME, "Macro"},
-      {TokenCategory::MACRO_PARAMETER_NAME, "MParm"},
+      {TokenCategory::MACRO_NAME, "M"},
+      {TokenCategory::MACRO_PARAMETER_NAME, "MP"},
   };
   // clang-format on
 

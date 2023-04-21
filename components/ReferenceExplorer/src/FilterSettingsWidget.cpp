@@ -12,17 +12,14 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QRadioButton>
 #include <QCheckBox>
 
 namespace mx::gui {
 
 struct FilterSettingsWidget::PrivateData final {
-  QRadioButton *none_path_filter_radio{nullptr};
-  QRadioButton *name_path_filter_radio{nullptr};
-  QRadioButton *full_path_filter_radio{nullptr};
-
+  QCheckBox *file_name_filter_check{nullptr};
   QCheckBox *entity_name_filter_check{nullptr};
+  QCheckBox *breadcrumbs_filter_check{nullptr};
   QCheckBox *entity_id_filter_check{nullptr};
 };
 
@@ -36,25 +33,16 @@ FilterSettingsWidget::FilterSettingsWidget(QWidget *parent)
 
 FilterSettingsWidget::~FilterSettingsWidget() {}
 
-FilterSettingsWidget::PathFilterType
-FilterSettingsWidget::GetPathFilterType() const {
-  if (d->none_path_filter_radio->isChecked()) {
-    return PathFilterType::None;
-
-  } else if (d->name_path_filter_radio->isChecked()) {
-    return PathFilterType::FileName;
-
-  } else if (d->full_path_filter_radio->isChecked()) {
-    return PathFilterType::FullPath;
-
-  } else {
-    Assert(false, "Invalid state");
-    return PathFilterType::None;
-  }
+bool FilterSettingsWidget::FilterByFileName() const {
+  return d->file_name_filter_check->isChecked();
 }
 
 bool FilterSettingsWidget::FilterByEntityName() const {
   return d->entity_name_filter_check->isChecked();
+}
+
+bool FilterSettingsWidget::FilterByBreadcrumbs() const {
+  return d->breadcrumbs_filter_check->isChecked();
 }
 
 bool FilterSettingsWidget::FilterByEntityID() const {
@@ -67,7 +55,6 @@ void FilterSettingsWidget::InitializeWidgets() {
   auto layout = new QHBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
 
-  // Entity settings
   layout->addWidget(new QLabel(tr("Entity:")));
 
   d->entity_name_filter_check = new QCheckBox(tr("Name"));
@@ -76,36 +63,22 @@ void FilterSettingsWidget::InitializeWidgets() {
   connect(d->entity_name_filter_check, &QCheckBox::stateChanged, this,
           &FilterSettingsWidget::FilterParametersChanged);
 
+  d->breadcrumbs_filter_check = new QCheckBox(tr("Breadcrumbs"));
+  layout->addWidget(d->breadcrumbs_filter_check);
+
+  connect(d->breadcrumbs_filter_check, &QCheckBox::stateChanged, this,
+          &FilterSettingsWidget::FilterParametersChanged);
+
+  d->file_name_filter_check = new QCheckBox(tr("File name"));
+  layout->addWidget(d->file_name_filter_check);
+
+  connect(d->file_name_filter_check, &QCheckBox::stateChanged, this,
+          &FilterSettingsWidget::FilterParametersChanged);
+
   d->entity_id_filter_check = new QCheckBox(tr("ID"));
   layout->addWidget(d->entity_id_filter_check);
 
   connect(d->entity_id_filter_check, &QCheckBox::stateChanged, this,
-          &FilterSettingsWidget::FilterParametersChanged);
-
-  // Separator
-  auto separator = new QFrame(this);
-  separator->setFrameShape(QFrame::VLine);
-  layout->addWidget(separator);
-
-  // Path settings
-  layout->addWidget(new QLabel(tr("Path:")));
-
-  d->none_path_filter_radio = new QRadioButton(tr("None"));
-  layout->addWidget(d->none_path_filter_radio);
-
-  connect(d->none_path_filter_radio, &QRadioButton::toggled, this,
-          &FilterSettingsWidget::FilterParametersChanged);
-
-  d->name_path_filter_radio = new QRadioButton(tr("File name"));
-  layout->addWidget(d->name_path_filter_radio);
-
-  connect(d->name_path_filter_radio, &QRadioButton::toggled, this,
-          &FilterSettingsWidget::FilterParametersChanged);
-
-  d->full_path_filter_radio = new QRadioButton(tr("Full path"));
-  layout->addWidget(d->full_path_filter_radio);
-
-  connect(d->full_path_filter_radio, &QRadioButton::toggled, this,
           &FilterSettingsWidget::FilterParametersChanged);
 
   layout->addStretch();
@@ -127,11 +100,9 @@ void FilterSettingsWidget::Deactivate() {
 }
 
 void FilterSettingsWidget::ResetSearchSettings() {
-  d->none_path_filter_radio->setChecked(true);
-  d->name_path_filter_radio->setChecked(false);
-  d->full_path_filter_radio->setChecked(false);
-
+  d->file_name_filter_check->setChecked(true);
   d->entity_name_filter_check->setChecked(true);
+  d->breadcrumbs_filter_check->setChecked(true);
   d->entity_id_filter_check->setChecked(false);
 }
 
