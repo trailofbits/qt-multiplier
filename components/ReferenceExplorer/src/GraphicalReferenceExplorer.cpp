@@ -91,7 +91,6 @@ GraphicalReferenceExplorer::GraphicalReferenceExplorer(
 void GraphicalReferenceExplorer::InitializeWidgets() {
   // Initialize the tree view
   d->tree_view = new QTreeView(this);
-  d->tree_view->setHeaderHidden(true);
 
   // TODO(pag): Re-enable with some kind of "intrusive" sort that makes the
   //            dropping of dragged items disable sort by encoding the current
@@ -110,7 +109,7 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   d->tree_view->setTreePosition(0);
 
   d->tree_view->setAlternatingRowColors(false);
-  d->tree_view->setItemDelegate(new ReferenceExplorerItemDelegate);
+  d->tree_view->setItemDelegateForColumn(0, new ReferenceExplorerItemDelegate);
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree_view->setExpandsOnDoubleClick(false);
   d->tree_view->installEventFilter(this);
@@ -427,6 +426,7 @@ void GraphicalReferenceExplorer::UpdateTreeViewItemButtons() {
   // Enable the expansion button if we haven't yet expanded the node.
   auto expansion_status_var =
       index.data(IReferenceExplorerModel::ExpansionStatusRole);
+
   if (expansion_status_var.isValid() && !expansion_status_var.toBool()) {
     d->treeview_item_buttons.expand->setEnabled(true);
   }
@@ -441,8 +441,23 @@ void GraphicalReferenceExplorer::UpdateTreeViewItemButtons() {
   auto button_area_width =
       (button_count * button_size) + (button_count * button_margin);
 
-  auto current_x = rect.x() + rect.width() - button_area_width;
+  auto current_x =
+      d->tree_view->pos().x() + d->tree_view->width() - button_area_width;
+
+  const auto &vertical_scrollbar = *d->tree_view->verticalScrollBar();
+  if (vertical_scrollbar.isVisible()) {
+    current_x -= vertical_scrollbar.width();
+  }
+
   auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
+
+  auto pos =
+      d->tree_view->viewport()->mapToGlobal(QPoint(current_x, current_y));
+
+  pos = mapFromGlobal(pos);
+
+  current_x = pos.x();
+  current_y = pos.y();
 
   for (auto *button : button_list) {
     button->resize(button_size, button_size);
@@ -465,11 +480,14 @@ void GraphicalReferenceExplorer::OnModelReset() {
 
 void GraphicalReferenceExplorer::OnDataChanged() {
   UpdateTreeViewItemButtons();
+  ExpandAllNodes();
 }
 
 void GraphicalReferenceExplorer::ExpandAllNodes() {
   d->tree_view->expandAll();
+
   d->tree_view->resizeColumnToContents(0);
+  d->tree_view->resizeColumnToContents(1);
 }
 
 void GraphicalReferenceExplorer::OnRowsInserted(const QModelIndex &parent,

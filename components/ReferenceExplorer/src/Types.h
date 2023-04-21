@@ -86,6 +86,11 @@ struct Node final {
 
   //! Child nodes
   std::vector<std::uint64_t> child_node_id_list;
+
+  //! Optional breadcrumbs string
+  std::optional<QString> opt_breadcrumbs{
+      QString("This is a test breadcrumb output defined in Types.h@%1")
+          .arg(__LINE__)};
 };
 
 QDataStream &operator<<(QDataStream &stream, const Node &self);

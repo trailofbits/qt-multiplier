@@ -70,6 +70,10 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   //! \todo Fix role=TokenCategoryRole support
   virtual QVariant data(const QModelIndex &index, int role) const override;
 
+  //! Returns the column names for the tree view header
+  virtual QVariant headerData(int section, Qt::Orientation orientation,
+                              int role) const override;
+
   //! Returns the specified model items as a mime data object
   virtual QMimeData *mimeData(const QModelIndexList &indexes) const override;
 

@@ -37,7 +37,8 @@ namespace gui {
 
 template <typename T>
 static VariantEntity NamedDeclContaining(const T &thing)
-requires (!std::is_same_v<T, VariantEntity>) {
+  requires(!std::is_same_v<T, VariantEntity>)
+{
   for (FunctionDecl func : FunctionDecl::containing(thing)) {
     return func;
   }
@@ -89,6 +90,9 @@ std::optional<QString> NameOfEntity(const VariantEntity &ent);
 //! Return the tokens of `ent` as a string.
 QString TokensToString(const VariantEntity &ent);
 
+//! Create a breadcrumbs string of the token contexts.
+QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
+
 //// Try to determine the declarations associated with this token.
 //std::optional<Decl> DeclForToken(const Token &token);
 //
@@ -131,8 +135,6 @@ QString TokensToString(const VariantEntity &ent);
 //// that.
 //std::optional<Decl> NearestDeclFor(const Index &index, RawEntityId id);
 //
-//// Create a breadcrumbs string of the token contexts.
-//QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 
 }  // namespace gui
 }  // namespace mx

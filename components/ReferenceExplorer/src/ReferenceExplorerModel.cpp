@@ -364,7 +364,7 @@ int ReferenceExplorerModel::columnCount(const QModelIndex &) const {
     return 0;
   }
 
-  return 1;
+  return 3;
 }
 
 QVariant ReferenceExplorerModel::data(const QModelIndex &index,
@@ -382,12 +382,29 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   const auto &node = node_it->second;
 
   QVariant value;
-  if (role == Qt::DisplayRole) {
-    if (node.opt_name.has_value()) {
-      value = node.opt_name.value();
 
-    } else {
-      value = tr("Unnamed: ") + QString::number(node.entity_id);
+  if (role == Qt::DisplayRole) {
+    auto column_number = index.column();
+
+    if (column_number == 0) {
+      if (node.opt_name.has_value()) {
+        value = node.opt_name.value();
+
+      } else {
+        value = tr("Unnamed: ") + QString::number(node.entity_id);
+      }
+
+    } else if (column_number == 1) {
+      if (node.opt_breadcrumbs.has_value()) {
+        const auto &breadcrumbs = node.opt_breadcrumbs.value();
+        value.setValue(breadcrumbs);
+      }
+
+    } else if (column_number == 2) {
+      if (node.opt_location.has_value()) {
+        const auto &location = node.opt_location.value();
+        value.setValue(location.path);
+      }
     }
 
   } else if (role == Qt::ToolTipRole) {
@@ -481,6 +498,25 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   }
 
   return value;
+}
+
+QVariant ReferenceExplorerModel::headerData(int section,
+                                            Qt::Orientation orientation,
+                                            int role) const {
+
+  if (orientation != Qt::Horizontal || role != Qt::DisplayRole) {
+    return QVariant();
+  }
+
+  if (section == 0) {
+    return tr("Entity");
+
+  } else if (section == 1) {
+    return tr("Breadcrumbs");
+
+  } else {
+    return tr("Path");
+  }
 }
 
 QMimeData *
