@@ -6,4 +6,4 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-set(QTMULTIPLIER_VERSION "1.0.6")
+set(QTMULTIPLIER_VERSION "1.0.7")
