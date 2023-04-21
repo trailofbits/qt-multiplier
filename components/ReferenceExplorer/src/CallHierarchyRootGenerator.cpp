@@ -64,10 +64,10 @@ void CallHierarchyRootGenerator::run(void) {
   static const auto kAlreadyExpanded{true};
 
   for (VariantEntity root_entity : TopLevelEntities(entity)) {
-    auto opt_breadcrumbs = EntityBreadCrumbs(root_entity);
-    nodes.emplaceBack(Node::Create(d->file_cache, root_entity, root_entity,
-                                   IReferenceExplorerModel::CallHierarchyMode,
-                                   kAlreadyExpanded, opt_breadcrumbs));
+    nodes.emplaceBack(Node::Create(
+        d->file_cache, root_entity, root_entity,
+        IReferenceExplorerModel::CallHierarchyMode,
+        kAlreadyExpanded, EntityBreadCrumbs(root_entity)));
 
     if (CancelRequested()) {
       break;
@@ -84,10 +84,10 @@ void CallHierarchyRootGenerator::run(void) {
     const auto &ent = ref.first;
     const auto &referenced_entity = ref.second;
 
-    auto opt_breadcrumbs = EntityBreadCrumbs(ent);
-    auto child_node = Node::Create(d->file_cache, ent, referenced_entity,
-                                   IReferenceExplorerModel::CallHierarchyMode,
-                                   kNotYetExpanded);
+    auto child_node = Node::Create(
+        d->file_cache, ent, referenced_entity,
+        IReferenceExplorerModel::CallHierarchyMode,
+        kNotYetExpanded, EntityBreadCrumbs(referenced_entity));
 
     nodes.front().child_node_id_list.push_back(child_node.node_id);
     child_node.parent_node_id = nodes.front().node_id;

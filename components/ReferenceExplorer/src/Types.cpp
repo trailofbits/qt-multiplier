@@ -153,6 +153,13 @@ QDataStream &operator<<(QDataStream &stream, const Node &node) {
     stream << false;
   }
 
+  if (node.opt_breadcrumbs.has_value()) {
+    stream << true;
+    stream << node.opt_breadcrumbs.value();
+  } else {
+    stream << false;
+  }
+
   auto child_node_id_list_size =
       static_cast<std::uint64_t>(node.child_node_id_list.size());
 
@@ -190,6 +197,13 @@ QDataStream &operator>>(QDataStream &stream, Node &node) {
     Location location;
     stream >> location;
     node.opt_location = std::move(location);
+  }
+
+  // Read the breadcrumbs.
+  stream >> has_optional_field;
+  if (has_optional_field) {
+    stream >> string_value;
+    node.opt_breadcrumbs = string_value;
   }
 
   std::uint64_t child_node_id_list_size{};

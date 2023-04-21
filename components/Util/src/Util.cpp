@@ -571,19 +571,29 @@ std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
   std::optional<QString> output;
 
   if (std::holds_alternative<Decl>(ent)) {
-    const auto &decl = std::get<Decl>(ent);
-    output = TokenBreadCrumbs(decl.token(), run_length_encode);
+    const Decl &decl = std::get<Decl>(ent);
+    return TokenBreadCrumbs(decl.token(), run_length_encode);
 
   } else if (std::holds_alternative<Stmt>(ent)) {
-    //const auto &stmt = std::get<Stmt>(ent);
-    //output = TokenBreadCrumbs(stmt.token(), run_length_encode);
+    const Stmt &stmt = std::get<Stmt>(ent);
+    if (std::optional<Expr> expr = Expr::from(stmt)) {
+      if (Token tok = expr->expression_token()) {
+        return TokenBreadCrumbs(tok, run_length_encode);
+      }
+    }
+    for (Token tok : stmt.tokens()) {
+      return TokenBreadCrumbs(tok, run_length_encode);
+    }
 
   } else if (std::holds_alternative<Macro>(ent)) {
-    //const auto &macro = std::get<Macro>(ent);
-    //output = TokenBreadCrumbs(macro.token(), run_length_encode);
+    for (Token tok : std::get<Macro>(ent).generate_expansion_tokens()) {
+      if (Token ptok = tok.parsed_token()) {
+        return TokenBreadCrumbs(tok, run_length_encode);
+      }
+    }
   }
 
-  return output;
+  return std::nullopt;
 }
 
 }  // namespace mx::gui
