@@ -442,7 +442,7 @@ void CodeView::OnTextEditViewportMouseButtonPress(QMouseEvent *event) {
   d->last_press_position = cursor.position();
   d->last_block = cursor.block().blockNumber();
 
-  auto opt_model_index = GetCodeModelIndexFromMousePosition(event->pos());
+  auto opt_model_index = GetCodeModelIndexFromTextCursor(d->token_map, cursor);
   if (!opt_model_index.has_value()) {
     return;
   }
@@ -451,11 +451,13 @@ void CodeView::OnTextEditViewportMouseButtonPress(QMouseEvent *event) {
 
   if (event->button() == Qt::LeftButton &&
       event->modifiers() == Qt::ControlModifier) {
+    HandleNewCursor(cursor);
     emit TokenTriggered({TokenAction::Type::Primary, std::nullopt},
                         model_index);
 
   } else if (event->button() == Qt::RightButton &&
              event->modifiers() == Qt::NoModifier) {
+    HandleNewCursor(cursor);
     emit TokenTriggered({TokenAction::Type::Secondary, std::nullopt},
                         model_index);
   }
@@ -932,7 +934,7 @@ void CodeView::OnTextEditUpdateRequest(const QRect &rect, int dy) {
   }
 }
 
-void CodeView::OnCursorMoved(void) {
+void CodeView::HandleNewCursor(const QTextCursor &cursor) {
   if (!d->model->IsReady()) {
     return;
   }
@@ -943,12 +945,11 @@ void CodeView::OnCursorMoved(void) {
   // Highlight the current line where the cursor is.
   selection.format.setBackground(d->theme.selected_line_background_color);
   selection.format.setProperty(QTextFormat::FullWidthSelection, true);
-  selection.cursor = d->text_edit->textCursor();
+  selection.cursor = cursor;
   selection.cursor.clearSelection();
   extra_selections.append(selection);
 
-  auto opt_model_index =
-      GetCodeModelIndexFromTextCursor(d->token_map, d->text_edit->textCursor());
+  auto opt_model_index = GetCodeModelIndexFromTextCursor(d->token_map, cursor);
 
   // Try to highlight all entities related to the entity on which the cursor
   // is hovering.
@@ -966,7 +967,7 @@ void CodeView::OnCursorMoved(void) {
       auto related_entity_id =
           qvariant_cast<std::uint64_t>(related_entity_id_var);
       HighlightTokensForRelatedEntityID(
-          d->token_map, d->text_edit->textCursor(), related_entity_id,
+          d->token_map, cursor, related_entity_id,
           extra_selections, d->theme);
     }
   }
@@ -977,6 +978,10 @@ void CodeView::OnCursorMoved(void) {
   if (opt_model_index.has_value()) {
     emit CursorMoved(opt_model_index.value());
   }
+}
+
+void CodeView::OnCursorMoved(void) {
+  HandleNewCursor(d->text_edit->textCursor());
 }
 
 void CodeView::OnSearchParametersChange(
