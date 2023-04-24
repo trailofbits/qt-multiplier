@@ -50,6 +50,8 @@ class MainWindow final : public QMainWindow {
   void OpenReferenceExplorer(RawEntityId entity_id,
                              IReferenceExplorerModel::ExpansionMode mode);
   void OpenCodePreview(const CodeModelIndex &index);
+  void CloseQuickRefExplorerPopup();
+  void CloseCodePreviewPopup();
   void CloseAllPopups();
   void UpdateLocatiomFromWidget(QWidget *widget);
   ICodeView *CreateNewCodeView(RawEntityId file_entity_id, QString tab_name);

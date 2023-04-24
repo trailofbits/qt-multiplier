@@ -8,6 +8,8 @@
 
 #include <QWidget>
 
+#include <multiplier/ui/ICodeView.h>
+
 #include <multiplier/Index.h>
 
 namespace mx::gui {
@@ -68,6 +70,18 @@ class QuickCodeView final : public QWidget {
 
   //! Updates the window name with the entity name request output
   void EntityNameFutureStatusChanged();
+
+  //! Forwards a subset of ICodeView::TokenTriggered events
+  void OnTokenTriggered(const ICodeView::TokenAction &token_action,
+                        const CodeModelIndex &index);
+
+ signals:
+  //! \brief This signal will only fire for TokenAction::Type::Keyboard events
+  //! The reason it is limited to a single event type is that the popup
+  //! needs to be closed automatically, and handling other interactions
+  //! becomes trickier to make available without a design first.
+  void TokenTriggered(const ICodeView::TokenAction &token_action,
+                      const CodeModelIndex &index);
 };
 
 }  // namespace mx::gui
