@@ -403,9 +403,9 @@ void MainWindow::OpenCodePreview(const CodeModelIndex &index) {
   auto max_width = margin + (width() / 3);
   auto max_height = margin + (height() / 4);
 
-//  auto size_hint = d->quick_code_view->sizeHint();
-//  auto width = std::min(max_width, size_hint.width());
-//  auto height = std::min(max_height, size_hint.height());
+  //  auto size_hint = d->quick_code_view->sizeHint();
+  //  auto width = std::min(max_width, size_hint.width());
+  //  auto height = std::min(max_height, size_hint.height());
 
   d->quick_code_view->resize(max_width, max_height);
   d->quick_code_view->show();
@@ -641,29 +641,28 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
     // Ideally we should find a Qt-friendly method that the framework handles
     // well natively
     const auto &keyboard_button = token_action.opt_keyboard_button.value();
+    if (keyboard_button.shift_modifier || keyboard_button.control_modifier) {
+      return;
+    }
 
     // Like in IDA Pro, pressing X while the cursor is on an entity shows us
     // its cross-references.
-    if (keyboard_button.key == Qt::Key_X && !keyboard_button.shift_modifier &&
-        !keyboard_button.control_modifier) {
+    if (keyboard_button.key == Qt::Key_X) {
       OpenTokenReferenceExplorer(index);
-    }
 
-    if (keyboard_button.key == Qt::Key_T && !keyboard_button.shift_modifier &&
-        !keyboard_button.control_modifier) {
+    } else if (keyboard_button.key == Qt::Key_P) {
+      OpenCodePreview(index);
+
+    } else if (keyboard_button.key == Qt::Key_T) {
       OpenTokenTaintExplorer(index);
-    }
 
-    if (keyboard_button.key == Qt::Key_I && !keyboard_button.shift_modifier &&
-        !keyboard_button.control_modifier) {
+    } else if (keyboard_button.key == Qt::Key_I) {
       d->info_explorer_dock->show();
       OpenTokenEntityInfo(index);
-    }
 
-    // Like in IDA Pro, pressing Enter while the cursor is on a use of that
-    // entity will bring us to that entity.
-    if (keyboard_button.key == Qt::Key_Enter &&
-        !keyboard_button.shift_modifier && !keyboard_button.control_modifier) {
+    } else if (keyboard_button.key == Qt::Key_Enter) {
+      // Like in IDA Pro, pressing Enter while the cursor is on a use of that
+      // entity will bring us to that entity.
       OpenEntityRelatedToToken(index);
     }
   }
