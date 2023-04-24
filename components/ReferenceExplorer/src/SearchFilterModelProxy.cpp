@@ -106,11 +106,13 @@ bool SearchFilterModelProxy::filterAcceptsRow(
 
 bool SearchFilterModelProxy::lessThan(const QModelIndex &left,
                                       const QModelIndex &right) const {
-  auto left_location_role_var =
-      sourceModel()->data(left, IReferenceExplorerModel::LocationRole);
+  auto sort_role = sortRole();
+  if (sort_role != IReferenceExplorerModel::LocationRole) {
+    return QSortFilterProxyModel::lessThan(left, right);
+  }
 
-  auto right_location_role_var =
-      sourceModel()->data(right, IReferenceExplorerModel::LocationRole);
+  auto left_location_role_var = sourceModel()->data(left, sort_role);
+  auto right_location_role_var = sourceModel()->data(right, sort_role);
 
   std::optional<bool> opt_line_cmp_result;
   std::optional<bool> opt_column_cmp_result;
