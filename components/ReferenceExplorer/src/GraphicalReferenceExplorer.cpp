@@ -101,9 +101,12 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   d->tree_view->setSortingEnabled(true);
   d->tree_view->sortByColumn(0, Qt::AscendingOrder);
 
-  // When a user clicks on a cell, we don't want to randomly scroll to the
-  // beginning of a cell. That can be jarring.
-  d->tree_view->setAutoScroll(false);
+  // The auto scroll takes care of keeping the active item within the
+  // visible viewport region. This is true for mouse clicks but also
+  // keyboard navigation (i.e. arrow keys, page up/down, etc).
+  //
+  // Commenting out the following code for now:
+  // d->tree_view->setAutoScroll(false);
 
   // Smooth scrolling.
   d->tree_view->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
