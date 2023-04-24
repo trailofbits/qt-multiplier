@@ -85,6 +85,7 @@ class MainWindow final : public QMainWindow {
   void OnHistoryNavigationEntitySelected(RawEntityId original_id,
                                          RawEntityId canonical_id);
   void OnInformationExplorerSelectionChange(const QModelIndex &index);
+  void OnCloseActiveCodeViewTab();
 };
 
 }  // namespace mx::gui
