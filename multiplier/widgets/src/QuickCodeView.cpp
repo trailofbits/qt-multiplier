@@ -218,11 +218,11 @@ void QuickCodeView::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 
   switch (token_action.type) {
     case ICodeView::TokenAction::Type::Keyboard:
+    case ICodeView::TokenAction::Type::Primary:
+    case ICodeView::TokenAction::Type::Secondary:
       emit TokenTriggered(token_action, index);
       break;
 
-    case ICodeView::TokenAction::Type::Primary:
-    case ICodeView::TokenAction::Type::Secondary:
     case ICodeView::TokenAction::Type::Hover: break;
   }
 }
