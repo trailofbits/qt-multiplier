@@ -5,7 +5,7 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "QuickCodeView.h"
-
+#include "CodePreviewModelAdapter.h"
 #include <multiplier/ui/IDatabase.h>
 
 #include <QVBoxLayout>
@@ -140,14 +140,15 @@ void QuickCodeView::InitializeWidgets(
   // Contents
   //
 
-  auto model = ICodeModel::Create(file_location_cache, index, this);
-  auto view = ICodeView::Create(model, this);
+  auto main_model = ICodeModel::Create(file_location_cache, index, this);
+  auto proxy_model = new CodePreviewModelAdapter(main_model, this);
+  auto view = ICodeView::Create(proxy_model, this);
   view->SetWordWrapping(true);
 
   connect(view, &ICodeView::TokenTriggered, this,
           &QuickCodeView::OnTokenTriggered);
 
-  model->SetEntity(entity_id);
+  proxy_model->SetEntity(entity_id);
 
   auto contents_layout = new QVBoxLayout();
   contents_layout->setContentsMargins(0, 0, 0, 0);
