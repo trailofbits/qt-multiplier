@@ -384,6 +384,8 @@ void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
 }
 
 void MainWindow::OpenCodePreview(const CodeModelIndex &index) {
+  CloseAllPopups();
+
   QVariant related_entity_id_var =
       index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
 
@@ -396,6 +398,9 @@ void MainWindow::OpenCodePreview(const CodeModelIndex &index) {
   d->quick_code_view = std::make_unique<QuickCodeView>(
       d->index, d->file_location_cache, related_entity_id, this);
 
+  connect(d->quick_code_view.get(), &QuickCodeView::TokenTriggered, this,
+          &MainWindow::OnTokenTriggered);
+
   auto dialog_pos = QCursor::pos();
   d->quick_code_view->move(dialog_pos.x() - 20, dialog_pos.y() - 20);
 
@@ -403,24 +408,33 @@ void MainWindow::OpenCodePreview(const CodeModelIndex &index) {
   auto max_width = margin + (width() / 3);
   auto max_height = margin + (height() / 4);
 
-  //  auto size_hint = d->quick_code_view->sizeHint();
-  //  auto width = std::min(max_width, size_hint.width());
-  //  auto height = std::min(max_height, size_hint.height());
-
   d->quick_code_view->resize(max_width, max_height);
   d->quick_code_view->show();
 }
 
-void MainWindow::CloseAllPopups() {
-  if (d->quick_ref_explorer != nullptr) {
-    d->quick_ref_explorer->close();
-    d->quick_ref_explorer.reset();
+void MainWindow::CloseQuickRefExplorerPopup() {
+  if (d->quick_ref_explorer == nullptr) {
+    return;
   }
 
-  if (d->quick_code_view != nullptr) {
-    d->quick_code_view->close();
-    d->quick_code_view.reset();
+  d->quick_ref_explorer->close();
+  d->quick_ref_explorer->deleteLater();
+  d->quick_ref_explorer.release();
+}
+
+void MainWindow::CloseCodePreviewPopup() {
+  if (d->quick_code_view == nullptr) {
+    return;
   }
+
+  d->quick_code_view->close();
+  d->quick_code_view->deleteLater();
+  d->quick_code_view.release();
+}
+
+void MainWindow::CloseAllPopups() {
+  CloseQuickRefExplorerPopup();
+  CloseCodePreviewPopup();
 }
 
 ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,

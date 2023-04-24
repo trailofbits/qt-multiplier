@@ -6,7 +6,6 @@
 
 #include "QuickCodeView.h"
 
-#include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IDatabase.h>
 
 #include <QVBoxLayout>
@@ -145,6 +144,9 @@ void QuickCodeView::InitializeWidgets(
   auto view = ICodeView::Create(model, this);
   view->SetWordWrapping(true);
 
+  connect(view, &ICodeView::TokenTriggered, this,
+          &QuickCodeView::OnTokenTriggered);
+
   model->SetEntity(entity_id);
 
   auto contents_layout = new QVBoxLayout();
@@ -208,6 +210,20 @@ void QuickCodeView::EntityNameFutureStatusChanged() {
 
   auto window_name = tr("Preview for") + " `" + entity_name + "`";
   d->window_title->setText(window_name);
+}
+
+void QuickCodeView::OnTokenTriggered(const ICodeView::TokenAction &token_action,
+                                     const CodeModelIndex &index) {
+
+  switch (token_action.type) {
+    case ICodeView::TokenAction::Type::Keyboard:
+      emit TokenTriggered(token_action, index);
+      break;
+
+    case ICodeView::TokenAction::Type::Primary:
+    case ICodeView::TokenAction::Type::Secondary:
+    case ICodeView::TokenAction::Type::Hover: break;
+  }
 }
 
 }  // namespace mx::gui
