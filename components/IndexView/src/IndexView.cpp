@@ -57,7 +57,6 @@ void IndexView::InitializeWidgets() {
   // Setup the tree view
   d->tree_view = new QTreeView();
   d->tree_view->setHeaderHidden(true);
-  d->tree_view->setSortingEnabled(true);
   d->tree_view->setAlternatingRowColors(false);
 
   d->tree_view->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -133,14 +132,16 @@ void IndexView::InstallModel(IFileTreeModel *model) {
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);
   d->model_proxy->setFilterRole(IFileTreeModel::AbsolutePathRole);
+  d->model_proxy->setDynamicSortFilter(true);
+  d->model_proxy->sort(0, Qt::AscendingOrder);
 
   d->tree_view->setModel(d->model_proxy);
 
   // Note: this needs to happen after the model has been set in the
   // tree view!
   auto tree_selection_model = d->tree_view->selectionModel();
-  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
-          this, &IndexView::SelectionChanged);
+  connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
+          &IndexView::SelectionChanged);
 
   connect(d->model, &QAbstractItemModel::modelReset, this,
           &IndexView::OnModelReset);
