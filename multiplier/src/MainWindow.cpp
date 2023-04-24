@@ -31,6 +31,7 @@
 #include <QToolBar>
 #include <QMenuBar>
 #include <QToolButton>
+#include <QShortcut>
 
 namespace mx::gui {
 
@@ -70,6 +71,7 @@ struct MainWindow::PrivateData final {
   QAction *enable_code_preview_action{nullptr};
   std::unique_ptr<QuickCodeView> quick_code_view;
 
+  QShortcut *close_active_code_tab_shortcut{nullptr};
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
 
@@ -245,7 +247,17 @@ void MainWindow::CreateNewReferenceExplorer(QString window_title) {
   d->reference_explorer_dock->show();
 }
 
+void MainWindow::OnCloseActiveCodeViewTab() {
+  auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
+  auto current_index = tab_widget.currentIndex();
+  OnCodeViewTabBarClose(current_index);
+}
+
 void MainWindow::CreateCodeView() {
+  d->close_active_code_tab_shortcut = new QShortcut(
+      QKeySequence::Close, this, this, &MainWindow::OnCloseActiveCodeViewTab,
+      Qt::WidgetWithChildrenShortcut);
+
   auto tab_widget = new QTabWidget();
   tab_widget->setTabsClosable(true);
   tab_widget->setDocumentMode(true);
