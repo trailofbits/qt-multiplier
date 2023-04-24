@@ -26,10 +26,16 @@ namespace {
 
 struct ContextMenu final {
   QMenu *menu{nullptr};
+
   QMenu *copy_menu{nullptr};
+  QMenu *sort_menu{nullptr};
+
   QAction *set_root_action{nullptr};
   QAction *copy_file_name{nullptr};
   QAction *copy_full_path{nullptr};
+
+  QAction *sort_ascending_order{nullptr};
+  QAction *sort_descending_order{nullptr};
 };
 
 }  // namespace
@@ -108,6 +114,15 @@ void IndexView::InitializeWidgets() {
   d->context_menu.menu = new QMenu(tr("Index View menu"));
   d->context_menu.set_root_action = new QAction(tr("Set as root"));
   d->context_menu.menu->addAction(d->context_menu.set_root_action);
+
+  d->context_menu.sort_menu = new QMenu(tr("Sort..."));
+  d->context_menu.sort_ascending_order = new QAction(tr("Ascending order"));
+  d->context_menu.sort_menu->addAction(d->context_menu.sort_ascending_order);
+
+  d->context_menu.sort_descending_order = new QAction(tr("Descending order"));
+  d->context_menu.sort_menu->addAction(d->context_menu.sort_descending_order);
+
+  d->context_menu.menu->addMenu(d->context_menu.sort_menu);
 
   d->context_menu.copy_menu = new QMenu(tr("Copy..."));
   d->context_menu.copy_file_name = new QAction(tr("File name"));
@@ -213,7 +228,8 @@ void IndexView::OnOpenItemContextMenu(const QPoint &point) {
   auto is_directory = !file_id_role.isValid();
   d->context_menu.set_root_action->setVisible(is_directory);
 
-  for (auto menu : {d->context_menu.menu, d->context_menu.copy_menu}) {
+  for (auto menu : {d->context_menu.menu, d->context_menu.sort_menu,
+                    d->context_menu.copy_menu}) {
     for (auto &action : menu->actions()) {
       action->setData(action_data);
     }
@@ -258,6 +274,15 @@ void IndexView::OnContextMenuActionTriggered(QAction *action) {
       auto &clipboard = *QGuiApplication::clipboard();
       clipboard.setText(clipboard_value);
     }
+
+  } else if (action == d->context_menu.sort_ascending_order ||
+             action == d->context_menu.sort_descending_order) {
+
+    auto sorting_order = (action == d->context_menu.sort_ascending_order)
+                             ? Qt::AscendingOrder
+                             : Qt::DescendingOrder;
+
+    d->model_proxy->sort(0, sorting_order);
   }
 }
 
