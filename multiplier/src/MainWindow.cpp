@@ -71,7 +71,9 @@ struct MainWindow::PrivateData final {
   QAction *enable_code_preview_action{nullptr};
   std::unique_ptr<QuickCodeView> quick_code_view;
 
+  QShortcut *close_active_ref_explorer_tab_shortcut{nullptr};
   QShortcut *close_active_code_tab_shortcut{nullptr};
+
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
 
@@ -201,6 +203,10 @@ void MainWindow::CreateReferenceExplorerDock() {
   d->ref_explorer_tab_widget->setDocumentMode(true);
   d->ref_explorer_tab_widget->setTabsClosable(true);
 
+  d->close_active_ref_explorer_tab_shortcut = new QShortcut(
+      QKeySequence::Close, d->ref_explorer_tab_widget, this,
+      &MainWindow::OnCloseActiveRefExplorerTab, Qt::WidgetWithChildrenShortcut);
+
   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabCloseRequested,
           this, &MainWindow::OnReferenceExplorerTabBarClose);
 
@@ -249,19 +255,25 @@ void MainWindow::CreateNewReferenceExplorer(QString window_title) {
 
 void MainWindow::OnCloseActiveCodeViewTab() {
   auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
+  if (tab_widget.count() == 0) {
+    return;
+  }
+
   auto current_index = tab_widget.currentIndex();
   OnCodeViewTabBarClose(current_index);
+
+  tab_widget.setFocus();
 }
 
 void MainWindow::CreateCodeView() {
-  d->close_active_code_tab_shortcut = new QShortcut(
-      QKeySequence::Close, this, this, &MainWindow::OnCloseActiveCodeViewTab,
-      Qt::WidgetWithChildrenShortcut);
-
   auto tab_widget = new QTabWidget();
   tab_widget->setTabsClosable(true);
   tab_widget->setDocumentMode(true);
   tab_widget->setTabBarAutoHide(false);
+
+  d->close_active_code_tab_shortcut = new QShortcut(
+      QKeySequence::Close, tab_widget, this,
+      &MainWindow::OnCloseActiveCodeViewTab, Qt::WidgetWithChildrenShortcut);
 
   setCentralWidget(tab_widget);
 
@@ -860,6 +872,17 @@ void MainWindow::OnCodeViewTabClicked(int index) {
       central_tab_widget->widget(index)) {
     d->toolbar.back_forward->CommitCurrentLocationToHistory();
   }
+}
+
+void MainWindow::OnCloseActiveRefExplorerTab() {
+  if (d->ref_explorer_tab_widget->count() == 0) {
+    return;
+  }
+
+  auto current_index = d->ref_explorer_tab_widget->currentIndex();
+  OnReferenceExplorerTabBarClose(current_index);
+
+  d->ref_explorer_tab_widget->setFocus();
 }
 
 }  // namespace mx::gui
