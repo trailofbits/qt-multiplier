@@ -86,6 +86,7 @@ class MainWindow final : public QMainWindow {
                                          RawEntityId canonical_id);
   void OnInformationExplorerSelectionChange(const QModelIndex &index);
   void OnCloseActiveCodeViewTab();
+  void OnCloseActiveRefExplorerTab();
 };
 
 }  // namespace mx::gui
