@@ -73,7 +73,11 @@ struct EntityInformation final {
 
   //! If `entity` is a decl with redeclarations, then this is the list of
   //! redeclarations. Each selection will reference a `NamedDecl`.
-  std::vector<Selection> redeclarations;
+  std::vector<Selection> declarations;
+
+  //! If `entity` is a decl with redeclarations, then this is the list of
+  //! redeclarations. Each selection will reference a `NamedDecl`.
+  std::vector<Selection> definitions;
 
   //! If `entity` is a declaration, then this is the set of macros used in the
   //! declaration (or its redeclarations), including the bod(ies) of any
@@ -88,6 +92,21 @@ struct EntityInformation final {
   //! `entity`. Each selection will reference a `FunctionDecl`.
   std::vector<Selection> callers;
 
+  //! If `entity` is a function, then this is the set of things where we capture
+  //! the address of the func.
+  std::vector<Selection> pointers;
+
+  //! If `entity` is a variable, then this is the set of things where we capture
+  //! the address of the var/func.
+  std::vector<Selection> address_ofs;
+
+  //! If `entity` is a variable, then this is the set of things where we
+  //! dereference the variable. E.g. `*var` or `var->blah`.
+  std::vector<Selection> dereferences;
+
+  //! Uses of an entity as an argument to a function call.
+  std::vector<Selection> arguments;
+
   //! If `entity` is a variable, then this is the list of variables to which
   //! `entity` is assigned. This could be a `VarDeclStmt`, a `BinaryOperator`,
   //! or a `DeclRefExpr` where the variable is passed as a paremter to another
@@ -98,6 +117,13 @@ struct EntityInformation final {
   //! `entity`. In the case of parameters, this will include arguments passed
   //! to the function. Each selection will reference a `Stmt`.
   std::vector<Selection> assignments;
+
+  //! If `entity` is a variable, then this is a use in some kind of conditional
+  //! statement, like an `if` statement or a `?:` operator.
+  std::vector<Selection> tests;
+
+  //! If `entity` is a variable, then this is a general set of uses.
+  std::vector<Selection> uses;
 
   //! If `entity` is a file, then this is the set of `#include`-like directives
   //! inside of the file. Each selection will reference an
