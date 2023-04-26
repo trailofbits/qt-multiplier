@@ -31,11 +31,6 @@ namespace mx::gui {
 
 namespace {
 
-const QString kNodeInfoMimeType = "application/mx-reference-explorer-node-info";
-
-const QString kInstanceInfoMimeType =
-    "application/mx-reference-explorer-instance-info";
-
 static TokenCategory FromDeclCategory(DeclCategory cat) {
   switch (cat) {
     case DeclCategory::LOCAL_VARIABLE: return TokenCategory::LOCAL_VARIABLE;
@@ -90,9 +85,6 @@ struct ReferenceExplorerModel::PrivateData final {
 
   //! Node tree for this model.
   NodeTree node_tree;
-
-  //! Active drag and drop mode
-  DragAndDropMode drag_and_drop_mode{DragAndDropMode::CopySubTree};
 };
 
 //! Adds a new entity object under the given parent
@@ -390,9 +382,8 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   if (role == Qt::ForegroundRole) {
     QColor color = qApp->palette().text().color();
     if (index.column() > 0) {
-      return QColor::fromRgbF(
-          color.redF(), color.greenF(), color.blueF(),
-          color.alphaF() * static_cast<float>(0.75));
+      return QColor::fromRgbF(color.redF(), color.greenF(), color.blueF(),
+                              color.alphaF() * static_cast<float>(0.75));
     } else {
       return color;
     }
@@ -539,105 +530,6 @@ QVariant ReferenceExplorerModel::headerData(int section,
   }
 }
 
-QMimeData *
-ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
-  // Only allow dragging of one thing at a time. Dragging one thing implies
-  // bringing along all of its children.
-  if (indexes.size() != 1) {
-    return nullptr;
-  }
-
-  const QModelIndex &root_index = indexes[0];
-
-  auto mime_data = new QMimeData();
-
-  // Serialize the whole subtree
-  {
-    std::vector<std::uint64_t> node_id_stack;
-
-    // Append the internal node ID associated with `index` to `node_id_stack`.
-    auto append_to_node_id_stack = [&](const QModelIndex &index) {
-      if (!index.isValid()) {
-        return false;
-      }
-
-      auto node_id_var =
-          index.data(ReferenceExplorerModel::InternalIdentifierRole);
-
-      Assert(node_id_var.isValid(), "Invalid InternalIdentifierRole value");
-
-      auto node_id = qvariant_cast<std::uint64_t>(node_id_var);
-      node_id_stack.push_back(node_id);
-      return true;
-    };
-
-    // If we don't get a node ID for the root index, then go look for all of the
-    // top-level rows.
-    if (!append_to_node_id_stack(root_index)) {
-      int row_count = rowCount(QModelIndex());
-      for (int i = 0; i < row_count; ++i) {
-        append_to_node_id_stack(index(i, 0, QModelIndex()));
-      }
-    }
-
-    if (node_id_stack.empty()) {
-      return nullptr;
-    }
-
-    QByteArray encoded_data;
-    QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
-
-    // NOTE(pag): This serializes nodes in the order that they appear in the
-    //            tree, that way deserialization also preserves the same order,
-    //            and all parent nodes are deserialized before child nodes.
-    std::reverse(node_id_stack.begin(), node_id_stack.end());
-    while (!node_id_stack.empty()) {
-      std::uint64_t node_id = node_id_stack.back();
-      node_id_stack.pop_back();
-
-      auto node_it = d->node_tree.node_map.find(node_id);
-      Assert(node_it != d->node_tree.node_map.end(), "Invalid node identifier");
-
-      const Node &node = node_it->second;
-      encoded_data_stream << node;
-
-      node_id_stack.insert(node_id_stack.end(),
-                           node.child_node_id_list.rbegin(),
-                           node.child_node_id_list.rend());
-
-      mime_data->setData(Node::kMimeTypeName, encoded_data);
-    }
-  }
-
-  // Add the instance identifier mime data to prevent us from dragging
-  // and dropping onto ourselves.
-  {
-    QByteArray encoded_data;
-    QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
-
-    std::uint64_t instance_identifier{};
-    auto this_ptr{this};
-    std::memcpy(&instance_identifier, &this_ptr, sizeof(instance_identifier));
-
-    encoded_data_stream << instance_identifier;
-    mime_data->setData(kInstanceInfoMimeType, encoded_data);
-  }
-
-  // Add the raw entity id information
-  auto entity_id_var = root_index.data(IReferenceExplorerModel::EntityIdRole);
-  if (entity_id_var.isValid()) {
-    QByteArray encoded_data;
-    QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
-
-    auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
-    encoded_data_stream << entity_id;
-
-    mime_data->setData(kNodeInfoMimeType, encoded_data);
-  }
-
-  return mime_data;
-}
-
 void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
                                          const QModelIndex &drop_target) {
 
@@ -734,102 +626,6 @@ void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
       root_nodes_dropped.begin(), root_nodes_dropped.end());
 
   emit endInsertRows();
-}
-
-bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
-                                          Qt::DropAction action, int row, int,
-                                          const QModelIndex &drop_target) {
-  if (action == Qt::IgnoreAction) {
-    return true;
-  }
-
-  if (!data->hasFormat(Node::kMimeTypeName) &&
-      !data->hasFormat(kNodeInfoMimeType)) {
-
-    return false;
-  }
-
-  // Prevent dragging and dropping nodes when the source and destination
-  // trees match, i.e. from ourself to ourself.
-  {
-    auto encoded_data = data->data(kInstanceInfoMimeType);
-    QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
-
-    std::uint64_t instance_identifier{};
-    auto this_ptr{this};
-    std::memcpy(&instance_identifier, &this_ptr, sizeof(instance_identifier));
-
-    std::uint64_t incoming_instance_identifier{};
-    encoded_data_stream >> incoming_instance_identifier;
-    if (instance_identifier == incoming_instance_identifier) {
-      return false;
-    }
-  }
-
-  auto succeeded{false};
-
-  // Deserialize the correct stream and transfer all the nodes as-is
-  // when we are asked to perform a subtree copy
-  if (d->drag_and_drop_mode == DragAndDropMode::CopySubTree) {
-    auto encoded_data = data->data(Node::kMimeTypeName);
-    QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
-
-    // Deserialize the nodes
-    QVector<Node> decoded_nodes;
-    while (!encoded_data_stream.atEnd()) {
-      encoded_data_stream >> decoded_nodes.emplaceBack();
-    }
-
-    if (decoded_nodes.isEmpty()) {
-      return false;
-    }
-
-    auto old_num_nodes = d->node_tree.node_map.size();
-    InsertNodes(std::move(decoded_nodes), row, drop_target);
-
-    succeeded = d->node_tree.node_map.size() > old_num_nodes;
-
-  } else {
-    auto encoded_data = data->data(kNodeInfoMimeType);
-    QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
-
-    RawEntityId entity_id{};
-    encoded_data_stream >> entity_id;
-
-    ExpansionMode expansion_mode{};
-    if (d->drag_and_drop_mode == DragAndDropMode::AddRootAndTaint) {
-      expansion_mode = ExpansionMode::TaintMode;
-
-    } else if (d->drag_and_drop_mode == DragAndDropMode::AddRootAndShowRefs) {
-      expansion_mode = ExpansionMode::CallHierarchyMode;
-
-    } else {
-      Assert(false, "Invalid drag and drop state");
-    }
-
-    AppendEntityById(entity_id, expansion_mode, drop_target);
-    succeeded = true;
-  }
-
-  return succeeded;
-}
-
-Qt::ItemFlags ReferenceExplorerModel::flags(const QModelIndex &index) const {
-  auto item_flags{QAbstractItemModel::flags(index) | Qt::ItemIsDropEnabled};
-
-  if (index.isValid()) {
-    item_flags |= Qt::ItemIsDragEnabled;
-  }
-
-  return item_flags;
-}
-
-QStringList ReferenceExplorerModel::mimeTypes() const {
-  return {Node::kMimeTypeName};
-}
-
-void ReferenceExplorerModel::SetDragAndDropMode(const DragAndDropMode &mode) {
-  d->drag_and_drop_mode = mode;
 }
 
 ReferenceExplorerModel::ReferenceExplorerModel(
