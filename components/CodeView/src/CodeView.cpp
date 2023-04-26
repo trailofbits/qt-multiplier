@@ -356,8 +356,7 @@ void CodeView::InitializeWidgets() {
           &CodeView::OnGoToLine);
 
   // This will also cause a model reset update
-  static const auto kRequestDarkTheme{true};
-  SetTheme(GetDefaultCodeViewTheme(kRequestDarkTheme));
+  SetTheme(GetDefaultCodeViewTheme());
 
   // NOTE(pag): This has to go last, as it requires all things to be
   //            initialized.

@@ -48,8 +48,7 @@ EntityExplorer::EntityExplorer(IEntityExplorerModel *model, QWidget *parent)
 }
 
 void EntityExplorer::InitializeWidgets() {
-  static const auto kRequestDarkTheme{true};
-  CodeViewTheme theme = GetDefaultCodeViewTheme(kRequestDarkTheme);
+  CodeViewTheme theme = GetDefaultCodeViewTheme();
 
   auto list_view_item_delegate = new EntityExplorerItemDelegate(theme, this);
 
