@@ -24,10 +24,7 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
  public:
   //! Additional item data roles
   //! \note Make sure this is not overlapping the ICodeModel roles
-  enum ItemDataRole {
-    OriginalModelIndex = Qt::UserRole + 100,
-    IsExpandButton
-  };
+  enum ItemDataRole { OriginalModelIndex = Qt::UserRole + 100, IsExpandButton };
 
   //! Constructor
   RefExplorerToCodeViewModelAdapter(IReferenceExplorerModel *model,
@@ -35,6 +32,9 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
 
   //! Destructor
   virtual ~RefExplorerToCodeViewModelAdapter() override;
+
+  //! Enables or disables breadcrumbs
+  void SetBreadcrumbsVisibility(const bool &enable);
 
   //! \copybrief ICodeModel::GetEntity
   //! \todo This method needs to be removed from the interface
@@ -77,6 +77,9 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
 
     //! A list of row objects for the code view
     using RowList = std::vector<Row>;
+
+    //! If enabled, the text view will also show breadcrumbs
+    bool breadcrumbs_enabled{false};
 
     //! All the data imported from the original ref explorer model
     RowList row_list;
