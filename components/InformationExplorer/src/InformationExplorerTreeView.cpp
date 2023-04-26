@@ -29,7 +29,7 @@ void InformationExplorerTreeView::drawRow(QPainter *painter,
                                           const QStyleOptionViewItem &option,
                                           const QModelIndex &index) const {
 
-  auto code_view_theme = GetDefaultCodeViewTheme(true);
+  auto code_view_theme = GetDefaultCodeViewTheme();
   auto background_color = (option.state & QStyle::State_Selected) != 0
                               ? code_view_theme.selected_line_background_color
                               : code_view_theme.default_background_color;

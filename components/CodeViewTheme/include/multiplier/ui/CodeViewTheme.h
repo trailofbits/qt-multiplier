@@ -56,6 +56,9 @@ struct CodeViewTheme final {
   Style TextStyle(const QVariant &category) const;
 };
 
-CodeViewTheme GetDefaultCodeViewTheme(bool dark_mode);
+extern bool gUseDarkTheme;
+
+CodeViewTheme GetDefaultCodeViewTheme(
+    std::optional<bool> dark_mode=std::nullopt);
 
 }  // namespace mx::gui

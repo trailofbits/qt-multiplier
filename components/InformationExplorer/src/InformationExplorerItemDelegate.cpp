@@ -27,7 +27,7 @@ InformationExplorerItemDelegate::InformationExplorerItemDelegate(
     : QStyledItemDelegate(parent),
       d(new PrivateData) {
 
-  d->code_view_theme = GetDefaultCodeViewTheme(true);
+  d->code_view_theme = GetDefaultCodeViewTheme();
 
   TokenPainterConfiguration painter_config(d->code_view_theme);
   d->token_painter = std::make_unique<TokenPainter>(painter_config);
