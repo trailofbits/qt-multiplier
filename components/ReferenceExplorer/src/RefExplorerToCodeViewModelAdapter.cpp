@@ -47,15 +47,29 @@ void ImportReferenceExplorerModelHelper(
     const IReferenceExplorerModel *model, const QModelIndex &root,
     std::uint64_t &id_generator, const std::size_t &indent) {
 
+  auto L_getBreadcrumbs =
+      [model](const QModelIndex &index) -> std::optional<QString> {
+    auto breadcrumbs_index = model->index(index.row(), 2, index.parent());
+
+    auto breadcrumbs_var = breadcrumbs_index.data();
+    if (!breadcrumbs_var.isValid()) {
+      return std::nullopt;
+    }
+
+    const auto &breadcrumbs = breadcrumbs_var.toString();
+    if (breadcrumbs.isEmpty()) {
+      return std::nullopt;
+    }
+
+    return breadcrumbs;
+  };
+
   auto node_name_var = root.data();
   if (!node_name_var.isValid()) {
     return;
   }
 
   const auto &node_name = node_name_var.toString();
-
-  RefExplorerToCodeViewModelAdapter::Context::Row row;
-  row.original_model_index = root;
 
   auto token_category{TokenCategory::UNKNOWN};
   auto token_category_var =
@@ -84,6 +98,26 @@ void ImportReferenceExplorerModelHelper(
     }
   }
 
+  RefExplorerToCodeViewModelAdapter::Context::Row row;
+  row.original_model_index = root;
+
+  if (context.breadcrumbs_enabled) {
+    if (auto opt_breadcrumbs = L_getBreadcrumbs(root);
+        opt_breadcrumbs.has_value()) {
+
+      const auto &breadcrumbs = opt_breadcrumbs.value();
+
+      GenerateIndentToken(row.token_list, id_generator, indent + 1);
+      GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT,
+                    breadcrumbs);
+
+      context.row_list.push_back(std::move(row));
+    }
+  }
+
+  row = {};
+  row.original_model_index = root;
+
   GenerateIndentToken(row.token_list, id_generator, indent);
   GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT, symbol);
   GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
@@ -97,10 +131,12 @@ void ImportReferenceExplorerModelHelper(
     GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
     GenerateToken(row.token_list, id_generator, TokenCategory::FILE_NAME,
                   QString::fromStdString(path.filename().generic_string()));
-    GenerateToken(row.token_list, id_generator, TokenCategory::PUNCTUATION, ":");
+    GenerateToken(row.token_list, id_generator, TokenCategory::PUNCTUATION,
+                  ":");
     GenerateToken(row.token_list, id_generator, TokenCategory::LINE_NUMBER,
                   QString::number(location.line));
-    GenerateToken(row.token_list, id_generator, TokenCategory::PUNCTUATION, ":");
+    GenerateToken(row.token_list, id_generator, TokenCategory::PUNCTUATION,
+                  ":");
     GenerateToken(row.token_list, id_generator, TokenCategory::COLUMN_NUMBER,
                   QString::number(location.column));
   }
@@ -148,19 +184,28 @@ RefExplorerToCodeViewModelAdapter::RefExplorerToCodeViewModelAdapter(
 
   d->model = model;
 
-  connect(d->model, &QAbstractItemModel::modelReset,
-          this, &RefExplorerToCodeViewModelAdapter::OnModelChange);
+  connect(d->model, &QAbstractItemModel::modelReset, this,
+          &RefExplorerToCodeViewModelAdapter::OnModelChange);
 
-  connect(d->model, &QAbstractItemModel::dataChanged,
-          this, &RefExplorerToCodeViewModelAdapter::OnModelChange);
+  connect(d->model, &QAbstractItemModel::dataChanged, this,
+          &RefExplorerToCodeViewModelAdapter::OnModelChange);
 
-  connect(d->model, &QAbstractItemModel::rowsInserted,
-          this, &RefExplorerToCodeViewModelAdapter::OnModelChange);
+  connect(d->model, &QAbstractItemModel::rowsInserted, this,
+          &RefExplorerToCodeViewModelAdapter::OnModelChange);
 
   OnModelChange();
 }
 
 RefExplorerToCodeViewModelAdapter::~RefExplorerToCodeViewModelAdapter() {}
+
+void RefExplorerToCodeViewModelAdapter::SetBreadcrumbsVisibility(
+    const bool &enable) {
+
+  d->context.breadcrumbs_enabled = enable;
+
+  ImportReferenceExplorerModel(d->context, d->model);
+  emit ModelReset();
+}
 
 std::optional<RawEntityId>
 RefExplorerToCodeViewModelAdapter::GetEntity() const {
@@ -183,8 +228,7 @@ Count RefExplorerToCodeViewModelAdapter::RowCount() const {
   return static_cast<Count>(d->context.row_list.size());
 }
 
-Count RefExplorerToCodeViewModelAdapter::TokenCount(
-    Count row) const {
+Count RefExplorerToCodeViewModelAdapter::TokenCount(Count row) const {
   if (row >= d->context.row_list.size()) {
     return 0;
   }
@@ -237,7 +281,7 @@ bool RefExplorerToCodeViewModelAdapter::IsReady() const {
 void RefExplorerToCodeViewModelAdapter::ImportReferenceExplorerModel(
     Context &context, const IReferenceExplorerModel *model) {
 
-  context = {};
+  context.row_list = {};
 
   std::uint64_t id_generator{};
   auto row_count = model->rowCount();
