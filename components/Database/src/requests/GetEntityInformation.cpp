@@ -216,12 +216,10 @@ static void FillVariableUsedByStatementInformation(
       case mx::StmtKind::UNARY_OPERATOR:
         if (auto uop = UnaryOperator::from(parent)) {
           switch (uop->opcode()) {
-            case UnaryOperatorKind::ADDRESS_OF: {
+            case UnaryOperatorKind::ADDRESS_OF:
               goto address_of_use;
-            }
-            case UnaryOperatorKind::DEREF: {
+            case UnaryOperatorKind::DEREF:
               goto dereference_use;
-            }
             default:
               break;
           }
@@ -329,6 +327,7 @@ address_of_use:
   sel->display_role.setValue(parent->tokens().strip_whitespace());
   sel->entity_role = stmt;
   sel->location = GetLocation(stmt.tokens(), file_location_cache);
+  return;
 
 dereference_use:
   sel = &(info.dereferences.emplace_back());
