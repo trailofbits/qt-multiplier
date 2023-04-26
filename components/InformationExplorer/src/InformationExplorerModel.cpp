@@ -354,11 +354,18 @@ void InformationExplorerModel::ImportEntityInformation(
   };
 
   const Filler filler_list[] = {
-      {{tr("Redeclarations")}, entity_information.redeclarations},
+      {{tr("Definitions")}, entity_information.definitions},
+      {{tr("Declarations")}, entity_information.declarations},
       {{tr("Callees")}, entity_information.callees},
       {{tr("Callers")}, entity_information.callers},
+      {{tr("Pointers")}, entity_information.pointers},
       {{tr("Assigned to")}, entity_information.assigned_tos},
-      {{tr("Assignements")}, entity_information.assignments},
+      {{tr("Assignments")}, entity_information.assignments},
+      {{tr("Address ofs")}, entity_information.address_ofs},
+      {{tr("Dereferences")}, entity_information.dereferences},
+      {{tr("Call arguments")}, entity_information.arguments},
+      {{tr("Conditional tests")}, entity_information.tests},
+      {{tr("Uses")}, entity_information.uses},
       {{tr("Includes")}, entity_information.includes},
       {{tr("Included by")}, entity_information.include_bys},
       {{tr("Macros used")}, entity_information.macros_used},
