@@ -38,10 +38,6 @@ class PreviewableReferenceExplorer final : public QWidget {
   PreviewableReferenceExplorer &
   operator=(const PreviewableReferenceExplorer &) = delete;
 
- protected:
-  //! The resize event is used to determine whether to show the preview
-  virtual void resizeEvent(QResizeEvent *event) override;
-
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
@@ -51,9 +47,6 @@ class PreviewableReferenceExplorer final : public QWidget {
                          mx::FileLocationCache file_location_cache,
                          IReferenceExplorerModel *model,
                          const IReferenceExplorer::Mode &mode);
-
-  //! Based on the widget size, it will show or hide the code preview
-  void UpdateLayout();
 
   //! Schedules a post-update scroll-to-line operation
   void SchedulePostUpdateLineScrollCommand(unsigned line_number);

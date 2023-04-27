@@ -68,7 +68,6 @@ void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model,
 
   switch (mode) {
     case Mode::TreeView: splitter->setSizes({screen_height, 0}); break;
-
     case Mode::TextView: splitter->setSizes({0, screen_height}); break;
 
     case Mode::Split:
