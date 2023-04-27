@@ -107,21 +107,19 @@ void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
     return;
   }
 
+  auto line_number_var = index.data(IReferenceExplorerModel::LineNumberRole);
+  if (!line_number_var.isValid()) {
+    return;
+  }
+
+  auto line_number = qvariant_cast<unsigned>(line_number_var);
+  SchedulePostUpdateLineScrollCommand(line_number);
+
+  auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
+  d->code_model->SetEntity(file_raw_entity_id);
+
   if (d->code_view->visibleRegion().isEmpty()) {
     emit ItemActivated(index);
-
-  } else {
-    auto line_number_var = index.data(IReferenceExplorerModel::LineNumberRole);
-    if (!line_number_var.isValid()) {
-      return;
-    }
-
-    auto line_number = qvariant_cast<unsigned>(line_number_var);
-    SchedulePostUpdateLineScrollCommand(line_number);
-
-    auto file_raw_entity_id =
-        qvariant_cast<RawEntityId>(file_raw_entity_id_var);
-    d->code_model->SetEntity(file_raw_entity_id);
   }
 }
 
