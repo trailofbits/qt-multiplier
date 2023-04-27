@@ -45,6 +45,13 @@ struct TreeviewItemButtons final {
   QPushButton *expand{nullptr};
 };
 
+struct DragAndDropMenu final {
+  QMenu *menu{nullptr};
+  QAction *copy_subtree_action{nullptr};
+  QAction *add_and_taint_action{nullptr};
+  QAction *add_and_show_refs_action{nullptr};
+};
+
 }  // namespace
 
 struct GraphicalReferenceExplorer::PrivateData final {
@@ -57,6 +64,7 @@ struct GraphicalReferenceExplorer::PrivateData final {
   ContextMenu context_menu;
 
   TreeviewItemButtons treeview_item_buttons;
+  DragAndDropMenu drag_and_drop_menu;
 };
 
 GraphicalReferenceExplorer::~GraphicalReferenceExplorer() {}
@@ -131,6 +139,10 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   connect(d->tree_view, &ReferenceExplorerTreeView::customContextMenuRequested,
           this, &GraphicalReferenceExplorer::OnOpenItemContextMenu);
 
+  d->tree_view->setDragEnabled(true);
+  d->tree_view->setAcceptDrops(true);
+  d->tree_view->setDropIndicatorShown(true);
+
   QIcon open_item_icon;
   open_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/activate_ref_item_on"),
                            QIcon::Normal, QIcon::On);
@@ -144,6 +156,29 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
 
   expand_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/expand_ref_item_off"),
                              QIcon::Disabled, QIcon::On);
+
+  // Initialize the drag and drop menu
+  d->drag_and_drop_menu.menu = new QMenu(tr("Drag and drop menu"), this);
+
+  d->drag_and_drop_menu.copy_subtree_action =
+      new QAction(tr("Copy subtree"), this);
+
+  d->drag_and_drop_menu.menu->addAction(
+      d->drag_and_drop_menu.copy_subtree_action);
+
+  d->drag_and_drop_menu.menu->addSeparator();
+
+  d->drag_and_drop_menu.add_and_taint_action =
+      new QAction(tr("Add node and taint"), this);
+
+  d->drag_and_drop_menu.menu->addAction(
+      d->drag_and_drop_menu.add_and_taint_action);
+
+  d->drag_and_drop_menu.add_and_show_refs_action =
+      new QAction(tr("Add node and show references"), this);
+
+  d->drag_and_drop_menu.menu->addAction(
+      d->drag_and_drop_menu.add_and_show_refs_action);
 
   // Initialize the treeview item buttons
   d->treeview_item_buttons.open = new QPushButton(open_item_icon, "", this);
@@ -300,7 +335,21 @@ bool GraphicalReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
     }
 
   } else if (obj == d->tree_view->viewport()) {
-    if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
+    if (event->type() == QEvent::Drop) {
+      if (auto drop_event = dynamic_cast<QDropEvent *>(event)) {
+        // Discard the event if the user cancelled the drag and drop
+        // operation
+        auto process_event = OnTreeViewDropEvent(*drop_event);
+        if (!process_event) {
+
+          return true;
+        }
+      }
+
+      return false;
+
+    } else if (event->type() == QEvent::Leave ||
+               event->type() == QEvent::MouseMove) {
       // It is important to double check the leave event; it is sent
       // even if the mouse is still inside our treeview item but
       // above the hovering button (which steals the focus)
@@ -323,6 +372,41 @@ bool GraphicalReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
   } else {
     return false;
   }
+}
+
+bool GraphicalReferenceExplorer::OnTreeViewDropEvent(
+    const QDropEvent &drop_event) {
+  auto drag_and_drop_mode{ReferenceExplorerModel::DragAndDropMode::CopySubTree};
+
+  if ((drop_event.modifiers() & Qt::ControlModifier) != 0) {
+    // Show menu, and filter out the drag and drop operation if the escape
+    // key is pressed
+    auto selected_action = d->drag_and_drop_menu.menu->exec(QCursor::pos());
+    if (selected_action == nullptr) {
+      return false;
+
+    } else if (selected_action == d->drag_and_drop_menu.copy_subtree_action) {
+      drag_and_drop_mode = ReferenceExplorerModel::DragAndDropMode::CopySubTree;
+
+    } else if (selected_action == d->drag_and_drop_menu.add_and_taint_action) {
+      drag_and_drop_mode =
+          ReferenceExplorerModel::DragAndDropMode::AddRootAndTaint;
+
+    } else if (selected_action ==
+               d->drag_and_drop_menu.add_and_show_refs_action) {
+      drag_and_drop_mode =
+          ReferenceExplorerModel::DragAndDropMode::AddRootAndShowRefs;
+
+    } else {
+      Assert(false, "Invalid drag and drop mode");
+    }
+  }
+
+  // Use the private model APIs to set the drag and drop mode
+  auto &model = *static_cast<ReferenceExplorerModel *>(d->model);
+  model.SetDragAndDropMode(drag_and_drop_mode);
+
+  return true;
 }
 
 void GraphicalReferenceExplorer::UpdateTreeViewItemButtons() {

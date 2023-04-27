@@ -53,6 +53,10 @@ class GraphicalReferenceExplorer final : public IReferenceExplorer {
   //! Used for the tree view hover events
   virtual bool eventFilter(QObject *obj, QEvent *event) override;
 
+  //! Event filter for the Drop event of the tree view
+  //! \return False if the event should be discarded, or true otherwise
+  bool OnTreeViewDropEvent(const QDropEvent &drop_event);
+
   //! Updates the treeview item hover buttons
   void UpdateTreeViewItemButtons();
 
