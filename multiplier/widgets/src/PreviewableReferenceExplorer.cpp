@@ -8,7 +8,6 @@
 
 #include <multiplier/Index.h>
 #include <multiplier/ui/ICodeView.h>
-#include <multiplier/ui/IReferenceExplorer.h>
 
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -31,11 +30,12 @@ struct PreviewableReferenceExplorer::PrivateData final {
 
 PreviewableReferenceExplorer::PreviewableReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
-    IReferenceExplorerModel *model, QWidget *parent)
+    IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
+    QWidget *parent)
     : QWidget(parent),
       d(new PrivateData()) {
 
-  InitializeWidgets(index, file_location_cache, model);
+  InitializeWidgets(index, file_location_cache, model, mode);
   UpdateLayout();
 }
 
@@ -51,30 +51,30 @@ void PreviewableReferenceExplorer::resizeEvent(QResizeEvent *) {
 
 void PreviewableReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
-    IReferenceExplorerModel *model) {
+    IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode) {
 
-  d->reference_explorer = IReferenceExplorer::Create(model, this);
+  d->reference_explorer = IReferenceExplorer::Create(model, mode, this);
 
   connect(
       d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
       &PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged);
 
-  connect(d->reference_explorer, &IReferenceExplorer::SelectedItemChanged,
-          this, &PreviewableReferenceExplorer::SelectedItemChanged);
+  connect(d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
+          &PreviewableReferenceExplorer::SelectedItemChanged);
 
-  connect(d->reference_explorer, &IReferenceExplorer::ItemActivated,
-          this, &PreviewableReferenceExplorer::ItemActivated);
+  connect(d->reference_explorer, &IReferenceExplorer::ItemActivated, this,
+          &PreviewableReferenceExplorer::ItemActivated);
 
   d->code_model = new CodePreviewModelAdapter(
       ICodeModel::Create(file_location_cache, index), this);
   d->code_view = ICodeView::Create(d->code_model);
   d->code_view->hide();
 
-  connect(d->code_view, &ICodeView::DocumentChanged,
-          this, &PreviewableReferenceExplorer::OnCodeViewDocumentChange);
+  connect(d->code_view, &ICodeView::DocumentChanged, this,
+          &PreviewableReferenceExplorer::OnCodeViewDocumentChange);
 
-  connect(d->code_view, &ICodeView::TokenTriggered,
-          this, &PreviewableReferenceExplorer::TokenTriggered);
+  connect(d->code_view, &ICodeView::TokenTriggered, this,
+          &PreviewableReferenceExplorer::TokenTriggered);
 
   d->splitter = new QSplitter(this);
   d->splitter->addWidget(d->reference_explorer);

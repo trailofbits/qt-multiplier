@@ -87,6 +87,7 @@ class MainWindow final : public QMainWindow {
   void OnInformationExplorerSelectionChange(const QModelIndex &index);
   void OnCloseActiveCodeViewTab();
   void OnCloseActiveRefExplorerTab();
+  void OnRefExplorerModeSelected(QAction *action);
 };
 
 }  // namespace mx::gui

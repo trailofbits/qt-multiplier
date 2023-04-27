@@ -28,10 +28,11 @@ class ReferenceExplorer final : public IReferenceExplorer {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  ReferenceExplorer(IReferenceExplorerModel *model, QWidget *parent);
+  ReferenceExplorer(IReferenceExplorerModel *model, const Mode &mode,
+                    QWidget *parent);
 
   //! Initializes the internalwidgets
-  void InitializeWidgets(IReferenceExplorerModel *model);
+  void InitializeWidgets(IReferenceExplorerModel *model, const Mode &mode);
 
   friend class IReferenceExplorer;
 };

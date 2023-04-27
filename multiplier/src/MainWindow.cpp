@@ -74,6 +74,8 @@ struct MainWindow::PrivateData final {
   QShortcut *close_active_ref_explorer_tab_shortcut{nullptr};
   QShortcut *close_active_code_tab_shortcut{nullptr};
 
+  IReferenceExplorer::Mode ref_explorer_mode{
+      IReferenceExplorer::Mode::TextView};
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
 
@@ -114,6 +116,27 @@ void MainWindow::InitializeWidgets() {
   d->enable_code_preview_action->setCheckable(true);
   d->enable_code_preview_action->setChecked(false);
   d->view_menu->addAction(d->enable_code_preview_action);
+
+  auto ref_explorer_view_menu = new QMenu(tr("Reference Explorer"));
+  d->view_menu->addMenu(ref_explorer_view_menu);
+
+  auto ref_explorer_text_mode = new QAction(tr("Text mode"));
+  ref_explorer_text_mode->setData(
+      static_cast<int>(IReferenceExplorer::Mode::TextView));
+  ref_explorer_view_menu->addAction(ref_explorer_text_mode);
+
+  auto ref_explorer_tree_mode = new QAction(tr("Tree view"));
+  ref_explorer_tree_mode->setData(
+      static_cast<int>(IReferenceExplorer::Mode::TreeView));
+  ref_explorer_view_menu->addAction(ref_explorer_tree_mode);
+
+  auto ref_explorer_split_mode = new QAction(tr("Split"));
+  ref_explorer_split_mode->setData(
+      static_cast<int>(IReferenceExplorer::Mode::Split));
+  ref_explorer_view_menu->addAction(ref_explorer_split_mode);
+
+  connect(ref_explorer_view_menu, &QMenu::triggered, this,
+          &MainWindow::OnRefExplorerModeSelected);
 
   setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
@@ -236,7 +259,8 @@ void MainWindow::CreateNewReferenceExplorer(QString window_title) {
       IReferenceExplorerModel::Create(d->index, d->file_location_cache, this);
 
   auto reference_explorer = new PreviewableReferenceExplorer(
-      d->index, d->file_location_cache, ref_explorer_model, this);
+      d->index, d->file_location_cache, ref_explorer_model,
+      d->ref_explorer_mode, this);
 
   reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
 
@@ -330,7 +354,8 @@ void MainWindow::OpenReferenceExplorer(
   CloseAllPopups();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
-      d->index, d->file_location_cache, entity_id, expansion_mode, this);
+      d->index, d->file_location_cache, entity_id, expansion_mode,
+      d->ref_explorer_mode, this);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
           &MainWindow::OnQuickRefExplorerSaveAllClicked);
@@ -883,6 +908,12 @@ void MainWindow::OnCloseActiveRefExplorerTab() {
   OnReferenceExplorerTabBarClose(current_index);
 
   d->ref_explorer_tab_widget->setFocus();
+}
+
+void MainWindow::OnRefExplorerModeSelected(QAction *action) {
+  auto ref_explorer_int_mode = action->data().toInt();
+  d->ref_explorer_mode =
+      static_cast<IReferenceExplorer::Mode>(ref_explorer_int_mode);
 }
 
 }  // namespace mx::gui
