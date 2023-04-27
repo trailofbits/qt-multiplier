@@ -5,16 +5,17 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "PreviewableReferenceExplorer.h"
+#include "CodePreviewModelAdapter.h"
 
 #include <multiplier/Index.h>
 #include <multiplier/ui/ICodeView.h>
 
 #include <QSplitter>
 #include <QVBoxLayout>
+#include <QApplication>
+#include <QScreen>
 
 #include <optional>
-
-#include "CodePreviewModelAdapter.h"
 
 namespace mx::gui {
 
@@ -36,17 +37,12 @@ PreviewableReferenceExplorer::PreviewableReferenceExplorer(
       d(new PrivateData()) {
 
   InitializeWidgets(index, file_location_cache, model, mode);
-  UpdateLayout();
 }
 
 PreviewableReferenceExplorer::~PreviewableReferenceExplorer() {}
 
 IReferenceExplorerModel *PreviewableReferenceExplorer::Model() {
   return d->reference_explorer->Model();
-}
-
-void PreviewableReferenceExplorer::resizeEvent(QResizeEvent *) {
-  UpdateLayout();
 }
 
 void PreviewableReferenceExplorer::InitializeWidgets(
@@ -59,26 +55,26 @@ void PreviewableReferenceExplorer::InitializeWidgets(
       d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
       &PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged);
 
-  connect(d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
-          &PreviewableReferenceExplorer::SelectedItemChanged);
-
   connect(d->reference_explorer, &IReferenceExplorer::ItemActivated, this,
           &PreviewableReferenceExplorer::ItemActivated);
 
   d->code_model = new CodePreviewModelAdapter(
       ICodeModel::Create(file_location_cache, index), this);
-  d->code_view = ICodeView::Create(d->code_model);
-  d->code_view->hide();
 
+  d->code_view = ICodeView::Create(d->code_model);
   connect(d->code_view, &ICodeView::DocumentChanged, this,
           &PreviewableReferenceExplorer::OnCodeViewDocumentChange);
 
   connect(d->code_view, &ICodeView::TokenTriggered, this,
           &PreviewableReferenceExplorer::TokenTriggered);
 
-  d->splitter = new QSplitter(this);
+  d->splitter = new QSplitter(Qt::Horizontal, this);
   d->splitter->addWidget(d->reference_explorer);
   d->splitter->addWidget(d->code_view);
+
+  const auto &primary_screen = *QGuiApplication::primaryScreen();
+  auto screen_width = primary_screen.virtualSize().width();
+  d->splitter->setSizes({screen_width, 0});
 
   setContentsMargins(0, 0, 0, 0);
 
@@ -86,27 +82,6 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->splitter);
   setLayout(layout);
-}
-
-void PreviewableReferenceExplorer::UpdateLayout() {
-  auto character_length = fontMetrics().horizontalAdvance("_");
-  auto minimum_size = character_length * 100;
-
-  auto enable_code_view{false};
-  if (width() >= minimum_size) {
-    enable_code_view = true;
-    d->splitter->setOrientation(Qt::Horizontal);
-
-  } else if (height() >= minimum_size) {
-    enable_code_view = true;
-    d->splitter->setOrientation(Qt::Vertical);
-  }
-
-  if (enable_code_view) {
-    enable_code_view = d->code_model->RowCount() != 0;
-  }
-
-  d->code_view->setVisible(enable_code_view);
 }
 
 void PreviewableReferenceExplorer::SchedulePostUpdateLineScrollCommand(
@@ -132,16 +107,22 @@ void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
     return;
   }
 
-  auto line_number_var = index.data(IReferenceExplorerModel::LineNumberRole);
-  if (!line_number_var.isValid()) {
-    return;
+  if (d->code_view->visibleRegion().isEmpty()) {
+    emit ItemActivated(index);
+
+  } else {
+    auto line_number_var = index.data(IReferenceExplorerModel::LineNumberRole);
+    if (!line_number_var.isValid()) {
+      return;
+    }
+
+    auto line_number = qvariant_cast<unsigned>(line_number_var);
+    SchedulePostUpdateLineScrollCommand(line_number);
+
+    auto file_raw_entity_id =
+        qvariant_cast<RawEntityId>(file_raw_entity_id_var);
+    d->code_model->SetEntity(file_raw_entity_id);
   }
-
-  auto line_number = qvariant_cast<unsigned>(line_number_var);
-  SchedulePostUpdateLineScrollCommand(line_number);
-
-  auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
-  d->code_model->SetEntity(file_raw_entity_id);
 }
 
 void PreviewableReferenceExplorer::OnCodeViewDocumentChange() {
@@ -151,8 +132,6 @@ void PreviewableReferenceExplorer::OnCodeViewDocumentChange() {
     const auto &line_number = opt_scroll_to_line.value();
     d->code_view->ScrollToLineNumber(line_number);
   }
-
-  UpdateLayout();
 }
 
 }  // namespace mx::gui
