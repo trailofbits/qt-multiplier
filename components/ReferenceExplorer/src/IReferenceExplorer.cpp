@@ -12,10 +12,12 @@
 
 namespace mx::gui {
 
-IReferenceExplorer *IReferenceExplorer::Create(IReferenceExplorerModel *model,
-                                               QWidget *parent) {
+IReferenceExplorer *
+IReferenceExplorer::Create(IReferenceExplorerModel *model,
+                           const IReferenceExplorer::Mode &mode,
+                           QWidget *parent) {
 
-  return new ReferenceExplorer(model, parent);
+  return new ReferenceExplorer(model, mode, parent);
 }
 
 }  // namespace mx::gui

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IReferenceExplorerModel.h>
+#include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ICodeView.h>
 
 #include <QWidget>
@@ -22,6 +22,7 @@ class PreviewableReferenceExplorer final : public QWidget {
   PreviewableReferenceExplorer(const Index &index,
                                const FileLocationCache &file_location_cache,
                                IReferenceExplorerModel *model,
+                               const IReferenceExplorer::Mode &mode,
                                QWidget *parent = nullptr);
 
   //! Destructor
@@ -48,7 +49,8 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Initializes the internal widgets
   void InitializeWidgets(mx::Index index,
                          mx::FileLocationCache file_location_cache,
-                         IReferenceExplorerModel *model);
+                         IReferenceExplorerModel *model,
+                         const IReferenceExplorer::Mode &mode);
 
   //! Based on the widget size, it will show or hide the code preview
   void UpdateLayout();

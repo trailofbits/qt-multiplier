@@ -29,15 +29,17 @@ IReferenceExplorerModel *ReferenceExplorer::Model() {
 }
 
 ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
-                                     QWidget *parent)
+                                     const Mode &mode, QWidget *parent)
     : IReferenceExplorer(parent),
       d(new PrivateData) {
 
   model->setParent(this);
-  InitializeWidgets(model);
+  InitializeWidgets(model, mode);
 }
 
-void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model) {
+void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model,
+                                          const Mode &mode) {
+
   d->text_view = new TextBasedReferenceExplorer(model, this);
 
   connect(d->text_view, &TextBasedReferenceExplorer::SelectedItemChanged, this,
@@ -64,8 +66,15 @@ void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model) {
   const auto &primary_screen = *QGuiApplication::primaryScreen();
   auto screen_height = primary_screen.virtualSize().height();
 
-  // By default, hide the text view.
-  splitter->setSizes({screen_height, 0});
+  switch (mode) {
+    case Mode::TreeView: splitter->setSizes({screen_height, 0}); break;
+
+    case Mode::TextView: splitter->setSizes({0, screen_height}); break;
+
+    case Mode::Split:
+      splitter->setSizes({screen_height / 2, screen_height / 2});
+      break;
+  }
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);

@@ -21,8 +21,9 @@ class QuickReferenceExplorer final : public QWidget {
   //! Constructor
   QuickReferenceExplorer(
       const Index &index, const FileLocationCache &file_location_cache,
-      RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode,
-      QWidget *parent = nullptr);
+      RawEntityId entity_id,
+      const IReferenceExplorerModel::ExpansionMode &expansion_mode,
+      const IReferenceExplorer::Mode &mode, QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickReferenceExplorer() override;
@@ -69,7 +70,9 @@ class QuickReferenceExplorer final : public QWidget {
   //! Initializes the internal widgets
   void InitializeWidgets(
       const Index &index, const FileLocationCache &file_location_cache,
-      RawEntityId entity_id, IReferenceExplorerModel::ExpansionMode mode);
+      RawEntityId entity_id,
+      const IReferenceExplorerModel::ExpansionMode &expansion_mode,
+      const IReferenceExplorer::Mode &mode);
 
   //! Used to emit the SaveAll signal
   void EmitSaveSignal(const bool &as_new_tab);
@@ -87,13 +90,14 @@ class QuickReferenceExplorer final : public QWidget {
   void CancelRunningRequest();
 
   //! Generate a new window name for the given entity name
-  static QString GenerateWindowName(
-      const QString &entity_name, IReferenceExplorerModel::ExpansionMode mode);
+  static QString
+  GenerateWindowName(const QString &entity_name,
+                     IReferenceExplorerModel::ExpansionMode mode);
 
   //! Generate a new window name for the given entity id
-  static QString GenerateWindowName(
-      const RawEntityId &entity_id,
-      IReferenceExplorerModel::ExpansionMode mode);
+  static QString
+  GenerateWindowName(const RawEntityId &entity_id,
+                     IReferenceExplorerModel::ExpansionMode mode);
 
  private slots:
   //! Restores the widget visibility when the application gains focus
