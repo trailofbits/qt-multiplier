@@ -40,9 +40,6 @@ class TextBasedReferenceExplorer final : public IReferenceExplorer {
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
                         const CodeModelIndex &index);
 
-  //! Code view event handler
-  void OnCursorMoved(const CodeModelIndex &index);
-
   friend class ReferenceExplorer;
 };
 
