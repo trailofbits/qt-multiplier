@@ -353,6 +353,16 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
 void MainWindow::OpenReferenceExplorer(
     RawEntityId entity_id,
     IReferenceExplorerModel::ExpansionMode expansion_mode) {
+
+  QPoint dialog_pos;
+  if (d->quick_ref_explorer != nullptr) {
+    dialog_pos = d->quick_ref_explorer->pos();
+
+  } else {
+    auto cursor_pos{QCursor::pos()};
+    dialog_pos = {cursor_pos.x() - 20, cursor_pos.y() - 20};
+  }
+
   CloseAllPopups();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
@@ -365,9 +375,7 @@ void MainWindow::OpenReferenceExplorer(
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
 
-  auto dialog_pos = QCursor::pos();
-
-  d->quick_ref_explorer->move(dialog_pos.x() - 20, dialog_pos.y() - 20);
+  d->quick_ref_explorer->move(dialog_pos.x(), dialog_pos.y());
 
   auto margin = fontMetrics().height();
   auto max_width = margin + (width() / 3);
