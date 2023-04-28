@@ -426,23 +426,17 @@ void GraphicalReferenceExplorer::ExpandAllNodes() {
   d->tree_view->resizeColumnToContents(1);
 }
 
-void GraphicalReferenceExplorer::OnRowsInserted(const QModelIndex &parent,
-                                                int first, int) {
+void GraphicalReferenceExplorer::OnRowsInserted(const QModelIndex &, int, int) {
   ExpandAllNodes();
-
-  auto parent_is_root{!parent.isValid()};
-  if (parent_is_root && first == 0) {
-    auto first_root_index = d->tree_view->model()->index(0, 0);
-
-    d->tree_view->setCurrentIndex(first_root_index);
-    d->tree_view->setFocus();
-
-    OnCurrentItemChanged(first_root_index, QModelIndex());
-  }
 }
 
 void GraphicalReferenceExplorer::OnCurrentItemChanged(
     const QModelIndex &current_index, const QModelIndex &) {
+
+  if (!current_index.isValid()) {
+    return;
+  }
+
   emit SelectedItemChanged(current_index);
 }
 
