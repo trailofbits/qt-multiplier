@@ -54,12 +54,18 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Returns a previously scheduled scroll-to-line operation, if any
   std::optional<unsigned> GetScheduledPostUpdateLineScrollCommand();
 
+  //! Updates the code preview using the given model index
+  void UpdateCodePreview(const QModelIndex &index);
+
  private slots:
   //! Schedules a code model update whenever a reference is clicked
   void OnReferenceExplorerSelectedItemChanged(const QModelIndex &index);
 
   //! Handles scheduled scroll-to-line operations for the code view
   void OnCodeViewDocumentChange();
+
+  //! Used to do the first time initialization of the code preview
+  void OnRowsInserted();
 
  signals:
   //! The forwarded IReferenceExplorer::SelectedItemChanged signal
@@ -68,6 +74,7 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! The forwarded IReferenceExplorer::ItemActivated signal
   void ItemActivated(const QModelIndex &index);
 
+  //! The forwarded ICodeView::TokenTriggered
   void TokenTriggered(const ICodeView::TokenAction &token_action,
                       const CodeModelIndex &index);
 };

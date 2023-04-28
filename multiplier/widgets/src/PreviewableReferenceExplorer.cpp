@@ -58,6 +58,9 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   connect(d->reference_explorer, &IReferenceExplorer::ItemActivated, this,
           &PreviewableReferenceExplorer::ItemActivated);
 
+  connect(model, &QAbstractItemModel::rowsInserted, this,
+          &PreviewableReferenceExplorer::OnRowsInserted);
+
   d->code_model = new CodePreviewModelAdapter(
       ICodeModel::Create(file_location_cache, index), this);
 
@@ -97,9 +100,7 @@ PreviewableReferenceExplorer::GetScheduledPostUpdateLineScrollCommand() {
   return opt_scroll_to_line;
 }
 
-void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
-    const QModelIndex &index) {
-
+void PreviewableReferenceExplorer::UpdateCodePreview(const QModelIndex &index) {
   auto file_raw_entity_id_var =
       index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
 
@@ -117,6 +118,12 @@ void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
 
   auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
   d->code_model->SetEntity(file_raw_entity_id);
+}
+
+void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
+    const QModelIndex &index) {
+
+  UpdateCodePreview(index);
 
   if (d->code_view->visibleRegion().isEmpty()) {
     emit ItemActivated(index);
@@ -130,6 +137,15 @@ void PreviewableReferenceExplorer::OnCodeViewDocumentChange() {
     const auto &line_number = opt_scroll_to_line.value();
     d->code_view->ScrollToLineNumber(line_number);
   }
+}
+
+void PreviewableReferenceExplorer::OnRowsInserted() {
+  if (!d->code_view->Text().isEmpty()) {
+    return;
+  }
+
+  auto first_item_index = Model()->index(0, 0);
+  UpdateCodePreview(first_item_index);
 }
 
 }  // namespace mx::gui
