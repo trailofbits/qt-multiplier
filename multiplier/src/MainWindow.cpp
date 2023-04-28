@@ -777,7 +777,7 @@ void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
 
   auto entity_id = qvariant_cast<RawEntityId>(entity_id_role);
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
-  OpenEntityInfo(entity_id);
+
   OpenEntityCode(entity_id);
 }
 
