@@ -454,10 +454,6 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
 
       return font;
 
-    } else if (role == Qt::ForegroundRole) {
-      const auto &palette = qApp->palette();
-      return palette.dark();
-
     } else {
       return QVariant();
     }
