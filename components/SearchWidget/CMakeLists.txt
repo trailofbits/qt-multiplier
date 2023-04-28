@@ -26,6 +26,7 @@ target_link_libraries("mx_searchwidget"
     "thirdparty_qt"
     "mx_assert"
     "mx_lineedit"
+    "mx_util"
 )
 
 target_include_directories("mx_searchwidget" PRIVATE

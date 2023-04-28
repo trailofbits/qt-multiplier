@@ -7,6 +7,7 @@
 */
 
 #include <multiplier/ui/HistoryWidget.h>
+#include <multiplier/ui/Icons.h>
 
 #include <QHBoxLayout>
 #include <QIcon>
@@ -27,10 +28,10 @@ namespace {
 
 static std::atomic<std::uint64_t> gNextItemId(0);
 
-static const char * const kBackButtonToolTip =
+static const char *const kBackButtonToolTip =
     "Go back in the navigation history";
 
-static const char * const kForwardButtonToolTip =
+static const char *const kForwardButtonToolTip =
     "Go forward in the navigation history";
 
 struct Item final {
@@ -45,7 +46,8 @@ struct Item final {
         canonical_id(canonical_id_),
         name(QString("Entity %1").arg(canonical_id)) {}
 
-  Item(RawEntityId original_id_, RawEntityId canonical_id_, const QString &name_)
+  Item(RawEntityId original_id_, RawEntityId canonical_id_,
+       const QString &name_)
       : item_id(gNextItemId.fetch_add(1u)),
         original_id(original_id_),
         canonical_id(canonical_id_),
@@ -74,8 +76,8 @@ struct HistoryWidget::PrivateData {
   // changes.
   std::optional<std::pair<RawEntityId, std::optional<QString>>> next_item;
 
-  const QIcon back_icon;
-  const QIcon forward_icon;
+  QIcon back_icon;
+  QIcon forward_icon;
 
   QToolButton *back_button{nullptr};
   QAction *back_action{nullptr};
@@ -83,15 +85,12 @@ struct HistoryWidget::PrivateData {
   QToolButton *forward_button{nullptr};
   QAction *forward_action{nullptr};
 
-  inline PrivateData(const Index &index_,
-                     const FileLocationCache &file_cache_,
+  inline PrivateData(const Index &index_, const FileLocationCache &file_cache_,
                      unsigned max_history_size_)
       : index(index_),
         file_cache(file_cache_),
         max_history_size(max_history_size_),
-        current_item_it(item_list.end()),
-        back_icon(":/Icons/HistoryWidget/HistoryBack"),
-        forward_icon(":/Icons/HistoryWidget/HistoryForward") {}
+        current_item_it(item_list.end()) {}
 
 
   void AddToHistory(RawEntityId id, std::optional<QString> opt_label,
@@ -102,10 +101,13 @@ struct HistoryWidget::PrivateData {
 
 HistoryWidget::HistoryWidget(const Index &index_,
                              const FileLocationCache &file_cache_,
-                             unsigned max_history_size,
-                             QWidget *parent)
+                             unsigned max_history_size, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData(index_, file_cache_, max_history_size)) {
+
+  d->back_icon = GetIcon(":/Icons/HistoryWidget/HistoryBack");
+  d->forward_icon = GetIcon(":/Icons/HistoryWidget/HistoryForward");
+
   InitializeWidgets();
 }
 
@@ -118,8 +120,8 @@ void HistoryWidget::SetIconSize(QSize size) {
 }
 
 //! Tells the history what our current location is.
-void HistoryWidget::SetCurrentLocation(
-    RawEntityId id, std::optional<QString> opt_label) {
+void HistoryWidget::SetCurrentLocation(RawEntityId id,
+                                       std::optional<QString> opt_label) {
   d->next_item.reset();
   d->next_item.emplace(id, std::move(opt_label));
 }
@@ -138,9 +140,9 @@ void HistoryWidget::CommitCurrentLocationToHistory(void) {
   UpdateMenus();
 }
 
-void HistoryWidget::PrivateData::AddToHistory(
-    RawEntityId entity_id, std::optional<QString> opt_label,
-    HistoryWidget *widget) {
+void HistoryWidget::PrivateData::AddToHistory(RawEntityId entity_id,
+                                              std::optional<QString> opt_label,
+                                              HistoryWidget *widget) {
 
   VariantId vid = EntityId(entity_id).Unpack();
   if (std::holds_alternative<InvalidId>(vid)) {
@@ -185,7 +187,7 @@ void HistoryWidget::PrivateData::AddToHistory(
     if (opt_label.has_value()) {
       item_list.emplace_back(original_id, canonical_id, opt_label.value());
 
-    // If we weren't given a label, then compute a label on a background thread.
+      // If we weren't given a label, then compute a label on a background thread.
     } else {
       Item &item = item_list.emplace_back(original_id, canonical_id);
 
@@ -193,8 +195,8 @@ void HistoryWidget::PrivateData::AddToHistory(
                                               item.item_id);
       labeller->setAutoDelete(true);
 
-      connect(labeller, &HistoryLabelBuilder::LabelForItem,
-              widget, &HistoryWidget::OnLabelForItem);
+      connect(labeller, &HistoryLabelBuilder::LabelForItem, widget,
+              &HistoryWidget::OnLabelForItem);
 
       QThreadPool::globalInstance()->start(labeller);
     }
@@ -212,22 +214,20 @@ void HistoryWidget::InitializeWidgets(void) {
 
   d->back_button = new QToolButton(this);
   d->back_button->setPopupMode(QToolButton::MenuButtonPopup);
-  d->back_button->setDefaultAction(
-      d->back_action);
+  d->back_button->setDefaultAction(d->back_action);
 
   d->forward_button = new QToolButton(this);
   d->forward_button->setPopupMode(QToolButton::MenuButtonPopup);
-  d->forward_button->setDefaultAction(
-      d->forward_action);
+  d->forward_button->setDefaultAction(d->forward_action);
 
   d->back_button->setIcon(d->back_icon);
   d->forward_button->setIcon(d->forward_icon);
 
-  connect(d->back_action, &QAction::triggered,
-          this, &HistoryWidget::OnNavigateBack);
+  connect(d->back_action, &QAction::triggered, this,
+          &HistoryWidget::OnNavigateBack);
 
-  connect(d->forward_action, &QAction::triggered,
-          this, &HistoryWidget::OnNavigateForward);
+  connect(d->forward_action, &QAction::triggered, this,
+          &HistoryWidget::OnNavigateForward);
 
   // By default, there is no history, so there is nowhere for these buttons to
   // navigate.
@@ -261,12 +261,12 @@ void HistoryWidget::UpdateMenus(void) {
   }
 
   QMenu *history_back_menu = new QMenu(tr("Previous history menu"));
-  connect(history_back_menu, &QMenu::triggered,
-          this, &HistoryWidget::OnNavigateBackToHistoryItem);
+  connect(history_back_menu, &QMenu::triggered, this,
+          &HistoryWidget::OnNavigateBackToHistoryItem);
 
   QMenu *history_forward_menu = new QMenu(tr("Next history menu"));
-  connect(history_forward_menu, &QMenu::triggered,
-          this, &HistoryWidget::OnNavigateForwardToHistoryItem);
+  connect(history_forward_menu, &QMenu::triggered, this,
+          &HistoryWidget::OnNavigateForwardToHistoryItem);
 
   int num_back_actions = 0;
   int num_forward_actions = 0;
@@ -274,8 +274,8 @@ void HistoryWidget::UpdateMenus(void) {
 
   // Populate everything up to the current item in the back button sub-menu.
   std::vector<QAction *> back_history_action_list;
-  for (auto item_it = d->item_list.begin();
-       item_it != d->current_item_it; ++item_it) {
+  for (auto item_it = d->item_list.begin(); item_it != d->current_item_it;
+       ++item_it) {
 
     const Item &item = *item_it;
     QAction *action = new QAction(item.name);
@@ -312,8 +312,8 @@ void HistoryWidget::UpdateMenus(void) {
   // Enable/disable and customize the tool tip for the backward button.
   d->back_button->setMenu(history_back_menu);
   if (num_back_actions) {
-    d->back_action->setToolTip(
-        tr("Go back to ") + history_back_menu->actions().first()->text());
+    d->back_action->setToolTip(tr("Go back to ") +
+                               history_back_menu->actions().first()->text());
   } else {
     d->back_action->setToolTip(tr(kBackButtonToolTip));
   }
@@ -355,12 +355,11 @@ void HistoryWidget::OnLabelForItem(std::uint64_t item_id,
 //! navigation away from our "present location" then we just-in-time materialize
 //! the present location into a history item.
 void HistoryWidget::OnNavigateBack(void) {
-  Assert(d->current_item_it != d->item_list.begin(),
-         "Too far back");
+  Assert(d->current_item_it != d->item_list.begin(), "Too far back");
 
   QAction dummy;
-  ssize_t index = std::distance(d->item_list.begin(),
-                                 std::prev(d->current_item_it, 1));
+  ssize_t index =
+      std::distance(d->item_list.begin(), std::prev(d->current_item_it, 1));
   Assert(0 <= index, "Invalid index");
   dummy.setData(QVariant::fromValue(static_cast<size_t>(index)));
 
@@ -375,12 +374,11 @@ void HistoryWidget::OnNavigateBack(void) {
 //! is allowed to change (with followup clicks and such) without there being a
 //! random record of our "former present" stuck within the history menu.
 void HistoryWidget::OnNavigateForward(void) {
-  Assert(d->current_item_it != d->item_list.end(),
-         "Too far forward");
+  Assert(d->current_item_it != d->item_list.end(), "Too far forward");
 
   QAction dummy;
-  ssize_t index = std::distance(d->item_list.begin(),
-                                std::next(d->current_item_it, 1));
+  ssize_t index =
+      std::distance(d->item_list.begin(), std::next(d->current_item_it, 1));
   Assert(0 < index, "Invalid index");
   dummy.setData(QVariant::fromValue(static_cast<size_t>(index)));
   OnNavigateForwardToHistoryItem(&dummy);
@@ -395,8 +393,8 @@ void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
   if (!item_index_var.isValid()) {
     return;
   }
-  ItemList::iterator it = std::next(d->item_list.begin(),
-                                    item_index_var.toInt());
+  ItemList::iterator it =
+      std::next(d->item_list.begin(), item_index_var.toInt());
 
   RawEntityId original_id = it->original_id;
   RawEntityId canonical_id = it->canonical_id;
@@ -431,8 +429,8 @@ void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
     return;
   }
 
-  ItemList::iterator it = std::next(d->item_list.begin(),
-                                    item_index_var.toInt());
+  ItemList::iterator it =
+      std::next(d->item_list.begin(), item_index_var.toInt());
 
   RawEntityId original_id = it->original_id;
   RawEntityId canonical_id = it->canonical_id;

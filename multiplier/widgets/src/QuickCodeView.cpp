@@ -6,7 +6,9 @@
 
 #include "QuickCodeView.h"
 #include "CodePreviewModelAdapter.h"
+
 #include <multiplier/ui/IDatabase.h>
+#include <multiplier/ui/Icons.h>
 
 #include <QVBoxLayout>
 #include <QLabel>
@@ -117,7 +119,7 @@ void QuickCodeView::InitializeWidgets(
 
   // Close button
   auto close_button =
-      new QPushButton(QIcon(":/Icons/QuickCodeView/Close"), "", this);
+      new QPushButton(GetIcon(":/Icons/QuickCodeView/Close"), "", this);
 
   close_button->setToolTip(tr("Close"));
   close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
