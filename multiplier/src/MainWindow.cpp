@@ -155,9 +155,11 @@ void MainWindow::InitializeWidgets() {
 }
 
 void MainWindow::InitializeToolBar() {
-  QSize icon_size(32, 32);
+  QSize icon_size(16, 16);
+
   d->toolbar.back_forward =
       new HistoryWidget(d->index, d->file_location_cache, kMaxHistorySize);
+
   connect(d->toolbar.back_forward, &HistoryWidget::GoToEntity, this,
           &MainWindow::OnHistoryNavigationEntitySelected);
 
