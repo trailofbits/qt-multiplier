@@ -7,9 +7,15 @@
 */
 
 #include "GraphicalReferenceExplorer.h"
+#include "FilterSettingsWidget.h"
+#include "ReferenceExplorerItemDelegate.h"
+#include "ReferenceExplorerModel.h"
+#include "ReferenceExplorerTreeView.h"
+#include "SearchFilterModelProxy.h"
 
 #include <multiplier/ui/Assert.h>
-#include <optional>
+#include <multiplier/ui/Icons.h>
+
 #include <QApplication>
 #include <QClipboard>
 #include <QDropEvent>
@@ -20,11 +26,7 @@
 #include <QVBoxLayout>
 #include <QScrollBar>
 
-#include "FilterSettingsWidget.h"
-#include "ReferenceExplorerItemDelegate.h"
-#include "ReferenceExplorerModel.h"
-#include "ReferenceExplorerTreeView.h"
-#include "SearchFilterModelProxy.h"
+#include <optional>
 
 namespace mx::gui {
 
@@ -132,18 +134,20 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
           this, &GraphicalReferenceExplorer::OnOpenItemContextMenu);
 
   QIcon open_item_icon;
-  open_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/activate_ref_item_on"),
+  open_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/activate_ref_item"),
                            QIcon::Normal, QIcon::On);
 
-  open_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/activate_ref_item_off"),
-                           QIcon::Disabled, QIcon::On);
+  open_item_icon.addPixmap(
+      GetPixmap(":/ReferenceExplorer/activate_ref_item", IconStyle::Disabled),
+      QIcon::Disabled, QIcon::On);
 
   QIcon expand_item_icon;
-  expand_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/expand_ref_item_on"),
+  expand_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/expand_ref_item"),
                              QIcon::Normal, QIcon::On);
 
-  expand_item_icon.addPixmap(QPixmap(":/ReferenceExplorer/expand_ref_item_off"),
-                             QIcon::Disabled, QIcon::On);
+  expand_item_icon.addPixmap(
+      GetPixmap(":/ReferenceExplorer/expand_ref_item", IconStyle::Disabled),
+      QIcon::Disabled, QIcon::On);
 
   // Initialize the treeview item buttons
   d->treeview_item_buttons.open = new QPushButton(open_item_icon, "", this);
@@ -153,7 +157,7 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
           &GraphicalReferenceExplorer::OnActivateTreeViewItem);
 
   d->treeview_item_buttons.close =
-      new QPushButton(QIcon(":/ReferenceExplorer/close_ref_item"), "", this);
+      new QPushButton(GetIcon(":/ReferenceExplorer/close_ref_item"), "", this);
 
   d->treeview_item_buttons.close->setToolTip(tr("Close"));
 

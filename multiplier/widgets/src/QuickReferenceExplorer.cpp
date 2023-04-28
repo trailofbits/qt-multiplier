@@ -9,6 +9,7 @@
 
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/IDatabase.h>
+#include <multiplier/ui/Icons.h>
 
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -130,7 +131,7 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   // Save to active button
   auto save_to_active_ref_explorer_button = new QPushButton(
-      QIcon(":/Icons/QuickReferenceExplorer/SaveToActiveTab"), "", this);
+      GetIcon(":/Icons/QuickReferenceExplorer/SaveToActiveTab"), "", this);
 
   save_to_active_ref_explorer_button->setToolTip(tr("Save to active tab"));
   save_to_active_ref_explorer_button->setSizePolicy(QSizePolicy::Minimum,
@@ -141,7 +142,7 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   // Save as new button
   auto save_to_new_ref_explorer_button = new QPushButton(
-      QIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"), "", this);
+      GetIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"), "", this);
 
   save_to_new_ref_explorer_button->setToolTip(tr("Save to new tab"));
   save_to_new_ref_explorer_button->setSizePolicy(QSizePolicy::Minimum,
@@ -151,8 +152,8 @@ void QuickReferenceExplorer::InitializeWidgets(
           &QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress);
 
   // Close button
-  auto close_button =
-      new QPushButton(QIcon(":/Icons/QuickReferenceExplorer/Close"), "", this);
+  auto close_button = new QPushButton(
+      GetIcon(":/Icons/QuickReferenceExplorer/Close"), "", this);
 
   close_button->setToolTip(tr("Close"));
   close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);

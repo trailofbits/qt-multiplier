@@ -8,18 +8,25 @@
 
 add_library("mx_util"
   include/multiplier/ui/Util.h
-  include/multiplier/ui/TokenPainter.h
   src/Util.h
   src/Util.cpp
+
+  include/multiplier/ui/TokenPainter.h
   src/TokenPainter.cpp
-  
+
+  include/multiplier/ui/Icons.h
+  src/Icons.cpp
 )
 
-target_link_libraries("mx_util" PRIVATE
-  "qtmx_cxx_flags"
-  "mx_codeviewtheme"
-  "thirdparty_qt"
-  "multiplier::mx-api"
+target_link_libraries("mx_util"
+  PRIVATE
+    "qtmx_cxx_flags"
+    "mx_codeviewtheme"
+    "thirdparty_qt"
+    "multiplier::mx-api"
+
+  PUBLIC
+    "mx_codeviewtheme"
 )
 
 target_include_directories("mx_util" PRIVATE

@@ -1,14 +1,8 @@
 <RCC>
     <qresource prefix="/SearchWidget">
-        <file alias="search_icon_case_sensitive_on">Icons/search_icon_case_sensitive_on.png</file>
-        <file alias="search_icon_case_sensitive_off">Icons/search_icon_case_sensitive_off.png</file>
-
-        <file alias="search_icon_regex_on">Icons/search_icon_regex_on.png</file>
-        <file alias="search_icon_regex_off">Icons/search_icon_regex_off.png</file>
-
-        <file alias="search_icon_whole_word_on">Icons/search_icon_whole_word_on.png</file>
-        <file alias="search_icon_whole_word_off">Icons/search_icon_whole_word_off.png</file>
-
+        <file alias="search_icon_case_sensitive">Icons/search_icon_case_sensitive.png</file>
+        <file alias="search_icon_regex">Icons/search_icon_regex.png</file>
+        <file alias="search_icon_whole_word">Icons/search_icon_whole_word.png</file>
         <file alias="show_prev_result">Icons/show_prev_result.png</file>
         <file alias="show_next_result">Icons/show_next_result.png</file>
 

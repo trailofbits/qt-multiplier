@@ -10,8 +10,8 @@
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/ILineEdit.h>
+#include <multiplier/ui/Icons.h>
 
-#include <QIcon>
 #include <QLineEdit>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -97,24 +97,27 @@ SearchWidget::SearchWidget(Mode mode, QWidget *parent)
 }
 
 void SearchWidget::LoadIcons() {
-  d->search_icon = QIcon(":/SearchWidget/search_icon");
+  d->search_icon = GetIcon(":/SearchWidget/search_icon");
 
-  d->enabled_case_sensitive_search =
-      QIcon(":/SearchWidget/search_icon_case_sensitive_on");
+  d->enabled_case_sensitive_search = GetIcon(
+      ":/SearchWidget/search_icon_case_sensitive", IconStyle::Highlighted);
 
   d->disabled_case_sensitive_search =
-      QIcon(":/SearchWidget/search_icon_case_sensitive_off");
+      GetIcon(":/SearchWidget/search_icon_case_sensitive");
 
-  d->enabled_regex_search = QIcon(":/SearchWidget/search_icon_regex_on");
-  d->disabled_regex_search = QIcon(":/SearchWidget/search_icon_regex_off");
+  d->enabled_regex_search =
+      GetIcon(":/SearchWidget/search_icon_regex", IconStyle::Highlighted);
+
+  d->disabled_regex_search = GetIcon(":/SearchWidget/search_icon_regex");
 
   d->enabled_whole_word_search =
-      QIcon(":/SearchWidget/search_icon_whole_word_on");
-  d->disabled_whole_word_search =
-      QIcon(":/SearchWidget/search_icon_whole_word_off");
+      GetIcon(":/SearchWidget/search_icon_whole_word", IconStyle::Highlighted);
 
-  d->show_prev_result_icon = QIcon(":/SearchWidget/show_prev_result");
-  d->show_next_result_icon = QIcon(":/SearchWidget/show_next_result");
+  d->disabled_whole_word_search =
+      GetIcon(":/SearchWidget/search_icon_whole_word");
+
+  d->show_prev_result_icon = GetIcon(":/SearchWidget/show_prev_result");
+  d->show_next_result_icon = GetIcon(":/SearchWidget/show_next_result");
 }
 
 void SearchWidget::InitializeWidgets() {
@@ -260,7 +263,7 @@ void SearchWidget::ShowResult() {
   emit ShowSearchResult(d->current_search_result);
 }
 
-void SearchWidget::OnSearchInputTextChanged(const QString &text) {
+void SearchWidget::OnSearchInputTextChanged(const QString &) {
   ClearDisplayMessage();
 
   SearchParameters search_parameters;
