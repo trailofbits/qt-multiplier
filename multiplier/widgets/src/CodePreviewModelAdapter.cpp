@@ -16,47 +16,46 @@ CodePreviewModelAdapter::CodePreviewModelAdapter(ICodeModel *model,
       next(model) {
   next->setParent(this);
 
-  connect(next, &ICodeModel::ModelReset,
-          this, &ICodeModel::ModelReset);
-
-  connect(next, &ICodeModel::ModelResetSkipped,
-          this, &ICodeModel::ModelResetSkipped);
+  connect(next, &ICodeModel::modelReset, this, &ICodeModel::modelReset);
 }
 
-//! Asks the model for the currently showing entity. This is usually a file
-//! id or a fragment id.
 std::optional<RawEntityId> CodePreviewModelAdapter::GetEntity(void) const {
   return next->GetEntity();
 }
 
-//! Asks the model to fetch the specified entity.
 void CodePreviewModelAdapter::SetEntity(RawEntityId id) {
   next->SetEntity(id);
 }
 
-//! How many rows are accessible from this model
-Count CodePreviewModelAdapter::RowCount() const {
-  return next->RowCount();
-}
-
-//! How many tokens are accessible on the specified column
-Count CodePreviewModelAdapter::TokenCount(Count row) const {
-  return next->TokenCount(row);
-}
-
-//! Returns the data role contents for the specified model index
-QVariant CodePreviewModelAdapter::Data(const CodeModelIndex &index,
-                                       int role = Qt::DisplayRole) const {
-  if (role == ICodeModel::RelatedEntityIdRole) {
-    return next->Data(index, ICodeModel::TokenIdRole);
-  } else {
-    return next->Data(index, role);
-  }
-}
-
-//! Returns true if this model is ready.
 bool CodePreviewModelAdapter::IsReady() const {
   return next->IsReady();
 }
+
+QModelIndex CodePreviewModelAdapter::index(int row, int column,
+                                           const QModelIndex &parent) const {
+
+  return next->index(row, column, parent);
+}
+
+QModelIndex CodePreviewModelAdapter::parent(const QModelIndex &child) const {
+
+  return next->parent(child);
+}
+
+int CodePreviewModelAdapter::rowCount(const QModelIndex &parent) const {
+  return next->rowCount(parent);
+}
+
+int CodePreviewModelAdapter::columnCount(const QModelIndex &parent) const {
+  return next->columnCount(parent);
+}
+
+QVariant CodePreviewModelAdapter::data(const QModelIndex &index,
+                                       int role) const {
+  role = (role == ICodeModel::RelatedEntityIdRole) ? ICodeModel::TokenIdRole
+                                                   : role;
+  return next->data(index, role);
+}
+
 
 }  // namespace mx::gui

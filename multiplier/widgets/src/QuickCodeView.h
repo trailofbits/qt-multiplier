@@ -73,7 +73,7 @@ class QuickCodeView final : public QWidget {
 
   //! Forwards a subset of ICodeView::TokenTriggered events
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
-                        const CodeModelIndex &index);
+                        const QModelIndex &index);
 
  signals:
   //! \brief This signal will only fire for TokenAction::Type::Keyboard events
@@ -81,7 +81,7 @@ class QuickCodeView final : public QWidget {
   //! needs to be closed automatically, and handling other interactions
   //! becomes trickier to make available without a design first.
   void TokenTriggered(const ICodeView::TokenAction &token_action,
-                      const CodeModelIndex &index);
+                      const QModelIndex &index);
 };
 
 }  // namespace mx::gui

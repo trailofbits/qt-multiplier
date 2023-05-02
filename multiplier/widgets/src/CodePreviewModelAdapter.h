@@ -36,21 +36,27 @@ class CodePreviewModelAdapter final : public ICodeModel {
   //! Asks the model to fetch the specified entity.
   virtual void SetEntity(RawEntityId id) Q_DECL_FINAL;
 
-  //! How many rows are accessible from this model
-  virtual Count RowCount() const Q_DECL_FINAL;
-
-  //! How many tokens are accessible on the specified column
-  virtual Count TokenCount(Count row) const Q_DECL_FINAL;
-
-  //! Returns the data role contents for the specified model index
-  virtual QVariant Data(const CodeModelIndex &index,
-                        int role) const Q_DECL_FINAL;
-
   //! Returns true if this model is ready.
   virtual bool IsReady() const Q_DECL_FINAL;
 
+  //! Creates a new Qt model index
+  virtual QModelIndex index(int row, int column,
+                            const QModelIndex &parent) const override;
+
+  //! Returns the parent of the given model index
+  virtual QModelIndex parent(const QModelIndex &child) const override;
+
+  //! Returns the amount of rows in the given parent item
+  virtual int rowCount(const QModelIndex &parent) const override;
+
+  //! Returns the amount of columns for the given parent item
+  virtual int columnCount(const QModelIndex &parent) const override;
+
+  //! Returns the data for the specified role
+  virtual QVariant data(const QModelIndex &index, int role) const override;
+
  private:
-  ICodeModel * const next;
+  ICodeModel *const next;
 };
 
 }  // namespace mx::gui

@@ -76,7 +76,7 @@ class PreviewableReferenceExplorer final : public QWidget {
 
   //! The forwarded ICodeView::TokenTriggered
   void TokenTriggered(const ICodeView::TokenAction &token_action,
-                      const CodeModelIndex &index);
+                      const QModelIndex &index);
 };
 
 }  // namespace mx::gui

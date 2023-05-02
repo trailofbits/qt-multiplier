@@ -14,16 +14,10 @@
 #include <filesystem>
 
 namespace mx::gui {
+
 namespace {
 
 static const QString kExpandText = "[+]";
-
-void GenerateToken(
-    RefExplorerToCodeViewModelAdapter::Context::TokenList &token_list,
-    std::uint64_t &id_generator, const TokenCategory &token_category,
-    const QString &data) {
-  token_list.push_back({data, token_category, ++id_generator});
-}
 
 void AppendIndentWhitespace(QString &buffer, std::size_t level_count) {
   for (std::size_t i{}; i < level_count; ++i) {
@@ -32,20 +26,10 @@ void AppendIndentWhitespace(QString &buffer, std::size_t level_count) {
   }
 }
 
-void GenerateIndentToken(
-    RefExplorerToCodeViewModelAdapter::Context::TokenList &token_list,
-    std::uint64_t &id_generator, std::size_t indent) {
-
-  QString token_data;
-  AppendIndentWhitespace(token_data, indent);
-  GenerateToken(token_list, id_generator, TokenCategory::WHITESPACE,
-                token_data);
-}
-
 void ImportReferenceExplorerModelHelper(
     RefExplorerToCodeViewModelAdapter::Context &context,
     const IReferenceExplorerModel *model, const QModelIndex &root,
-    std::uint64_t &id_generator, const std::size_t &indent) {
+    const std::size_t &indent, std::size_t &line_number) {
 
   auto L_getBreadcrumbs =
       [model](const QModelIndex &index) -> std::optional<QString> {
@@ -98,8 +82,66 @@ void ImportReferenceExplorerModelHelper(
     }
   }
 
-  RefExplorerToCodeViewModelAdapter::Context::Row row;
-  row.original_model_index = root;
+  RefExplorerToCodeViewModelAdapter::Context::Node::ColumnListData
+      column_list_data;
+
+  auto L_generateIndent = [&](const std::size_t &indent) {
+    RefExplorerToCodeViewModelAdapter::Context::Node::ColumnListData::Column
+        column;
+    AppendIndentWhitespace(column.data, indent);
+
+    column_list_data.column_list.push_back(std::move(column));
+  };
+
+  auto L_generateColumn = [&](const QString &data,
+                              const TokenCategory &token_category) {
+    RefExplorerToCodeViewModelAdapter::Context::Node::ColumnListData::Column
+        column;
+
+    column.data = data;
+    column.token_category = token_category;
+    column.is_expand_button =
+        (data == kExpandText && token_category == TokenCategory::COMMENT);
+
+    column_list_data.column_list.push_back(std::move(column));
+  };
+
+  auto L_saveCurrentLine = [&]() {
+    auto line_node_id =
+        RefExplorerToCodeViewModelAdapter::GenerateNodeID(context);
+
+    auto column_list_node_id =
+        RefExplorerToCodeViewModelAdapter::GenerateNodeID(context);
+
+    RefExplorerToCodeViewModelAdapter::Context::Node::LineData line_data;
+    line_data.original_model_index = root;
+    line_data.child_id = column_list_node_id;
+    line_data.line_number = line_number;
+
+    RefExplorerToCodeViewModelAdapter::Context::Node line_node;
+    line_node.id = line_node_id;
+    line_node.parent_id = 0;
+    line_node.data = std::move(line_data);
+
+    RefExplorerToCodeViewModelAdapter::Context::Node column_list_node;
+    column_list_node.id = column_list_node_id;
+    column_list_node.parent_id = line_node_id;
+    column_list_node.data = std::move(column_list_data);
+
+    column_list_data = {};
+
+    context.node_map.insert({line_node_id, std::move(line_node)});
+    context.node_map.insert({column_list_node_id, std::move(column_list_node)});
+
+    auto &root_node = context.node_map[0];
+    auto &root_data =
+        std::get<RefExplorerToCodeViewModelAdapter::Context::Node::RootData>(
+            root_node.data);
+
+    root_data.child_id_list.push_back(line_node_id);
+
+    ++line_number;
+  };
 
   if (context.breadcrumbs_enabled) {
     if (auto opt_breadcrumbs = L_getBreadcrumbs(root);
@@ -107,55 +149,50 @@ void ImportReferenceExplorerModelHelper(
 
       const auto &breadcrumbs = opt_breadcrumbs.value();
 
-      GenerateIndentToken(row.token_list, id_generator, indent + 1);
-      GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT,
-                    breadcrumbs);
-
-      context.row_list.push_back(std::move(row));
+      L_generateIndent(indent + 1);
+      L_generateColumn(breadcrumbs, TokenCategory::COMMENT);
+      L_saveCurrentLine();
     }
   }
 
-  row = {};
-  row.original_model_index = root;
-
-  GenerateIndentToken(row.token_list, id_generator, indent);
-  GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT, symbol);
-  GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
-  GenerateToken(row.token_list, id_generator, token_category, node_name);
+  L_generateIndent(indent);
+  L_generateColumn(symbol, TokenCategory::COMMENT);
+  L_generateColumn(" ", TokenCategory::WHITESPACE);
+  L_generateColumn(node_name, token_category);
 
   auto location_var = root.data(IReferenceExplorerModel::LocationRole);
   if (location_var.isValid()) {
     const auto &location = qvariant_cast<Location>(location_var);
     std::filesystem::path path{location.path.toStdString()};
 
-    GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
-    GenerateToken(row.token_list, id_generator, TokenCategory::FILE_NAME,
-                  QString::fromStdString(path.filename().generic_string()));
-    GenerateToken(row.token_list, id_generator, TokenCategory::PUNCTUATION,
-                  ":");
-    GenerateToken(row.token_list, id_generator, TokenCategory::LINE_NUMBER,
-                  QString::number(location.line));
-    GenerateToken(row.token_list, id_generator, TokenCategory::PUNCTUATION,
-                  ":");
-    GenerateToken(row.token_list, id_generator, TokenCategory::COLUMN_NUMBER,
-                  QString::number(location.column));
+    L_generateColumn(" ", TokenCategory::WHITESPACE);
+    L_generateColumn(QString::fromStdString(path.filename().generic_string()),
+                     TokenCategory::FILE_NAME);
+
+    L_generateColumn(":", TokenCategory::PUNCTUATION);
+    L_generateColumn(QString::number(location.line),
+                     TokenCategory::LINE_NUMBER);
+
+    L_generateColumn(":", TokenCategory::PUNCTUATION);
+    L_generateColumn(QString::number(location.column),
+                     TokenCategory::COLUMN_NUMBER);
   }
 
   auto show_expand_comment{true};
   auto expansion_status_role_var =
       root.data(IReferenceExplorerModel::ExpansionStatusRole);
+
   if (expansion_status_role_var.isValid()) {
     auto already_expanded = expansion_status_role_var.toBool();
     show_expand_comment = !already_expanded;
   }
 
   if (show_expand_comment) {
-    GenerateToken(row.token_list, id_generator, TokenCategory::WHITESPACE, " ");
-    GenerateToken(row.token_list, id_generator, TokenCategory::COMMENT,
-                  kExpandText);
+    L_generateColumn(" ", TokenCategory::WHITESPACE);
+    L_generateColumn(kExpandText, TokenCategory::COMMENT);
   }
 
-  context.row_list.push_back(std::move(row));
+  L_saveCurrentLine();
 
   auto row_count = model->rowCount(root);
 
@@ -165,8 +202,8 @@ void ImportReferenceExplorerModelHelper(
       continue;
     }
 
-    ImportReferenceExplorerModelHelper(context, model, child_index,
-                                       id_generator, indent + 1);
+    ImportReferenceExplorerModelHelper(context, model, child_index, indent + 1,
+                                       line_number);
   }
 }
 
@@ -201,10 +238,12 @@ RefExplorerToCodeViewModelAdapter::~RefExplorerToCodeViewModelAdapter() {}
 void RefExplorerToCodeViewModelAdapter::SetBreadcrumbsVisibility(
     const bool &enable) {
 
-  d->context.breadcrumbs_enabled = enable;
+  emit beginResetModel();
 
+  d->context.breadcrumbs_enabled = enable;
   ImportReferenceExplorerModel(d->context, d->model);
-  emit ModelReset();
+
+  emit endResetModel();
 }
 
 std::optional<RawEntityId>
@@ -224,79 +263,234 @@ void RefExplorerToCodeViewModelAdapter::SetEntity(RawEntityId) {
   __builtin_unreachable();
 }
 
-Count RefExplorerToCodeViewModelAdapter::RowCount() const {
-  return static_cast<Count>(d->context.row_list.size());
+bool RefExplorerToCodeViewModelAdapter::IsReady() const {
+  return true;
 }
 
-Count RefExplorerToCodeViewModelAdapter::TokenCount(Count row) const {
-  if (row >= d->context.row_list.size()) {
+QModelIndex
+RefExplorerToCodeViewModelAdapter::index(int row, int column,
+                                         const QModelIndex &parent) const {
+
+  Context::Node::ID parent_node_id{};
+  if (parent.isValid()) {
+    parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
+  }
+
+  const auto &parent_node = d->context.node_map[parent_node_id];
+  if (std::holds_alternative<Context::Node::RootData>(parent_node.data)) {
+    if (column != 0) {
+      return QModelIndex();
+    }
+
+    auto unsigned_row = static_cast<std::size_t>(row);
+
+    const auto &root_data = std::get<Context::Node::RootData>(parent_node.data);
+    if (unsigned_row >= root_data.child_id_list.size()) {
+      return QModelIndex();
+    }
+
+    const auto &child_id = root_data.child_id_list[unsigned_row];
+    return createIndex(row, column, child_id);
+
+  } else if (std::holds_alternative<Context::Node::LineData>(
+                 parent_node.data)) {
+    if (row != 0) {
+      return QModelIndex();
+    }
+
+    const auto &line_data = std::get<Context::Node::LineData>(parent_node.data);
+    return createIndex(row, column, line_data.child_id);
+
+  } else {
+    return QModelIndex();
+  }
+}
+
+QModelIndex
+RefExplorerToCodeViewModelAdapter::parent(const QModelIndex &child) const {
+  if (!child.isValid()) {
+    return QModelIndex();
+  }
+
+  Context::Node::ID parent_id{};
+
+  {
+    auto node_id = static_cast<Context::Node::ID>(child.internalId());
+    const auto &node = d->context.node_map[node_id];
+
+    parent_id = node.parent_id;
+  }
+
+  if (parent_id == 0) {
+    return QModelIndex();
+  }
+
+  Context::Node::ID grandparent_id{};
+
+  {
+    const auto &node = d->context.node_map[parent_id];
+    grandparent_id = node.parent_id;
+  }
+
+  if (grandparent_id != 0) {
+    return QModelIndex();
+  }
+
+  const auto &grandparent_node = d->context.node_map[grandparent_id];
+
+  if (!std::holds_alternative<Context::Node::RootData>(grandparent_node.data)) {
+    return QModelIndex();
+  }
+
+  const auto &root_data =
+      std::get<Context::Node::RootData>(grandparent_node.data);
+
+  auto it = std::find(root_data.child_id_list.begin(),
+                      root_data.child_id_list.end(), parent_id);
+
+  if (it == root_data.child_id_list.end()) {
+    return QModelIndex();
+  }
+
+  auto parent_row =
+      static_cast<int>(std::distance(root_data.child_id_list.begin(), it));
+
+  return createIndex(parent_row, 0, parent_id);
+
+  return QModelIndex();
+}
+
+int RefExplorerToCodeViewModelAdapter::rowCount(
+    const QModelIndex &parent) const {
+
+  Context::Node::ID parent_node_id{};
+  if (parent.isValid()) {
+    parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
+  }
+
+  const auto &parent_node = d->context.node_map[parent_node_id];
+  if (std::holds_alternative<Context::Node::RootData>(parent_node.data)) {
+    const auto &root_data = std::get<Context::Node::RootData>(parent_node.data);
+    return static_cast<int>(root_data.child_id_list.size());
+
+  } else if (std::holds_alternative<Context::Node::LineData>(
+                 parent_node.data)) {
+    return 1;
+
+  } else {
     return 0;
   }
-
-  const auto &r = d->context.row_list[row];
-  return static_cast<Count>(r.token_list.size());
 }
 
-QVariant RefExplorerToCodeViewModelAdapter::Data(const CodeModelIndex &index,
+int RefExplorerToCodeViewModelAdapter::columnCount(
+    const QModelIndex &parent) const {
+
+  Context::Node::ID parent_node_id{};
+  if (parent.isValid()) {
+    parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
+  }
+
+  const auto &parent_node = d->context.node_map[parent_node_id];
+  if (std::holds_alternative<Context::Node::LineData>(parent_node.data)) {
+    const auto &line_data = std::get<Context::Node::LineData>(parent_node.data);
+
+    const auto &column_list_node = d->context.node_map[line_data.child_id];
+    const auto &column_list_data =
+        std::get<Context::Node::ColumnListData>(column_list_node.data);
+
+    return static_cast<int>(column_list_data.column_list.size());
+  }
+
+  return 1;
+}
+
+QVariant RefExplorerToCodeViewModelAdapter::data(const QModelIndex &index,
                                                  int role) const {
-  if (role == ICodeModel::LineNumberRole) {
-    return index.row + 1;
-  }
 
-  auto row_number = static_cast<std::size_t>(index.row);
-  if (row_number >= d->context.row_list.size()) {
-    return QVariant();
-  }
-
-  const auto &row = d->context.row_list[row_number];
-
-  auto token_number = static_cast<std::size_t>(index.token_index);
-  if (token_number >= row.token_list.size()) {
-    return QVariant();
-  }
-
-  const auto &token = row.token_list[token_number];
+  auto node_id = static_cast<Context::Node::ID>(index.internalId());
+  const auto &node = d->context.node_map[node_id];
 
   QVariant value;
-  if (role == Qt::DisplayRole) {
-    value.setValue(token.data);
 
-  } else if (role == ICodeModel::TokenCategoryRole) {
-    value.setValue(token.category);
+  if (std::holds_alternative<Context::Node::LineData>(node.data)) {
+    const auto &line_data = std::get<Context::Node::LineData>(node.data);
 
-  } else if (role == RefExplorerToCodeViewModelAdapter::OriginalModelIndex) {
-    value.setValue(row.original_model_index);
+    if (role == Qt::DisplayRole) {
+      value.setValue(QString::number(line_data.line_number));
 
-  } else if (role == RefExplorerToCodeViewModelAdapter::IsExpandButton) {
-    value.setValue(token.data == kExpandText);
+    } else if (role == ICodeModel::LineNumberRole) {
+      value.setValue(line_data.line_number);
+
+    } else if (role == RefExplorerToCodeViewModelAdapter::OriginalModelIndex) {
+      value.setValue(line_data.original_model_index);
+    }
+
+  } else if (std::holds_alternative<Context::Node::ColumnListData>(node.data)) {
+    const auto &column_list_data =
+        std::get<Context::Node::ColumnListData>(node.data);
+
+    auto unsigned_column = static_cast<std::size_t>(index.column());
+    if (unsigned_column >= column_list_data.column_list.size()) {
+      return QVariant();
+    }
+
+    const auto &column = column_list_data.column_list[unsigned_column];
+
+    if (role == Qt::DisplayRole) {
+      value.setValue(column.data);
+
+    } else if (role == ICodeModel::TokenCategoryRole) {
+      value.setValue(static_cast<std::uint32_t>(column.token_category));
+
+    } else if (role == ICodeModel::LineNumberRole) {
+      auto parent_index = index.parent();
+      value = parent_index.data(ICodeModel::LineNumberRole);
+
+    } else if (role == RefExplorerToCodeViewModelAdapter::OriginalModelIndex) {
+      auto parent_index = index.parent();
+      value = parent_index.data(role);
+
+    } else if (role == RefExplorerToCodeViewModelAdapter::IsExpandButton) {
+      value.setValue(column.is_expand_button);
+    }
   }
 
   return value;
 }
 
-bool RefExplorerToCodeViewModelAdapter::IsReady() const {
-  return true;
-}
-
 void RefExplorerToCodeViewModelAdapter::ImportReferenceExplorerModel(
     Context &context, const IReferenceExplorerModel *model) {
 
-  context.row_list = {};
+  context.node_id_generator = 0;
+  context.node_map.clear();
 
-  std::uint64_t id_generator{};
+  Context::Node root_node;
+  root_node.data = Context::Node::RootData{};
+  context.node_map.insert({0, std::move(root_node)});
+
   auto row_count = model->rowCount();
+  std::size_t line_number{1};
 
   for (int row{0}; row < row_count; ++row) {
     auto child_index = model->index(row, 0);
 
-    ImportReferenceExplorerModelHelper(context, model, child_index,
-                                       id_generator, 0);
+    ImportReferenceExplorerModelHelper(context, model, child_index, 0,
+                                       line_number);
   }
 }
 
+RefExplorerToCodeViewModelAdapter::Context::Node::ID
+RefExplorerToCodeViewModelAdapter::GenerateNodeID(Context &context) {
+
+  return ++context.node_id_generator;
+}
+
 void RefExplorerToCodeViewModelAdapter::OnModelChange() {
+  emit beginResetModel();
+
   ImportReferenceExplorerModel(d->context, d->model);
-  emit ModelReset();
+
+  emit endResetModel();
 }
 
 }  // namespace mx::gui

@@ -14,6 +14,7 @@
 #include <multiplier/Entities/TokenCategory.h>
 
 #include <memory>
+#include <unordered_map>
 
 namespace mx::gui {
 
@@ -44,51 +45,91 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
   //! \todo This method needs to be removed from the interface
   [[noreturn]] virtual void SetEntity(RawEntityId id) override;
 
-  //! \copybrief ICodeModel::RowCount
-  virtual Count RowCount() const override;
-
-  //! \copybrief ICodeModel::TokenCount
-  virtual Count TokenCount(Count row) const override;
-
-  //! \copybrief ICodeModel::Data
-  virtual QVariant Data(const CodeModelIndex &index,
-                        int role = Qt::DisplayRole) const override;
-
   //! \copybrief ICodeModel::IsReady
   virtual bool IsReady() const override;
 
-  //! Token data that represents all the references
+  //! Creates a new Qt model index
+  virtual QModelIndex index(int row, int column,
+                            const QModelIndex &parent) const override;
+
+  //! Returns the parent of the given model index
+  virtual QModelIndex parent(const QModelIndex &child) const override;
+
+  //! Returns the amount of rows in the given parent item
+  virtual int rowCount(const QModelIndex &parent) const override;
+
+  //! Returns the amount of columns for the given parent item
+  virtual int columnCount(const QModelIndex &parent) const override;
+
+  //! Returns the data for the specified role
+  virtual QVariant data(const QModelIndex &index, int role) const override;
+
+  //! Contains all the nodes in the model
   struct Context final {
-    //! Token data for the code view
-    struct Token final {
-      QString data;
-      TokenCategory category{TokenCategory::UNKNOWN};
-      std::uint64_t id{};
+    //! A single node
+    struct Node final {
+      //! Node identifier
+      using ID = std::uint64_t;
+
+      //! A list of node IDs. Use to list child nodes
+      using IDList = std::vector<ID>;
+
+      //! The root node only has a child id list
+      struct RootData final {
+        IDList child_id_list;
+      };
+
+      //! A line node references the original index and the column list node
+      struct LineData final {
+        std::uint64_t line_number{};
+        QModelIndex original_model_index;
+        ID child_id{};
+      };
+
+      //! Contains the tokens displayed by the code view
+      struct ColumnListData final {
+        struct Column final {
+          TokenCategory token_category;
+          QString data;
+          bool is_expand_button{false};
+        };
+
+        using ColumnList = std::vector<Column>;
+
+        ColumnList column_list;
+      };
+
+      //! Node data
+      using NodeData =
+          std::variant<std::monostate, RootData, LineData, ColumnListData>;
+
+      //! The id of this node
+      ID id{};
+
+      //! Parent node id
+      ID parent_id{};
+
+      //! Node data
+      NodeData data;
     };
 
-    //! A group of tokens that represent a row
-    using TokenList = std::vector<Token>;
+    //! Node ID generator
+    Node::ID node_id_generator{};
 
-    //! Contains both the token list and the original QModelIndex
-    struct Row final {
-      TokenList token_list;
-      QModelIndex original_model_index;
-    };
+    //! The node map. Node 0 is always the root
+    std::unordered_map<Node::ID, Node> node_map;
 
-    //! A list of row objects for the code view
-    using RowList = std::vector<Row>;
-
-    //! If enabled, the text view will also show breadcrumbs
+    //! True if the breadcrumbs should be generated
     bool breadcrumbs_enabled{false};
-
-    //! All the data imported from the original ref explorer model
-    RowList row_list;
   };
 
   //! Imports the given model by generating tokens for the code view
   static void
   ImportReferenceExplorerModel(Context &context,
                                const IReferenceExplorerModel *model);
+
+  //! Generates a new node id
+  static Context::Node::ID GenerateNodeID(Context &context);
 
  private:
   struct PrivateData;

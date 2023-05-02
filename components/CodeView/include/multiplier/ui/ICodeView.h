@@ -86,8 +86,8 @@ class ICodeView : public QWidget {
   virtual int GetCursorPosition() const = 0;
 
   //! Sets the new cursor position, returning false in case of an error
-  virtual bool
-  SetCursorPosition(int start, std::optional<int> opt_end = std::nullopt) = 0;
+  virtual bool SetCursorPosition(int start,
+                                 std::optional<int> opt_end = std::nullopt) = 0;
 
   //! Returns the current code view contents in plain text format
   virtual QString Text() const = 0;
@@ -107,10 +107,10 @@ class ICodeView : public QWidget {
  signals:
   //! This signal is emitted when a token action is performed
   void TokenTriggered(const TokenAction &token_action,
-                      const CodeModelIndex &index);
+                      const QModelIndex &index);
 
   //! This signal is emitted when the cursor position has changed.
-  void CursorMoved(const CodeModelIndex &index);
+  void CursorMoved(const QModelIndex &index);
 
   //! Emitted when the document is changed in response to a model reset
   void DocumentChanged();
