@@ -59,9 +59,44 @@ jobs:
           mkdir -p \
             "${CCACHE_DIR}"
 
+      - name: Install system dependencies
+        run: |
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sudo chown -R $(whoami) $(brew --prefix)/*
+
+            brew install \
+              ccache \
+              cmake \
+              flex \
+              bison \
+              qt@6 \
+              curl
+
+            brew unlink qt@6
+            brew link qt@6
+
+          else
+            sudo apt install -y \
+              clang \
+              ccache \
+              cmake \
+              flex \
+              bison \
+              qt6-base-dev \
+              libqt6core5compat6-dev \
+              libgl1-mesa-dev \
+              libglvnd-dev \
+              cbindgen
+          fi
+
       - name: Install cxx-common
         run: |
-          folder_name="vcpkg_macos-12_llvm-16-pasta_xcode-14.2_amd64"
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            folder_name="vcpkg_macos-12_llvm-16-pasta_xcode-14.2_amd64"
+          else
+            folder_name="vcpkg_ubuntu-22.04_llvm-16-pasta_amd64"
+          fi
+
           archive_name="${folder_name}.tar.xz"
           cxx_common_url="https://github.com/lifting-bits/cxx-common/releases/download/${{ inputs.cxx_common_tag }}/${archive_name}"
 
@@ -78,26 +113,6 @@ jobs:
 
           echo "VCPKG_ROOT=$(pwd)/${folder_name}" >> $GITHUB_ENV
 
-      - name: Install system dependencies
-        run: |
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            sudo chown -R $(whoami) $(brew --prefix)/*
-
-            brew install \
-              ccache \
-              cmake \
-              flex \
-              bison \
-              qt@6
-
-            brew unlink qt@6
-            brew link qt@6
-
-          else
-            echo "Platform is not yet supported"
-            exit 1
-          fi
-
       - name: Setup the build folders for the vendored libraries
         run: |
           mkdir build_vendored
@@ -108,6 +123,24 @@ jobs:
           mkdir qt_multiplier_install
           echo "QT_MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/qt_multiplier_install" >> $GITHUB_ENV
 
+      - name: Determine job count
+        id: job_count
+        run: |
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            echo "VALUE=$(sysctl -n hw.ncpu)" >> $GITHUB_OUTPUT
+          else
+            echo "VALUE=$(nproc)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Select triplet
+        id: triplet
+        run: |
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            echo "VALUE=x64-osx-rel" >> $GITHUB_OUTPUT
+          else
+            echo "VALUE=x64-linux-rel" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build weggli-native
         run: |
           cmake \
@@ -116,8 +149,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
-            -DVCPKG_HOST_TRIPLET=x64-osx-rel \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -S libraries/vendored/weggli-native \
@@ -125,7 +156,7 @@ jobs:
 
           cmake \
             --build build_vendored/weggli-native \
-            -j $(sysctl -n hw.ncpu) \
+            -j ${{ steps.job_count.outputs.VALUE }} \
             --target install
 
       - name: Build pasta
@@ -136,8 +167,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
-            -DVCPKG_HOST_TRIPLET=x64-osx-rel \
+            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DPASTA_BOOTSTRAP_MACROS=OFF \
             -DPASTA_BOOTSTRAP_TYPES=OFF \
             -DPASTA_ENABLE_INSTALL=ON \
@@ -147,7 +178,7 @@ jobs:
 
           cmake \
             --build build_vendored/pasta \
-            -j $(sysctl -n hw.ncpu) \
+            -j ${{ steps.job_count.outputs.VALUE }} \
             --target install
 
       - name: Build gap
@@ -171,7 +202,7 @@ jobs:
 
           cmake \
             --build build_vendored/gap \
-            -j $(sysctl -n hw.ncpu) \
+            -j ${{ steps.job_count.outputs.VALUE }} \
             --target install
 
       - name: Build multiplier
@@ -182,8 +213,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
-            -DVCPKG_HOST_TRIPLET=x64-osx-rel \
+            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DMX_ENABLE_BOOTSTRAP=OFF \
@@ -196,7 +227,7 @@ jobs:
 
           cmake \
             --build build_vendored/multiplier \
-            -j $(sysctl -n hw.ncpu) \
+            -j ${{ steps.job_count.outputs.VALUE }} \
             --target install
 
       - name: Build qt-multiplier
@@ -206,8 +237,8 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=x64-osx-rel \
-            -DVCPKG_HOST_TRIPLET=x64-osx-rel \
+            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DMXQT_ENABLE_TESTS=true \
@@ -217,7 +248,7 @@ jobs:
 
           cmake \
             --build build_qtmultiplier \
-            -j $(sysctl -n hw.ncpu)
+            -j ${{ steps.job_count.outputs.VALUE }}
 
           export DESTDIR="${QT_MULTIPLIER_INSTALL_DIRECTORY}"
 
@@ -232,6 +263,7 @@ jobs:
             --target test
 
       - name: Create the DMG package
+        if: inputs.platform == 'macos-12'
         id: dmg_package
         run: |
           cmake \
@@ -252,10 +284,39 @@ jobs:
           echo "NAME=${package_name}" >> $GITHUB_OUTPUT
 
       - name: Upload the DMG package
+        if: inputs.platform == 'macos-12'
         uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.dmg_package.outputs.NAME }}
           path: ${{ steps.dmg_package.outputs.PATH }}
+
+      - name: Create the DEB package
+        if: inputs.platform == 'ubuntu-22.04'
+        id: deb_package
+        run: |
+          cmake \
+            -S package \
+            -B package-build \
+            -DQT_MULTIPLIER_DATA_PATH="${QT_MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DMULTIPLIER_DATA_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DCPACK_GENERATOR=DEB
+
+          cmake \
+            --build package-build \
+            --target package
+
+          rel_package_path="$(ls package-build/*.deb)"
+          package_name="$(basename ${rel_package_path})"
+
+          echo "PATH=${rel_package_path}" >> $GITHUB_OUTPUT
+          echo "NAME=${package_name}" >> $GITHUB_OUTPUT
+
+      - name: Upload the DEB package
+        if: inputs.platform == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.deb_package.outputs.NAME }}
+          path: ${{ steps.deb_package.outputs.PATH }}
 
       - name: Generate the sample database file
         run: |

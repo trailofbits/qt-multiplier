@@ -37,3 +37,16 @@ jobs:
       platform: macos-12
       build_type: ${{ matrix.build_type }}
       cxx_common_tag: v0.3.1
+
+  linux:
+    strategy:
+      matrix:
+        build_type: [Release]
+
+    uses: ./.github/workflows/posix.yml
+    secrets: inherit
+
+    with:
+      platform: ubuntu-22.04
+      build_type: ${{ matrix.build_type }}
+      cxx_common_tag: v0.3.1

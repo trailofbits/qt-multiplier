@@ -28,7 +28,7 @@ QString Node::kMimeTypeName = "application/mx-reference-explorer-node-tree";
 
 QDataStream &operator<<(QDataStream &stream, const Location &location) {
   stream << location.path;
-  stream << location.file_id;
+  stream << static_cast<quint64>(location.file_id);
   stream << location.line;
   stream << location.column;
   return stream;
@@ -37,7 +37,11 @@ QDataStream &operator<<(QDataStream &stream, const Location &location) {
 QDataStream &operator>>(QDataStream &stream, Location &location) {
 
   stream >> location.path;
-  stream >> location.file_id;
+
+  quint64 file_id{};
+  stream >> file_id;
+  location.file_id = static_cast<RawEntityId>(file_id);
+
   stream >> location.line;
   stream >> location.column;
   return stream;
@@ -131,11 +135,11 @@ const Node *NodeTree::CurrentRootNode(void) const {
 }
 
 QDataStream &operator<<(QDataStream &stream, const Node &node) {
-  stream << node.node_id;
-  stream << node.parent_node_id;
+  stream << static_cast<quint64>(node.node_id);
+  stream << static_cast<quint64>(node.parent_node_id);
   stream << node.expansion_mode;
-  stream << node.entity_id;
-  stream << node.referenced_entity_id;
+  stream << static_cast<quint64>(node.entity_id);
+  stream << static_cast<quint64>(node.referenced_entity_id);
   stream << node.expanded;
 
   if (node.opt_name.has_value()) {
@@ -161,12 +165,12 @@ QDataStream &operator<<(QDataStream &stream, const Node &node) {
   }
 
   auto child_node_id_list_size =
-      static_cast<std::uint64_t>(node.child_node_id_list.size());
+      static_cast<quint64>(node.child_node_id_list.size());
 
   stream << child_node_id_list_size;
 
   for (const auto &child_node_id : node.child_node_id_list) {
-    stream << child_node_id;
+    stream << static_cast<quint64>(child_node_id);
   }
 
   return stream;
@@ -174,11 +178,22 @@ QDataStream &operator<<(QDataStream &stream, const Node &node) {
 
 QDataStream &operator>>(QDataStream &stream, Node &node) {
 
-  stream >> node.node_id;
-  stream >> node.parent_node_id;
+  quint64 uint64_value{};
+
+  stream >> uint64_value;
+  node.node_id = static_cast<std::uint64_t>(uint64_value);
+
+  stream >> uint64_value;
+  node.parent_node_id = static_cast<std::uint64_t>(uint64_value);
+
   stream >> node.expansion_mode;
-  stream >> node.entity_id;
-  stream >> node.referenced_entity_id;
+
+  stream >> uint64_value;
+  node.entity_id = static_cast<RawEntityId>(uint64_value);
+
+  stream >> uint64_value;
+  node.referenced_entity_id = static_cast<RawEntityId>(uint64_value);
+
   stream >> node.expanded;
 
   bool has_optional_field = false;
@@ -206,14 +221,15 @@ QDataStream &operator>>(QDataStream &stream, Node &node) {
     node.opt_breadcrumbs = string_value;
   }
 
-  std::uint64_t child_node_id_list_size{};
+  quint64 child_node_id_list_size{};
   stream >> child_node_id_list_size;
 
-  for (std::uint64_t i = 0; i < child_node_id_list_size; ++i) {
-    std::uint64_t child_node_id{};
+  for (quint64 i = 0; i < child_node_id_list_size; ++i) {
+    quint64 child_node_id{};
     stream >> child_node_id;
 
-    node.child_node_id_list.push_back(child_node_id);
+    node.child_node_id_list.push_back(
+        static_cast<std::uint64_t>(child_node_id));
   }
 
   return stream;

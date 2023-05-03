@@ -17,6 +17,14 @@ include("cmake/utils.cmake")
 include("cmake/options.cmake")
 include("cmake/build_flags.cmake")
 
+if(MXQT_ENABLE_INSTALL AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "" FORCE)
+  else()
+    set(CMAKE_INSTALL_PREFIX "/opt/multiplier" CACHE PATH "" FORCE)
+  endif()
+endif()
+
 if(MXQT_ENABLE_TESTS)
   include("CTest")
   enable_testing()
@@ -27,9 +35,15 @@ add_subdirectory("components")
 add_subdirectory("multiplier")
 
 if(MXQT_ENABLE_INSTALL)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(install_destination "share/multiplier")
+  else()
+    set(install_destination "control")
+  endif()
+
   install(
     FILES "LICENSE"
-    DESTINATION "control"
+    DESTINATION "${install_destination}"
     RENAME "LICENSE.txt"
   )
 endif()

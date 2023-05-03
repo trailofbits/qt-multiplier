@@ -6,7 +6,13 @@
 
 #pragma once
 
+// The Entity.h is missing this header when building on linux
+
+// clang-format off
+#include <memory>
 #include <multiplier/Entity.h>
+// clang-format on
+
 #include <multiplier/Entities/Attr.h>
 #include <multiplier/Entities/CXXBaseSpecifier.h>
 #include <multiplier/Entities/DefineMacroDirective.h>
@@ -22,8 +28,10 @@
 #include <multiplier/Entities/Type.h>
 #include <multiplier/Entities/TypeDecl.h>
 #include <multiplier/Entities/VarDecl.h>
-#include <optional>
+
 #include <QString>
+
+#include <optional>
 #include <unordered_map>
 #include <utility>
 
@@ -36,9 +44,8 @@ class TokenRange;
 namespace gui {
 
 template <typename T>
-static VariantEntity NamedDeclContaining(const T &thing)
-  requires(!std::is_same_v<T, VariantEntity>)
-{
+static VariantEntity NamedDeclContaining(const T &thing) requires(
+    !std::is_same_v<T, VariantEntity>) {
   for (FunctionDecl func : FunctionDecl::containing(thing)) {
     return func;
   }

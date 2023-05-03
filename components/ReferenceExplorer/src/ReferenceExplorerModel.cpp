@@ -390,9 +390,8 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   if (role == Qt::ForegroundRole) {
     QColor color = qApp->palette().text().color();
     if (index.column() > 0) {
-      return QColor::fromRgbF(
-          color.redF(), color.greenF(), color.blueF(),
-          color.alphaF() * static_cast<float>(0.75));
+      return QColor::fromRgbF(color.redF(), color.greenF(), color.blueF(),
+                              color.alphaF() * static_cast<float>(0.75));
     } else {
       return color;
     }
@@ -456,10 +455,10 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     value = std::move(buffer);
 
   } else if (role == IReferenceExplorerModel::EntityIdRole) {
-    value = node.entity_id;
+    value = static_cast<quint64>(node.entity_id);
 
   } else if (role == IReferenceExplorerModel::ReferencedEntityIdRole) {
-    value = node.referenced_entity_id;
+    value = static_cast<quint64>(node.referenced_entity_id);
 
   } else if (role == IReferenceExplorerModel::FragmentIdRole) {
     if (std::optional<FragmentId> frag_id =
@@ -615,7 +614,7 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
     QByteArray encoded_data;
     QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
 
-    std::uint64_t instance_identifier{};
+    quint64 instance_identifier{};
     auto this_ptr{this};
     std::memcpy(&instance_identifier, &this_ptr, sizeof(instance_identifier));
 
@@ -630,7 +629,7 @@ ReferenceExplorerModel::mimeData(const QModelIndexList &indexes) const {
     QDataStream encoded_data_stream(&encoded_data, QIODevice::WriteOnly);
 
     auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
-    encoded_data_stream << entity_id;
+    encoded_data_stream << static_cast<quint64>(entity_id);
 
     mime_data->setData(kNodeInfoMimeType, encoded_data);
   }
@@ -755,11 +754,11 @@ bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
     auto encoded_data = data->data(kInstanceInfoMimeType);
     QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
 
-    std::uint64_t instance_identifier{};
+    quint64 instance_identifier{};
     auto this_ptr{this};
     std::memcpy(&instance_identifier, &this_ptr, sizeof(instance_identifier));
 
-    std::uint64_t incoming_instance_identifier{};
+    quint64 incoming_instance_identifier{};
     encoded_data_stream >> incoming_instance_identifier;
     if (instance_identifier == incoming_instance_identifier) {
       return false;
@@ -794,7 +793,13 @@ bool ReferenceExplorerModel::dropMimeData(const QMimeData *data,
     QDataStream encoded_data_stream(&encoded_data, QIODevice::ReadOnly);
 
     RawEntityId entity_id{};
-    encoded_data_stream >> entity_id;
+
+    {
+      quint64 value{};
+      encoded_data_stream >> value;
+
+      entity_id = static_cast<RawEntityId>(value);
+    }
 
     ExpansionMode expansion_mode{};
     if (d->drag_and_drop_mode == DragAndDropMode::AddRootAndTaint) {

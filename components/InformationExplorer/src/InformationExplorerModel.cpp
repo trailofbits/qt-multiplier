@@ -437,8 +437,9 @@ void InformationExplorerModel::ImportEntityInformation(
       property.path = filler.base_path;
       property.path.append(property.display_role);
 
+      auto entity_id = static_cast<quint64>(IdOfEntity(selection.entity_role));
       property.value_map.emplace(IInformationExplorerModel::EntityIdRole,
-                                 IdOfEntity(selection.entity_role));
+                                 entity_id);
 
       if (selection.display_role.canConvert<TokenRange>()) {
         property.value_map.emplace(IInformationExplorerModel::TokenRangeRole,

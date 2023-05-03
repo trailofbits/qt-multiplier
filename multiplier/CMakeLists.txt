@@ -20,7 +20,11 @@ set_source_files_properties("${multiplier_icon_path}" PROPERTIES
   MACOSX_PACKAGE_LOCATION "Resources"
 )
 
-add_executable("Multiplier" MACOSX_BUNDLE
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(executable_type "MACOSX_BUNDLE")
+endif()
+
+add_executable("Multiplier" ${executable_type}
   src/main.cpp
 
   src/MainWindow.h
@@ -72,15 +76,25 @@ target_link_libraries("Multiplier"
 )
 
 enable_qt_properties("Multiplier")
-enable_appbundle_postbuild_steps("Multiplier")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set_target_properties("Multiplier" PROPERTIES
+    OUTPUT_NAME "multiplier"
+  )
+
+else()
+  enable_appbundle_postbuild_steps("Multiplier")
+endif()
 
 if(MXQT_ENABLE_INSTALL)
-  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX "/opt/multiplier" CACHE PATH "" FORCE)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(install_destination "bin")
+  else()
+    set(install_destination ".")
   endif()
 
   install(
     TARGETS "Multiplier"
-    DESTINATION "."
+    DESTINATION "${install_destination}"
   )
 endif()

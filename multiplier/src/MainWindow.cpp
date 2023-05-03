@@ -508,8 +508,9 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   code_view->setAttribute(Qt::WA_DeleteOnClose);
 
   // Make it so that the initial last location for a given view is the file ID.
-  code_view->setProperty(kLastLocationProperty, file_entity_id);
-  code_view->setProperty(kFileIdProperty, file_entity_id);
+  code_view->setProperty(kLastLocationProperty,
+                         static_cast<quint64>(file_entity_id));
+  code_view->setProperty(kFileIdProperty, static_cast<quint64>(file_entity_id));
 
   auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
   central_tab_widget->addTab(code_view, tab_name);
@@ -618,7 +619,8 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
 
   // We've asked to open a specific entity id. Record it as the last open
   // entity ID in this view.
-  code_view->setProperty(kLastLocationProperty, entity_id);
+  code_view->setProperty(kLastLocationProperty,
+                         static_cast<quint64>(entity_id));
   d->toolbar.back_forward->SetCurrentLocation(entity_id);
 
   // Scroll to the appropriate line.

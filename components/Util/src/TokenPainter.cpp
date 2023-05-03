@@ -23,6 +23,18 @@
 namespace mx::gui {
 namespace {
 
+QPointF GetRectPosition(const QRectF &rect) {
+  return rect.topLeft();
+}
+
+#ifdef __APPLE__
+
+QPointF GetRectPosition(const QRect &rect) {
+  return GetRectPosition(rect.toRectF());
+}
+
+#endif
+
 static QFont CreateFont(const CodeViewTheme &theme_) {
   QFont font(theme_.font_name);
   font.setStyleHint(QFont::TypeWriter);
@@ -120,8 +132,7 @@ std::string_view TokenPainter::PrivateData::Characters(const Token &tok) {
             num_printed_since_space = 0;
           }
           continue;
-        case '\r':
-          continue;
+        case '\r': continue;
         default:
         non_whitespace:
           num_printed_since_space += 1;
@@ -137,9 +148,10 @@ std::string_view TokenPainter::PrivateData::Characters(const Token &tok) {
 }
 
 template <typename Painter>
-void TokenPainter::PrivateData::PaintToken(
-    Painter *painter, const QStyleOptionViewItem &option, const Token &token,
-    QPointF &pos_inout) {
+void TokenPainter::PrivateData::PaintToken(Painter *painter,
+                                           const QStyleOptionViewItem &option,
+                                           const Token &token,
+                                           QPointF &pos_inout) {
 
   TokenCategory token_category = token.category();
   painter->setPen(config.theme.ForegroundColor(token_category));
@@ -228,7 +240,7 @@ void TokenPainter::Paint(QPainter *painter, const QStyleOptionViewItem &option,
                          const TokenRange &tokens) const {
   d->Reset();
 
-  QPointF pos = option.rect.toRectF().topLeft();
+  QPointF pos = GetRectPosition(option.rect);
   painter->save();
   for (Token token : tokens) {
     d->PaintToken(painter, option, token, pos);
@@ -241,7 +253,7 @@ void TokenPainter::Paint(QPainter *painter, const QStyleOptionViewItem &option,
                          const Token &token) const {
   d->Reset();
 
-  QPointF pos = option.rect.toRectF().topLeft();
+  QPointF pos = GetRectPosition(option.rect);
   painter->save();
   d->PaintToken(painter, option, token, pos);
   painter->restore();
@@ -252,7 +264,7 @@ QSize TokenPainter::SizeHint(const QStyleOptionViewItem &option,
                              const TokenRange &tokens) const {
   d->Reset();
 
-  QPointF pos = option.rect.toRectF().topLeft();
+  QPointF pos = GetRectPosition(option.rect);
   QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
   MeasuringPainter painter(empty_rect);
 
@@ -268,7 +280,7 @@ QSize TokenPainter::SizeHint(const QStyleOptionViewItem &option,
                              const Token &token) const {
   d->Reset();
 
-  QPointF pos = option.rect.toRectF().topLeft();
+  QPointF pos = GetRectPosition(option.rect);
   QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
   MeasuringPainter painter(empty_rect);
 
@@ -279,9 +291,9 @@ QSize TokenPainter::SizeHint(const QStyleOptionViewItem &option,
 
 //! Given that we've painted `tokens` into a QRect, go and figure out what
 //! token was clicked.
-std::optional<Token> TokenPainter::TokenAtPosition(
-    const QRect &visual_rect, const QPoint &query_pos,
-    const TokenRange &tokens) const {
+std::optional<Token>
+TokenPainter::TokenAtPosition(const QRect &visual_rect, const QPoint &query_pos,
+                              const TokenRange &tokens) const {
   if (!visual_rect.contains(query_pos)) {
     return std::nullopt;
   }
@@ -291,7 +303,8 @@ std::optional<Token> TokenPainter::TokenAtPosition(
   QStyleOptionViewItem option;
   option.rect = visual_rect;
 
-  QPointF query_pos_f = query_pos.toPointF();
+  QPointF query_pos_f(static_cast<qreal>(query_pos.x()),
+                      static_cast<qreal>(query_pos.y()));
   QPointF pos = visual_rect.topLeft();
   QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
   MeasuringPainter painter(empty_rect);
@@ -307,9 +320,9 @@ std::optional<Token> TokenPainter::TokenAtPosition(
 
 //! Given that we've painted `tokens` into a QRect, go and figure out what
 //! token was clicked.
-std::optional<Token> TokenPainter::TokenAtPosition(
-    const QRect &visual_rect, const QPoint &query_pos,
-    const Token &token) const {
+std::optional<Token> TokenPainter::TokenAtPosition(const QRect &visual_rect,
+                                                   const QPoint &query_pos,
+                                                   const Token &token) const {
 
   if (!visual_rect.contains(query_pos)) {
     return std::nullopt;
@@ -320,7 +333,8 @@ std::optional<Token> TokenPainter::TokenAtPosition(
   QStyleOptionViewItem option;
   option.rect = visual_rect;
 
-  QPointF query_pos_f = query_pos.toPointF();
+  QPointF query_pos_f(static_cast<qreal>(query_pos.x()),
+                      static_cast<qreal>(query_pos.y()));
   QPointF pos = visual_rect.topLeft();
   QRectF empty_rect(pos.x(), pos.y(), d->space_width, d->line_height);
   MeasuringPainter painter(empty_rect);
