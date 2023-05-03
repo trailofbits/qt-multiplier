@@ -9,35 +9,18 @@
 #pragma once
 
 #include <multiplier/Types.h>
+#include <multiplier/Index.h>
 
-#include <QObject>
-#include <QVariant>
-
-namespace mx {
-class FileLocationCache;
-class Index;
-}  // namespace mx
+#include <QAbstractItemModel>
 
 namespace mx::gui {
 
-class ICodeModel;
-
-using Count = unsigned;
-
-//! A model index used to reference a single token
-struct CodeModelIndex final {
-  const ICodeModel *model{nullptr};
-  Count row{};
-  Count token_index{};
-};
-
-//! A code model interface inspired by Qt, used by the ICodeView widget
-class ICodeModel : public QObject {
+//! An item-based model for the ICodeView widget
+class ICodeModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
-
-  //! Compatible data roles that can be used in addition to Qt::DisplayRole
+  //! Custom data roles
   enum {
     //! Token category, used for syntax coloring
     TokenCategoryRole = Qt::UserRole + 1,
@@ -71,43 +54,25 @@ class ICodeModel : public QObject {
 
   //! Asks the model for the currently showing entity. This is usually a file
   //! id or a fragment id.
-  virtual std::optional<RawEntityId> GetEntity(void) const = 0;
+  virtual std::optional<RawEntityId> GetEntity() const = 0;
 
   //! Asks the model to fetch the specified entity.
   virtual void SetEntity(RawEntityId id) = 0;
 
-  //! How many rows are accessible from this model
-  virtual Count RowCount() const = 0;
-
-  //! How many tokens are accessible on the specified column
-  virtual Count TokenCount(Count row) const = 0;
-
-  //! Returns the data role contents for the specified model index
-  virtual QVariant Data(const CodeModelIndex &index,
-                        int role = Qt::DisplayRole) const = 0;
-
-  //! Returns true if this model is ready.
+  //! Returns true if the model is not currently running any operation
   virtual bool IsReady() const = 0;
 
   //! Constructor
-  ICodeModel(QObject *parent) : QObject(parent) {}
+  ICodeModel(QObject *parent) : QAbstractItemModel(parent) {}
 
   //! Destructor
   virtual ~ICodeModel() override = default;
 
+  //! Disabled copy constructor
   ICodeModel(const ICodeModel &) = delete;
+
+  //! Disabled copy assignment operator
   ICodeModel &operator=(const ICodeModel &) = delete;
-
- signals:
-  //! This signal is emitted at the end of the model reset process
-  void ModelReset();
-
-  //! This signal is emitted if we ask to set the model to the same thing it
-  //! was set to before.
-  void ModelResetSkipped();
 };
 
 }  // namespace mx::gui
-
-//! Allows mx::gui::CodeModelIndex values to fit inside QVariant objects
-Q_DECLARE_METATYPE(mx::gui::CodeModelIndex);

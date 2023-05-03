@@ -40,16 +40,16 @@ class MainWindow final : public QMainWindow {
   void CreateReferenceExplorerDock();
   void CreateNewReferenceExplorer(QString window_title);
   void CreateCodeView();
-  void OpenEntityRelatedToToken(const CodeModelIndex &index);
+  void OpenEntityRelatedToToken(const QModelIndex &index);
   void OpenEntityCode(RawEntityId entity_id, bool canonicalize = true);
   void OpenEntityInfo(RawEntityId entity_id);
-  void OpenTokenContextMenu(CodeModelIndex index);
-  void OpenTokenReferenceExplorer(CodeModelIndex index);
-  void OpenTokenTaintExplorer(CodeModelIndex index);
-  void OpenTokenEntityInfo(CodeModelIndex index);
+  void OpenTokenContextMenu(QModelIndex index);
+  void OpenTokenReferenceExplorer(QModelIndex index);
+  void OpenTokenTaintExplorer(QModelIndex index);
+  void OpenTokenEntityInfo(QModelIndex index);
   void OpenReferenceExplorer(RawEntityId entity_id,
                              IReferenceExplorerModel::ExpansionMode mode);
-  void OpenCodePreview(const CodeModelIndex &index);
+  void OpenCodePreview(const QModelIndex &index);
   void CloseQuickRefExplorerPopup();
   void CloseCodePreviewPopup();
   void CloseAllPopups();
@@ -66,9 +66,9 @@ class MainWindow final : public QMainWindow {
                               Qt::MouseButtons buttons);
 
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
-                        const CodeModelIndex &index);
+                        const QModelIndex &index);
 
-  void OnMainCodeViewCursorMoved(const CodeModelIndex &index);
+  void OnMainCodeViewCursorMoved(const QModelIndex &index);
 
   void OnReferenceExplorerItemActivated(const QModelIndex &index);
 

@@ -75,8 +75,7 @@ class CodeView final : public ICodeView {
   void InitializeWidgets(void);
 
   //! Returns the code model index for the token at the given coordinates
-  std::optional<CodeModelIndex>
-  GetCodeModelIndexFromMousePosition(const QPoint &pos);
+  std::optional<QModelIndex> GetModelIndexFromMousePosition(const QPoint &pos);
 
   //! Starts tracking the mouse position for a possible hover event
   void OnTextEditViewportMouseMoveEvent(QMouseEvent *event);
@@ -109,10 +108,10 @@ class CodeView final : public ICodeView {
     struct Entry final {
       int cursor_start{};
       int cursor_end{};
-      CodeModelIndex model_index;
+      QModelIndex model_index;
     };
 
-    //! The key is unique and derived from a CodeModelIndex
+    //! The key is unique and derived from a QModelIndex
     std::unordered_map<std::uint64_t, Entry> data;
 
     //! This maps a block number to a list of unique token identifiers
@@ -120,10 +119,10 @@ class CodeView final : public ICodeView {
         block_number_to_unique_token_id_list;
 
     //! This maps a line number to a block number
-    std::unordered_map<Count, int> line_number_to_block_number;
+    std::unordered_map<std::size_t, int> line_number_to_block_number;
 
     //! This maps a block number to a line number
-    std::unordered_map<int, Count> block_number_to_line_number;
+    std::unordered_map<int, std::size_t> block_number_to_line_number;
 
     //! This maps a token group to a list of unique token identifiers
     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>
@@ -134,11 +133,11 @@ class CodeView final : public ICodeView {
         related_entity_id_to_unique_token_id_list;
 
     //! The highest line number that we have encountered
-    unsigned highest_line_number{};
+    std::uint64_t highest_line_number{};
   };
 
   //! Creates a unique token identifier from the given code model index
-  static std::uint64_t GetUniqueTokenIdentifier(const CodeModelIndex &index);
+  static std::uint64_t GetUniqueTokenIdentifier(const QModelIndex &index);
 
   //! Returns the line number for the specified block number
   static std::optional<std::size_t>
@@ -149,9 +148,9 @@ class CodeView final : public ICodeView {
   GetBlockNumberFromLineNumber(const TokenMap &token_map, unsigned line_number);
 
   //! Returns a code model index from the specified text cursor
-  static std::optional<CodeModelIndex>
-  GetCodeModelIndexFromTextCursor(const TokenMap &token_map,
-                                  const QTextCursor &cursor);
+  static std::optional<QModelIndex>
+  GetQModelIndexFromTextCursor(const TokenMap &token_map,
+                               const QTextCursor &cursor);
 
   //! Used with CreateTextDocument to display graphical progress
   using CreateTextDocumentProgressCallback = std::function<bool(int)>;

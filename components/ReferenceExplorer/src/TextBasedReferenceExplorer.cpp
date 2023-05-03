@@ -57,10 +57,10 @@ void TextBasedReferenceExplorer::InitializeWidgets(
 }
 
 void TextBasedReferenceExplorer::OnTokenTriggered(
-    const ICodeView::TokenAction &token_action, const CodeModelIndex &index) {
+    const ICodeView::TokenAction &token_action, const QModelIndex &index) {
 
-  auto original_index_var = d->code_model->Data(
-      index, RefExplorerToCodeViewModelAdapter::OriginalModelIndex);
+  auto original_index_var =
+      index.data(RefExplorerToCodeViewModelAdapter::OriginalModelIndex);
 
   if (!original_index_var.isValid()) {
     return;
@@ -72,8 +72,8 @@ void TextBasedReferenceExplorer::OnTokenTriggered(
   }
 
   if (token_action.type == ICodeView::TokenAction::Type::Primary) {
-    auto is_expand_var = d->code_model->Data(
-        index, RefExplorerToCodeViewModelAdapter::IsExpandButton);
+    auto is_expand_var =
+        index.data(RefExplorerToCodeViewModelAdapter::IsExpandButton);
 
     if (is_expand_var.isValid() && qvariant_cast<bool>(is_expand_var)) {
       d->model->ExpandEntity(original_index);

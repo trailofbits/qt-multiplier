@@ -74,7 +74,7 @@ struct CodeView::PrivateData final {
   CodeViewTheme theme;
   std::size_t tab_width{4};
 
-  std::optional<CodeModelIndex> opt_prev_hovered_model_index;
+  std::optional<QModelIndex> opt_prev_hovered_model_index;
   QTimer hover_timer;
 
   QShortcut *go_to_line_shortcut{nullptr};
@@ -289,10 +289,7 @@ void CodeView::InstallModel(ICodeModel *model) {
   d->model = model;
   d->model->setParent(this);
 
-  connect(d->model, &ICodeModel::ModelReset, this, &CodeView::OnModelReset);
-
-  connect(d->model, &ICodeModel::ModelResetSkipped, this,
-          &CodeView::OnModelResetDone);
+  connect(d->model, &ICodeModel::modelReset, this, &CodeView::OnModelReset);
 }
 
 void CodeView::InitializeWidgets() {
@@ -382,14 +379,14 @@ void CodeView::ConnectCursorChangeEvent(void) {
   OnCursorMoved();
 }
 
-std::optional<CodeModelIndex>
-CodeView::GetCodeModelIndexFromMousePosition(const QPoint &pos) {
+std::optional<QModelIndex>
+CodeView::GetModelIndexFromMousePosition(const QPoint &pos) {
   QTextCursor text_cursor = d->text_edit->cursorForPosition(pos);
-  return GetCodeModelIndexFromTextCursor(d->token_map, text_cursor);
+  return GetQModelIndexFromTextCursor(d->token_map, text_cursor);
 }
 
 void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
-  auto opt_model_index = GetCodeModelIndexFromMousePosition(event->pos());
+  auto opt_model_index = GetModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
     d->opt_prev_hovered_model_index = std::nullopt;
     return;
@@ -397,12 +394,22 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
 
   const auto &model_index = opt_model_index.value();
 
+  auto token_id_var = model_index.data(ICodeModel::TokenIdRole);
+  if (!token_id_var.isValid()) {
+    return;
+  }
+
+  auto token_id = qvariant_cast<RawEntityId>(token_id_var);
+
   if (d->opt_prev_hovered_model_index.has_value()) {
     const auto &prev_hovered_model_index =
         d->opt_prev_hovered_model_index.value();
 
-    if (prev_hovered_model_index.row == model_index.row &&
-        prev_hovered_model_index.token_index == model_index.token_index) {
+    auto prev_token_id_var =
+        prev_hovered_model_index.data(ICodeModel::TokenIdRole);
+    auto prev_token_id = qvariant_cast<RawEntityId>(prev_token_id_var);
+
+    if (prev_token_id == token_id) {
       return;
     }
   }
@@ -420,14 +427,28 @@ void CodeView::OnHoverTimerTimeout() {
   d->opt_prev_hovered_model_index = std::nullopt;
 
   auto cursor_pos = d->text_edit->viewport()->mapFromGlobal(QCursor::pos());
-  auto opt_model_index = GetCodeModelIndexFromMousePosition(cursor_pos);
+  auto opt_model_index = GetModelIndexFromMousePosition(cursor_pos);
   if (!opt_model_index.has_value()) {
     return;
   }
 
   const auto &model_index = opt_model_index.value();
-  if (prev_hovered_model_index.row != model_index.row ||
-      prev_hovered_model_index.token_index != model_index.token_index) {
+  if (!model_index.isValid()) {
+    return;
+  }
+
+  if (!prev_hovered_model_index.isValid()) {
+    return;
+  }
+
+  auto token_id_var = model_index.data(ICodeModel::TokenIdRole);
+  auto token_id = qvariant_cast<RawEntityId>(token_id_var);
+
+  auto prev_token_id_var =
+      prev_hovered_model_index.data(ICodeModel::TokenIdRole);
+
+  auto prev_token_id = qvariant_cast<RawEntityId>(prev_token_id_var);
+  if (token_id != prev_token_id) {
     return;
   }
 
@@ -435,18 +456,17 @@ void CodeView::OnHoverTimerTimeout() {
 }
 
 void CodeView::OnTextEditViewportMouseButtonPress(QMouseEvent *event) {
-
   QTextCursor cursor = d->text_edit->cursorForPosition(event->pos());
   d->last_press_version = d->version;
   d->last_press_position = cursor.position();
   d->last_block = cursor.block().blockNumber();
 
-  auto opt_model_index = GetCodeModelIndexFromTextCursor(d->token_map, cursor);
+  auto opt_model_index = GetQModelIndexFromTextCursor(d->token_map, cursor);
   if (!opt_model_index.has_value()) {
     return;
   }
 
-  const CodeModelIndex &model_index = opt_model_index.value();
+  const QModelIndex &model_index = opt_model_index.value();
 
   if (event->button() == Qt::LeftButton &&
       event->modifiers() == Qt::ControlModifier) {
@@ -466,7 +486,7 @@ void CodeView::OnTextEditViewportKeyboardButtonPress(QKeyEvent *event) {
   auto text_cursor = d->text_edit->textCursor();
 
   auto opt_model_index =
-      GetCodeModelIndexFromTextCursor(d->token_map, text_cursor);
+      GetQModelIndexFromTextCursor(d->token_map, text_cursor);
 
   if (!opt_model_index.has_value()) {
     return;
@@ -481,7 +501,7 @@ void CodeView::OnTextEditViewportKeyboardButtonPress(QKeyEvent *event) {
   keyboard_button.control_modifier =
       (event->modifiers() & Qt::ControlModifier) != 0;
 
-  const CodeModelIndex &model_index = opt_model_index.value();
+  const QModelIndex &model_index = opt_model_index.value();
   emit TokenTriggered({TokenAction::Type::Keyboard, keyboard_button},
                       model_index);
 }
@@ -534,9 +554,11 @@ void CodeView::UpdateTokenGroupColors() {
   d->text_edit->setExtraSelections(std::move(extra_selection_list));
 }
 
-std::uint64_t CodeView::GetUniqueTokenIdentifier(const CodeModelIndex &index) {
-  return (static_cast<std::uint64_t>(index.row) << 32u) |
-         static_cast<std::uint64_t>(index.token_index);
+std::uint64_t CodeView::GetUniqueTokenIdentifier(const QModelIndex &index) {
+  auto node_id = static_cast<std::uint64_t>(index.internalId());
+  auto index_column = static_cast<std::uint64_t>(index.column());
+
+  return (node_id << 32) | index_column;
 }
 
 std::optional<std::size_t>
@@ -567,18 +589,16 @@ CodeView::GetBlockNumberFromLineNumber(const TokenMap &token_map,
   return block_number_it->second;
 }
 
-std::optional<CodeModelIndex>
-CodeView::GetCodeModelIndexFromTextCursor(const TokenMap &token_map,
-                                          const QTextCursor &cursor) {
+std::optional<QModelIndex>
+CodeView::GetQModelIndexFromTextCursor(const TokenMap &token_map,
+                                       const QTextCursor &cursor) {
 
   auto line_number = cursor.blockNumber();
-
   auto token_unique_id_list_it =
       token_map.block_number_to_unique_token_id_list.find(line_number);
 
   if (token_unique_id_list_it ==
       token_map.block_number_to_unique_token_id_list.end()) {
-
     return std::nullopt;
   }
 
@@ -610,7 +630,7 @@ QTextDocument *CodeView::CreateTextDocument(
   auto document_layout = new QPlainTextDocumentLayout(document);
   document->setDocumentLayout(document_layout);
 
-  Count row_count = model.RowCount();
+  auto row_count = model.rowCount();
   if (!row_count) {
     return document;
   }
@@ -618,7 +638,7 @@ QTextDocument *CodeView::CreateTextDocument(
   QTextCursor cursor(document);
   cursor.beginEditBlock();
 
-  auto L_updateProgress = [&](std::uint64_t current_row) -> bool {
+  auto L_updateProgress = [&](int current_row) -> bool {
     if (!opt_progress_callback.has_value()) {
       return true;
     }
@@ -634,47 +654,36 @@ QTextDocument *CodeView::CreateTextDocument(
       return true;
     }
 
-    auto current_progress = (current_row * 100u) / row_count;
+    auto current_progress = (current_row * 100) / row_count;
     return progress_callback(static_cast<int>(current_progress));
   };
 
-  for (Count row_index = 0u; row_index < row_count; ++row_index) {
-    if (!L_updateProgress(row_index)) {
+  for (int row = 0; row < row_count; ++row) {
+    if (!L_updateProgress(row)) {
       break;
     }
 
-    CodeModelIndex model_index = {&model, row_index, 0};
-    auto line_mappings_need_update{true};
-    Count token_count = model.TokenCount(row_index);
+    auto row_index = model.index(row, 0);
+    auto column_count = model.columnCount(row_index);
 
-    for (Count token_index = 0; token_index < token_count; ++token_index) {
-      // Update the highest line number value
-      const auto &line_number_var =
-          model.Data(model_index, ICodeModel::LineNumberRole);
+    const auto &line_number_var = row_index.data(ICodeModel::LineNumberRole);
+    if (line_number_var.isValid()) {
+      auto line_number = qvariant_cast<std::uint64_t>(line_number_var);
 
-      if (line_number_var.isValid()) {
-        auto line_number = qvariant_cast<Count>(line_number_var);
+      token_map.highest_line_number =
+          std::max(line_number, token_map.highest_line_number);
 
-        token_map.highest_line_number =
-            std::max(line_number, token_map.highest_line_number);
+      auto block_number = cursor.blockNumber();
+      token_map.line_number_to_block_number.insert({line_number, block_number});
+      token_map.block_number_to_line_number.insert({block_number, line_number});
+    }
 
-        if (line_mappings_need_update) {
-          auto block_number = cursor.blockNumber();
-
-          token_map.line_number_to_block_number.insert(
-              {line_number, block_number});
-
-          token_map.block_number_to_line_number.insert(
-              {block_number, line_number});
-
-          line_mappings_need_update = false;
-        }
-      }
+    for (int column = 0; column < column_count; ++column) {
+      auto token_index = model.index(0, column, row_index);
 
       // Get the token that will have to be displayed on screen. There is nothing
       // else to do here if it is not visible
-      model_index.token_index = token_index;
-      const auto &token_var = model.Data(model_index, Qt::DisplayRole);
+      const auto &token_var = token_index.data(Qt::DisplayRole);
       if (!token_var.isValid()) {
         continue;
       }
@@ -685,12 +694,12 @@ QTextDocument *CodeView::CreateTextDocument(
       }
 
       // Generate the token map entry
-      auto unique_token_id = GetUniqueTokenIdentifier(model_index);
+      auto unique_token_id = GetUniqueTokenIdentifier(token_index);
 
       TokenMap::Entry entry{};
       entry.cursor_start = cursor.position();
       entry.cursor_end = entry.cursor_start + static_cast<int>(token.size());
-      entry.model_index = model_index;
+      entry.model_index = token_index;
 
       token_map.data.insert({unique_token_id, std::move(entry)});
 
@@ -699,24 +708,26 @@ QTextDocument *CodeView::CreateTextDocument(
         auto block_number = cursor.blockNumber();
         auto &unique_token_id_list =
             token_map.block_number_to_unique_token_id_list[block_number];
+
         unique_token_id_list.push_back(unique_token_id);
       }
 
       // Add the entry to the token group index.
       const auto &token_group_id_var =
-          model.Data(model_index, ICodeModel::TokenGroupIdRole);
+          token_index.data(ICodeModel::TokenGroupIdRole);
 
       if (token_group_id_var.isValid()) {
         auto token_group_id = qvariant_cast<std::uint64_t>(token_group_id_var);
         auto &unique_token_id_list =
             token_map.token_group_id_to_unique_token_id_list[token_group_id];
+
         unique_token_id_list.push_back(unique_token_id);
       }
 
       // Add the entry to the related entity id index. We use this to highlight
       // other tokens sharing the same related entity id.
       const auto &related_entity_id_var =
-          model.Data(model_index, ICodeModel::RealRelatedEntityIdRole);
+          token_index.data(ICodeModel::RealRelatedEntityIdRole);
 
       if (related_entity_id_var.isValid()) {
         auto related_entity_id =
@@ -730,8 +741,7 @@ QTextDocument *CodeView::CreateTextDocument(
       }
 
       // Add the token to the document
-      auto token_category_var =
-          model.Data(model_index, ICodeModel::TokenCategoryRole);
+      auto token_category_var = token_index.data(ICodeModel::TokenCategoryRole);
 
       QTextCharFormat text_format;
       ConfigureTextFormatFromTheme(text_format, theme, token_category_var);
@@ -775,17 +785,22 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
     const TokenMap &token_map, QPlainTextEdit &text_edit,
     const ICodeModel &model, const CodeViewTheme &theme) {
 
+  static_cast<void>(token_map);
+  static_cast<void>(text_edit);
+  static_cast<void>(model);
+  static_cast<void>(theme);
+
   QList<QTextEdit::ExtraSelection> extra_selection_list;
 
-  QTextEdit::ExtraSelection selection;
+  /*QTextEdit::ExtraSelection selection;
 
   std::unordered_set<std::uint64_t> visited_model_index_list;
-  std::unordered_set<Count> colored_line_list;
+  std::unordered_set<int> colored_line_list;
 
-  for (const Count &colored_line : colored_line_list) {
+  for (const int &colored_line : colored_line_list) {
     auto column_count = model.TokenCount(colored_line);
 
-    for (Count column = 0; column < column_count; ++column) {
+    for (int column = 0; column < column_count; ++column) {
       auto unique_token_id =
           GetUniqueTokenIdentifier({&model, colored_line, column});
 
@@ -806,7 +821,7 @@ QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
 
       extra_selection_list.append(std::move(selection));
     }
-  }
+  }*/
 
   return extra_selection_list;
 }
@@ -948,7 +963,7 @@ void CodeView::HandleNewCursor(const QTextCursor &cursor) {
   selection.cursor.clearSelection();
   extra_selections.append(selection);
 
-  auto opt_model_index = GetCodeModelIndexFromTextCursor(d->token_map, cursor);
+  auto opt_model_index = GetQModelIndexFromTextCursor(d->token_map, cursor);
 
   // Try to highlight all entities related to the entity on which the cursor
   // is hovering.
@@ -959,15 +974,14 @@ void CodeView::HandleNewCursor(const QTextCursor &cursor) {
   if (opt_model_index.has_value()) {
     auto unique_token_id = GetUniqueTokenIdentifier(opt_model_index.value());
     const auto &token_map_entry = d->token_map.data.at(unique_token_id);
-    QVariant related_entity_id_var = d->model->Data(
-        token_map_entry.model_index, ICodeModel::RealRelatedEntityIdRole);
+    QVariant related_entity_id_var =
+        token_map_entry.model_index.data(ICodeModel::RealRelatedEntityIdRole);
 
     if (related_entity_id_var.isValid()) {
       auto related_entity_id =
           qvariant_cast<std::uint64_t>(related_entity_id_var);
-      HighlightTokensForRelatedEntityID(
-          d->token_map, cursor, related_entity_id,
-          extra_selections, d->theme);
+      HighlightTokensForRelatedEntityID(d->token_map, cursor, related_entity_id,
+                                        extra_selections, d->theme);
     }
   }
 

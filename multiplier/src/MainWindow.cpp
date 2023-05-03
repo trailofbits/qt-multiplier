@@ -32,6 +32,7 @@
 #include <QMenuBar>
 #include <QToolButton>
 #include <QShortcut>
+#include <QTreeView>
 
 namespace mx::gui {
 
@@ -332,7 +333,7 @@ void MainWindow::CreateCodeView() {
       d->code_view_context_menu.show_ref_explorer_action);
 }
 
-void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
+void MainWindow::OpenTokenContextMenu(QModelIndex index) {
   QVariant action_data;
   action_data.setValue(index);
 
@@ -340,8 +341,7 @@ void MainWindow::OpenTokenContextMenu(CodeModelIndex index) {
     action->setData(action_data);
   }
 
-  QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
+  QVariant related_entity_id_var = index.data(ICodeModel::RelatedEntityIdRole);
 
   // Only enable the references browser if the token is related to an entity.
   d->code_view_context_menu.show_ref_explorer_action->setEnabled(
@@ -389,10 +389,10 @@ void MainWindow::OpenReferenceExplorer(
   d->quick_ref_explorer->show();
 }
 
-void MainWindow::OpenTokenReferenceExplorer(CodeModelIndex index) {
+void MainWindow::OpenTokenReferenceExplorer(QModelIndex index) {
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
+      index.data(ICodeModel::RealRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     CloseAllPopups();
@@ -403,10 +403,10 @@ void MainWindow::OpenTokenReferenceExplorer(CodeModelIndex index) {
                         IReferenceExplorerModel::CallHierarchyMode);
 }
 
-void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
+void MainWindow::OpenTokenTaintExplorer(QModelIndex index) {
 
   QVariant related_stmt_id_var =
-      index.model->Data(index, ICodeModel::EntityIdOfStmtContainingTokenRole);
+      index.data(ICodeModel::EntityIdOfStmtContainingTokenRole);
 
   // If we clicked on a statement, then if it's a decl statement, it could be
   // of the form `int a = 1, b = 2;` and the taint tracker doesn't handle that
@@ -419,7 +419,7 @@ void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
   }
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
+      index.data(ICodeModel::RealRelatedEntityIdRole);
 
   if (related_entity_id_var.isValid()) {
     OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
@@ -430,10 +430,10 @@ void MainWindow::OpenTokenTaintExplorer(CodeModelIndex index) {
   CloseAllPopups();
 }
 
-void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
+void MainWindow::OpenTokenEntityInfo(QModelIndex index) {
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
+      index.data(ICodeModel::RealRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     return;
@@ -442,11 +442,11 @@ void MainWindow::OpenTokenEntityInfo(CodeModelIndex index) {
   OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var));
 }
 
-void MainWindow::OpenCodePreview(const CodeModelIndex &index) {
+void MainWindow::OpenCodePreview(const QModelIndex &index) {
   CloseAllPopups();
 
   QVariant related_entity_id_var =
-      index.model->Data(index, ICodeModel::RealRelatedEntityIdRole);
+      index.data(ICodeModel::RealRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
     return;
@@ -498,6 +498,7 @@ void MainWindow::CloseAllPopups() {
 
 ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
                                          QString tab_name) {
+
   auto model = ICodeModel::Create(d->file_location_cache, d->index, this);
   auto code_view = ICodeView::Create(model);
 
@@ -555,9 +556,8 @@ MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
   return nullptr;
 }
 
-void MainWindow::OpenEntityRelatedToToken(const CodeModelIndex &index) {
-  auto entity_id_var =
-      index.model->Data(index, ICodeModel::RelatedEntityIdRole);
+void MainWindow::OpenEntityRelatedToToken(const QModelIndex &index) {
+  auto entity_id_var = index.data(ICodeModel::RelatedEntityIdRole);
   if (!entity_id_var.isValid()) {
     return;
   }
@@ -676,8 +676,8 @@ void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
 //! and record it to the current file view's tab as its current location, so
 //! that if we switch away from the tab, then we can store that current location
 //! into the history.
-void MainWindow::OnMainCodeViewCursorMoved(const CodeModelIndex &index) {
-  QVariant entity_id_var = index.model->Data(index, ICodeModel::TokenIdRole);
+void MainWindow::OnMainCodeViewCursorMoved(const QModelIndex &index) {
+  QVariant entity_id_var = index.data(ICodeModel::TokenIdRole);
   if (!entity_id_var.isValid()) {
     return;
   }
@@ -694,7 +694,7 @@ void MainWindow::OnMainCodeViewCursorMoved(const CodeModelIndex &index) {
 //! Called when we interact with a token in a main file view, or in a code
 //! preview, e.g. a reference browser code view.
 void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
-                                  const CodeModelIndex &index) {
+                                  const QModelIndex &index) {
 
   if (token_action.type == ICodeView::TokenAction::Type::Primary) {
     OpenEntityRelatedToToken(index);
@@ -795,8 +795,8 @@ void MainWindow::OnCodeViewContextMenuActionTriggered(QAction *action) {
     return;
   }
 
-  CodeModelIndex code_model_index =
-      qvariant_cast<CodeModelIndex>(code_model_index_var);
+  QModelIndex code_model_index =
+      qvariant_cast<QModelIndex>(code_model_index_var);
 
   if (action == d->code_view_context_menu.show_ref_explorer_action) {
     OpenTokenReferenceExplorer(code_model_index);

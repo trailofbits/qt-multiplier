@@ -216,7 +216,7 @@ void QuickCodeView::EntityNameFutureStatusChanged() {
 }
 
 void QuickCodeView::OnTokenTriggered(const ICodeView::TokenAction &token_action,
-                                     const CodeModelIndex &index) {
+                                     const QModelIndex &index) {
 
   switch (token_action.type) {
     case ICodeView::TokenAction::Type::Keyboard:

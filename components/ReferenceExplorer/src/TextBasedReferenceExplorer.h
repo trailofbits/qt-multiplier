@@ -38,7 +38,7 @@ class TextBasedReferenceExplorer final : public IReferenceExplorer {
  private slots:
   //! Code view event handler
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
-                        const CodeModelIndex &index);
+                        const QModelIndex &index);
 
   friend class ReferenceExplorer;
 };
