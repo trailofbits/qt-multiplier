@@ -54,11 +54,9 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity,
     Macro macro = std::move(std::get<Macro>(entity));
 
     for (Token tok : macro.generate_expansion_tokens()) {
-      if (Token pt = tok.parsed_token()) {
-        if (auto nd = NamedDeclContaining(pt);
-            !std::holds_alternative<NotAnEntity>(nd)) {
-          return nd;
-        }
+      if (auto nd = NamedDeclContaining(tok);
+          !std::holds_alternative<NotAnEntity>(nd)) {
+        return nd;
       }
     }
 
@@ -72,11 +70,9 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity,
     // declaration containing that.
     if (root_macro != macro) {
       for (Token tok : root_macro.generate_expansion_tokens()) {
-        if (auto pt = tok.parsed_token()) {
-          if (auto nd = NamedDeclContaining(pt);
-              !std::holds_alternative<NotAnEntity>(nd)) {
-            return nd;
-          }
+        if (auto nd = NamedDeclContaining(tok);
+            !std::holds_alternative<NotAnEntity>(nd)) {
+          return nd;
         }
       }
     }
