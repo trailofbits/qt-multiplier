@@ -31,8 +31,14 @@ if(MXQT_ENABLE_INSTALL AND MXQT_GENERATE_LIBRARY_MANIFEST)
   set(library_manifest_path "${CMAKE_BINARY_DIR}/library_manifest.txt")
   file(WRITE "${library_manifest_path}" "${library_manifest}")
 
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(install_destination "share/multiplier")
+  else()
+    set(install_destination "control")
+  endif()
+
   install(
     FILES "${library_manifest_path}"
-    DESTINATION "control"
+    DESTINATION "${install_destination}"
   )
 endif()

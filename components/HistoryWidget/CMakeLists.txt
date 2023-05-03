@@ -15,7 +15,7 @@ add_library("mx_historywidget"
 )
 
 target_sources("mx_historywidget" INTERFACE
-  Resources/Resources.qrc
+  Resources/resources.qrc
 )
 
 target_link_libraries("mx_historywidget"

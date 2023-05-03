@@ -424,7 +424,7 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
     return GetNodeAbsolutePath(d->node_map, node_id);
 
   } else if (role == InternalIdentifierRole) {
-    return node_id;
+    return static_cast<quint64>(node_id);
   }
 
   const auto &node = node_it->second;
