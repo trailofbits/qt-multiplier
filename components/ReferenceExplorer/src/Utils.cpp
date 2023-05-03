@@ -53,20 +53,37 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity,
 
     Macro macro = std::move(std::get<Macro>(entity));
 
-    for (Token tok : macro.expansion_tokens()) {
-      if (auto nd = NamedDeclContaining(tok);
-          !std::holds_alternative<NotAnEntity>(nd)) {
-        return nd;
+    for (Token tok : macro.generate_expansion_tokens()) {
+      if (Token pt = tok.parsed_token()) {
+        if (auto nd = NamedDeclContaining(pt);
+            !std::holds_alternative<NotAnEntity>(nd)) {
+          return nd;
+        }
+      }
+    }
+
+    mx::Macro root_macro = macro.root();
+
+    // It could be that we are looking at an expansion that isn't actually
+    // used per se (e.g. the expansion happens as a result of PASTA eagerly
+    // doing argument pre-expansions), but only the macro name gets used, so
+    // we can't connect any final parsed tokens to anything, and thus we want
+    // to instead go and find the root of the expansion and ask for the named
+    // declaration containing that.
+    if (root_macro != macro) {
+      for (Token tok : root_macro.generate_expansion_tokens()) {
+        if (auto pt = tok.parsed_token()) {
+          if (auto nd = NamedDeclContaining(pt);
+              !std::holds_alternative<NotAnEntity>(nd)) {
+            return nd;
+          }
+        }
       }
     }
 
     // If the macro wasn't used inside of a decl/statement, then go try to
     // find the macro definition containing this macro.
-    for (auto parent = macro.parent(); parent; parent = macro.parent()) {
-      macro = std::move(parent.value());
-    }
-
-    if (auto dd = DefineMacroDirective::from(macro)) {
+    if (auto dd = DefineMacroDirective::from(root_macro)) {
       return dd.value();
     }
 
