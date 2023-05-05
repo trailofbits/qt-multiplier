@@ -6,6 +6,8 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
+#pragma once
+
 #include <QAction>
 #include <QSize>
 #include <QString>
@@ -32,10 +34,8 @@ class HistoryWidget final : public QWidget {
   void UpdateMenus(void);
 
  public:
-  HistoryWidget(const Index &index_,
-                const FileLocationCache &file_cache_,
-                unsigned max_history_size=30,
-                QWidget *parent=nullptr);
+  HistoryWidget(const Index &index_, const FileLocationCache &file_cache_,
+                unsigned max_history_size = 30, QWidget *parent = nullptr);
 
   virtual ~HistoryWidget(void);
 
@@ -44,7 +44,7 @@ class HistoryWidget final : public QWidget {
 
   //! Tells the history what our current location is.
   void SetCurrentLocation(RawEntityId id,
-                          std::optional<QString> opt_label=std::nullopt);
+                          std::optional<QString> opt_label = std::nullopt);
 
   //! Commits our "last current" location to the history. This makes our last
   //! current location visible in the history menu.
