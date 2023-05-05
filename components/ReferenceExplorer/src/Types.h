@@ -46,8 +46,6 @@ QDataStream &operator>>(QDataStream &stream, Location &self);
 
 //! A single node in the model
 struct Node final {
-  static QString kMimeTypeName;
-
   //! How this node was imported
   IReferenceExplorerModel::ExpansionMode expansion_mode{};
 

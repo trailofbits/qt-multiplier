@@ -30,11 +30,6 @@ namespace mx::gui {
 
 namespace {
 
-const QString kNodeInfoMimeType = "application/mx-reference-explorer-node-info";
-
-const QString kInstanceInfoMimeType =
-    "application/mx-reference-explorer-instance-info";
-
 static TokenCategory FromDeclCategory(DeclCategory cat) {
   switch (cat) {
     case DeclCategory::LOCAL_VARIABLE: return TokenCategory::LOCAL_VARIABLE;
