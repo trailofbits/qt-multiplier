@@ -5,7 +5,6 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "QuickReferenceExplorer.h"
-#include "PreviewableReferenceExplorer.h"
 
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/IDatabase.h>
@@ -37,6 +36,8 @@ struct QuickReferenceExplorer::PrivateData final {
   IDatabase::Ptr database;
   QFuture<std::optional<QString>> entity_name_future;
   QFutureWatcher<std::optional<QString>> future_watcher;
+
+  PreviewableReferenceExplorer *reference_explorer{nullptr};
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
@@ -129,17 +130,6 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->entity_name_future = d->database->RequestEntityName(entity_id);
   d->future_watcher.setFuture(d->entity_name_future);
 
-  // Save to active button
-  auto save_to_active_ref_explorer_button = new QPushButton(
-      GetIcon(":/Icons/QuickReferenceExplorer/SaveToActiveTab"), "", this);
-
-  save_to_active_ref_explorer_button->setToolTip(tr("Save to active tab"));
-  save_to_active_ref_explorer_button->setSizePolicy(QSizePolicy::Minimum,
-                                                    QSizePolicy::Minimum);
-
-  connect(save_to_active_ref_explorer_button, &QPushButton::clicked, this,
-          &QuickReferenceExplorer::OnSaveAllToActiveRefExplorerButtonPress);
-
   // Save as new button
   auto save_to_new_ref_explorer_button = new QPushButton(
       GetIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"), "", this);
@@ -149,7 +139,7 @@ void QuickReferenceExplorer::InitializeWidgets(
                                                  QSizePolicy::Minimum);
 
   connect(save_to_new_ref_explorer_button, &QPushButton::clicked, this,
-          &QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress);
+          &QuickReferenceExplorer::OnSaveReferenceExplorer);
 
   // Close button
   auto close_button = new QPushButton(
@@ -166,7 +156,6 @@ void QuickReferenceExplorer::InitializeWidgets(
   title_frame_layout->setContentsMargins(0, 0, 0, 0);
   title_frame_layout->addWidget(d->window_title);
   title_frame_layout->addStretch();
-  title_frame_layout->addWidget(save_to_active_ref_explorer_button);
   title_frame_layout->addWidget(save_to_new_ref_explorer_button);
   title_frame_layout->addWidget(close_button);
 
@@ -182,22 +171,22 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
   d->model->AppendEntityById(entity_id, expansion_mode, QModelIndex());
 
-  auto reference_explorer = new PreviewableReferenceExplorer(
+  d->reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, mode, this);
 
-  connect(reference_explorer,
+  connect(d->reference_explorer,
           &PreviewableReferenceExplorer::SelectedItemChanged, this,
           &QuickReferenceExplorer::SelectedItemChanged);
 
-  connect(reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
+  connect(d->reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
           this, &QuickReferenceExplorer::ItemActivated);
 
-  reference_explorer->setSizePolicy(QSizePolicy::Expanding,
-                                    QSizePolicy::Expanding);
+  d->reference_explorer->setSizePolicy(QSizePolicy::Expanding,
+                                       QSizePolicy::Expanding);
 
   auto contents_layout = new QVBoxLayout();
   contents_layout->setContentsMargins(0, 0, 0, 0);
-  contents_layout->addWidget(reference_explorer);
+  contents_layout->addWidget(d->reference_explorer);
 
   //
   // Main layout
@@ -209,18 +198,6 @@ void QuickReferenceExplorer::InitializeWidgets(
   main_layout->addLayout(contents_layout);
 
   setLayout(main_layout);
-}
-
-void QuickReferenceExplorer::EmitSaveSignal(const bool &as_new_tab) {
-  auto mime_data = d->model->mimeData({QModelIndex()});
-  if (mime_data == nullptr) {
-    return;
-  }
-
-  mime_data->setParent(this);
-
-  emit SaveAll(mime_data, d->window_title->text(), as_new_tab);
-  close();
 }
 
 void QuickReferenceExplorer::OnTitleFrameMousePress(QMouseEvent *event) {
@@ -255,12 +232,19 @@ void QuickReferenceExplorer::OnApplicationStateChange(
   setVisible(window_is_visible);
 }
 
-void QuickReferenceExplorer::OnSaveAllToActiveRefExplorerButtonPress() {
-  EmitSaveSignal(false);
-}
+void QuickReferenceExplorer::OnSaveReferenceExplorer() {
+  d->model->setParent(d->reference_explorer);
 
-void QuickReferenceExplorer::OnSaveAllToNewRefExplorerButtonPress() {
-  EmitSaveSignal(true);
+  d->reference_explorer->setWindowTitle(d->window_title->text());
+
+  d->reference_explorer->hide();
+  d->reference_explorer->setParent(nullptr);
+
+  layout()->removeWidget(d->reference_explorer);
+  emit SaveReferenceExplorer(d->reference_explorer);
+
+  close();
+  deleteLater();
 }
 
 void QuickReferenceExplorer::EntityNameFutureStatusChanged() {
