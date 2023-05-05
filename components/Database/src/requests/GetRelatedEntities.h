@@ -6,14 +6,16 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "CodeView.h"
+#pragma once
 
-#include <multiplier/ui/ICodeView.h>
+#include <multiplier/ui/IDatabase.h>
+
+#include <QPromise>
 
 namespace mx::gui {
 
-ICodeView *ICodeView::Create(QAbstractItemModel *model, QWidget *parent) {
-  return new CodeView(model, parent);
-}
+void GetRelatedEntities(
+    QPromise<IDatabase::EntityIDList> &related_entities_promise,
+    const Index &index, RawEntityId entity_id);
 
 }  // namespace mx::gui

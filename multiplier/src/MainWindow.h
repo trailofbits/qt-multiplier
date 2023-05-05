@@ -40,6 +40,7 @@ class MainWindow final : public QMainWindow {
   void CreateInfoExplorerDock();
   void CreateReferenceExplorerDock();
   void CreateCodeView();
+  void CreateGlobalHighlighter();
   void OpenEntityRelatedToToken(const QModelIndex &index);
   void OpenEntityCode(RawEntityId entity_id, bool canonicalize = true);
   void OpenEntityInfo(RawEntityId entity_id);
@@ -53,7 +54,11 @@ class MainWindow final : public QMainWindow {
   void CloseQuickRefExplorerPopup();
   void CloseCodePreviewPopup();
   void CloseAllPopups();
+
+  //! Tell the history back/forward button widget that our current location has
+  //! changed.
   void UpdateLocatiomFromWidget(QWidget *widget);
+
   ICodeView *CreateNewCodeView(RawEntityId file_entity_id, QString tab_name);
 
   ICodeView *
@@ -61,13 +66,23 @@ class MainWindow final : public QMainWindow {
                           std::optional<QString> opt_tab_name = std::nullopt);
 
  private slots:
+  //! Called when a file name in the project explorer (list of indexed files) is
+  //! clicked.
   void OnIndexViewFileClicked(RawEntityId file_id, QString file_name,
                               Qt::KeyboardModifiers modifiers,
                               Qt::MouseButtons buttons);
 
+  //! Called when we interact with a token in a main file view, or in a code
+  //! preview, e.g. a reference browser code view.
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
                         const QModelIndex &index);
 
+  //! Called when we user moves their cursor, or when an action triggered by the
+  //! user causes the view itself to re-position the cursor in a file code view.
+  //! Wherever the new cursor position is, we capture the token under the cursor
+  //! and record it to the current file view's tab as its current location, so
+  //! that if we switch away from the tab, then we can store that current location
+  //! into the history.
   void OnMainCodeViewCursorMoved(const QModelIndex &index);
 
   void OnReferenceExplorerItemActivated(const QModelIndex &index);
@@ -79,7 +94,13 @@ class MainWindow final : public QMainWindow {
   void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
   void OnCodeViewTabClicked(int index);
+
+  //! Called when an entity in the entity explorer / filter, which allows us to
+  //! search for entities by name/type, is clicked.
   void OnEntityExplorerEntityClicked(RawEntityId entity_id);
+
+  //! Called when the history menu is used to go back/forward to some specific
+  //! entity ID.
   void OnHistoryNavigationEntitySelected(RawEntityId original_id,
                                          RawEntityId canonical_id);
   void OnInformationExplorerSelectionChange(const QModelIndex &index);

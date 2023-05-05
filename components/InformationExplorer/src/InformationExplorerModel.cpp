@@ -11,6 +11,8 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/Assert.h>
 
+#include <QFutureWatcher>
+
 namespace mx::gui {
 
 namespace {

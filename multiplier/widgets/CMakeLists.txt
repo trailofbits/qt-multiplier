@@ -36,6 +36,7 @@ target_link_libraries("mx_widgets"
     "multiplier::mx-api"
     "mx_codeview"
     "mx_referenceexplorer"
+    "mx_globalhighlighter"
 )
 
 enable_qt_properties("mx_widgets")
