@@ -6,10 +6,9 @@
 
 #pragma once
 
-#include <multiplier/ui/IReferenceExplorer.h>
+#include "PreviewableReferenceExplorer.h"
 
 #include <QWidget>
-#include <QMimeData>
 
 namespace mx::gui {
 
@@ -35,14 +34,8 @@ class QuickReferenceExplorer final : public QWidget {
   QuickReferenceExplorer &operator=(const QuickReferenceExplorer &) = delete;
 
  signals:
-  //! Emitted when the references should be saved by the parent widget
-  //! \param window_title A reference explorer could contain multiple
-  //!        different things inside once they have been edited. For
-  //!        this reason, we emit the window title instead of the
-  //!        entity name, because that reference could have been
-  //!        removed.
-  void SaveAll(QMimeData *mime_data, const QString &window_title,
-               const bool &as_new_tab);
+  //! Emitted when the user asks to dock this window
+  void SaveReferenceExplorer(PreviewableReferenceExplorer *reference_explorer);
 
   //! The forwarded PreviewableReferenceExplorer::SelectedItemChanged signal
   void SelectedItemChanged(const QModelIndex &index);
@@ -74,9 +67,6 @@ class QuickReferenceExplorer final : public QWidget {
       const IReferenceExplorerModel::ExpansionMode &expansion_mode,
       const IReferenceExplorer::Mode &mode);
 
-  //! Used to emit the SaveAll signal
-  void EmitSaveSignal(const bool &as_new_tab);
-
   //! Used to start window dragging
   void OnTitleFrameMousePress(QMouseEvent *event);
 
@@ -103,11 +93,8 @@ class QuickReferenceExplorer final : public QWidget {
   //! Restores the widget visibility when the application gains focus
   void OnApplicationStateChange(Qt::ApplicationState state);
 
-  //! Called when the save to active tab button is pressed
-  void OnSaveAllToActiveRefExplorerButtonPress();
-
   //! Called when the save to new tab button is pressed
-  void OnSaveAllToNewRefExplorerButtonPress();
+  void OnSaveReferenceExplorer();
 
   //! Called when the entity name resolution has finished
   void EntityNameFutureStatusChanged();

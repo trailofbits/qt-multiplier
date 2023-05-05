@@ -74,30 +74,6 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   virtual QVariant headerData(int section, Qt::Orientation orientation,
                               int role) const override;
 
-  //! Returns the specified model items as a mime data object
-  virtual QMimeData *mimeData(const QModelIndexList &indexes) const override;
-
-  //! Returns the specified model items as a mime data object
-  virtual bool dropMimeData(const QMimeData *data, Qt::DropAction action,
-                            int row, int column,
-                            const QModelIndex &parent) override;
-
-  //! Returns the item flags for the specified index
-  virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
-
-  //! Defines the mime types supported by this model
-  virtual QStringList mimeTypes() const override;
-
-  //! Drag and drop modes
-  enum class DragAndDropMode {
-    CopySubTree,
-    AddRootAndTaint,
-    AddRootAndShowRefs,
-  };
-
-  //! Sets the active drag and drop mode
-  void SetDragAndDropMode(const DragAndDropMode &mode);
-
  public slots:
   //! \copybrief IReferenceExplorerModel::AppendEntityById
   virtual void AppendEntityById(RawEntityId entity_id,

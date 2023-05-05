@@ -6,13 +6,14 @@
 
 #pragma once
 
+#include "PreviewableReferenceExplorer.h"
+
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IReferenceExplorerModel.h>
 
 #include <multiplier/Index.h>
 
 #include <QMainWindow>
-#include <QMimeData>
 
 namespace mx::gui {
 
@@ -38,7 +39,6 @@ class MainWindow final : public QMainWindow {
   void CreateEntityExplorerDock();
   void CreateInfoExplorerDock();
   void CreateReferenceExplorerDock();
-  void CreateNewReferenceExplorer(QString window_title);
   void CreateCodeView();
   void OpenEntityRelatedToToken(const QModelIndex &index);
   void OpenEntityCode(RawEntityId entity_id, bool canonicalize = true);
@@ -74,9 +74,7 @@ class MainWindow final : public QMainWindow {
 
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
-  void OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
-                                        const QString &window_title,
-                                        const bool &as_new_tab);
+  void SaveReferenceExplorer(PreviewableReferenceExplorer *reference_explorer);
   void OnReferenceExplorerTabBarClose(int index);
   void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);

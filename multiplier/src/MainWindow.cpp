@@ -250,36 +250,6 @@ void MainWindow::CreateReferenceExplorerDock() {
   d->reference_explorer_dock->hide();
 }
 
-void MainWindow::CreateNewReferenceExplorer(QString window_title) {
-  auto new_tab_index = d->ref_explorer_tab_widget->count();
-
-  if (window_title.isEmpty()) {
-    window_title =
-        tr("Reference Explorer #") + QString::number(new_tab_index + 1);
-  }
-
-  auto ref_explorer_model =
-      IReferenceExplorerModel::Create(d->index, d->file_location_cache, this);
-
-  auto reference_explorer = new PreviewableReferenceExplorer(
-      d->index, d->file_location_cache, ref_explorer_model,
-      d->ref_explorer_mode, this);
-
-  reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
-
-  connect(reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
-          this, &MainWindow::OnReferenceExplorerItemActivated);
-
-  connect(reference_explorer, &PreviewableReferenceExplorer::TokenTriggered,
-          this, &MainWindow::OnTokenTriggered);
-
-  d->ref_explorer_tab_widget->addTab(reference_explorer, window_title);
-  d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
-
-  d->reference_explorer_dock->toggleViewAction()->setEnabled(true);
-  d->reference_explorer_dock->show();
-}
-
 void MainWindow::OnCloseActiveCodeViewTab() {
   auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
   if (tab_widget.count() == 0) {
@@ -369,8 +339,9 @@ void MainWindow::OpenReferenceExplorer(
       d->index, d->file_location_cache, entity_id, expansion_mode,
       d->ref_explorer_mode, this);
 
-  connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::SaveAll, this,
-          &MainWindow::OnQuickRefExplorerSaveAllClicked);
+  connect(d->quick_ref_explorer.get(),
+          &QuickReferenceExplorer::SaveReferenceExplorer, this,
+          &MainWindow::SaveReferenceExplorer);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
@@ -811,20 +782,25 @@ void MainWindow::OnToggleWordWrap(bool checked) {
   code_view.SetWordWrapping(checked);
 }
 
-void MainWindow::OnQuickRefExplorerSaveAllClicked(QMimeData *mime_data,
-                                                  const QString &window_title,
-                                                  const bool &as_new_tab) {
-  if (d->ref_explorer_tab_widget->count() == 0 || as_new_tab) {
-    CreateNewReferenceExplorer(window_title);
-  }
+void MainWindow::SaveReferenceExplorer(
+    PreviewableReferenceExplorer *reference_explorer) {
+  auto new_tab_index = d->ref_explorer_tab_widget->count();
 
-  auto current_tab = d->ref_explorer_tab_widget->currentIndex();
-  auto reference_explorer = static_cast<PreviewableReferenceExplorer *>(
-      d->ref_explorer_tab_widget->widget(current_tab));
+  reference_explorer->setParent(this);
+  reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
 
-  auto reference_explorer_model = reference_explorer->Model();
-  reference_explorer_model->dropMimeData(mime_data, Qt::CopyAction, -1, 0,
-                                         QModelIndex());
+  connect(reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
+          this, &MainWindow::OnReferenceExplorerItemActivated);
+
+  connect(reference_explorer, &PreviewableReferenceExplorer::TokenTriggered,
+          this, &MainWindow::OnTokenTriggered);
+
+  d->ref_explorer_tab_widget->addTab(reference_explorer,
+                                     reference_explorer->windowTitle());
+  d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
+
+  d->reference_explorer_dock->toggleViewAction()->setEnabled(true);
+  d->reference_explorer_dock->show();
 }
 
 void MainWindow::OnReferenceExplorerTabBarClose(int index) {
