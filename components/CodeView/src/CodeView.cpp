@@ -54,7 +54,7 @@ class QPlainTextEditMod final : public QPlainTextEdit {
 }  // namespace
 
 struct CodeView::PrivateData final {
-  ICodeModel *model{nullptr};
+  QAbstractItemModel *model{nullptr};
 
   int version{0};
   int last_press_version{-1};
@@ -81,11 +81,8 @@ struct CodeView::PrivateData final {
   GoToLineWidget *go_to_line_widget{nullptr};
 
   std::optional<unsigned> deferred_scroll_to_line;
+  QList<QTextEdit::ExtraSelection> extra_selection_list;
 };
-
-ICodeModel *CodeView::Model() {
-  return d->model;
-}
 
 void CodeView::SetTheme(const CodeViewTheme &theme) {
   d->theme = theme;
@@ -181,7 +178,9 @@ void CodeView::SetWordWrapping(bool enabled) {
 bool CodeView::ScrollToLineNumber(unsigned line) {
   d->deferred_scroll_to_line.reset();
 
-  if (!d->model->IsReady()) {
+  // Check whether we have enough lines for the go-to operation.
+  auto row_count = static_cast<unsigned>(d->model->rowCount());
+  if (line > row_count) {
     d->deferred_scroll_to_line = line;
     return false;
   }
@@ -202,7 +201,7 @@ bool CodeView::ScrollToLineNumber(unsigned line) {
   return SetCursorPosition(text_block.position(), std::nullopt);
 }
 
-CodeView::CodeView(ICodeModel *model, QWidget *parent)
+CodeView::CodeView(QAbstractItemModel *model, QWidget *parent)
     : ICodeView(parent),
       d(new PrivateData) {
 
@@ -285,11 +284,15 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
   return false;
 }
 
-void CodeView::InstallModel(ICodeModel *model) {
+void CodeView::InstallModel(QAbstractItemModel *model) {
   d->model = model;
   d->model->setParent(this);
 
-  connect(d->model, &ICodeModel::modelReset, this, &CodeView::OnModelReset);
+  connect(d->model, &QAbstractItemModel::modelReset, this,
+          &CodeView::OnModelReset);
+
+  connect(d->model, &QAbstractItemModel::dataChanged, this,
+          &CodeView::OnDataChange);
 }
 
 void CodeView::InitializeWidgets() {
@@ -544,14 +547,61 @@ void CodeView::UpdateGutterWidth() {
   d->gutter->setMinimumWidth(gutter_margin + required_gutter_width);
 }
 
-void CodeView::UpdateTokenGroupColors() {
-  auto extra_selection_list =
-      GenerateExtraSelections(d->token_map, *d->text_edit, *d->model, d->theme);
+void CodeView::UpdateBaseExtraSelections() {
+  QList<QTextEdit::ExtraSelection> extra_selection_list;
 
-  // TODO: Implement here any additional highlighting by appending
-  // into the extra selection list
+  auto row_count = d->model->rowCount();
 
-  d->text_edit->setExtraSelections(std::move(extra_selection_list));
+  for (int row{}; row < row_count; ++row) {
+    auto line_index = d->model->index(row, 0);
+    if (!line_index.isValid()) {
+      break;
+    }
+
+    auto column_count = d->model->columnCount(line_index);
+
+    for (int column{}; column < column_count; ++column) {
+      auto token_index = d->model->index(0, column, line_index);
+      if (!token_index.isValid()) {
+        break;
+      }
+
+      auto background_color_var = token_index.data(Qt::BackgroundRole);
+      if (!background_color_var.isValid()) {
+        continue;
+      }
+
+      const auto &background_color =
+          qvariant_cast<QColor>(background_color_var);
+
+      auto token_id_var = token_index.data(ICodeModel::TokenIdRole);
+      if (!token_id_var.isValid()) {
+        continue;
+      }
+
+      auto foreground_color =
+          GetForegroundColorForColorHighlight(background_color);
+
+      QTextEdit::ExtraSelection selection = {};
+      selection.format.setBackground(background_color);
+      selection.format.setForeground(foreground_color);
+
+      auto unique_token_id = GetUniqueTokenIdentifier(token_index);
+      const auto &token_entry = d->token_map.data[unique_token_id];
+
+      selection.cursor = d->text_edit->textCursor();
+      selection.cursor.setPosition(token_entry.cursor_start,
+                                   QTextCursor::MoveMode::MoveAnchor);
+
+      selection.cursor.setPosition(token_entry.cursor_end,
+                                   QTextCursor::MoveMode::KeepAnchor);
+
+      extra_selection_list.append(std::move(selection));
+    }
+  }
+
+  d->extra_selection_list = std::move(extra_selection_list);
+  d->text_edit->setExtraSelections(d->extra_selection_list);
 }
 
 std::uint64_t CodeView::GetUniqueTokenIdentifier(const QModelIndex &index) {
@@ -619,7 +669,7 @@ CodeView::GetQModelIndexFromTextCursor(const TokenMap &token_map,
 }
 
 QTextDocument *CodeView::CreateTextDocument(
-    CodeView::TokenMap &token_map, const ICodeModel &model,
+    CodeView::TokenMap &token_map, const QAbstractItemModel &model,
     const CodeViewTheme &theme,
     const std::optional<CreateTextDocumentProgressCallback>
         &opt_progress_callback) {
@@ -781,51 +831,6 @@ void CodeView::ConfigureTextFormatFromTheme(
   text_format.setFontStrikeOut(text_style.strikeout);
 }
 
-QList<QTextEdit::ExtraSelection> CodeView::GenerateExtraSelections(
-    const TokenMap &token_map, QPlainTextEdit &text_edit,
-    const ICodeModel &model, const CodeViewTheme &theme) {
-
-  static_cast<void>(token_map);
-  static_cast<void>(text_edit);
-  static_cast<void>(model);
-  static_cast<void>(theme);
-
-  QList<QTextEdit::ExtraSelection> extra_selection_list;
-
-  /*QTextEdit::ExtraSelection selection;
-
-  std::unordered_set<std::uint64_t> visited_model_index_list;
-  std::unordered_set<int> colored_line_list;
-
-  for (const int &colored_line : colored_line_list) {
-    auto column_count = model.TokenCount(colored_line);
-
-    for (int column = 0; column < column_count; ++column) {
-      auto unique_token_id =
-          GetUniqueTokenIdentifier({&model, colored_line, column});
-
-      if (visited_model_index_list.count(unique_token_id) > 0) {
-        continue;
-      }
-
-      const auto &token_map_entry = token_map.data.at(unique_token_id);
-
-      selection = {};
-      selection.format.setBackground(theme.default_background_color);
-      selection.cursor = text_edit.textCursor();
-      selection.cursor.setPosition(token_map_entry.cursor_start,
-                                   QTextCursor::MoveMode::MoveAnchor);
-
-      selection.cursor.setPosition(token_map_entry.cursor_end,
-                                   QTextCursor::MoveMode::KeepAnchor);
-
-      extra_selection_list.append(std::move(selection));
-    }
-  }*/
-
-  return extra_selection_list;
-}
-
 void CodeView::HighlightTokensForRelatedEntityID(
     const TokenMap &token_map, const QTextCursor &text_cursor,
     RawEntityId related_entity_id,
@@ -851,6 +856,45 @@ void CodeView::HighlightTokensForRelatedEntityID(
 
     selection_list.append(std::move(selection));
   }
+}
+
+float CodeView::GetColorContrast(const QColor &color) {
+  return (0.2126f * color.redF() + 0.7152f * color.greenF() +
+          0.0722f * color.blueF()) /
+         1000.0f;
+}
+
+QColor CodeView::GetForegroundColorForColorHighlight(const QColor &color) {
+  QColor black_foreground{Qt::black};
+  float black_foreground_contrast{GetColorContrast(black_foreground)};
+
+  QColor white_foreground{Qt::white};
+  float white_foreground_contrast{GetColorContrast(white_foreground)};
+
+  float background_contrast{GetColorContrast(color)};
+
+  QColor foreground_color;
+  if (std::abs(black_foreground_contrast - background_contrast) >
+      std::abs(white_foreground_contrast - background_contrast)) {
+
+    foreground_color = black_foreground;
+
+  } else {
+    foreground_color = white_foreground;
+  }
+
+  return foreground_color;
+}
+
+void CodeView::OnDataChange(const QModelIndex &, const QModelIndex &,
+                            const QList<int> &roles) {
+
+  if (roles.size() != 1 || roles[0] != Qt::BackgroundRole) {
+    OnModelReset();
+    return;
+  }
+
+  UpdateBaseExtraSelections();
 }
 
 void CodeView::OnModelReset() {
@@ -888,7 +932,7 @@ void CodeView::OnModelReset() {
   d->text_edit->setDocument(document);
 
   UpdateGutterWidth();
-  UpdateTokenGroupColors();
+  UpdateBaseExtraSelections();
   UpdateTabStopDistance();
   OnModelResetDone();
 }
@@ -949,11 +993,8 @@ void CodeView::OnTextEditUpdateRequest(const QRect &rect, int dy) {
 }
 
 void CodeView::HandleNewCursor(const QTextCursor &cursor) {
-  if (!d->model->IsReady()) {
-    return;
-  }
+  auto extra_selections = d->extra_selection_list;
 
-  QList<QTextEdit::ExtraSelection> extra_selections;
   QTextEdit::ExtraSelection selection;
 
   // Highlight the current line where the cursor is.

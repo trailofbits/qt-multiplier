@@ -8,8 +8,7 @@
 
 #include "EntityExplorerModel.h"
 
-#include <set>
-#include <unordered_map>
+#include <QFutureWatcher>
 
 namespace mx::gui {
 

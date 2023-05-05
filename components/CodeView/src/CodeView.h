@@ -29,9 +29,6 @@ class CodeView final : public ICodeView {
   Q_OBJECT
 
  public:
-  //! \copybrief ICodeView::Model
-  virtual ICodeModel *Model(void) override;
-
   //! \copybrief ICodeView::SetTheme
   virtual void SetTheme(const CodeViewTheme &theme) override;
 
@@ -59,7 +56,7 @@ class CodeView final : public ICodeView {
 
  protected:
   //! Constructor
-  CodeView(ICodeModel *model, QWidget *parent);
+  CodeView(QAbstractItemModel *model, QWidget *parent);
 
  private:
   struct PrivateData;
@@ -69,7 +66,7 @@ class CodeView final : public ICodeView {
   virtual bool eventFilter(QObject *obj, QEvent *event) override;
 
   //! Installs the given module, updating its parent
-  void InstallModel(ICodeModel *model);
+  void InstallModel(QAbstractItemModel *model);
 
   //! Initializes all the widgets in this component
   void InitializeWidgets(void);
@@ -95,11 +92,20 @@ class CodeView final : public ICodeView {
   //! Updates the tab stop distance based on the current font/settings
   void UpdateTabStopDistance(void);
 
+  //! Regenerates the extra selections for the highlights
+  void UpdateBaseExtraSelections();
+
   //! Updates the gutter's minimum width based on the highest line number
   void UpdateGutterWidth(void);
 
-  // Reapplies token group colors using the QPlainTextEdit extra selections
-  void UpdateTokenGroupColors(void);
+  //! Disable cursor change tracking.
+  void StopCursorTracking(void);
+
+  //! Re-introduce cursor change tracking.
+  void ResumeCursorTracking(void);
+
+  //! Handle a cursor move.
+  void HandleNewCursor(const QTextCursor &cursor);
 
  public:
   //! Contains all the tokens that we have imported from the model
@@ -157,7 +163,7 @@ class CodeView final : public ICodeView {
 
   //! Creates a new text document from the given model
   static QTextDocument *
-  CreateTextDocument(TokenMap &token_map, const ICodeModel &model,
+  CreateTextDocument(TokenMap &token_map, const QAbstractItemModel &model,
                      const CodeViewTheme &theme,
                      const std::optional<CreateTextDocumentProgressCallback>
                          &opt_progress_callback = std::nullopt);
@@ -167,11 +173,6 @@ class CodeView final : public ICodeView {
                                            const CodeViewTheme &theme,
                                            const QVariant &token_category_var);
 
-  //! Creates a list of extra selections used to highlight token groups
-  static QList<QTextEdit::ExtraSelection>
-  GenerateExtraSelections(const TokenMap &token_map, QPlainTextEdit &text_edit,
-                          const ICodeModel &model, const CodeViewTheme &theme);
-
   //! Adds highlights for tokens to an existing extra selection list
   static void HighlightTokensForRelatedEntityID(
       const TokenMap &token_map, const QTextCursor &text_cursor,
@@ -179,18 +180,19 @@ class CodeView final : public ICodeView {
       QList<QTextEdit::ExtraSelection> &selection_list,
       const CodeViewTheme &theme);
 
-  //! Disable cursor change tracking.
-  void StopCursorTracking(void);
+  //! Returns the contrast ratio for the given color
+  static float GetColorContrast(const QColor &color);
 
-  //! Re-introduce cursor change tracking.
-  void ResumeCursorTracking(void);
-
-  //! Handle a cursor move.
-  void HandleNewCursor(const QTextCursor &cursor);
+  //! Returns the best foreground color for the given background highlight
+  static QColor GetForegroundColorForColorHighlight(const QColor &color);
 
  private slots:
   //! Connect the cursor changed event. This will also trigger a cursor event.
   void ConnectCursorChangeEvent(void);
+
+  //! Generates new extra selections for highlight changes, or a reset otherwise
+  void OnDataChange(const QModelIndex &top_left,
+                    const QModelIndex &bottom_right, const QList<int> &roles);
 
   //! This slot regenerates the code view contents using CreateTextDocument
   void OnModelReset(void);

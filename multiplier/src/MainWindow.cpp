@@ -12,12 +12,12 @@
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/HistoryWidget.h>
-#include <multiplier/ui/IDatabase.h>
 #include <multiplier/ui/IIndexView.h>
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/IInformationExplorer.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
 
 #include <multiplier/Entities/StmtKind.h>
 
@@ -33,6 +33,7 @@
 #include <QToolButton>
 #include <QShortcut>
 #include <QTreeView>
+#include <QColorDialog>
 
 namespace mx::gui {
 
@@ -49,6 +50,11 @@ static const char *kLastLocationProperty = "mx:lastLocation";
 struct CodeViewContextMenu final {
   QMenu *menu{nullptr};
   QAction *show_ref_explorer_action{nullptr};
+
+  QMenu *highlight_menu{nullptr};
+  QAction *set_entity_highlight{nullptr};
+  QAction *remove_entity_highlight{nullptr};
+  QAction *reset_entity_highlights{nullptr};
 };
 
 struct ToolBar final {
@@ -60,8 +66,6 @@ struct ToolBar final {
 struct MainWindow::PrivateData final {
   mx::Index index;
   mx::FileLocationCache file_location_cache;
-
-  IDatabase::Ptr database;
 
   IIndexView *index_view{nullptr};
   IEntityExplorer *entity_explorer{nullptr};
@@ -85,6 +89,8 @@ struct MainWindow::PrivateData final {
   QDockWidget *info_explorer_dock{nullptr};
   IInformationExplorerModel *info_explorer_model{nullptr};
 
+  IGlobalHighlighter *global_highlighter{nullptr};
+
   QMenu *view_menu{nullptr};
   ToolBar toolbar;
 };
@@ -98,8 +104,6 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
 
   d->index = mx::Index::in_memory_cache(
       mx::Index::from_database(database_path.toStdString()));
-
-  d->database = IDatabase::Create(d->index, d->file_location_cache);
 
   InitializeWidgets();
   InitializeToolBar();
@@ -149,6 +153,7 @@ void MainWindow::InitializeWidgets() {
   CreateEntityExplorerDock();
   CreateInfoExplorerDock();
   CreateCodeView();
+  CreateGlobalHighlighter();
   CreateReferenceExplorerDock();
 
   tabifyDockWidget(d->entity_explorer_dock, d->project_explorer_dock);
@@ -292,7 +297,6 @@ void MainWindow::CreateCodeView() {
   // Also create the custom context menu
   d->code_view_context_menu.menu = new QMenu(tr("Token menu"));
 
-  // TODO(alessandro): Only show this when there is a related entity.
   connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
           &MainWindow::OnCodeViewContextMenuActionTriggered);
 
@@ -301,13 +305,50 @@ void MainWindow::CreateCodeView() {
 
   d->code_view_context_menu.menu->addAction(
       d->code_view_context_menu.show_ref_explorer_action);
+
+  d->code_view_context_menu.highlight_menu = new QMenu(tr("Highlights"));
+  d->code_view_context_menu.menu->addMenu(
+      d->code_view_context_menu.highlight_menu);
+
+  d->code_view_context_menu.set_entity_highlight = new QAction(tr("Set color"));
+
+  d->code_view_context_menu.highlight_menu->addAction(
+      d->code_view_context_menu.set_entity_highlight);
+
+  d->code_view_context_menu.remove_entity_highlight = new QAction(tr("Remove"));
+
+  d->code_view_context_menu.highlight_menu->addAction(
+      d->code_view_context_menu.remove_entity_highlight);
+
+  d->code_view_context_menu.reset_entity_highlights = new QAction(tr("Reset"));
+
+  d->code_view_context_menu.highlight_menu->addAction(
+      d->code_view_context_menu.reset_entity_highlights);
+}
+
+void MainWindow::CreateGlobalHighlighter() {
+  d->global_highlighter =
+      IGlobalHighlighter::Create(d->index, d->file_location_cache, this);
+
+  auto dock = new QDockWidget(tr("Global Highlighter"), this);
+  dock->setWidget(d->global_highlighter);
+  dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+
+  d->view_menu->addAction(dock->toggleViewAction());
+  addDockWidget(Qt::LeftDockWidgetArea, dock);
 }
 
 void MainWindow::OpenTokenContextMenu(QModelIndex index) {
   QVariant action_data;
   action_data.setValue(index);
 
-  for (auto &action : d->code_view_context_menu.menu->actions()) {
+  std::vector<QAction *> action_list{
+      d->code_view_context_menu.show_ref_explorer_action,
+      d->code_view_context_menu.set_entity_highlight,
+      d->code_view_context_menu.remove_entity_highlight,
+      d->code_view_context_menu.reset_entity_highlights};
+
+  for (auto &action : action_list) {
     action->setData(action_data);
   }
 
@@ -337,7 +378,7 @@ void MainWindow::OpenReferenceExplorer(
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache, entity_id, expansion_mode,
-      d->ref_explorer_mode, this);
+      d->ref_explorer_mode, *d->global_highlighter, this);
 
   connect(d->quick_ref_explorer.get(),
           &QuickReferenceExplorer::SaveReferenceExplorer, this,
@@ -470,10 +511,12 @@ void MainWindow::CloseAllPopups() {
 ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
                                          QString tab_name) {
 
-  auto model = ICodeModel::Create(d->file_location_cache, d->index, this);
-  auto code_view = ICodeView::Create(model);
+  auto code_model = ICodeModel::Create(d->file_location_cache, d->index, this);
+  auto proxy_model = d->global_highlighter->CreateModelProxy(
+      code_model, ICodeModel::TokenIdRole);
 
-  model->SetEntity(file_entity_id);
+  auto code_view = ICodeView::Create(proxy_model);
+  code_model->SetEntity(file_entity_id);
 
   code_view->SetWordWrapping(false);
   code_view->setAttribute(Qt::WA_DeleteOnClose);
@@ -481,6 +524,7 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   // Make it so that the initial last location for a given view is the file ID.
   code_view->setProperty(kLastLocationProperty,
                          static_cast<quint64>(file_entity_id));
+
   code_view->setProperty(kFileIdProperty, static_cast<quint64>(file_entity_id));
 
   auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
@@ -608,8 +652,6 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
   }
 }
 
-//! Called when a file name in the project explorer (list of indexed files) is
-//! clicked.
 void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
                                         Qt::KeyboardModifiers,
                                         Qt::MouseButtons) {
@@ -643,12 +685,6 @@ void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
   UpdateLocatiomFromWidget(next_tab);
 }
 
-//! Called when we user moves their cursor, or when an action triggered by the
-//! user causes the view itself to re-position the cursor in a file code view.
-//! Wherever the new cursor position is, we capture the token under the cursor
-//! and record it to the current file view's tab as its current location, so
-//! that if we switch away from the tab, then we can store that current location
-//! into the history.
 void MainWindow::OnMainCodeViewCursorMoved(const QModelIndex &index) {
   QVariant entity_id_var = index.data(ICodeModel::TokenIdRole);
   if (!entity_id_var.isValid()) {
@@ -664,8 +700,6 @@ void MainWindow::OnMainCodeViewCursorMoved(const QModelIndex &index) {
   }
 }
 
-//! Called when we interact with a token in a main file view, or in a code
-//! preview, e.g. a reference browser code view.
 void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
                                   const QModelIndex &index) {
 
@@ -714,8 +748,6 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
   }
 }
 
-//! Called when an entity in the entity explorer / filter, which allows us to
-//! search for entities by name/type, is clicked.
 void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
   CloseAllPopups();
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
@@ -723,8 +755,6 @@ void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
   OpenEntityCode(entity_id, false /* don't canonicalize entity IDs */);
 }
 
-//! Called when the history menu is used to go back/forward to some specific
-//! entity ID.
 void MainWindow::OnHistoryNavigationEntitySelected(RawEntityId,
                                                    RawEntityId canonical_id) {
   CloseAllPopups();
@@ -773,6 +803,33 @@ void MainWindow::OnCodeViewContextMenuActionTriggered(QAction *action) {
 
   if (action == d->code_view_context_menu.show_ref_explorer_action) {
     OpenTokenReferenceExplorer(code_model_index);
+
+  } else if (action == d->code_view_context_menu.set_entity_highlight) {
+    QVariant token_id_var = code_model_index.data(ICodeModel::TokenIdRole);
+    if (!token_id_var.isValid()) {
+      return;
+    }
+
+    RawEntityId token_id = qvariant_cast<RawEntityId>(token_id_var);
+
+    QColor color = QColorDialog::getColor();
+    if (!color.isValid()) {
+      return;
+    }
+
+    d->global_highlighter->SetEntityColor(token_id, color);
+
+  } else if (action == d->code_view_context_menu.remove_entity_highlight) {
+    QVariant token_id_var = code_model_index.data(ICodeModel::TokenIdRole);
+    if (!token_id_var.isValid()) {
+      return;
+    }
+
+    RawEntityId token_id = qvariant_cast<RawEntityId>(token_id_var);
+    d->global_highlighter->RemoveEntity(token_id);
+
+  } else if (action == d->code_view_context_menu.reset_entity_highlights) {
+    d->global_highlighter->Clear();
   }
 }
 
@@ -835,8 +892,6 @@ void MainWindow::OnReferenceExplorerTabBarDoubleClick(int index) {
   d->ref_explorer_tab_widget->setTabText(index, new_tab_name);
 }
 
-//! Tell the history back/forward button widget that our current location has
-//! changed.
 void MainWindow::UpdateLocatiomFromWidget(QWidget *widget) {
   if (!widget) {
     return;

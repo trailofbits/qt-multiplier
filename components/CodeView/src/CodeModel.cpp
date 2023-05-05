@@ -10,6 +10,8 @@
 
 #include <multiplier/ui/IDatabase.h>
 
+#include <QFutureWatcher>
+
 #include <unordered_set>
 
 namespace mx::gui {
@@ -178,8 +180,6 @@ QModelIndex CodeModel::parent(const QModelIndex &child) const {
       static_cast<int>(std::distance(root_data.child_id_list.begin(), it));
 
   return createIndex(parent_row, 0, parent_id);
-
-  return QModelIndex();
 }
 
 int CodeModel::rowCount(const QModelIndex &parent) const {

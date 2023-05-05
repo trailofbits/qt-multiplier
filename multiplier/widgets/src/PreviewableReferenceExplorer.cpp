@@ -32,11 +32,11 @@ struct PreviewableReferenceExplorer::PrivateData final {
 PreviewableReferenceExplorer::PreviewableReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
     IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
-    QWidget *parent)
+    IGlobalHighlighter &highlighter, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData()) {
 
-  InitializeWidgets(index, file_location_cache, model, mode);
+  InitializeWidgets(index, file_location_cache, model, mode, highlighter);
 }
 
 PreviewableReferenceExplorer::~PreviewableReferenceExplorer() {}
@@ -47,7 +47,8 @@ IReferenceExplorerModel *PreviewableReferenceExplorer::Model() {
 
 void PreviewableReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
-    IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode) {
+    IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
+    IGlobalHighlighter &highlighter) {
 
   d->reference_explorer = IReferenceExplorer::Create(model, mode, this);
 
@@ -64,7 +65,10 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   d->code_model = new CodePreviewModelAdapter(
       ICodeModel::Create(file_location_cache, index), this);
 
-  d->code_view = ICodeView::Create(d->code_model);
+  auto model_proxy =
+      highlighter.CreateModelProxy(d->code_model, ICodeModel::TokenIdRole);
+
+  d->code_view = ICodeView::Create(model_proxy);
   connect(d->code_view, &ICodeView::DocumentChanged, this,
           &PreviewableReferenceExplorer::OnCodeViewDocumentChange);
 

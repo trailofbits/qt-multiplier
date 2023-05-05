@@ -20,6 +20,7 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QPoint>
+#include <QFutureWatcher>
 
 #include <optional>
 
@@ -44,7 +45,8 @@ QuickReferenceExplorer::QuickReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
     RawEntityId entity_id,
     const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-    const IReferenceExplorer::Mode &mode, QWidget *parent)
+    const IReferenceExplorer::Mode &mode, IGlobalHighlighter &highlighter,
+    QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
@@ -53,8 +55,8 @@ QuickReferenceExplorer::QuickReferenceExplorer(
           &QFutureWatcher<QFuture<std::optional<QString>>>::finished, this,
           &QuickReferenceExplorer::EntityNameFutureStatusChanged);
 
-  InitializeWidgets(index, file_location_cache, entity_id, expansion_mode,
-                    mode);
+  InitializeWidgets(index, file_location_cache, entity_id, expansion_mode, mode,
+                    highlighter);
 }
 
 QuickReferenceExplorer::~QuickReferenceExplorer() {
@@ -107,7 +109,7 @@ void QuickReferenceExplorer::InitializeWidgets(
     const Index &index, const FileLocationCache &file_location_cache,
     RawEntityId entity_id,
     const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-    const IReferenceExplorer::Mode &mode) {
+    const IReferenceExplorer::Mode &mode, IGlobalHighlighter &highlighter) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -172,7 +174,7 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->model->AppendEntityById(entity_id, expansion_mode, QModelIndex());
 
   d->reference_explorer = new PreviewableReferenceExplorer(
-      index, file_location_cache, d->model, mode, this);
+      index, file_location_cache, d->model, mode, highlighter, this);
 
   connect(d->reference_explorer,
           &PreviewableReferenceExplorer::SelectedItemChanged, this,
@@ -243,8 +245,9 @@ void QuickReferenceExplorer::OnSaveReferenceExplorer() {
   layout()->removeWidget(d->reference_explorer);
   emit SaveReferenceExplorer(d->reference_explorer);
 
+  disconnect(d->reference_explorer, nullptr, this, nullptr);
+
   close();
-  deleteLater();
 }
 
 void QuickReferenceExplorer::EntityNameFutureStatusChanged() {

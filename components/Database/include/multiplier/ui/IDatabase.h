@@ -13,13 +13,13 @@
 
 #include <multiplier/Index.h>
 
-#include <QFutureWatcher>
 #include <QString>
+#include <QFuture>
 
 #include <deque>
 #include <variant>
-#include <vector>
 #include <optional>
+#include <unordered_set>
 
 namespace mx::gui {
 
@@ -65,12 +65,11 @@ class IDatabase {
 
 
   //! The output of an entity information request
-  using EntityInformationResult =
-      Result<EntityInformation, RPCErrorCode>;
+  using EntityInformationResult = Result<EntityInformation, RPCErrorCode>;
 
   //! Requests detailed information about a particular entity given its ID.
-  virtual QFuture<EntityInformationResult> RequestEntityInformation(
-      RawEntityId entity_id) = 0;
+  virtual QFuture<EntityInformationResult>
+  RequestEntityInformation(RawEntityId entity_id) = 0;
 
   //! The output of a file or fragment request
   using IndexedTokenRangeDataResult =
@@ -84,15 +83,19 @@ class IDatabase {
 
   //! Requests the specified file
   virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
-      RawEntityId entity_id,
-      IndexedTokenRangeDataRequestType request_type) = 0;
+      RawEntityId entity_id, IndexedTokenRangeDataRequestType request_type) = 0;
 
   //! An optional name
   using OptionalName = std::optional<QString>;
 
   //! Starts a name resolution request for the given entity
-  virtual QFuture<OptionalName>
-  RequestEntityName(RawEntityId fragment_id) = 0;
+  virtual QFuture<OptionalName> RequestEntityName(RawEntityId fragment_id) = 0;
+
+  //! A list of entity IDs
+  using EntityIDList = std::unordered_set<RawEntityId>;
+
+  //! Requests a list of all the entities related to the given one
+  virtual QFuture<EntityIDList> GetRelatedEntities(RawEntityId entity_id) = 0;
 
   //! A single entity query result
   struct EntityQueryResult final {

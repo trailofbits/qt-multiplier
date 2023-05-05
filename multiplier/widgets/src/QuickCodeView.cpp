@@ -18,6 +18,7 @@
 #include <QMouseEvent>
 #include <QApplication>
 #include <QPushButton>
+#include <QFutureWatcher>
 
 #include <optional>
 

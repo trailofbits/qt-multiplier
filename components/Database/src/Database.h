@@ -17,8 +17,8 @@ class Database final : public IDatabase {
   virtual ~Database() override;
 
   //! \copybrief IDatabase::RequestEntityInformation
-  virtual QFuture<EntityInformationResult> RequestEntityInformation(
-      RawEntityId entity_id) override;
+  virtual QFuture<EntityInformationResult>
+  RequestEntityInformation(RawEntityId entity_id) override;
 
   //! \copybrief IDatabase::RequestIndexedTokenRangeData
   virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
@@ -28,6 +28,10 @@ class Database final : public IDatabase {
   //! \copybrief IDatabase::RequestEntityName
   virtual QFuture<OptionalName>
   RequestEntityName(RawEntityId fragment_id) override;
+
+  //! \copybrief IDatabase::GetRelatedEntities
+  virtual QFuture<EntityIDList>
+  GetRelatedEntities(RawEntityId entity_id) override;
 
   //! \copybrief IDatabase::QueryEntities
   virtual QFuture<bool> QueryEntities(QueryEntitiesReceiver &receiver,

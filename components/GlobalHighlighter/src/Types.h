@@ -1,0 +1,21 @@
+/*
+  Copyright (c) 2023-present, Trail of Bits, Inc.
+  All rights reserved.
+
+  This source code is licensed in accordance with the terms specified in
+  the LICENSE file found in the root directory of this source tree.
+*/
+
+#pragma once
+
+#include <multiplier/Types.h>
+
+#include <QColor>
+
+#include <unordered_map>
+
+namespace mx::gui {
+
+using EntityHighlightList = std::unordered_map<RawEntityId, QColor>;
+
+}  // namespace mx::gui

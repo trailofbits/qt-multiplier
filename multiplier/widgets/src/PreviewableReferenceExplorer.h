@@ -8,6 +8,7 @@
 
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ICodeView.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
 
 #include <QWidget>
 
@@ -23,6 +24,7 @@ class PreviewableReferenceExplorer final : public QWidget {
                                const FileLocationCache &file_location_cache,
                                IReferenceExplorerModel *model,
                                const IReferenceExplorer::Mode &mode,
+                               IGlobalHighlighter &highlighter,
                                QWidget *parent = nullptr);
 
   //! Destructor
@@ -46,7 +48,8 @@ class PreviewableReferenceExplorer final : public QWidget {
   void InitializeWidgets(mx::Index index,
                          mx::FileLocationCache file_location_cache,
                          IReferenceExplorerModel *model,
-                         const IReferenceExplorer::Mode &mode);
+                         const IReferenceExplorer::Mode &mode,
+                         IGlobalHighlighter &highlighter);
 
   //! Schedules a post-update scroll-to-line operation
   void SchedulePostUpdateLineScrollCommand(unsigned line_number);

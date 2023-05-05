@@ -73,6 +73,7 @@ target_link_libraries("Multiplier"
     "mx_historywidget"
     "mx_widgets"
     "mx_informationexplorer"
+    "mx_globalhighlighter"
 )
 
 enable_qt_properties("Multiplier")
