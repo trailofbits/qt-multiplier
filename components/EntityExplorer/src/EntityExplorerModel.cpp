@@ -214,6 +214,13 @@ void EntityExplorerModel::OnDataBatch(
     token_category_set = d->opt_token_category_set.value();
   }
 
+  // If our sorting method is reverse, then put the entities back in their
+  // original order, so that when we call `SortRows` we get a properly
+  // maintained stable sort.
+  if (d->sorting_method == SortingMethod::Descending) {
+    std::reverse(d->row_list.begin(), d->row_list.end());
+  }
+
   for (auto &data_batch_entity : data_batch) {
     const IDatabase::EntityQueryResult &entity =
         d->results.emplace_back(std::move(data_batch_entity));
@@ -251,7 +258,12 @@ void EntityExplorerModel::GenerateRows(void) {
 }
 
 void EntityExplorerModel::SortRows(void) {
-  std::sort(d->row_list.begin(), d->row_list.end(), EntityQueryResultCmp{});
+
+  // Use a stable sort to maintain order from Multiplier API, which orders by
+  // entity IDs. This puts definitions before declarations.
+  std::stable_sort(d->row_list.begin(), d->row_list.end(),
+                   EntityQueryResultCmp{});
+
   if (d->sorting_method == SortingMethod::Descending) {
     std::reverse(d->row_list.begin(), d->row_list.end());
   }
