@@ -123,12 +123,6 @@ void GlobalHighlighter::EntityListFutureStatusChanged() {
   if (d->operation.type == Operation::Type::SetEntityColor) {
     for (const auto &related_entity_id : related_entity_list) {
       d->highlights[related_entity_id] = d->operation.color;
-      /*if (d->highlights.count(related_entity_id) > 0) {
-        d->highlights[related_entity_id] = color;
-
-      } else {
-        d->highlights.insert({related_entity_id, color});
-      }*/
     }
 
   } else {
