@@ -9,7 +9,7 @@
 #include "Utils.h"
 
 #include <utility>
-
+#include <iostream>
 namespace mx::gui {
 
 VariantEntity NamedEntityContaining(const VariantEntity &entity,
@@ -51,35 +51,34 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity,
 
   } else if (std::holds_alternative<Macro>(entity)) {
 
-    Macro macro = std::move(std::get<Macro>(entity));
-
-    for (Token tok : macro.generate_expansion_tokens()) {
-      if (auto nd = NamedDeclContaining(tok);
-          !std::holds_alternative<NotAnEntity>(nd)) {
-        return nd;
-      }
-    }
-
-    mx::Macro root_macro = macro.root();
-
     // It could be that we are looking at an expansion that isn't actually
     // used per se (e.g. the expansion happens as a result of PASTA eagerly
     // doing argument pre-expansions), but only the macro name gets used, so
     // we can't connect any final parsed tokens to anything, and thus we want
     // to instead go and find the root of the expansion and ask for the named
     // declaration containing that.
-    if (root_macro != macro) {
-      for (Token tok : root_macro.generate_expansion_tokens()) {
-        if (auto nd = NamedDeclContaining(tok);
+    //
+    // Another reason to look at the root macro expansion is that we may be
+    // asking for a use of a define that is in the same fragment as the
+    // expansion, and we don't want the expansion to put us into the body of
+    // a define, but to the use of the top-level macro expansion.
+    Macro macro = std::move(std::get<Macro>(entity)).root();
+
+    for (Token tok : macro.generate_expansion_tokens()) {
+      if (Token pt = tok.parsed_token()) {
+        std::cerr << "PT " << pt.id() << ' ' << pt.data() << '\n';
+        if (auto nd = NamedDeclContaining(pt);
             !std::holds_alternative<NotAnEntity>(nd)) {
           return nd;
         }
+      } else {
+        std::cerr << "ET " << tok.id() << ' ' << tok.data() << '\n';
       }
     }
 
     // If the macro wasn't used inside of a decl/statement, then go try to
     // find the macro definition containing this macro.
-    if (auto dd = DefineMacroDirective::from(root_macro)) {
+    if (auto dd = DefineMacroDirective::from(macro)) {
       return dd.value();
     }
 
