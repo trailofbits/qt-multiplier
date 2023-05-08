@@ -8,15 +8,30 @@
 
 #include "GetRelatedEntities.h"
 
+#include <multiplier/Entities/Decl.h>
+
 namespace mx::gui {
 
 void GetRelatedEntities(
     QPromise<IDatabase::EntityIDList> &related_entities_promise,
     const Index &index, RawEntityId entity_id) {
 
-  static_cast<void>(index);
+  IDatabase::EntityIDList entity_list;
 
-  IDatabase::EntityIDList entity_list{entity_id};
+  VariantEntity ent = index.entity(entity_id);
+  if (std::holds_alternative<NotAnEntity>(ent)) {
+    related_entities_promise.addResult(std::move(entity_list));
+    return;
+  }
+
+  if (std::holds_alternative<Decl>(ent)) {
+    for (Decl redecl : std::get<Decl>(ent).redeclarations()) {
+      entity_list.insert(redecl.id().Pack());
+    }
+  } else {
+    entity_list.insert(entity_id);
+  }
+
   related_entities_promise.addResult(std::move(entity_list));
 }
 

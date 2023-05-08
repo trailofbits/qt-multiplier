@@ -65,8 +65,8 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   d->code_model = new CodePreviewModelAdapter(
       ICodeModel::Create(file_location_cache, index), this);
 
-  auto model_proxy =
-      highlighter.CreateModelProxy(d->code_model, ICodeModel::TokenIdRole);
+  auto model_proxy = highlighter.CreateModelProxy(
+      d->code_model, ICodeModel::RealRelatedEntityIdRole);
 
   d->code_view = ICodeView::Create(model_proxy);
   connect(d->code_view, &ICodeView::DocumentChanged, this,

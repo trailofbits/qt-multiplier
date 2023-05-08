@@ -18,7 +18,7 @@ struct HighlightingModelProxy::PrivateData final {
 };
 
 HighlightingModelProxy::HighlightingModelProxy(QAbstractItemModel *source_model,
-                                               const int &entity_id_data_role)
+                                               int entity_id_data_role)
     : QAbstractItemModel(source_model->parent()),
       d(new PrivateData) {
 

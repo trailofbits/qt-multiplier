@@ -13,8 +13,6 @@
 
 #include <QFutureWatcher>
 
-#include <unordered_set>
-
 namespace mx::gui {
 
 struct Operation final {
@@ -45,7 +43,7 @@ GlobalHighlighter::~GlobalHighlighter() {
 
 QAbstractItemModel *
 GlobalHighlighter::CreateModelProxy(QAbstractItemModel *source_model,
-                                    const int &entity_id_data_role) {
+                                    int entity_id_data_role) {
 
   auto model_proxy =
       new HighlightingModelProxy(source_model, entity_id_data_role);
@@ -56,7 +54,7 @@ GlobalHighlighter::CreateModelProxy(QAbstractItemModel *source_model,
   return model_proxy;
 }
 
-void GlobalHighlighter::SetEntityColor(const RawEntityId &entity_id,
+void GlobalHighlighter::SetEntityColor(RawEntityId entity_id,
                                        const QColor &color) {
   CancelRequest();
 
@@ -66,7 +64,7 @@ void GlobalHighlighter::SetEntityColor(const RawEntityId &entity_id,
   StartRequest(entity_id);
 }
 
-void GlobalHighlighter::RemoveEntity(const RawEntityId &entity_id) {
+void GlobalHighlighter::RemoveEntity(RawEntityId entity_id) {
   CancelRequest();
 
   d->operation.type = Operation::Type::RemoveEntity;
@@ -119,15 +117,18 @@ void GlobalHighlighter::EntityListFutureStatusChanged() {
   }
 
   auto related_entity_list = d->related_entities_future.takeResult();
+  if (related_entity_list.empty()) {
+    return;
+  }
 
   if (d->operation.type == Operation::Type::SetEntityColor) {
-    for (const auto &related_entity_id : related_entity_list) {
+    for (RawEntityId related_entity_id : related_entity_list) {
       d->highlights[related_entity_id] = d->operation.color;
     }
 
   } else {
 
-    for (const auto &related_entity_id : related_entity_list) {
+    for (RawEntityId related_entity_id : related_entity_list) {
       d->highlights.erase(related_entity_id);
     }
   }

@@ -22,7 +22,7 @@ class HighlightingModelProxy final : public QAbstractItemModel {
 
  public:
   HighlightingModelProxy(QAbstractItemModel *source_model,
-                         const int &entity_id_data_role);
+                         int entity_id_data_role);
 
   virtual ~HighlightingModelProxy() override;
 
@@ -88,8 +88,7 @@ class HighlightingModelProxy final : public QAbstractItemModel {
 
  public slots:
   //! Triggers a model reset without a source model reindex
-  void
-  OnEntityHighlightListChange(const EntityHighlightList &entity_highlight_list);
+  void OnEntityHighlightListChange(const EntityHighlightList &);
 
  private slots:
   //! Triggers a source model reindex + a model reset signal

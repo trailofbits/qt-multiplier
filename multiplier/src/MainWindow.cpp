@@ -47,6 +47,8 @@ static const char *kFileIdProperty = "mx:fileId";
 //! The last cursor location in a code view.
 static const char *kLastLocationProperty = "mx:lastLocation";
 
+static const auto kHighlightEntityIdRole = ICodeModel::RealRelatedEntityIdRole;
+
 struct CodeViewContextMenu final {
   QMenu *menu{nullptr};
   QAction *show_ref_explorer_action{nullptr};
@@ -513,7 +515,7 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
 
   auto code_model = ICodeModel::Create(d->file_location_cache, d->index, this);
   auto proxy_model = d->global_highlighter->CreateModelProxy(
-      code_model, ICodeModel::TokenIdRole);
+      code_model, kHighlightEntityIdRole);
 
   auto code_view = ICodeView::Create(proxy_model);
   code_model->SetEntity(file_entity_id);
@@ -805,28 +807,27 @@ void MainWindow::OnCodeViewContextMenuActionTriggered(QAction *action) {
     OpenTokenReferenceExplorer(code_model_index);
 
   } else if (action == d->code_view_context_menu.set_entity_highlight) {
-    QVariant token_id_var = code_model_index.data(ICodeModel::TokenIdRole);
-    if (!token_id_var.isValid()) {
+    QVariant entity_id_var = code_model_index.data(kHighlightEntityIdRole);
+    if (!entity_id_var.isValid()) {
       return;
     }
 
-    RawEntityId token_id = qvariant_cast<RawEntityId>(token_id_var);
-
+    RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
     QColor color = QColorDialog::getColor();
     if (!color.isValid()) {
       return;
     }
 
-    d->global_highlighter->SetEntityColor(token_id, color);
+    d->global_highlighter->SetEntityColor(entity_id, color);
 
   } else if (action == d->code_view_context_menu.remove_entity_highlight) {
-    QVariant token_id_var = code_model_index.data(ICodeModel::TokenIdRole);
-    if (!token_id_var.isValid()) {
+    QVariant entity_id_var = code_model_index.data(kHighlightEntityIdRole);
+    if (!entity_id_var.isValid()) {
       return;
     }
 
-    RawEntityId token_id = qvariant_cast<RawEntityId>(token_id_var);
-    d->global_highlighter->RemoveEntity(token_id);
+    RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+    d->global_highlighter->RemoveEntity(entity_id);
 
   } else if (action == d->code_view_context_menu.reset_entity_highlights) {
     d->global_highlighter->Clear();
