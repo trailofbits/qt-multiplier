@@ -24,14 +24,14 @@ class GlobalHighlighter final : public IGlobalHighlighter {
   //! \copybrief IGlobalHighlighter::CreateModelProxy
   virtual QAbstractItemModel *
   CreateModelProxy(QAbstractItemModel *source_model,
-                   const int &entity_id_data_role) override;
+                   int entity_id_data_role) override;
 
   //! \copybrief IGlobalHighlighter::AddEntity
-  virtual void SetEntityColor(const RawEntityId &entity_id,
+  virtual void SetEntityColor(RawEntityId entity_id,
                               const QColor &color) override;
 
   //! \copybrief IGlobalHighlighter::RemoveEntity
-  virtual void RemoveEntity(const RawEntityId &entity_id) override;
+  virtual void RemoveEntity(RawEntityId entity_id) override;
 
   //! \copybrief IGlobalHighlighter::Clear
   virtual void Clear() override;
