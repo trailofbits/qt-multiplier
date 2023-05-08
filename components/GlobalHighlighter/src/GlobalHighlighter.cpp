@@ -69,7 +69,7 @@ void GlobalHighlighter::SetEntityColor(const RawEntityId &entity_id,
 void GlobalHighlighter::RemoveEntity(const RawEntityId &entity_id) {
   CancelRequest();
 
-  d->operation.type = Operation::Type::SetEntityColor;
+  d->operation.type = Operation::Type::RemoveEntity;
   d->operation.color = {};
 
   StartRequest(entity_id);
