@@ -25,6 +25,7 @@ target_link_libraries("mx_globalhighlighter"
     "thirdparty_qt"
     "multiplier::mx-api"
     "mx_database"
+    "mx_util"
 )
 
 target_include_directories("mx_globalhighlighter" PRIVATE

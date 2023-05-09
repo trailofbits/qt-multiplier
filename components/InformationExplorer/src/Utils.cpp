@@ -16,6 +16,12 @@ bool ShouldPaintAsTokens(const QModelIndex &index) {
     return false;
   }
 
+  // This is used for highlights
+  auto background_role_var = index.data(Qt::BackgroundRole);
+  if (background_role_var.isValid()) {
+    return false;
+  }
+
   auto token_range_var = index.data(InformationExplorerModel::TokenRangeRole);
   if (!token_range_var.isValid()) {
     return false;

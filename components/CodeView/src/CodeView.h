@@ -180,12 +180,6 @@ class CodeView final : public ICodeView {
       QList<QTextEdit::ExtraSelection> &selection_list,
       const CodeViewTheme &theme);
 
-  //! Returns the contrast ratio for the given color
-  static float GetColorContrast(const QColor &color);
-
-  //! Returns the best foreground color for the given background highlight
-  static QColor GetForegroundColorForColorHighlight(const QColor &color);
-
  private slots:
   //! Connect the cursor changed event. This will also trigger a cursor event.
   void ConnectCursorChangeEvent(void);

@@ -28,13 +28,15 @@ class InformationExplorer final : public IInformationExplorer {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  InformationExplorer(IInformationExplorerModel *model, QWidget *parent);
+  InformationExplorer(IInformationExplorerModel *model, QWidget *parent,
+                      IGlobalHighlighter *global_highlighter);
 
   //! Initializes the internal widgets
   void InitializeWidgets(IInformationExplorerModel *model);
 
   //! Installs the specified model
-  void InstallModel(IInformationExplorerModel *model);
+  void InstallModel(IInformationExplorerModel *model,
+                    IGlobalHighlighter *global_highlighter);
 
   //! Expands all the nodes in the tree view
   void ExpandAllNodes();
@@ -42,6 +44,11 @@ class InformationExplorer final : public IInformationExplorer {
  private slots:
   //! Used to auto-expand nodes at each model reset
   void OnModelReset();
+
+  //! Called when the data in the model changes
+  void OnHighlightModelDataChange(const QModelIndex &top_left,
+                                  const QModelIndex &bottom_right,
+                                  const QList<int> &roles);
 
   //! Called by the ISearchWidget component whenever search options change
   void OnSearchParametersChange(

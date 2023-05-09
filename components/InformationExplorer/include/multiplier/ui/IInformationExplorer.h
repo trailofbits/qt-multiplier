@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/ui/IInformationExplorerModel.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
 
 #include <QWidget>
 
@@ -20,8 +21,9 @@ class IInformationExplorer : public QWidget {
 
  public:
   //! Factory function
-  static IInformationExplorer *Create(IInformationExplorerModel *model,
-                                      QWidget *parent = nullptr);
+  static IInformationExplorer *
+  Create(IInformationExplorerModel *model, QWidget *parent = nullptr,
+         IGlobalHighlighter *global_highlighter = nullptr);
 
   //! Constructor
   IInformationExplorer(QWidget *parent) : QWidget(parent) {}

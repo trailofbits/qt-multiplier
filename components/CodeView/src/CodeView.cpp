@@ -579,8 +579,8 @@ void CodeView::UpdateBaseExtraSelections() {
         continue;
       }
 
-      auto foreground_color =
-          GetForegroundColorForColorHighlight(background_color);
+      auto foreground_color_var = token_index.data(Qt::ForegroundRole);
+      auto foreground_color = qvariant_cast<QColor>(foreground_color_var);
 
       QTextEdit::ExtraSelection selection = {};
       selection.format.setBackground(background_color);
@@ -856,34 +856,6 @@ void CodeView::HighlightTokensForRelatedEntityID(
 
     selection_list.prepend(std::move(selection));
   }
-}
-
-float CodeView::GetColorContrast(const QColor &color) {
-  return (0.2126f * color.redF() + 0.7152f * color.greenF() +
-          0.0722f * color.blueF()) /
-         1000.0f;
-}
-
-QColor CodeView::GetForegroundColorForColorHighlight(const QColor &color) {
-  QColor black_foreground{Qt::black};
-  float black_foreground_contrast{GetColorContrast(black_foreground)};
-
-  QColor white_foreground{Qt::white};
-  float white_foreground_contrast{GetColorContrast(white_foreground)};
-
-  float background_contrast{GetColorContrast(color)};
-
-  QColor foreground_color;
-  if (std::abs(black_foreground_contrast - background_contrast) >
-      std::abs(white_foreground_contrast - background_contrast)) {
-
-    foreground_color = black_foreground;
-
-  } else {
-    foreground_color = white_foreground;
-  }
-
-  return foreground_color;
 }
 
 void CodeView::OnDataChange(const QModelIndex &, const QModelIndex &,

@@ -40,12 +40,13 @@ struct InformationExplorer::PrivateData final {
 InformationExplorer::~InformationExplorer() {}
 
 InformationExplorer::InformationExplorer(IInformationExplorerModel *model,
-                                         QWidget *parent)
+                                         QWidget *parent,
+                                         IGlobalHighlighter *global_highlighter)
     : IInformationExplorer(parent),
       d(new PrivateData) {
 
   InitializeWidgets(model);
-  InstallModel(model);
+  InstallModel(model, global_highlighter);
 }
 
 void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model) {
@@ -86,12 +87,23 @@ void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model) {
   setLayout(layout);
 }
 
-void InformationExplorer::InstallModel(IInformationExplorerModel *model) {
+void InformationExplorer::InstallModel(IInformationExplorerModel *model,
+                                       IGlobalHighlighter *global_highlighter) {
+
   d->model = model;
+
+  QAbstractItemModel *source_model{d->model};
+  if (global_highlighter != nullptr) {
+    source_model = global_highlighter->CreateModelProxy(
+        source_model, IInformationExplorerModel::EntityIdRole);
+
+    connect(source_model, &QAbstractItemModel::dataChanged, this,
+            &InformationExplorer::OnHighlightModelDataChange);
+  }
 
   d->model_proxy = new SortFilterProxyModel(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
-  d->model_proxy->setSourceModel(d->model);
+  d->model_proxy->setSourceModel(source_model);
 
   d->model_proxy->setSortRole(InformationExplorerModel::RawLocationRole);
   d->model_proxy->sort(0);
@@ -99,12 +111,14 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model) {
 
   d->tree_view->setModel(d->model_proxy);
 
-  connect(d->model, &QAbstractItemModel::modelReset, this,
+  connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
           &InformationExplorer::OnModelReset);
 
   auto tree_selection_model = d->tree_view->selectionModel();
   connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
           &InformationExplorer::OnCurrentItemChanged);
+
+  OnModelReset();
 }
 
 void InformationExplorer::ExpandAllNodes() {
@@ -147,6 +161,12 @@ void InformationExplorer::OnModelReset() {
   }
 
   d->history_widget->SetCurrentLocation(current_entity_id);
+}
+
+void InformationExplorer::OnHighlightModelDataChange(const QModelIndex &,
+                                                     const QModelIndex &,
+                                                     const QList<int> &) {
+  d->tree_view->viewport()->repaint();
 }
 
 void InformationExplorer::OnSearchParametersChange(

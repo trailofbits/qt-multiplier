@@ -30,6 +30,7 @@
 #include <multiplier/Entities/VarDecl.h>
 
 #include <QString>
+#include <QColor>
 
 #include <optional>
 #include <unordered_map>
@@ -103,6 +104,12 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 //! Create a breadcrumbs string of the token contexts.
 std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
                                          bool run_length_encode = true);
+
+//! Returns the constrast for the given color
+float GetColorContrast(const QColor &color);
+
+//! Returns the best foreground color for the given background
+QColor GetBestForegroundColor(const QColor &background_color);
 
 //// Try to determine the declarations associated with this token.
 //std::optional<Decl> DeclForToken(const Token &token);
