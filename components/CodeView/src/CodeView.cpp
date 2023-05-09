@@ -854,7 +854,7 @@ void CodeView::HighlightTokensForRelatedEntityID(
     selection.cursor.setPosition(token_map_entry.cursor_end,
                                  QTextCursor::MoveMode::KeepAnchor);
 
-    selection_list.append(std::move(selection));
+    selection_list.prepend(std::move(selection));
   }
 }
 
@@ -1002,7 +1002,7 @@ void CodeView::HandleNewCursor(const QTextCursor &cursor) {
   selection.format.setProperty(QTextFormat::FullWidthSelection, true);
   selection.cursor = cursor;
   selection.cursor.clearSelection();
-  extra_selections.append(selection);
+  extra_selections.prepend(selection);
 
   auto opt_model_index = GetQModelIndexFromTextCursor(d->token_map, cursor);
 
