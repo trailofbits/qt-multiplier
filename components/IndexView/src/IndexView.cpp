@@ -209,6 +209,9 @@ void IndexView::OnSearchParametersChange(
   Assert(regex.isValid(),
          "Invalid regex found in CodeView::OnSearchParametersChange");
 
+  auto &selection_model = *d->tree_view->selectionModel();
+  selection_model.select(QModelIndex(), QItemSelectionModel::Clear);
+
   d->model_proxy->setFilterRegularExpression(regex);
 
   d->tree_view->expandRecursively(QModelIndex());
