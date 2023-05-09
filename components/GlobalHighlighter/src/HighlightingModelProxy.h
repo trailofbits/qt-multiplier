@@ -88,7 +88,8 @@ class HighlightingModelProxy final : public QAbstractItemModel {
 
  public slots:
   //! Triggers a model reset without a source model reindex
-  void OnEntityHighlightListChange(const EntityHighlightList &);
+  void
+  OnEntityHighlightListChange(const EntityHighlightList &entity_highlight_list);
 
  private slots:
   //! Triggers a source model reindex + a model reset signal
