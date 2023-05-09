@@ -51,6 +51,8 @@ GlobalHighlighter::CreateModelProxy(QAbstractItemModel *source_model,
   connect(this, &GlobalHighlighter::EntityHighlightListChanged, model_proxy,
           &HighlightingModelProxy::OnEntityHighlightListChange);
 
+  model_proxy->OnEntityHighlightListChange(d->highlights);
+
   return model_proxy;
 }
 

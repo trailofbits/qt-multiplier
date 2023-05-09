@@ -26,13 +26,11 @@ class IGlobalHighlighter : public QWidget {
                                     QWidget *parent = nullptr);
 
   //! Creates a new proxy model controlled by the highlighter
-  virtual QAbstractItemModel *
-  CreateModelProxy(QAbstractItemModel *source_model,
-                   int entity_id_data_role) = 0;
+  virtual QAbstractItemModel *CreateModelProxy(QAbstractItemModel *source_model,
+                                               int entity_id_data_role) = 0;
 
   //! Adds (or updates) the specified highlight
-  virtual void SetEntityColor(RawEntityId entity_id,
-                              const QColor &color) = 0;
+  virtual void SetEntityColor(RawEntityId entity_id, const QColor &color) = 0;
 
   //! Removes the given entity to the highlight list
   virtual void RemoveEntity(RawEntityId entity_id) = 0;
