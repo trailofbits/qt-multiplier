@@ -151,11 +151,11 @@ void MainWindow::InitializeWidgets() {
   setTabPosition(Qt::TopDockWidgetArea, QTabWidget::North);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
+  CreateGlobalHighlighter();
   CreateProjectExplorerDock();
   CreateEntityExplorerDock();
   CreateInfoExplorerDock();
   CreateCodeView();
-  CreateGlobalHighlighter();
   CreateReferenceExplorerDock();
 
   tabifyDockWidget(d->entity_explorer_dock, d->project_explorer_dock);
@@ -217,8 +217,8 @@ void MainWindow::CreateInfoExplorerDock() {
   d->info_explorer_model =
       IInformationExplorerModel::Create(d->index, d->file_location_cache, this);
 
-  auto info_explorer =
-      IInformationExplorer::Create(d->info_explorer_model, this);
+  auto info_explorer = IInformationExplorer::Create(
+      d->info_explorer_model, this, d->global_highlighter);
 
   connect(info_explorer, &IInformationExplorer::SelectedItemChanged, this,
           &MainWindow::OnInformationExplorerSelectionChange);
@@ -338,6 +338,8 @@ void MainWindow::CreateGlobalHighlighter() {
 
   d->view_menu->addAction(dock->toggleViewAction());
   addDockWidget(Qt::LeftDockWidgetArea, dock);
+
+  dock->hide();
 }
 
 void MainWindow::OpenTokenContextMenu(QModelIndex index) {

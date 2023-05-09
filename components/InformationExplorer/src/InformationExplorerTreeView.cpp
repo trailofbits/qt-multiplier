@@ -34,7 +34,14 @@ void InformationExplorerTreeView::drawRow(QPainter *painter,
                               ? code_view_theme.selected_line_background_color
                               : code_view_theme.default_background_color;
 
+  if (auto highlight_color_var = index.data(Qt::BackgroundRole);
+      highlight_color_var.isValid()) {
+
+    background_color = qvariant_cast<QColor>(highlight_color_var);
+  }
+
   painter->fillRect(option.rect, QBrush(background_color));
+
   QTreeView::drawRow(painter, option, index);
 }
 

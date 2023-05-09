@@ -13,9 +13,10 @@
 namespace mx::gui {
 
 IInformationExplorer *
-IInformationExplorer::Create(IInformationExplorerModel *model,
-                             QWidget *parent) {
-  return new InformationExplorer(model, parent);
+IInformationExplorer::Create(IInformationExplorerModel *model, QWidget *parent,
+                             IGlobalHighlighter *global_highlighter) {
+
+  return new InformationExplorer(model, parent, global_highlighter);
 }
 
 }  // namespace mx::gui
