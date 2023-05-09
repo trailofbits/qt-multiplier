@@ -53,8 +53,11 @@ void LineEdit::OnEditingFinished() {
   }
 
   auto history = GetHistory();
-  history.append(history_item);
+  if (history.contains(history_item)) {
+    return;
+  }
 
+  history.append(history_item);
   SetHistory(history);
 }
 
