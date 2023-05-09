@@ -340,7 +340,7 @@ void SearchWidget::OnRegexSearchOptionToggled(bool checked) {
 }
 
 void SearchWidget::OnShowPreviousResult() {
-  if (d->mode != Mode::Search) {
+  if (d->mode != Mode::Search || d->search_result_count == 0) {
     return;
   }
 
@@ -361,7 +361,7 @@ void SearchWidget::OnShowPreviousResult() {
 }
 
 void SearchWidget::OnShowNextResult() {
-  if (d->mode != Mode::Search) {
+  if (d->mode != Mode::Search || d->search_result_count == 0) {
     return;
   }
 
