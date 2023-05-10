@@ -9,9 +9,11 @@
 #include "Types.h"
 #include "RefExplorerToCodeViewModelAdapter.h"
 
+#include <multiplier/ui/IReferenceExplorerModel.h>
 #include <multiplier/ui/Assert.h>
 
 #include <filesystem>
+#include <iostream>
 
 namespace mx::gui {
 
@@ -28,7 +30,7 @@ void AppendIndentWhitespace(QString &buffer, std::size_t level_count) {
 
 void ImportReferenceExplorerModelHelper(
     RefExplorerToCodeViewModelAdapter::Context &context,
-    const IReferenceExplorerModel *model, const QModelIndex &root,
+    const QAbstractItemModel *model, const QModelIndex &root,
     const std::size_t &indent, std::size_t &line_number) {
 
   auto L_getBreadcrumbs =
@@ -210,12 +212,12 @@ void ImportReferenceExplorerModelHelper(
 }  // namespace
 
 struct RefExplorerToCodeViewModelAdapter::PrivateData final {
-  IReferenceExplorerModel *model{nullptr};
+  QAbstractItemModel *model{nullptr};
   Context context;
 };
 
 RefExplorerToCodeViewModelAdapter::RefExplorerToCodeViewModelAdapter(
-    IReferenceExplorerModel *model, QObject *parent)
+    QAbstractItemModel *model, QObject *parent)
     : ICodeModel(parent),
       d(new PrivateData) {
 
@@ -356,8 +358,6 @@ RefExplorerToCodeViewModelAdapter::parent(const QModelIndex &child) const {
       static_cast<int>(std::distance(root_data.child_id_list.begin(), it));
 
   return createIndex(parent_row, 0, parent_id);
-
-  return QModelIndex();
 }
 
 int RefExplorerToCodeViewModelAdapter::rowCount(
@@ -452,6 +452,19 @@ QVariant RefExplorerToCodeViewModelAdapter::data(const QModelIndex &index,
 
     } else if (role == RefExplorerToCodeViewModelAdapter::IsExpandButton) {
       value.setValue(column.is_expand_button);
+
+    } else if (role == Qt::ForegroundRole || role == Qt::BackgroundRole) {
+      auto parent_index = index.parent();
+
+      auto original_index_var = parent_index.data(
+          RefExplorerToCodeViewModelAdapter::OriginalModelIndex);
+
+      if (original_index_var.isValid()) {
+        const auto &original_index =
+            qvariant_cast<QModelIndex>(original_index_var);
+
+        value = original_index.data(role);
+      }
     }
   }
 
@@ -459,7 +472,7 @@ QVariant RefExplorerToCodeViewModelAdapter::data(const QModelIndex &index,
 }
 
 void RefExplorerToCodeViewModelAdapter::ImportReferenceExplorerModel(
-    Context &context, const IReferenceExplorerModel *model) {
+    Context &context, const QAbstractItemModel *model) {
 
   context.node_id_generator = 0;
   context.node_map.clear();

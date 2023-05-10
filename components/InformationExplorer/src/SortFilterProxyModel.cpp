@@ -9,12 +9,24 @@
 #include "SortFilterProxyModel.h"
 #include "InformationExplorerModel.h"
 
+#include <multiplier/ui/Assert.h>
+
 namespace mx::gui {
 
 SortFilterProxyModel::SortFilterProxyModel(QObject *parent)
     : QSortFilterProxyModel(parent) {}
 
 SortFilterProxyModel::~SortFilterProxyModel() {}
+
+void SortFilterProxyModel::setSourceModel(QAbstractItemModel *source_model) {
+  Assert(sourceModel() == nullptr,
+         "The source model was already set. Changing it is not supported");
+
+  connect(source_model, &QAbstractItemModel::dataChanged, this,
+          &SortFilterProxyModel::OnDataChange);
+
+  QSortFilterProxyModel::setSourceModel(source_model);
+}
 
 bool SortFilterProxyModel::lessThan(const QModelIndex &source_left,
                                     const QModelIndex &source_right) const {
@@ -46,6 +58,16 @@ bool SortFilterProxyModel::lessThan(const QModelIndex &source_left,
   }
 
   return lhs.column_number < rhs.column_number;
+}
+
+void SortFilterProxyModel::OnDataChange(const QModelIndex &top_left,
+                                        const QModelIndex &bottom_right,
+                                        const QList<int> &roles) {
+
+  auto mapped_top_left{mapFromSource(top_left)};
+  auto mapped_bottom_right{mapFromSource(bottom_right)};
+
+  emit dataChanged(mapped_top_left, mapped_bottom_right, roles);
 }
 
 }  // namespace mx::gui

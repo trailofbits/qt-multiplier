@@ -30,10 +30,12 @@ class TextBasedReferenceExplorer final : public IReferenceExplorer {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  TextBasedReferenceExplorer(IReferenceExplorerModel *model, QWidget *parent);
+  TextBasedReferenceExplorer(IReferenceExplorerModel *model, QWidget *parent,
+                             IGlobalHighlighter *global_highlighter);
 
   //! Initializes the internalwidgets
-  void InitializeWidgets(IReferenceExplorerModel *model);
+  void InitializeWidgets(IReferenceExplorerModel *model,
+                         IGlobalHighlighter *global_highlighter);
 
  private slots:
   //! Code view event handler

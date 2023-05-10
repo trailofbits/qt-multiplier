@@ -36,12 +36,6 @@ QVariant HighlightingModelProxy::data(const QModelIndex &index,
     return QIdentityProxyModel::data(index, role);
   }
 
-  auto background_role_var = sourceModel()->data(index, Qt::BackgroundRole);
-  auto foreground_role_var = sourceModel()->data(index, Qt::ForegroundRole);
-  if (background_role_var.isValid() || foreground_role_var.isValid()) {
-    return QIdentityProxyModel::data(index, role);
-  }
-
   auto entity_id_var = sourceModel()->data(index, d->entity_id_data_role);
   if (!entity_id_var.isValid()) {
     return QVariant();

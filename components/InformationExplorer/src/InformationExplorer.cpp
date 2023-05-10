@@ -96,9 +96,6 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model,
   if (global_highlighter != nullptr) {
     source_model = global_highlighter->CreateModelProxy(
         source_model, IInformationExplorerModel::EntityIdRole);
-
-    connect(source_model, &QAbstractItemModel::dataChanged, this,
-            &InformationExplorer::OnHighlightModelDataChange);
   }
 
   d->model_proxy = new SortFilterProxyModel(this);
@@ -110,6 +107,9 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model,
   d->model_proxy->setDynamicSortFilter(true);
 
   d->tree_view->setModel(d->model_proxy);
+
+  connect(d->model_proxy, &QAbstractItemModel::dataChanged, this,
+          &InformationExplorer::OnHighlightModelDataChange);
 
   connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
           &InformationExplorer::OnModelReset);

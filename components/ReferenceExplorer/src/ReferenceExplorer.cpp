@@ -29,18 +29,21 @@ IReferenceExplorerModel *ReferenceExplorer::Model() {
 }
 
 ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
-                                     const Mode &mode, QWidget *parent)
+                                     const Mode &mode, QWidget *parent,
+                                     IGlobalHighlighter *global_highlighter)
     : IReferenceExplorer(parent),
       d(new PrivateData) {
 
   model->setParent(this);
-  InitializeWidgets(model, mode);
+  InitializeWidgets(model, mode, global_highlighter);
 }
 
-void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model,
-                                          const Mode &mode) {
+void ReferenceExplorer::InitializeWidgets(
+    IReferenceExplorerModel *model, const Mode &mode,
+    IGlobalHighlighter *global_highlighter) {
 
-  d->text_view = new TextBasedReferenceExplorer(model, this);
+  d->text_view =
+      new TextBasedReferenceExplorer(model, this, global_highlighter);
 
   connect(d->text_view, &TextBasedReferenceExplorer::SelectedItemChanged, this,
           &IReferenceExplorer::SelectedItemChanged);
@@ -48,7 +51,8 @@ void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model,
   connect(d->text_view, &TextBasedReferenceExplorer::ItemActivated, this,
           &IReferenceExplorer::ItemActivated);
 
-  d->graphical_view = new GraphicalReferenceExplorer(model, this);
+  d->graphical_view =
+      new GraphicalReferenceExplorer(model, this, global_highlighter);
 
   connect(d->graphical_view, &TextBasedReferenceExplorer::SelectedItemChanged,
           this, &IReferenceExplorer::SelectedItemChanged);

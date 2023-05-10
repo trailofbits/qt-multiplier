@@ -209,6 +209,7 @@ CodeView::CodeView(QAbstractItemModel *model, QWidget *parent)
   InitializeWidgets();
 
   SetWordWrapping(false);
+  OnModelReset();
 }
 
 bool CodeView::eventFilter(QObject *obj, QEvent *event) {
@@ -574,11 +575,6 @@ void CodeView::UpdateBaseExtraSelections() {
       const auto &background_color =
           qvariant_cast<QColor>(background_color_var);
 
-      auto token_id_var = token_index.data(ICodeModel::TokenIdRole);
-      if (!token_id_var.isValid()) {
-        continue;
-      }
-
       auto foreground_color_var = token_index.data(Qt::ForegroundRole);
       auto foreground_color = qvariant_cast<QColor>(foreground_color_var);
 
@@ -867,6 +863,7 @@ void CodeView::OnDataChange(const QModelIndex &, const QModelIndex &,
   }
 
   UpdateBaseExtraSelections();
+  d->text_edit->viewport()->update();
 }
 
 void CodeView::OnModelReset() {
