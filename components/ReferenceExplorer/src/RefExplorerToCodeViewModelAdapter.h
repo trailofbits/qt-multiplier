@@ -9,9 +9,10 @@
 #pragma once
 
 #include <multiplier/ui/ICodeModel.h>
-#include <multiplier/ui/IReferenceExplorerModel.h>
 
 #include <multiplier/Entities/TokenCategory.h>
+
+#include <QAbstractItemModel>
 
 #include <memory>
 #include <unordered_map>
@@ -28,8 +29,7 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
   enum ItemDataRole { OriginalModelIndex = Qt::UserRole + 100, IsExpandButton };
 
   //! Constructor
-  RefExplorerToCodeViewModelAdapter(IReferenceExplorerModel *model,
-                                    QObject *parent);
+  RefExplorerToCodeViewModelAdapter(QAbstractItemModel *model, QObject *parent);
 
   //! Destructor
   virtual ~RefExplorerToCodeViewModelAdapter() override;
@@ -124,9 +124,8 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
   };
 
   //! Imports the given model by generating tokens for the code view
-  static void
-  ImportReferenceExplorerModel(Context &context,
-                               const IReferenceExplorerModel *model);
+  static void ImportReferenceExplorerModel(Context &context,
+                                           const QAbstractItemModel *model);
 
   //! Generates a new node id
   static Context::Node::ID GenerateNodeID(Context &context);

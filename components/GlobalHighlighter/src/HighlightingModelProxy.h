@@ -19,11 +19,14 @@ class HighlightingModelProxy final : public QIdentityProxyModel {
   Q_OBJECT
 
  public:
+  //! Constructor
   HighlightingModelProxy(QAbstractItemModel *source_model,
                          int entity_id_data_role);
 
+  //! Destructor
   virtual ~HighlightingModelProxy() override;
 
+  //! Hooks into Qt::{BackgroundRole,ForegroundRole} and forwards the rest
   QVariant data(const QModelIndex &index, int role) const override;
 
  private:

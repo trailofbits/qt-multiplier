@@ -72,12 +72,13 @@ void GraphicalReferenceExplorer::resizeEvent(QResizeEvent *) {
 }
 
 GraphicalReferenceExplorer::GraphicalReferenceExplorer(
-    IReferenceExplorerModel *model, QWidget *parent)
+    IReferenceExplorerModel *model, QWidget *parent,
+    IGlobalHighlighter *global_highlighter)
     : IReferenceExplorer(parent),
       d(new PrivateData) {
 
   InitializeWidgets();
-  InstallModel(model);
+  InstallModel(model, global_highlighter);
 
   // Synchronize the search widget and its addon
   d->search_widget->Deactivate();
@@ -234,11 +235,19 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
           &GraphicalReferenceExplorer::OnContextMenuActionTriggered);
 }
 
-void GraphicalReferenceExplorer::InstallModel(IReferenceExplorerModel *model) {
+void GraphicalReferenceExplorer::InstallModel(
+    IReferenceExplorerModel *model, IGlobalHighlighter *global_highlighter) {
   d->model = model;
+
+  QAbstractItemModel *source_model{d->model};
+  if (global_highlighter != nullptr) {
+    source_model = global_highlighter->CreateModelProxy(
+        source_model, IReferenceExplorerModel::EntityIdRole);
+  }
+
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
-  d->model_proxy->setSourceModel(d->model);
+  d->model_proxy->setSourceModel(source_model);
 
   d->tree_view->setModel(d->model_proxy);
 
@@ -421,6 +430,8 @@ void GraphicalReferenceExplorer::OnModelReset() {
 void GraphicalReferenceExplorer::OnDataChanged() {
   UpdateTreeViewItemButtons();
   ExpandAllNodes();
+
+  d->tree_view->viewport()->repaint();
 }
 
 void GraphicalReferenceExplorer::ExpandAllNodes() {

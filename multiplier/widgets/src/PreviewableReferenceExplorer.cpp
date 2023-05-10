@@ -50,7 +50,8 @@ void PreviewableReferenceExplorer::InitializeWidgets(
     IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
     IGlobalHighlighter &highlighter) {
 
-  d->reference_explorer = IReferenceExplorer::Create(model, mode, this);
+  d->reference_explorer =
+      IReferenceExplorer::Create(model, mode, this, &highlighter);
 
   connect(
       d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,

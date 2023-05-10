@@ -33,13 +33,15 @@ class GraphicalReferenceExplorer final : public IReferenceExplorer {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  GraphicalReferenceExplorer(IReferenceExplorerModel *model, QWidget *parent);
+  GraphicalReferenceExplorer(IReferenceExplorerModel *model, QWidget *parent,
+                             IGlobalHighlighter *global_highlighter);
 
   //! Initializes the internalwidgets
   void InitializeWidgets();
 
   //! Installs the given model
-  void InstallModel(IReferenceExplorerModel *model);
+  void InstallModel(IReferenceExplorerModel *model,
+                    IGlobalHighlighter *global_highlighter);
 
   //! Called when copying the details of a reference explorer item
   void CopyRefExplorerItemDetails(const QModelIndex &index);

@@ -10,6 +10,7 @@
 #include "RefExplorerToCodeViewModelAdapter.h"
 
 #include <QVBoxLayout>
+#include <QDebug>
 
 namespace mx::gui {
 
@@ -28,20 +29,28 @@ IReferenceExplorerModel *TextBasedReferenceExplorer::Model() {
 }
 
 TextBasedReferenceExplorer::TextBasedReferenceExplorer(
-    IReferenceExplorerModel *model, QWidget *parent)
+    IReferenceExplorerModel *model, QWidget *parent,
+    IGlobalHighlighter *global_highlighter)
     : IReferenceExplorer(parent),
       d(new PrivateData) {
 
-  InitializeWidgets(model);
+  InitializeWidgets(model, global_highlighter);
 }
 
 void TextBasedReferenceExplorer::InitializeWidgets(
-    IReferenceExplorerModel *model) {
+    IReferenceExplorerModel *model, IGlobalHighlighter *global_highlighter) {
+
   setContentsMargins(0, 0, 0, 0);
 
   d->model = model;
 
-  d->code_model = new RefExplorerToCodeViewModelAdapter(model, this);
+  QAbstractItemModel *source_model{d->model};
+  if (global_highlighter != nullptr) {
+    source_model = global_highlighter->CreateModelProxy(
+        source_model, IReferenceExplorerModel::EntityIdRole);
+  }
+
+  d->code_model = new RefExplorerToCodeViewModelAdapter(source_model, this);
   d->code_model->SetBreadcrumbsVisibility(d->breadcrumbs_enabled);
 
   d->code_view = ICodeView::Create(d->code_model, this);
@@ -69,6 +78,28 @@ void TextBasedReferenceExplorer::OnTokenTriggered(
   auto original_index = qvariant_cast<QModelIndex>(original_index_var);
   if (!original_index.isValid()) {
     return;
+  }
+
+  qDebug() << "";
+  if (auto var = index.data(Qt::DisplayRole); var.isValid()) {
+    auto token = qvariant_cast<QString>(var);
+    qDebug() << "Qt::DisplayRole" << token;
+  }
+
+  if (auto var = index.data(Qt::BackgroundRole); var.isValid()) {
+    auto color = qvariant_cast<QColor>(var);
+    qDebug() << "Qt::BackgroundRole" << color;
+  }
+
+  if (auto var = index.data(Qt::ForegroundRole); var.isValid()) {
+    auto color = qvariant_cast<QColor>(var);
+    qDebug() << "Qt::ForegroundRole" << color;
+  }
+
+  if (auto var = index.data(IReferenceExplorerModel::EntityIdRole);
+      var.isValid()) {
+    auto id = qvariant_cast<RawEntityId>(var);
+    qDebug() << "IReferenceExplorerModel::EntityIdRole" << id;
   }
 
   if (token_action.type == ICodeView::TokenAction::Type::Primary) {

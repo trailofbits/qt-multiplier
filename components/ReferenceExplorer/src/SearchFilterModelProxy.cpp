@@ -9,6 +9,7 @@
 #include "SearchFilterModelProxy.h"
 
 #include <multiplier/ui/IReferenceExplorerModel.h>
+#include <multiplier/ui/Assert.h>
 
 #include "Types.h"
 
@@ -45,6 +46,16 @@ void SearchFilterModelProxy::EnableEntityIDFilter(const bool &enable) {
 void SearchFilterModelProxy::EnableBreadcrumbsFilter(const bool &enable) {
   d->enable_breadcrumbs_filter = enable;
   invalidateFilter();
+}
+
+void SearchFilterModelProxy::setSourceModel(QAbstractItemModel *source_model) {
+  Assert(sourceModel() == nullptr,
+         "The source model was already set. Changing it is not supported");
+
+  connect(source_model, &QAbstractItemModel::dataChanged, this,
+          &SearchFilterModelProxy::OnDataChange);
+
+  QSortFilterProxyModel::setSourceModel(source_model);
 }
 
 bool SearchFilterModelProxy::filterAcceptsRow(
@@ -165,6 +176,16 @@ bool SearchFilterModelProxy::lessThan(const QModelIndex &left,
   auto right_entity_id_role = right_entity_id_role_var.toULongLong();
 
   return left_entity_id_role < right_entity_id_role;
+}
+
+void SearchFilterModelProxy::OnDataChange(const QModelIndex &top_left,
+                                          const QModelIndex &bottom_right,
+                                          const QList<int> &roles) {
+
+  auto mapped_top_left{mapFromSource(top_left)};
+  auto mapped_bottom_right{mapFromSource(bottom_right)};
+
+  emit dataChanged(mapped_top_left, mapped_bottom_right, roles);
 }
 
 }  // namespace mx::gui

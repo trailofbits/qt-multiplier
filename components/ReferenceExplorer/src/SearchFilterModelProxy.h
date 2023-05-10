@@ -37,6 +37,9 @@ class SearchFilterModelProxy final : public QSortFilterProxyModel {
   //! Enables or disables breadscrumbs-based filtering
   void EnableBreadcrumbsFilter(const bool &enable);
 
+  //! Wraps `setSourceModel` in order to connect the required signals
+  virtual void setSourceModel(QAbstractItemModel *source_model) override;
+
  protected:
   //! Returns true if the specified row should be included in the view
   virtual bool
@@ -56,5 +59,10 @@ class SearchFilterModelProxy final : public QSortFilterProxyModel {
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
+
+ private slots:
+  //! Forwards the dataChanged signal
+  void OnDataChange(const QModelIndex &top_left,
+                    const QModelIndex &bottom_right, const QList<int> &roles);
 };
 }  // namespace mx::gui

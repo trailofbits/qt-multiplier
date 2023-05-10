@@ -80,6 +80,7 @@ target_link_libraries("mx_referenceexplorer"
     "mx_searchwidget"
     "mx_util"
     "mx_codeview"
+    "mx_globalhighlighter"
 )
 
 target_include_directories("mx_referenceexplorer" PRIVATE

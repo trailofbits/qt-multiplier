@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/ui/IReferenceExplorerModel.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
 
 #include <QWidget>
 
@@ -27,9 +28,10 @@ class IReferenceExplorer : public QWidget {
   };
 
   //! Factory method
-  static IReferenceExplorer *Create(IReferenceExplorerModel *model,
-                                    const Mode &mode,
-                                    QWidget *parent = nullptr);
+  static IReferenceExplorer *
+  Create(IReferenceExplorerModel *model, const Mode &mode,
+         QWidget *parent = nullptr,
+         IGlobalHighlighter *global_highlighter = nullptr);
 
   //! Constructor
   IReferenceExplorer(QWidget *parent) : QWidget(parent) {}

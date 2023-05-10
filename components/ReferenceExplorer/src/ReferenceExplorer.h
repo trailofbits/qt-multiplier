@@ -29,10 +29,11 @@ class ReferenceExplorer final : public IReferenceExplorer {
 
   //! Constructor
   ReferenceExplorer(IReferenceExplorerModel *model, const Mode &mode,
-                    QWidget *parent);
+                    QWidget *parent, IGlobalHighlighter *global_highlighter);
 
   //! Initializes the internalwidgets
-  void InitializeWidgets(IReferenceExplorerModel *model, const Mode &mode);
+  void InitializeWidgets(IReferenceExplorerModel *model, const Mode &mode,
+                         IGlobalHighlighter *global_highlighter);
 
   friend class IReferenceExplorer;
 };

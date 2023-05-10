@@ -92,9 +92,17 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   painter->save();
 
   painter->setRenderHint(QPainter::Antialiasing, true);
+
+  auto background_color{option.palette.base()};
   if ((option.state & QStyle::State_Selected) != 0) {
-    painter->fillRect(option.rect, option.palette.highlight());
+    background_color = option.palette.highlight();
+
+  } else if (auto background_role_var = index.data(Qt::BackgroundRole);
+             background_role_var.isValid()) {
+    background_color = qvariant_cast<QColor>(background_role_var);
   }
+
+  painter->fillRect(option.rect, background_color);
 
   painter->translate(option.rect.x() + margin, option.rect.y() + margin);
 
@@ -108,7 +116,16 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   font.setBold(true);
   painter->setFont(font);
 
-  painter->setPen(option.palette.text().color());
+  if (auto foreground_color_var = index.data(Qt::ForegroundRole);
+      foreground_color_var.isValid()) {
+    const auto &foreground_color = qvariant_cast<QColor>(foreground_color_var);
+    painter->setPen(QPen(foreground_color));
+    painter->setBrush(QBrush(foreground_color));
+
+  } else {
+    painter->setPen(option.palette.text().color());
+  }
+
   painter->drawText(
       QRect(0, (icon_size / 2) - (font_height / 2), rect_width, font_height),
       Qt::AlignVCenter, label);
