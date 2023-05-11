@@ -14,7 +14,7 @@ set(CPACK_STRIP_FILES ON)
 set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "extra")
 set(CPACK_DEBIAN_PACKAGE_SECTION "default")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>=2.35), libqt6gui6 (>=6.2.4), libgl1-mesa-dri (>=22.2.5), libglvnd0 (>=1.4.0)")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>=2.35), libqt6gui6 (>=6.2.4), libgl1-mesa-dri (>=22.2.5), libglvnd0 (>=1.4.0), libqt6widgets6 (>=6.2.4), libqt6concurrent6 (>=6.2.4), libqt6core5compat6 (>=6.2.4), qt6-wayland (>=6.2.4)")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
 
 install(
