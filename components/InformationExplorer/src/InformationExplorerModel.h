@@ -129,6 +129,7 @@ class InformationExplorerModel final : public IInformationExplorerModel {
     std::unordered_map<NodeID, Node> node_map;
   };
 
+  //! Creates a new property in the node map
   static void
   CreateProperty(Context &context, const QStringList &path,
                  const std::unordered_map<int, QVariant> &value_map = {});
@@ -143,13 +144,6 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   static void
   ImportEntityInformation(Context &context,
                           const EntityInformation &entity_information);
-
-  //! Returns the row count for the given model index
-  static int RowCount(const Context &context, const QModelIndex &parent);
-
-  //! Returns the node data for the given item data role
-  static QVariant Data(const Context &context, const QModelIndex &index,
-                       int role);
 
   friend class IInformationExplorerModel;
 };
