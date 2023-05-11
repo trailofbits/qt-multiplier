@@ -260,7 +260,18 @@ QModelIndex InformationExplorerModel::parent(const QModelIndex &child) const {
 }
 
 int InformationExplorerModel::rowCount(const QModelIndex &parent) const {
-  return RowCount(d->context, parent);
+  Context::NodeID node_id{};
+  if (parent.isValid()) {
+    node_id = parent.internalId();
+  }
+
+  auto node_map_it = d->context.node_map.find(node_id);
+  if (node_map_it == d->context.node_map.end()) {
+    return 0;
+  }
+
+  const auto &node = node_map_it->second;
+  return static_cast<int>(node.child_id_list.size());
 }
 
 int InformationExplorerModel::columnCount(const QModelIndex &) const {
@@ -269,7 +280,28 @@ int InformationExplorerModel::columnCount(const QModelIndex &) const {
 
 QVariant InformationExplorerModel::data(const QModelIndex &index,
                                         int role) const {
-  return Data(d->context, index, role);
+  if (!index.isValid()) {
+    return QVariant();
+  }
+
+  auto node_id = index.internalId();
+
+  auto node_map_it = d->context.node_map.find(node_id);
+  if (node_map_it == d->context.node_map.end()) {
+    return QVariant();
+  }
+
+  const auto &node = node_map_it->second;
+  if (role == Qt::DisplayRole) {
+    return node.display_role;
+  }
+
+  auto value_map_it = node.value_map.find(role);
+  if (value_map_it == node.value_map.end()) {
+    return QVariant();
+  }
+
+  return value_map_it->second;
 }
 
 void InformationExplorerModel::FutureResultStateChanged() {
@@ -537,50 +569,6 @@ void InformationExplorerModel::ImportEntityInformation(
     std::filesystem::path path(context.entity_name.toStdString());
     context.entity_name = QString::fromStdString(path.filename());
   }
-}
-
-int InformationExplorerModel::RowCount(const Context &context,
-                                       const QModelIndex &parent) {
-
-  Context::NodeID node_id{};
-  if (parent.isValid()) {
-    node_id = parent.internalId();
-  }
-
-  auto node_map_it = context.node_map.find(node_id);
-  if (node_map_it == context.node_map.end()) {
-    return 0;
-  }
-
-  const auto &node = node_map_it->second;
-  return static_cast<int>(node.child_id_list.size());
-}
-
-QVariant InformationExplorerModel::Data(const Context &context,
-                                        const QModelIndex &index, int role) {
-
-  if (!index.isValid()) {
-    return QVariant();
-  }
-
-  auto node_id = index.internalId();
-
-  auto node_map_it = context.node_map.find(node_id);
-  if (node_map_it == context.node_map.end()) {
-    return QVariant();
-  }
-
-  const auto &node = node_map_it->second;
-  if (role == Qt::DisplayRole) {
-    return node.display_role;
-  }
-
-  auto value_map_it = node.value_map.find(role);
-  if (value_map_it == node.value_map.end()) {
-    return QVariant();
-  }
-
-  return value_map_it->second;
 }
 
 }  // namespace mx::gui
