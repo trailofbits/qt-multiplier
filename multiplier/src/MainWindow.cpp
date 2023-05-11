@@ -12,7 +12,7 @@
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/HistoryWidget.h>
-#include <multiplier/ui/IIndexView.h>
+#include <multiplier/ui/IProjectExplorer.h>
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/Util.h>
@@ -69,7 +69,7 @@ struct MainWindow::PrivateData final {
   mx::Index index;
   mx::FileLocationCache file_location_cache;
 
-  IIndexView *index_view{nullptr};
+  IProjectExplorer *project_explorer{nullptr};
   IEntityExplorer *entity_explorer{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
@@ -183,15 +183,15 @@ void MainWindow::InitializeToolBar() {
 
 void MainWindow::CreateProjectExplorerDock() {
   auto file_tree_model = IFileTreeModel::Create(d->index, this);
-  d->index_view = IIndexView::Create(file_tree_model, this);
+  d->project_explorer = IProjectExplorer::Create(file_tree_model, this);
 
-  connect(d->index_view, &IIndexView::FileClicked, this,
-          &MainWindow::OnIndexViewFileClicked);
+  connect(d->project_explorer, &IProjectExplorer::FileClicked, this,
+          &MainWindow::OnProjectExplorerFileClicked);
 
   d->project_explorer_dock = new QDockWidget(tr("Project Explorer"), this);
   d->project_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
   d->view_menu->addAction(d->project_explorer_dock->toggleViewAction());
-  d->project_explorer_dock->setWidget(d->index_view);
+  d->project_explorer_dock->setWidget(d->project_explorer);
   addDockWidget(Qt::LeftDockWidgetArea, d->project_explorer_dock);
 }
 
@@ -656,9 +656,10 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
   }
 }
 
-void MainWindow::OnIndexViewFileClicked(RawEntityId file_id, QString tab_name,
-                                        Qt::KeyboardModifiers,
-                                        Qt::MouseButtons) {
+void MainWindow::OnProjectExplorerFileClicked(RawEntityId file_id,
+                                              QString tab_name,
+                                              Qt::KeyboardModifiers,
+                                              Qt::MouseButtons) {
   CloseAllPopups();
   OpenEntityInfo(file_id);
 
