@@ -10,13 +10,24 @@ For the time being, refer to the [GitHub Actions workflow](https://github.com/tr
 
 ## Pre-built binaries
 
+### CI builds
+
 The CI workflow automatically uploads build artifacts. To download a pre-built binary:
 
  * Open the repository home page
  * Click on the green checkmark of the last commit (or use the commit history)
  * Open the `details` link of the macOS build entry
  * Select `Summary` in the top left corner of the page
- * Scroll down and click on the `Multiplier.app.tar.gz` link under `Artifacts`
+ * Scroll down and download the relevant package for your system.
+
+### Releases
+
+Tagged releases can be found at the following link: [qt-multiplier releases](https://github.com/trailofbits/qt-multiplier/releases)
+
+### deb-specific instructions
+
+1. Install the package with the following command: `sudo dpkg -i package-name.deb`
+2. Install the missing dependencies: `sudo apt install -f`
 
 ## Running qt-multiplier
 
