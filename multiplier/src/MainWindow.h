@@ -68,9 +68,9 @@ class MainWindow final : public QMainWindow {
  private slots:
   //! Called when a file name in the project explorer (list of indexed files) is
   //! clicked.
-  void OnIndexViewFileClicked(RawEntityId file_id, QString file_name,
-                              Qt::KeyboardModifiers modifiers,
-                              Qt::MouseButtons buttons);
+  void OnProjectExplorerFileClicked(RawEntityId file_id, QString file_name,
+                                    Qt::KeyboardModifiers modifiers,
+                                    Qt::MouseButtons buttons);
 
   //! Called when we interact with a token in a main file view, or in a code
   //! preview, e.g. a reference browser code view.

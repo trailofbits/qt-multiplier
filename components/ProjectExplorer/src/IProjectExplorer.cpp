@@ -6,14 +6,15 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "IndexView.h"
+#include "ProjectExplorer.h"
 
-#include <multiplier/ui/IIndexView.h>
+#include <multiplier/ui/IProjectExplorer.h>
 
 namespace mx::gui {
 
-IIndexView *IIndexView::Create(IFileTreeModel *model, QWidget *parent) {
-  return new IndexView(model, parent);
+IProjectExplorer *IProjectExplorer::Create(IFileTreeModel *model,
+                                           QWidget *parent) {
+  return new ProjectExplorer(model, parent);
 }
 
 }  // namespace mx::gui

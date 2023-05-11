@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "IndexView.h"
+#include "ProjectExplorer.h"
 
 #include <multiplier/ui/Assert.h>
 
@@ -40,7 +40,7 @@ struct ContextMenu final {
 
 }  // namespace
 
-struct IndexView::PrivateData final {
+struct ProjectExplorer::PrivateData final {
   IFileTreeModel *model{nullptr};
   QSortFilterProxyModel *model_proxy{nullptr};
   QTreeView *tree_view{nullptr};
@@ -49,17 +49,17 @@ struct IndexView::PrivateData final {
   QWidget *alternative_root_warning{nullptr};
 };
 
-IndexView::~IndexView() {}
+ProjectExplorer::~ProjectExplorer() {}
 
-IndexView::IndexView(IFileTreeModel *model, QWidget *parent)
-    : IIndexView(parent),
+ProjectExplorer::ProjectExplorer(IFileTreeModel *model, QWidget *parent)
+    : IProjectExplorer(parent),
       d(new PrivateData) {
 
   InitializeWidgets();
   InstallModel(model);
 }
 
-void IndexView::InitializeWidgets() {
+void ProjectExplorer::InitializeWidgets() {
   // Setup the tree view
   d->tree_view = new QTreeView();
   d->tree_view->setHeaderHidden(true);
@@ -74,7 +74,7 @@ void IndexView::InitializeWidgets() {
 
   d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
   connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
-          &IndexView::OnSearchParametersChange);
+          &ProjectExplorer::OnSearchParametersChange);
 
   // Create the alternative root item warning
   auto root_warning_label = new QLabel();
@@ -88,7 +88,7 @@ void IndexView::InitializeWidgets() {
   root_warning_label->setFont(warning_font);
 
   connect(root_warning_label, &QLabel::linkActivated, this,
-          &IndexView::OnDisableCustomRootLinkClicked);
+          &ProjectExplorer::OnDisableCustomRootLinkClicked);
 
   auto root_warning_layout = new QHBoxLayout();
   root_warning_layout->setContentsMargins(0, 0, 0, 0);
@@ -134,13 +134,13 @@ void IndexView::InitializeWidgets() {
   d->context_menu.menu->addMenu(d->context_menu.copy_menu);
 
   connect(d->context_menu.menu, &QMenu::triggered, this,
-          &IndexView::OnContextMenuActionTriggered);
+          &ProjectExplorer::OnContextMenuActionTriggered);
 
   connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
-          &IndexView::OnOpenItemContextMenu);
+          &ProjectExplorer::OnOpenItemContextMenu);
 }
 
-void IndexView::InstallModel(IFileTreeModel *model) {
+void ProjectExplorer::InstallModel(IFileTreeModel *model) {
   d->model = model;
 
   d->model_proxy = new QSortFilterProxyModel(this);
@@ -156,21 +156,21 @@ void IndexView::InstallModel(IFileTreeModel *model) {
   // tree view!
   auto tree_selection_model = d->tree_view->selectionModel();
   connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
-          &IndexView::SelectionChanged);
+          &ProjectExplorer::SelectionChanged);
 
   connect(d->model, &QAbstractItemModel::modelReset, this,
-          &IndexView::OnModelReset);
+          &ProjectExplorer::OnModelReset);
 
   OnModelReset();
 }
 
 //! Try to open the file related to a specific model index.
-void IndexView::SelectionChanged(const QModelIndex &index,
-                                 const QModelIndex &) {
+void ProjectExplorer::SelectionChanged(const QModelIndex &index,
+                                       const QModelIndex &) {
   OnFileTreeItemClicked(index);
 }
 
-void IndexView::OnFileTreeItemClicked(const QModelIndex &index) {
+void ProjectExplorer::OnFileTreeItemClicked(const QModelIndex &index) {
   auto opt_file_id_var =
       d->model_proxy->data(index, IFileTreeModel::FileIdRole);
 
@@ -184,7 +184,7 @@ void IndexView::OnFileTreeItemClicked(const QModelIndex &index) {
                    qApp->mouseButtons());
 }
 
-void IndexView::OnSearchParametersChange(
+void ProjectExplorer::OnSearchParametersChange(
     const ISearchWidget::SearchParameters &search_parameters) {
 
   QRegularExpression::PatternOptions options{
@@ -218,7 +218,7 @@ void IndexView::OnSearchParametersChange(
   d->tree_view->resizeColumnToContents(0);
 }
 
-void IndexView::OnOpenItemContextMenu(const QPoint &point) {
+void ProjectExplorer::OnOpenItemContextMenu(const QPoint &point) {
   auto index = d->tree_view->indexAt(point);
   if (!index.isValid()) {
     return;
@@ -242,7 +242,7 @@ void IndexView::OnOpenItemContextMenu(const QPoint &point) {
   d->context_menu.menu->exec(menu_position);
 }
 
-void IndexView::OnContextMenuActionTriggered(QAction *action) {
+void ProjectExplorer::OnContextMenuActionTriggered(QAction *action) {
   auto index_var = action->data();
   if (!index_var.isValid()) {
     return;
@@ -289,7 +289,7 @@ void IndexView::OnContextMenuActionTriggered(QAction *action) {
   }
 }
 
-void IndexView::OnModelReset() {
+void ProjectExplorer::OnModelReset() {
   auto display_root_warning = d->model->HasAlternativeRoot();
   d->alternative_root_warning->setVisible(display_root_warning);
 
@@ -297,7 +297,7 @@ void IndexView::OnModelReset() {
   d->tree_view->resizeColumnToContents(0);
 }
 
-void IndexView::OnDisableCustomRootLinkClicked() {
+void ProjectExplorer::OnDisableCustomRootLinkClicked() {
   d->model->SetDefaultRoot();
 }
 

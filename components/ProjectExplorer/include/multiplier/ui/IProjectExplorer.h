@@ -15,30 +15,30 @@
 namespace mx::gui {
 
 //! A widget that displays the contents of an Index as a tree view
-class IIndexView : public QWidget {
+class IProjectExplorer : public QWidget {
   Q_OBJECT
 
  public:
   //! Factory function
-  static IIndexView *Create(IFileTreeModel *model, QWidget *parent = nullptr);
+  static IProjectExplorer *Create(IFileTreeModel *model,
+                                  QWidget *parent = nullptr);
 
   //! Constructor
-  IIndexView(QWidget *parent) : QWidget(parent) {}
+  IProjectExplorer(QWidget *parent) : QWidget(parent) {}
 
   //! Destructor
-  virtual ~IIndexView() override = default;
+  virtual ~IProjectExplorer() override = default;
 
   //! Disable the copy constructor
-  IIndexView(const IIndexView &) = delete;
+  IProjectExplorer(const IProjectExplorer &) = delete;
 
   //! Disable copy assignment
-  IIndexView &operator=(const IIndexView &) = delete;
+  IProjectExplorer &operator=(const IProjectExplorer &) = delete;
 
  signals:
   //! Emitted when a file has been clicked
   void FileClicked(RawEntityId file_id, QString file_name,
-                   Qt::KeyboardModifiers modifiers,
-                   Qt::MouseButtons buttons);
+                   Qt::KeyboardModifiers modifiers, Qt::MouseButtons buttons);
 };
 
 }  // namespace mx::gui

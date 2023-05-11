@@ -6,21 +6,21 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_library("mx_indexview"
-  include/multiplier/ui/IIndexView.h
-  src/IIndexView.cpp
+add_library("mx_projectexplorer"
+  include/multiplier/ui/IProjectExplorer.h
+  src/IProjectExplorer.cpp
 
   include/multiplier/ui/IFileTreeModel.h
   src/IFileTreeModel.cpp
 
-  src/IndexView.h
-  src/IndexView.cpp
+  src/ProjectExplorer.h
+  src/ProjectExplorer.cpp
 
   src/FileTreeModel.h
   src/FileTreeModel.cpp  
 )
 
-target_link_libraries("mx_indexview"
+target_link_libraries("mx_projectexplorer"
   PRIVATE
     "qtmx_cxx_flags"
 
@@ -30,15 +30,15 @@ target_link_libraries("mx_indexview"
     "mx_searchwidget"
 )
 
-target_include_directories("mx_indexview" PRIVATE
+target_include_directories("mx_projectexplorer" PRIVATE
   "include"
 )
 
-target_include_directories("mx_indexview" SYSTEM INTERFACE
+target_include_directories("mx_projectexplorer" SYSTEM INTERFACE
   "include"
 )
 
-enable_qt_properties("mx_indexview")
+enable_qt_properties("mx_projectexplorer")
 
 if(MXQT_ENABLE_TESTS)
   add_subdirectory("tests")

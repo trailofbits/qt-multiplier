@@ -8,25 +8,25 @@
 
 #pragma once
 
-#include <multiplier/ui/IIndexView.h>
+#include <multiplier/ui/IProjectExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
 
 namespace mx::gui {
 
-//! The main class implementing the IIndexView interface
-class IndexView final : public IIndexView {
+//! The main class implementing the IProjectExplorer interface
+class ProjectExplorer final : public IProjectExplorer {
   Q_OBJECT
 
  public:
   //! Destructor
-  virtual ~IndexView() override;
+  virtual ~ProjectExplorer() override;
 
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  IndexView(IFileTreeModel *model, QWidget *parent);
+  ProjectExplorer(IFileTreeModel *model, QWidget *parent);
 
   //! Initializes the widgets
   void InitializeWidgets();
@@ -58,7 +58,7 @@ class IndexView final : public IIndexView {
   //! Called when the user disables the custom root item from the warning widget
   void OnDisableCustomRootLinkClicked();
 
-  friend class IIndexView;
+  friend class IProjectExplorer;
 };
 
 }  // namespace mx::gui
