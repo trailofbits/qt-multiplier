@@ -37,6 +37,13 @@ class HighlightingModelProxy final : public QIdentityProxyModel {
   //! Triggers a model reset without a source model reindex
   void
   OnEntityHighlightListChange(const EntityHighlightList &entity_highlight_list);
+
+  //! Forwards the modelAboutToBeReset signal
+  void OnModelAboutToBeReset();
+
+ signals:
+  //! The forwarded modelAboutToBeReset signal
+  void modelAboutToBeReset();
 };
 
 }  // namespace mx::gui

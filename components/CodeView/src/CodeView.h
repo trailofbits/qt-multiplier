@@ -107,6 +107,9 @@ class CodeView final : public ICodeView {
   //! Handle a cursor move.
   void HandleNewCursor(const QTextCursor &cursor);
 
+  //! Scrolls the view to the specified entity id (internal)
+  bool ScrollToLineNumberInternal(unsigned line);
+
  public:
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
@@ -191,10 +194,6 @@ class CodeView final : public ICodeView {
   //! This slot regenerates the code view contents using CreateTextDocument
   void OnModelReset(void);
 
-  //! This slot receives tells us when a request for a model reset is was
-  //! skipped because the current model is already the right model to use.
-  void OnModelResetDone(void);
-
   //! Repaints the line numbers on the gutter
   void OnGutterPaintEvent(QPaintEvent *event);
 
@@ -216,6 +215,9 @@ class CodeView final : public ICodeView {
 
   //! Called when the cursor position has changed.
   void OnCursorMoved(void);
+
+  //! Called when the model is about to be reset
+  void OnModelAboutToBeReset();
 
   friend class ICodeView;
 };

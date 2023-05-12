@@ -58,10 +58,20 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   CancelRunningRequest();
 
   emit beginResetModel();
-  d->opt_entity_id = std::nullopt;
 
   EntityId eid(raw_id);
   VariantId vid = eid.Unpack();
+
+  if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
+    raw_id = EntityId(frag_id.value()).Pack();
+  }
+
+  if (d->opt_entity_id.has_value() && d->opt_entity_id.value() == raw_id) {
+    emit endResetModel();
+    return;
+  }
+
+  d->opt_entity_id = std::nullopt;
 
   if (std::holds_alternative<FileId>(vid)) {
     d->future_result = d->database->RequestIndexedTokenRangeData(
@@ -73,8 +83,7 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
 
   } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
     d->future_result = d->database->RequestIndexedTokenRangeData(
-        EntityId(frag_id.value()).Pack(),
-        IDatabase::IndexedTokenRangeDataRequestType::Fragment);
+        raw_id, IDatabase::IndexedTokenRangeDataRequestType::Fragment);
 
   } else {
     d->model_state = ModelState::UpdateFailed;
