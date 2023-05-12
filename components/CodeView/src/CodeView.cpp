@@ -40,6 +40,11 @@ namespace mx::gui {
 
 namespace {
 
+enum class ModelState {
+  Ready,
+  Updating,
+};
+
 const int kHoverMsecsTimer{2000};
 
 class QPlainTextEditMod final : public QPlainTextEdit {
@@ -54,6 +59,7 @@ class QPlainTextEditMod final : public QPlainTextEdit {
 }  // namespace
 
 struct CodeView::PrivateData final {
+  ModelState model_state{ModelState::Ready};
   QAbstractItemModel *model{nullptr};
 
   int version{0};
@@ -177,28 +183,12 @@ void CodeView::SetWordWrapping(bool enabled) {
 
 bool CodeView::ScrollToLineNumber(unsigned line) {
   d->deferred_scroll_to_line.reset();
-
-  // Check whether we have enough lines for the go-to operation.
-  auto row_count = static_cast<unsigned>(d->model->rowCount());
-  if (line > row_count) {
+  if (d->model_state != ModelState::Ready) {
     d->deferred_scroll_to_line = line;
     return false;
   }
 
-  auto opt_block_number = GetBlockNumberFromLineNumber(d->token_map, line);
-  if (!opt_block_number.has_value()) {
-    return false;
-  }
-
-  const auto &block_number = opt_block_number.value();
-
-  const auto &document = *d->text_edit->document();
-  auto text_block = document.findBlockByNumber(static_cast<int>(block_number));
-  if (!text_block.isValid()) {
-    return false;
-  }
-
-  return SetCursorPosition(text_block.position(), std::nullopt);
+  return ScrollToLineNumberInternal(line);
 }
 
 CodeView::CodeView(QAbstractItemModel *model, QWidget *parent)
@@ -291,6 +281,9 @@ void CodeView::InstallModel(QAbstractItemModel *model) {
 
   connect(d->model, &QAbstractItemModel::modelReset, this,
           &CodeView::OnModelReset);
+
+  connect(d->model, &QAbstractItemModel::modelAboutToBeReset, this,
+          &CodeView::OnModelAboutToBeReset);
 
   connect(d->model, &QAbstractItemModel::dataChanged, this,
           &CodeView::OnDataChange);
@@ -900,18 +893,19 @@ void CodeView::OnModelReset() {
   document->setDefaultFont(d->text_edit->font());
   d->text_edit->setDocument(document);
 
+  d->model_state = ModelState::Ready;
+
   UpdateGutterWidth();
   UpdateBaseExtraSelections();
   UpdateTabStopDistance();
-  OnModelResetDone();
-}
-
-void CodeView::OnModelResetDone() {
 
   // If there was a request to scroll to a line, but the document wasn't ready
   // at the time of the request, then enact the scroll now.
   if (d->deferred_scroll_to_line.has_value()) {
-    ScrollToLineNumber(d->deferred_scroll_to_line.value());
+    auto line_number = d->deferred_scroll_to_line.value();
+    d->deferred_scroll_to_line = std::nullopt;
+
+    ScrollToLineNumberInternal(line_number);
   }
 
   emit DocumentChanged();
@@ -1003,8 +997,29 @@ void CodeView::HandleNewCursor(const QTextCursor &cursor) {
   }
 }
 
+bool CodeView::ScrollToLineNumberInternal(unsigned line) {
+  auto opt_block_number = GetBlockNumberFromLineNumber(d->token_map, line);
+  if (!opt_block_number.has_value()) {
+    return false;
+  }
+
+  const auto &block_number = opt_block_number.value();
+
+  const auto &document = *d->text_edit->document();
+  auto text_block = document.findBlockByNumber(static_cast<int>(block_number));
+  if (!text_block.isValid()) {
+    return false;
+  }
+
+  return SetCursorPosition(text_block.position(), std::nullopt);
+}
+
 void CodeView::OnCursorMoved(void) {
   HandleNewCursor(d->text_edit->textCursor());
+}
+
+void CodeView::OnModelAboutToBeReset() {
+  d->model_state = ModelState::Updating;
 }
 
 void CodeView::OnSearchParametersChange(

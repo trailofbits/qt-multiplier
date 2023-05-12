@@ -26,6 +26,9 @@ HighlightingModelProxy::HighlightingModelProxy(QAbstractItemModel *source_model,
   source_model->setParent(this);
 
   d->entity_id_data_role = entity_id_data_role;
+
+  connect(source_model, &QAbstractItemModel::modelAboutToBeReset, this,
+          &HighlightingModelProxy::OnModelAboutToBeReset);
 }
 
 HighlightingModelProxy::~HighlightingModelProxy() {}
@@ -62,6 +65,10 @@ void HighlightingModelProxy::OnEntityHighlightListChange(
   d->entity_highlight_list = entity_highlight_list;
 
   emit dataChanged(QModelIndex(), QModelIndex(), {Qt::BackgroundRole});
+}
+
+void HighlightingModelProxy::OnModelAboutToBeReset() {
+  emit modelAboutToBeReset();
 }
 
 }  // namespace mx::gui

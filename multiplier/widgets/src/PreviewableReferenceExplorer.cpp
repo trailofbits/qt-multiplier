@@ -70,9 +70,6 @@ void PreviewableReferenceExplorer::InitializeWidgets(
       d->code_model, ICodeModel::RealRelatedEntityIdRole);
 
   d->code_view = ICodeView::Create(model_proxy);
-  connect(d->code_view, &ICodeView::DocumentChanged, this,
-          &PreviewableReferenceExplorer::OnCodeViewDocumentChange);
-
   connect(d->code_view, &ICodeView::TokenTriggered, this,
           &PreviewableReferenceExplorer::TokenTriggered);
 
@@ -119,10 +116,10 @@ void PreviewableReferenceExplorer::UpdateCodePreview(const QModelIndex &index) {
   }
 
   auto line_number = qvariant_cast<unsigned>(line_number_var);
-  SchedulePostUpdateLineScrollCommand(line_number);
 
   auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
   d->code_model->SetEntity(file_raw_entity_id);
+  d->code_view->ScrollToLineNumber(line_number);
 }
 
 void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
@@ -132,15 +129,6 @@ void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
 
   if (d->code_view->visibleRegion().isEmpty()) {
     emit ItemActivated(index);
-  }
-}
-
-void PreviewableReferenceExplorer::OnCodeViewDocumentChange() {
-  if (auto opt_scroll_to_line = GetScheduledPostUpdateLineScrollCommand();
-      opt_scroll_to_line.has_value()) {
-
-    const auto &line_number = opt_scroll_to_line.value();
-    d->code_view->ScrollToLineNumber(line_number);
   }
 }
 

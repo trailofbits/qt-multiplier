@@ -64,9 +64,6 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Schedules a code model update whenever a reference is clicked
   void OnReferenceExplorerSelectedItemChanged(const QModelIndex &index);
 
-  //! Handles scheduled scroll-to-line operations for the code view
-  void OnCodeViewDocumentChange();
-
   //! Used to do the first time initialization of the code preview
   void OnRowsInserted();
 
