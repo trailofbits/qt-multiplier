@@ -11,6 +11,7 @@
 #include <multiplier/ui/Result.h>
 #include <multiplier/ui/RPCErrorCode.h>
 
+#include <multiplier/Analysis/TokenTree.h>
 #include <multiplier/Index.h>
 
 #include <QString>
@@ -64,6 +65,15 @@ class IDatabase {
                     const FileLocationCache &file_location_cache);
 
 
+  //! The output of an token tree request
+  using TokenTreeResult = Result<TokenTree, RPCErrorCode>;
+
+  //! Requests A token tree for a given entity. The entity could be a file or
+  //! fragment. If it's not a file or fragment, then this will request the
+  //! containing fragment, if any.
+  virtual QFuture<TokenTreeResult>
+  RequestTokenTree(RawEntityId entity_id) = 0;
+
   //! The output of an entity information request
   using EntityInformationResult = Result<EntityInformation, RPCErrorCode>;
 
@@ -83,7 +93,7 @@ class IDatabase {
 
   //! Requests the specified file
   virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
-      RawEntityId entity_id, IndexedTokenRangeDataRequestType request_type) = 0;
+      TokenTree tree, std::unique_ptr<TokenTreeVisitor> visitor) = 0;
 
   //! An optional name
   using OptionalName = std::optional<QString>;

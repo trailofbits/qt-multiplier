@@ -11,6 +11,7 @@
 #include <requests/GetEntityInformation.h>
 #include <requests/GetEntityList.h>
 #include <requests/GetRelatedEntities.h>
+#include <requests/GetTokenTree.h>
 
 #include <QThreadPool>
 #include <QtConcurrent>
@@ -30,6 +31,12 @@ struct Database::PrivateData {
 
 Database::~Database() {}
 
+QFuture<IDatabase::TokenTreeResult>
+Database::RequestTokenTree(RawEntityId entity_id) {
+  return QtConcurrent::run(QThreadPool::globalInstance(), GetTokenTree,
+                           d->index, entity_id);
+}
+
 QFuture<IDatabase::EntityInformationResult>
 Database::RequestEntityInformation(RawEntityId entity_id) {
   return QtConcurrent::run(QThreadPool::globalInstance(), GetEntityInformation,
@@ -38,10 +45,10 @@ Database::RequestEntityInformation(RawEntityId entity_id) {
 
 QFuture<IDatabase::IndexedTokenRangeDataResult>
 Database::RequestIndexedTokenRangeData(
-    RawEntityId entity_id, IndexedTokenRangeDataRequestType request_type) {
+    TokenTree tree, std::unique_ptr<TokenTreeVisitor> visitor) {
   return QtConcurrent::run(QThreadPool::globalInstance(),
                            GetIndexedTokenRangeData, d->index,
-                           d->file_location_cache, entity_id, request_type);
+                           d->file_location_cache, tree, std::move(visitor));
 }
 
 QFuture<OptionalName> Database::RequestEntityName(RawEntityId fragment_id) {

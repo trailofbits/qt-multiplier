@@ -16,14 +16,17 @@ class Database final : public IDatabase {
   //! Destructor
   virtual ~Database() override;
 
+  //! \copybrief IDatabase::RequestTokenTree
+  virtual QFuture<TokenTreeResult>
+  RequestTokenTree(RawEntityId entity_id) override;
+
   //! \copybrief IDatabase::RequestEntityInformation
   virtual QFuture<EntityInformationResult>
   RequestEntityInformation(RawEntityId entity_id) override;
 
   //! \copybrief IDatabase::RequestIndexedTokenRangeData
   virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
-      RawEntityId entity_id,
-      IndexedTokenRangeDataRequestType request_type) override;
+      TokenTree tree, std::unique_ptr<TokenTreeVisitor> visitor) override;
 
   //! \copybrief IDatabase::RequestEntityName
   virtual QFuture<OptionalName>

@@ -22,6 +22,7 @@ enum class RPCErrorCode {
   FileMismatch,
   InvalidFileOffsetRange,
   InvalidFileTokenSorting,
+  UnsupportedTokenTreeEntityType,
 };
 
 }  // namespace mx::gui
