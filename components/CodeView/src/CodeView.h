@@ -111,8 +111,12 @@ class CodeView final : public ICodeView {
   bool ScrollToLineNumberInternal(unsigned line);
 
  public:
+//  // A `(row, column)` pair identifying a token position.
+//  using TokenPosition = std::pair<int, int>;
+
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
+
     //! A single token map entry
     struct Entry final {
       int cursor_start{};
@@ -132,10 +136,6 @@ class CodeView final : public ICodeView {
 
     //! This maps a block number to a line number
     std::unordered_map<int, std::size_t> block_number_to_line_number;
-
-    //! This maps a token group to a list of unique token identifiers
-    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>
-        token_group_id_to_unique_token_id_list;
 
     //! This maps related entity ids to a list of unique token identifiers
     std::unordered_map<RawEntityId, std::vector<std::uint64_t>>

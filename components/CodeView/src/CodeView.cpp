@@ -594,9 +594,8 @@ void CodeView::UpdateBaseExtraSelections() {
 }
 
 std::uint64_t CodeView::GetUniqueTokenIdentifier(const QModelIndex &index) {
-  auto node_id = static_cast<std::uint64_t>(index.internalId());
+  auto node_id = static_cast<std::uint64_t>(index.row());
   auto index_column = static_cast<std::uint64_t>(index.column());
-
   return (node_id << 32) | index_column;
 }
 
@@ -669,7 +668,7 @@ QTextDocument *CodeView::CreateTextDocument(
   auto document_layout = new QPlainTextDocumentLayout(document);
   document->setDocumentLayout(document_layout);
 
-  auto row_count = model.rowCount();
+  int row_count = model.rowCount();
   if (!row_count) {
     return document;
   }
@@ -702,8 +701,12 @@ QTextDocument *CodeView::CreateTextDocument(
       break;
     }
 
-    auto row_index = model.index(row, 0);
-    auto column_count = model.columnCount(row_index);
+    if (row) {
+      cursor.insertText("\n");
+    }
+
+    QModelIndex row_index = model.index(row, 0);
+    int column_count = model.columnCount(row_index);
 
     const auto &line_number_var = row_index.data(ICodeModel::LineNumberRole);
     if (line_number_var.isValid()) {
@@ -718,16 +721,16 @@ QTextDocument *CodeView::CreateTextDocument(
     }
 
     for (int column = 0; column < column_count; ++column) {
-      auto token_index = model.index(0, column, row_index);
+      QModelIndex token_index = model.index(row, column, row_index);
 
       // Get the token that will have to be displayed on screen. There is nothing
       // else to do here if it is not visible
-      const auto &token_var = token_index.data(Qt::DisplayRole);
+      QVariant token_var = token_index.data(Qt::DisplayRole);
       if (!token_var.isValid()) {
         continue;
       }
 
-      const auto &token = token_var.toString();
+      QString token = token_var.toString();
       if (token.isEmpty()) {
         continue;
       }
@@ -747,18 +750,6 @@ QTextDocument *CodeView::CreateTextDocument(
         auto block_number = cursor.blockNumber();
         auto &unique_token_id_list =
             token_map.block_number_to_unique_token_id_list[block_number];
-
-        unique_token_id_list.push_back(unique_token_id);
-      }
-
-      // Add the entry to the token group index.
-      const auto &token_group_id_var =
-          token_index.data(ICodeModel::TokenGroupIdRole);
-
-      if (token_group_id_var.isValid()) {
-        auto token_group_id = qvariant_cast<std::uint64_t>(token_group_id_var);
-        auto &unique_token_id_list =
-            token_map.token_group_id_to_unique_token_id_list[token_group_id];
 
         unique_token_id_list.push_back(unique_token_id);
       }
@@ -787,8 +778,6 @@ QTextDocument *CodeView::CreateTextDocument(
 
       cursor.insertText(token, text_format);
     }
-
-    cursor.insertText("\n");
   }
 
   cursor.endEditBlock();
@@ -866,7 +855,7 @@ void CodeView::OnModelReset() {
   d->go_to_line_widget->Deactivate();
   d->opt_prev_hovered_model_index.reset();
 
-  QProgressDialog progress(tr("Generating rows..."), tr("Abort"), 0, 100, this);
+  QProgressDialog progress(tr("Fetching code..."), tr("Abort"), 0, 100, this);
   progress.setWindowModality(Qt::WindowModal);
 
   // clang-format off

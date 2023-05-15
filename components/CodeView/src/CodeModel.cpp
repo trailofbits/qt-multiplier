@@ -124,27 +124,17 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   d->opt_entity_id = std::nullopt;
   d->future_result = d->database->RequestTokenTree(raw_id).then(
       QtFuture::Launch::Inherit,
-      [this] (QFuture<IDatabase::TokenTreeResult> tt_fut) -> IDatabase::IndexedTokenRangeDataResult {
-        if (tt_fut.isCanceled()) {
-          return RPCErrorCode::Interrupted;
-        }
-
-        IDatabase::TokenTreeResult tt_res = tt_fut.takeResult();
+      [this] (IDatabase::TokenTreeResult tt_res) -> QFuture<IDatabase::IndexedTokenRangeDataResult> {
         if (!tt_res.Succeeded()) {
-          return tt_res.TakeError();
+          QFutureInterface<IDatabase::IndexedTokenRangeDataResult> fi;
+          IDatabase::IndexedTokenRangeDataResult err = tt_res.TakeError();
+          fi.reportFinished(&err);
+          return QFuture<IDatabase::IndexedTokenRangeDataResult>(&fi);
+        } else {
+          return d->database->RequestIndexedTokenRangeData(
+              tt_res.TakeValue(), std::make_unique<TokenTreeVisitor>());
         }
-
-        QFuture<IDatabase::IndexedTokenRangeDataResult> index_fut =
-            d->database->RequestIndexedTokenRangeData(
-                tt_res.TakeValue(), std::make_unique<TokenTreeVisitor>());
-
-        index_fut.waitForFinished();
-        if (index_fut.isCanceled()) {
-          return RPCErrorCode::Interrupted;
-        }
-
-        return index_fut.takeResult();
-      });
+      }).unwrap();
 
   d->model_state = ModelState::UpdateInProgress;
   d->future_watcher.setFuture(d->future_result);
@@ -158,9 +148,9 @@ bool CodeModel::IsReady() const {
 
 QModelIndex CodeModel::index(int row, int column,
                              const QModelIndex &parent) const {
-  if (!hasIndex(row, column, parent)) {
-    return QModelIndex();
-  }
+//  if (!hasIndex(row, column, parent)) {
+//    return QModelIndex();
+//  }
 
   if (parent.isValid()) {
     if (auto line = d->LinePointerCast(parent)) {
@@ -197,8 +187,6 @@ QModelIndex CodeModel::parent(const QModelIndex &child) const {
 int CodeModel::rowCount(const QModelIndex &parent) const {
   if (!parent.isValid()) {  // Root item.
     return static_cast<int>(d->tokens.lines.size());
-  } else if (d->LinePointerCast(parent)) {
-    return 1;
   } else {
     return 0;
   }
@@ -249,16 +237,10 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
         break;
       case ICodeModel::RelatedEntityIdRole:
       case ICodeModel::RealRelatedEntityIdRole:
-        value.setValue(d->tokens.tokens[col->index].related_entity_id().Pack());
-        break;
-
-      // TODO(pag): Consider removing this role. I believe the original
-      //            motivation for this was to support group highlights, but
-      //            often things belong to multiple groups, so this singular
-      //            value wasn't quite ideal anyway. We should think through
-      //            when we want group highlights, how they interact with
-      //            nesting, etc.
-      case ICodeModel::TokenGroupIdRole:
+        if (auto eid = d->tokens.tokens[col->index].related_entity_id().Pack();
+            eid != kInvalidEntityId) {
+          value.setValue(eid);
+        }
         break;
 
       // TODO(pag): Consider removing this role. It would be better to have the

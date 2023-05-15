@@ -29,16 +29,9 @@ class IndexedTokenRangeData final {
   //! Range of tokens in this data.
   TokenRange tokens;
 
-  //! Total number of `QChar`s needed to represent all lines of code.
-  unsigned size{0u};
-
   struct Column {
     //! Index of this token in `IndexedTokenRangeData::tokens`.
     unsigned index{0u};
-
-    //! Offset of the first QChar of this token within the overall concatenated
-    //! data of
-    unsigned offset{0u};
 
     //! Did this token start on this line?
     bool starts_on_line{true};
@@ -54,9 +47,6 @@ class IndexedTokenRangeData final {
   };
 
   struct Line {
-    //! Number of QChars of data on this line. This includes any trailing
-    //! newline.
-    unsigned size{0u};
 
     //! Offset of the first QChar of this line.
     unsigned offset{0u};

@@ -20,6 +20,19 @@
 namespace mx::gui {
 namespace {
 
+static unsigned LowerBoundOfLine(
+    const FileLocationCache &file_location_cache, const Token &tok) {
+  for (Macro m : Macro::containing(tok)) {
+    for (Token use_tok : m.root().generate_use_tokens()) {
+      if (auto file_line = use_tok.file_token().location(file_location_cache)) {
+        return file_line->first;
+      }
+    }
+  }
+
+  return 0u;
+}
+
 // Render `tok` across one or more lines of `res`.
 static void RenderToken(const FileLocationCache &file_location_cache,
                         IndexedTokenRangeData &res, Token tok,
@@ -41,6 +54,10 @@ static void RenderToken(const FileLocationCache &file_location_cache,
       line_number_from_tok = line_col->first;
       line->number = line_col->first;
     }
+
+  // Get an estimate for this line number.
+  } else if (!line->number) {
+    line->number = LowerBoundOfLine(file_location_cache, tok);
   }
 
   bool is_empty = true;
@@ -57,34 +74,27 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   IndexedTokenRangeData::Column col;
   col.category = tok.category();
   col.index = tok_index;
-  col.offset = line->size;
 
   for (QChar ch : utf16_data) {
     switch (ch.unicode()) {
       case QChar::Tabulation:
         is_empty = false;
-        ++res.size;
-        ++line->size;
         col.data.append(QChar::Tabulation);
         break;
 
       case QChar::Space:
       case QChar::Nbsp:
         is_empty = false;
-        ++res.size;
-        ++line->size;
         col.data.append(QChar::Space);
         break;
 
       case QChar::ParagraphSeparator:
       case QChar::LineFeed:
       case QChar::LineSeparator: {
-        ++res.size;
-        ++line->size;
-
-        col.data.append(QChar::LineSeparator);
-        split_self->split_across_lines = true;
-        split_self = &(line->columns.emplace_back(col));
+        if (!is_empty) {
+          split_self->split_across_lines = true;
+          split_self = &(line->columns.emplace_back(col));
+        }
 
         // Reset.
         col.data = QString();
@@ -94,7 +104,6 @@ static void RenderToken(const FileLocationCache &file_location_cache,
 
         // Start the next line.
         line = &(res.lines.emplace_back());
-        line->offset = res.size;
 
         // If this token contributed its line number, and if this token spans
         // more than one line, then we can use this token's starting line
@@ -112,8 +121,6 @@ static void RenderToken(const FileLocationCache &file_location_cache,
       // TODO(pag): Consult with QFontMetrics or something else to determine
       //            if this character is visible?
       default:
-        ++res.size;
-        ++line->size;
         col.data.append(ch);
         is_empty = false;
         break;
@@ -126,19 +133,6 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   }
 }
 
-//unsigned LowerBoundOfLine(const FileLocationCache &file_location_cache,
-//                          const Token &tok) {
-//  for (Macro m : Macro::containing(tok)) {
-//    for (Token use_tok : m.root().generate_use_tokens()) {
-//      if (auto file_line = use_tok.file_token().location(file_location_cache)) {
-//        return file_line->first;
-//      }
-//    }
-//  }
-//
-//  return 0u;
-//}
-//
 //static void FixupLineNumbers(IndexedTokenRangeData &res,
 //                             const FileLocationCache &file_location_cache) {
 //  // Algorithm:
