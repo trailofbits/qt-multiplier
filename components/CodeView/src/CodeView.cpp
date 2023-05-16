@@ -555,7 +555,7 @@ void CodeView::UpdateBaseExtraSelections() {
     auto column_count = d->model->columnCount(line_index);
 
     for (int column{}; column < column_count; ++column) {
-      auto token_index = d->model->index(0, column, line_index);
+      auto token_index = d->model->index(row, column, line_index);
       if (!token_index.isValid()) {
         break;
       }
