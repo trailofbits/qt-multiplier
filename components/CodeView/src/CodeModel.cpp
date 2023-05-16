@@ -232,13 +232,9 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
       case ICodeModel::TokenIdRole:
         value.setValue(d->tokens.tokens[col->index].id().Pack());
         break;
-      case ICodeModel::LineNumberRole: {
-        auto &col_line = d->tokens.lines[static_cast<unsigned>(index.row())];
-        if (col_line.number) {
-          value.setValue(col_line.number);
-        }
+      case ICodeModel::LineNumberRole:
+        value = index.parent().data(ICodeModel::LineNumberRole);
         break;
-      }
       case ICodeModel::RelatedEntityIdRole:
       case ICodeModel::RealRelatedEntityIdRole:
         if (auto eid = d->tokens.tokens[col->index].related_entity_id().Pack();
