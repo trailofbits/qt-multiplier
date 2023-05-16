@@ -123,6 +123,7 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
   d->tree_view->setAllColumnsShowFocus(true);
   d->tree_view->setTreePosition(0);
+  d->tree_view->setTextElideMode(Qt::TextElideMode::ElideRight);
 
   d->tree_view->setAlternatingRowColors(false);
   d->tree_view->setItemDelegateForColumn(0, new ReferenceExplorerItemDelegate);
@@ -130,6 +131,8 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   d->tree_view->installEventFilter(this);
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);
+
+
 
   connect(d->tree_view, &ReferenceExplorerTreeView::customContextMenuRequested,
           this, &GraphicalReferenceExplorer::OnOpenItemContextMenu);

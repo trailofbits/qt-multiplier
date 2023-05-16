@@ -31,7 +31,7 @@ void AppendIndentWhitespace(QString &buffer, std::size_t level_count) {
 void ImportReferenceExplorerModelHelper(
     RefExplorerToCodeViewModelAdapter::Context &context,
     const QAbstractItemModel *model, const QModelIndex &root,
-    const std::size_t &indent, std::size_t &line_number) {
+    std::size_t indent, std::size_t &line_number) {
 
   auto L_getBreadcrumbs =
       [model](const QModelIndex &index) -> std::optional<QString> {
@@ -291,7 +291,7 @@ RefExplorerToCodeViewModelAdapter::index(int row, int column,
       return QModelIndex();
     }
 
-    const auto &child_id = root_data.child_id_list[unsigned_row];
+    const Context::Node::ID &child_id = root_data.child_id_list[unsigned_row];
     return createIndex(row, column, child_id);
 
   } else if (std::holds_alternative<Context::Node::LineData>(
@@ -485,8 +485,7 @@ void RefExplorerToCodeViewModelAdapter::ImportReferenceExplorerModel(
   std::size_t line_number{1};
 
   for (int row{0}; row < row_count; ++row) {
-    auto child_index = model->index(row, 0);
-
+    QModelIndex child_index = model->index(row, 0);
     ImportReferenceExplorerModelHelper(context, model, child_index, 0,
                                        line_number);
   }

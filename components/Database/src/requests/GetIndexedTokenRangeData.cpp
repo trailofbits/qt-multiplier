@@ -20,19 +20,6 @@
 namespace mx::gui {
 namespace {
 
-static unsigned LowerBoundOfLine(
-    const FileLocationCache &file_location_cache, const Token &tok) {
-  for (Macro m : Macro::containing(tok)) {
-    for (Token use_tok : m.root().generate_use_tokens()) {
-      if (auto file_line = use_tok.file_token().location(file_location_cache)) {
-        return file_line->first;
-      }
-    }
-  }
-
-  return 0u;
-}
-
 // Render `tok` across one or more lines of `res`.
 static void RenderToken(const FileLocationCache &file_location_cache,
                         IndexedTokenRangeData &res, Token tok,
@@ -42,22 +29,17 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   IndexedTokenRangeData::Column *split_self = &dummy;
   IndexedTokenRangeData::Line *line = &(res.lines.back());
 
-  VariantId vid = tok.id().Unpack();
-
   // Try to get a number for this line.
   unsigned prev_line_number = line->number;
   unsigned line_number_from_tok = 0u;
-  if (std::holds_alternative<FileTokenId>(vid)) {
+  if (std::holds_alternative<FileTokenId>(tok.id().Unpack())) {
     if (auto line_col = tok.location(file_location_cache)) {
       Assert(!prev_line_number || prev_line_number == line_col->first,
-             "Line number doesn't match expectations");
+             "Line number doesn't match expectations for token " +
+             std::to_string(tok.id().Pack()));
       line_number_from_tok = line_col->first;
       line->number = line_col->first;
     }
-
-  // Get an estimate for this line number.
-  } else if (!line->number) {
-    line->number = LowerBoundOfLine(file_location_cache, tok);
   }
 
   bool is_empty = true;
@@ -133,44 +115,103 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   }
 }
 
-//static void FixupLineNumbers(IndexedTokenRangeData &res,
-//                             const FileLocationCache &file_location_cache) {
-//  // Algorithm:
-//  //  - get fragment containing a token, use it to have min/max line numbers
-//  //    to bound things
-//  //  - use lower bounds on the line numbers if contiguous with previous line
-//  //    numbers, or if for first line
-//  //  - use tok.file_token().location(...) otherwise, in in range.
-//
-//  unsigned last_line_number = 0u;
-//
-//  std::vector<unsigned> line_lbs;
-//
-//  for (IndexedTokenRangeData::Line &line : res.lines) {
-//    if (line.number) {
-//      last_line_number = line.number;
-//      continue;
-//    }
-//
-//    Assert(!line.starts_on_line.empty(), "Can't have completely empty lines");
-//
-//    unsigned tok_offset = 0u;
-//    for (auto starts_on_line : line.starts_on_line) {
-//      unsigned tok_index = line.token_index[tok_offset++];
-//      if (starts_on_line) {
-//        Token tok = res.tokens[tok_index];
-//        if (auto lb_line = LowerBoundOfLine(file_location_cache, tok)) {
-//          line_lbs
-//        }
-//      }
-//    }
-//
-//    for (unsigned token_index : line.token_index) {
-//      Token tok = res.tokens[token_index];
-//      VariantId vid = tok.id().Unpack();
-//    }
-//  }
-//}
+// Figure out if `tok` is visible in the file.
+static bool IsTopLevelToken(const Token &tok) {
+  VariantId vid = tok.id().Unpack();
+  if (std::holds_alternative<FileTokenId>(vid)) {
+    return true;
+  }
+
+  for (Macro m : Macro::containing(tok)) {
+    switch (m.kind()) {
+      case MacroKind::ARGUMENT:
+        continue;
+
+      // Directive tokens are always top level.
+      case MacroKind::PARAMETER:
+      case MacroKind::OTHER_DIRECTIVE:
+      case MacroKind::IF_DIRECTIVE:
+      case MacroKind::IF_DEFINED_DIRECTIVE:
+      case MacroKind::IF_NOT_DEFINED_DIRECTIVE:
+      case MacroKind::ELSE_IF_DIRECTIVE:
+      case MacroKind::ELSE_IF_DEFINED_DIRECTIVE:
+      case MacroKind::ELSE_IF_NOT_DEFINED_DIRECTIVE:
+      case MacroKind::ELSE_DIRECTIVE:
+      case MacroKind::END_IF_DIRECTIVE:
+      case MacroKind::DEFINE_DIRECTIVE:
+      case MacroKind::UNDEFINE_DIRECTIVE:
+      case MacroKind::PRAGMA_DIRECTIVE:
+      case MacroKind::INCLUDE_DIRECTIVE:
+      case MacroKind::INCLUDE_NEXT_DIRECTIVE:
+      case MacroKind::INCLUDE_MACROS_DIRECTIVE:
+      case MacroKind::IMPORT_DIRECTIVE:
+        return true;
+
+      // These all exist in the `MacroExpansion::intermediate_children` or
+      // `MacroExpansion::replacement_children`
+      case MacroKind::PARAMETER_SUBSTITUTION:
+      case MacroKind::STRINGIFY:
+      case MacroKind::CONCATENATE:
+      case MacroKind::VA_OPT:
+      case MacroKind::VA_OPT_ARGUMENT:
+        return false;
+
+      // Check if `tok` is in the use.
+      case MacroKind::SUBSTITUTION:
+      case MacroKind::EXPANSION: {
+        auto found = false;
+        for (MacroOrToken mt : m.children()) {
+          if (std::holds_alternative<Token>(mt) && std::get<Token>(mt) == tok) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          return false;
+        }
+        continue;
+      }
+    }
+  }
+
+  return true;
+}
+
+// Fixup the line numbers from the visible tokens.
+static void FixupLineNumbers(const FileLocationCache &file_location_cache,
+                             IndexedTokenRangeData &res) {
+  for (IndexedTokenRangeData::Line &line : res.lines) {
+    if (line.number) {
+      continue;
+    }
+
+    auto num_cols = line.columns.size();
+    if (!num_cols) {
+      continue;
+    }
+
+    if (!line.columns.front().starts_on_line) {
+      continue;
+    }
+
+    for (IndexedTokenRangeData::Column &c : line.columns) {
+      if (!c.starts_on_line) {
+        break;
+      }
+
+      Token tok = res.tokens[c.index];
+      if (IsTopLevelToken(tok)) {
+        if (auto line_col = tok.location(file_location_cache)) {
+          line.number = line_col->first;
+          goto next;
+        }
+      }
+    }
+
+  next:
+    continue;
+  }
+}
 
 }  // namespace
 
@@ -201,6 +242,8 @@ void GetIndexedTokenRangeData(
   if (res.lines.back().columns.empty()) {
     res.lines.pop_back();
   }
+
+  FixupLineNumbers(file_location_cache, res);
 
   result_promise.addResult(std::move(res));
 }
