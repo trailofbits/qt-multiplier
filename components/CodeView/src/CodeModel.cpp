@@ -152,7 +152,7 @@ bool CodeModel::IsReady() const {
   return d->model_state == ModelState::Ready;
 }
 
-QModelIndex CodeModel::token_index(int row, int column,
+QModelIndex CodeModel::index(int row, int column,
                              const QModelIndex &parent) const {
 //  if (!hasIndex(row, column, parent)) {
 //    return QModelIndex();
