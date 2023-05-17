@@ -15,16 +15,6 @@
 #include <unordered_set>
 
 namespace mx::gui {
-namespace {
-
-enum class ModelState {
-  UpdateInProgress,
-  UpdateFailed,
-  UpdateCancelled,
-  Ready,
-};
-
-}  // namespace
 
 struct CodeModel::PrivateData final {
   PrivateData(const FileLocationCache &file_location_cache_,
@@ -35,7 +25,7 @@ struct CodeModel::PrivateData final {
   FileLocationCache file_location_cache;
   Index index;
 
-  ModelState model_state{ModelState::Ready};
+  ModelState model_state{ModelState::Uninitialized};
   std::optional<RawEntityId> opt_entity_id;
 
   const IndexedTokenRangeData::Line *last_line_cache{nullptr};
@@ -115,7 +105,9 @@ std::optional<RawEntityId> CodeModel::GetEntity(void) const {
 void CodeModel::SetEntity(RawEntityId raw_id) {
   CancelRunningRequest();
 
+  auto prev_state = d->model_state;
   emit beginResetModel();
+  d->model_state = ModelState::UpdateInProgress;
 
   EntityId eid(raw_id);
   if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
@@ -123,6 +115,7 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   }
 
   if (d->opt_entity_id.has_value() && d->opt_entity_id.value() == raw_id) {
+    d->model_state = prev_state;
     emit endResetModel();
     return;
   }
@@ -142,7 +135,6 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
         }
       }).unwrap();
 
-  d->model_state = ModelState::UpdateInProgress;
   d->future_watcher.setFuture(d->future_result);
 
   emit endResetModel();
@@ -221,7 +213,12 @@ int CodeModel::columnCount(const QModelIndex &parent) const {
 QVariant CodeModel::data(const QModelIndex &index, int role) const {
 
   QVariant value;
+
+  // We're dealing with the root node.
   if (!index.isValid()) {
+    if (role == ICodeModel::ModelStateRole) {
+      value.setValue(int(d->model_state));
+    }
     return value;
   }
 

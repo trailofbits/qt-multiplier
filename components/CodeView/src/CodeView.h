@@ -216,9 +216,6 @@ class CodeView final : public ICodeView {
   //! Called when the cursor position has changed.
   void OnCursorMoved(void);
 
-  //! Called when the model is about to be reset
-  void OnModelAboutToBeReset();
-
   friend class ICodeView;
 };
 

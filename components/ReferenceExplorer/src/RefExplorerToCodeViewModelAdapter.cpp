@@ -466,6 +466,10 @@ QVariant RefExplorerToCodeViewModelAdapter::data(const QModelIndex &index,
         value = original_index.data(role);
       }
     }
+  } else if (index.isValid()) {
+    if (role == ICodeModel::ModelStateRole) {
+      value.setValue(int(ModelState::Ready));
+    }
   }
 
   return value;
