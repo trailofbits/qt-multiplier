@@ -9,6 +9,7 @@
 #include "GetIndexedTokenRangeData.h"
 
 #include <QChar>
+#include <QDebug>
 #include <QString>
 
 #include <unordered_map>
@@ -34,9 +35,11 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   unsigned line_number_from_tok = 0u;
   if (std::holds_alternative<FileTokenId>(tok.id().Unpack())) {
     if (auto line_col = tok.location(file_location_cache)) {
-      Assert(!prev_line_number || prev_line_number == line_col->first,
-             "Line number doesn't match expectations for token " +
-             std::to_string(tok.id().Pack()));
+      if (prev_line_number && prev_line_number != line_col->first) {
+        qDebug() << "Line number doesn't match expectations for token"
+                 << tok.id().Pack();
+      }
+
       line_number_from_tok = line_col->first;
       line->number = line_col->first;
     }
@@ -55,7 +58,8 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   // Split the token for lines and such.
   IndexedTokenRangeData::Column col;
   col.category = tok.category();
-  col.index = tok_index;
+  col.token_index = tok_index;
+  col.line_index = static_cast<unsigned>(res.lines.size() - 1u);
 
   for (QChar ch : utf16_data) {
     switch (ch.unicode()) {
@@ -82,6 +86,7 @@ static void RenderToken(const FileLocationCache &file_location_cache,
         col.data = QString();
         col.starts_on_line = false;
         col.split_across_lines = true;
+        col.line_index += 1u;
         is_empty = true;
 
         // Start the next line.
@@ -199,7 +204,7 @@ static void FixupLineNumbers(const FileLocationCache &file_location_cache,
         break;
       }
 
-      Token tok = res.tokens[c.index];
+      Token tok = res.tokens[c.token_index];
       if (IsTopLevelToken(tok)) {
         if (auto line_col = tok.location(file_location_cache)) {
           line.number = line_col->first;

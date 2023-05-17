@@ -79,20 +79,26 @@ const IndexedTokenRangeData::Column *CodeModel::PrivateData::ColumnPointerCast(
     return last_column_cache;
   }
 
-  auto row = static_cast<unsigned>(model_index.row());
-  auto col = static_cast<unsigned>(model_index.column());
-  auto tok = reinterpret_cast<const IndexedTokenRangeData::Column *>(ptr);
-  if (auto num_lines = tokens.lines.size(); row < num_lines) {
-    const IndexedTokenRangeData::Line &line = tokens.lines[row];
-    last_line_cache = &line;
+  if (model_index.row() != 0) {
+    return nullptr;
+  }
 
-    if (auto num_cols = line.columns.size(); col < num_cols) {
-      auto first = line.columns.data();
-      auto last = &(first[num_cols - 1u]);
-      if (first <= tok && tok <= last) {
-        last_column_cache = tok;
-        return tok;
-      }
+  auto tok = reinterpret_cast<const IndexedTokenRangeData::Column *>(ptr);
+  auto num_lines = tokens.lines.size();
+  if (tok->line_index >= num_lines) {  // Make unsafe :-P
+    return nullptr;
+  }
+
+  const IndexedTokenRangeData::Line &line = tokens.lines[tok->line_index];
+  last_line_cache = &line;
+
+  unsigned col = static_cast<unsigned>(model_index.column());
+  if (auto num_cols = line.columns.size(); col < num_cols) {
+    auto first = line.columns.data();
+    auto last = &(first[num_cols - 1u]);
+    if (first <= tok && tok <= last) {
+      last_column_cache = tok;
+      return tok;
     }
   }
   return nullptr;
@@ -146,7 +152,7 @@ bool CodeModel::IsReady() const {
   return d->model_state == ModelState::Ready;
 }
 
-QModelIndex CodeModel::index(int row, int column,
+QModelIndex CodeModel::token_index(int row, int column,
                              const QModelIndex &parent) const {
 //  if (!hasIndex(row, column, parent)) {
 //    return QModelIndex();
@@ -230,14 +236,14 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
         value.setValue(col->category);
         break;
       case ICodeModel::TokenIdRole:
-        value.setValue(d->tokens.tokens[col->index].id().Pack());
+        value.setValue(d->tokens.tokens[col->token_index].id().Pack());
         break;
       case ICodeModel::LineNumberRole:
         value = index.parent().data(ICodeModel::LineNumberRole);
         break;
       case ICodeModel::RelatedEntityIdRole:
       case ICodeModel::RealRelatedEntityIdRole:
-        if (auto eid = d->tokens.tokens[col->index].related_entity_id().Pack();
+        if (auto eid = d->tokens.tokens[col->token_index].related_entity_id().Pack();
             eid != kInvalidEntityId) {
           value.setValue(eid);
         }

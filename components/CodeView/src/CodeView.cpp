@@ -555,7 +555,7 @@ void CodeView::UpdateBaseExtraSelections() {
     auto column_count = d->model->columnCount(line_index);
 
     for (int column{}; column < column_count; ++column) {
-      auto token_index = d->model->index(row, column, line_index);
+      auto token_index = d->model->index(0, column, line_index);
       if (!token_index.isValid()) {
         break;
       }
@@ -721,7 +721,7 @@ QTextDocument *CodeView::CreateTextDocument(
     }
 
     for (int column = 0; column < column_count; ++column) {
-      QModelIndex token_index = model.index(row, column, row_index);
+      QModelIndex token_index = model.index(0, column, row_index);
 
       // Get the token that will have to be displayed on screen. There is nothing
       // else to do here if it is not visible
