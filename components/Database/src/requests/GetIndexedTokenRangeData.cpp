@@ -45,8 +45,6 @@ static void RenderToken(const FileLocationCache &file_location_cache,
     }
   }
 
-  bool is_empty = true;
-
   // Get the data of this token in Qt's native format.
   std::string_view utf8_data = tok.data();
   QString utf16_data;
@@ -63,20 +61,18 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   for (QChar ch : utf16_data) {
     switch (ch.unicode()) {
       case QChar::Tabulation:
-        is_empty = false;
         col.data.append(QChar::Tabulation);
         break;
 
       case QChar::Space:
       case QChar::Nbsp:
-        is_empty = false;
         col.data.append(QChar::Space);
         break;
 
       case QChar::ParagraphSeparator:
       case QChar::LineFeed:
       case QChar::LineSeparator: {
-        if (!is_empty) {
+        if (!col.data.isEmpty()) {
           split_self->split_across_lines = true;
           split_self = &(line->columns.emplace_back(col));
         }
@@ -85,7 +81,6 @@ static void RenderToken(const FileLocationCache &file_location_cache,
         col.data = QString();
         col.starts_on_line = false;
         col.split_across_lines = true;
-        is_empty = true;
 
         // Start the next line.
         line = &(res.lines.emplace_back());
@@ -107,12 +102,11 @@ static void RenderToken(const FileLocationCache &file_location_cache,
       //            if this character is visible?
       default:
         col.data.append(ch);
-        is_empty = false;
         break;
     }
   }
 
-  if (!is_empty) {
+  if (!col.data.isEmpty()) {
     split_self->split_across_lines = true;
     line->columns.emplace_back(std::move(col));
   }

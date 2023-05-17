@@ -21,7 +21,7 @@ namespace mx::gui {
 struct GoToLineWidget::PrivateData final {
   QLineEdit *line_number_edit{nullptr};
   QIntValidator *line_number_validator{nullptr};
-  std::uint64_t max_line_number{};
+  unsigned max_line_number{};
   QShortcut *deactivate_shortcut{nullptr};
 };
 
@@ -79,14 +79,13 @@ void GoToLineWidget::UpdateWidgetPlacement() {
 }
 
 void GoToLineWidget::OnLineNumberInputChanged() {
-  auto line_number =
-      static_cast<std::uint64_t>(d->line_number_edit->text().toUInt());
+  auto line_number = d->line_number_edit->text().toUInt();
   emit LineNumberChanged(line_number);
 
   Deactivate();
 }
 
-void GoToLineWidget::Activate(std::uint64_t max_line_number) {
+void GoToLineWidget::Activate(unsigned max_line_number) {
   d->max_line_number = max_line_number;
 
   d->line_number_edit->clear();

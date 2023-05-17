@@ -594,9 +594,7 @@ void CodeView::UpdateBaseExtraSelections() {
 }
 
 std::uint64_t CodeView::GetUniqueTokenIdentifier(const QModelIndex &index) {
-  auto node_id = static_cast<std::uint64_t>(index.row());
-  auto index_column = static_cast<std::uint64_t>(index.column());
-  return (node_id << 32) | index_column;
+  return index.internalId();
 }
 
 std::optional<std::size_t>
@@ -706,18 +704,22 @@ QTextDocument *CodeView::CreateTextDocument(
     }
 
     QModelIndex row_index = model.index(row, 0);
+    Assert(row_index.isValid(), "Invalid row index");
+
     int column_count = model.columnCount(row_index);
 
-    const auto &line_number_var = row_index.data(ICodeModel::LineNumberRole);
+    QVariant line_number_var = row_index.data(ICodeModel::LineNumberRole);
     if (line_number_var.isValid()) {
-      auto line_number = qvariant_cast<std::uint64_t>(line_number_var);
+      unsigned line_number = qvariant_cast<unsigned>(line_number_var);
+      Assert(0 != line_number, "Invalid line number");
 
       token_map.highest_line_number =
           std::max(line_number, token_map.highest_line_number);
 
-      auto block_number = cursor.blockNumber();
-      token_map.line_number_to_block_number.insert({line_number, block_number});
-      token_map.block_number_to_line_number.insert({block_number, line_number});
+      int block_number = cursor.blockNumber();
+      Assert(-1 != block_number, "Invalid block number");
+      token_map.line_number_to_block_number.emplace(line_number, block_number);
+      token_map.block_number_to_line_number.emplace(block_number, line_number);
     }
 
     for (int column = 0; column < column_count; ++column) {
@@ -756,7 +758,7 @@ QTextDocument *CodeView::CreateTextDocument(
 
       // Add the entry to the related entity id index. We use this to highlight
       // other tokens sharing the same related entity id.
-      const auto &related_entity_id_var =
+      QVariant related_entity_id_var =
           token_index.data(ICodeModel::RealRelatedEntityIdRole);
 
       if (related_entity_id_var.isValid()) {
@@ -771,7 +773,8 @@ QTextDocument *CodeView::CreateTextDocument(
       }
 
       // Add the token to the document
-      auto token_category_var = token_index.data(ICodeModel::TokenCategoryRole);
+      QVariant token_category_var =
+          token_index.data(ICodeModel::TokenCategoryRole);
 
       QTextCharFormat text_format;
       ConfigureTextFormatFromTheme(text_format, theme, token_category_var);
