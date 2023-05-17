@@ -79,27 +79,27 @@ const IndexedTokenRangeData::Column *CodeModel::PrivateData::ColumnPointerCast(
     return last_column_cache;
   }
 
-  if (model_index.row() != 0) {
+  unsigned row = static_cast<unsigned>(model_index.row());
+  auto num_lines = tokens.lines.size();
+  if (row >= num_lines) {  // Make unsafe :-P
+    return nullptr;
+  }
+
+  const IndexedTokenRangeData::Line &line = tokens.lines[row];
+  last_line_cache = &line;
+
+  unsigned col = static_cast<unsigned>(model_index.column());
+  auto num_cols = line.columns.size();
+  if (col >= num_cols) {
     return nullptr;
   }
 
   auto tok = reinterpret_cast<const IndexedTokenRangeData::Column *>(ptr);
-  auto num_lines = tokens.lines.size();
-  if (tok->line_index >= num_lines) {  // Make unsafe :-P
-    return nullptr;
-  }
-
-  const IndexedTokenRangeData::Line &line = tokens.lines[tok->line_index];
-  last_line_cache = &line;
-
-  unsigned col = static_cast<unsigned>(model_index.column());
-  if (auto num_cols = line.columns.size(); col < num_cols) {
-    auto first = line.columns.data();
-    auto last = &(first[num_cols - 1u]);
-    if (first <= tok && tok <= last) {
-      last_column_cache = tok;
-      return tok;
-    }
+  auto first = line.columns.data();
+  auto last = &(first[num_cols - 1u]);
+  if (first <= tok && tok <= last) {
+    last_column_cache = tok;
+    return tok;
   }
   return nullptr;
 }
@@ -159,16 +159,28 @@ QModelIndex CodeModel::index(int row, int column,
 //  }
 
   if (parent.isValid()) {
-    if (auto line = d->LinePointerCast(parent)) {
-      if (auto col_index = static_cast<unsigned>(column);
-          col_index < line->columns.size()) {
-        return createIndex(row, column, &(line->columns[col_index]));
-      }
+    if (row != 0) {
+      return QModelIndex();
+    }
+
+    auto line = d->LinePointerCast(parent);
+    if (!line) {
+      return QModelIndex();
+    }
+
+    if (auto col_index = static_cast<unsigned>(column);
+        col_index < line->columns.size()) {
+      auto col = &(line->columns[col_index]);
+      return createIndex(parent.row(), column, col);
     }
   } else {
+    if (column != 0) {
+      return QModelIndex();
+    }
+
     if (auto row_index = static_cast<unsigned>(row);
         row_index < d->tokens.lines.size()) {
-      return createIndex(row, column, &(d->tokens.lines[row_index]));
+      return createIndex(row, 0, &(d->tokens.lines[row_index]));
     }
   }
 

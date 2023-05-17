@@ -30,9 +30,6 @@ class IndexedTokenRangeData final {
   TokenRange tokens;
 
   struct Column {
-    //! Index of this line.
-    unsigned line_index{0u};
-
     //! Index of this token in `IndexedTokenRangeData::tokens`.
     unsigned token_index{0u};
 

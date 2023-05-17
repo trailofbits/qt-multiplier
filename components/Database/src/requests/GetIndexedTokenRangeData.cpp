@@ -59,7 +59,6 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   IndexedTokenRangeData::Column col;
   col.category = tok.category();
   col.token_index = tok_index;
-  col.line_index = static_cast<unsigned>(res.lines.size() - 1u);
 
   for (QChar ch : utf16_data) {
     switch (ch.unicode()) {
@@ -86,7 +85,6 @@ static void RenderToken(const FileLocationCache &file_location_cache,
         col.data = QString();
         col.starts_on_line = false;
         col.split_across_lines = true;
-        col.line_index += 1u;
         is_empty = true;
 
         // Start the next line.
