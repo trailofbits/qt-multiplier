@@ -25,9 +25,13 @@
 #include <phantom/phantomstyle.h>
 
 int main(int argc, char *argv[]) {
+  // The PhantomStyle does not really work well on Linux
+#ifndef __linux__
   QStyle *phantom_style = new PhantomStyle;
   QStyle *mx_style = new mx::gui::MultiplierStyle(phantom_style);
   QApplication::setStyle(mx_style);
+#endif
+
   QApplication application(argc, argv);
   application.setApplicationName("Multiplier");
 
