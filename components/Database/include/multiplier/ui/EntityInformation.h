@@ -135,6 +135,25 @@ struct EntityInformation final {
   //! `IncludeLikeMacroDirective`.
   std::vector<Selection> include_bys;
 
+  //! If `entity` is an enum, then this is the list of the enumerators.
+  std::vector<Selection> enumerators;
+
+  //! If `entity` is a`FunctionDecl`, then these are the `ParmVarDecl`s within
+  //! the thing.
+  std::vector<Selection> parameters;
+
+  //! If `entity` is an `TagDecl` or `FunctionDecl`, then these are the
+  //! `VarDecl`s within the thing.
+  std::vector<Selection> variables;
+
+  //! If `entity` is an `RecordDecl` then these are the `FieldDecls`s within
+  //! the thing.
+  std::vector<Selection> members;
+
+  //! If `entity` is an `TypeDecl` then these are the type casts with the
+  //! involved type.
+  std::vector<Selection> type_casts;
+
   //! If `entity` is a file, then this is the set of top-level entities in this
   //! file. Each selection will reference a `DefineMacroDirective` or a `Decl`.
   std::vector<Selection> top_level_entities;
