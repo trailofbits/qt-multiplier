@@ -107,6 +107,12 @@ class MainWindow final : public QMainWindow {
   void OnCloseActiveCodeViewTab();
   void OnCloseActiveRefExplorerTab();
   void OnRefExplorerModeSelected(QAction *action);
+
+  //! Called when the view->theme->dark action is selected
+  void OnSetDarkTheme();
+
+  //! Called when the view->theme->light action is selected
+  void OnSetLightTheme();
 };
 
 }  // namespace mx::gui

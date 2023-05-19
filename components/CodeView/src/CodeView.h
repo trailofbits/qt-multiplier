@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/ISearchWidget.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <multiplier/Token.h>
 
@@ -212,6 +213,10 @@ class CodeView final : public ICodeView {
 
   //! Called when the cursor position has changed.
   void OnCursorMoved(void);
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
   friend class ICodeView;
 };

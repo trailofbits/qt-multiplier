@@ -40,6 +40,7 @@ struct SearchWidget::PrivateData final {
   QPushButton *show_next_result{nullptr};
 
   QIcon search_icon;
+  QAction *search_icon_action{nullptr};
 
   QIcon enabled_case_sensitive_search;
   QIcon disabled_case_sensitive_search;
@@ -91,9 +92,11 @@ SearchWidget::SearchWidget(Mode mode, QWidget *parent)
 
   d->mode = mode;
 
-  LoadIcons();
   InitializeWidgets();
   InitializeKeyboardShortcuts(parent);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &SearchWidget::OnThemeChange);
 }
 
 void SearchWidget::LoadIcons() {
@@ -164,15 +167,12 @@ void SearchWidget::InitializeWidgets() {
   setLayout(main_layout);
 
   // Setup the input box
-  auto search_icon_action = new QAction(d->search_icon, tr("Search"));
-
-  d->search_input->addAction(search_icon_action, QLineEdit::LeadingPosition);
+  d->search_icon_action = new QAction(QIcon(), tr("Search"));
 
   d->case_sensitive_search_action =
       new QAction(tr("Enable case sensitive search"));
 
   d->case_sensitive_search_action->setCheckable(true);
-  d->case_sensitive_search_action->setIcon(d->disabled_case_sensitive_search);
   d->case_sensitive_search_action->setChecked(false);
 
   d->search_input->addAction(d->case_sensitive_search_action,
@@ -183,7 +183,6 @@ void SearchWidget::InitializeWidgets() {
                   tr("Enable whole word search"));
 
   d->whole_word_search_action->setCheckable(true);
-  d->whole_word_search_action->setIcon(d->disabled_whole_word_search);
   d->whole_word_search_action->setChecked(false);
 
   d->search_input->addAction(d->whole_word_search_action,
@@ -193,7 +192,6 @@ void SearchWidget::InitializeWidgets() {
       QPixmap(":/SearchWidget/search_icon_regex"), tr("Enable regex search"));
 
   d->regex_search_action->setCheckable(true);
-  d->regex_search_action->setIcon(d->disabled_regex_search);
   d->regex_search_action->setChecked(false);
 
   d->search_input->addAction(d->regex_search_action,
@@ -213,6 +211,7 @@ void SearchWidget::InitializeWidgets() {
           &SearchWidget::OnRegexSearchOptionToggled);
 
   setVisible(false);
+  UpdateIcons();
 }
 
 void SearchWidget::InitializeKeyboardShortcuts(QWidget *parent) {
@@ -261,6 +260,23 @@ void SearchWidget::ShowResult() {
                                QString::number(d->search_result_count));
 
   emit ShowSearchResult(d->current_search_result);
+}
+
+void SearchWidget::UpdateIcons() {
+  LoadIcons();
+
+  d->search_input->removeAction(d->search_icon_action);
+  d->search_icon_action->setIcon(d->search_icon);
+  d->search_input->addAction(d->search_icon_action, QLineEdit::LeadingPosition);
+
+  d->case_sensitive_search_action->setIcon(d->disabled_case_sensitive_search);
+  d->whole_word_search_action->setIcon(d->disabled_whole_word_search);
+  d->regex_search_action->setIcon(d->disabled_regex_search);
+
+  if (d->mode == Mode::Search) {
+    d->show_next_result->setIcon(d->show_next_result_icon);
+    d->show_prev_result->setIcon(d->show_prev_result_icon);
+  }
 }
 
 void SearchWidget::OnSearchInputTextChanged(const QString &) {
@@ -379,6 +395,10 @@ void SearchWidget::OnShowNextResult() {
   }
 
   ShowResult();
+}
+
+void SearchWidget::OnThemeChange(const QPalette &, const CodeViewTheme &) {
+  UpdateIcons();
 }
 
 void SearchWidget::Activate() {

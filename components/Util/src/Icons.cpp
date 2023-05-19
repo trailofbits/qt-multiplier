@@ -7,14 +7,13 @@
 */
 
 #include <multiplier/ui/Icons.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <QBitmap>
 #include <QPainter>
 #include <QColor>
 
 namespace mx::gui {
-
-extern bool gUseDarkTheme;
 
 namespace {
 
@@ -33,17 +32,18 @@ QPixmap GetColorizedPixmap(const QString &path, const QColor &color) {
 }
 
 QColor GetIconColor(const IconStyle &style) {
-  QColor color;
+  auto is_dark_theme = IThemeManager::Get().isDarkTheme();
 
+  QColor color;
   switch (style) {
-    case IconStyle::None: color = gUseDarkTheme ? Qt::white : Qt::black; break;
+    case IconStyle::None: color = is_dark_theme ? Qt::white : Qt::black; break;
 
     case IconStyle::Highlighted:
-      color = gUseDarkTheme ? Qt::cyan : Qt::red;
+      color = is_dark_theme ? Qt::cyan : Qt::red;
       break;
 
     case IconStyle::Disabled:
-      color = gUseDarkTheme ? Qt::gray : Qt::white;
+      color = is_dark_theme ? Qt::gray : Qt::white;
       break;
   }
 
@@ -51,8 +51,6 @@ QColor GetIconColor(const IconStyle &style) {
 }
 
 }  // namespace
-
-extern bool gUseDarkTheme;
 
 QIcon GetIcon(const QString &path, const IconStyle &style) {
   return QIcon(GetPixmap(path, style));

@@ -12,7 +12,6 @@
 
 namespace mx::gui {
 
-extern bool gUseDarkTheme;
 extern const CodeViewTheme kDefaultDarkCodeViewTheme;
 extern const CodeViewTheme kDefaultLightCodeViewTheme;
 

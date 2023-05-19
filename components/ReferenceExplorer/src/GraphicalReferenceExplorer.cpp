@@ -132,43 +132,23 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);
 
-
-
   connect(d->tree_view, &ReferenceExplorerTreeView::customContextMenuRequested,
           this, &GraphicalReferenceExplorer::OnOpenItemContextMenu);
 
-  QIcon open_item_icon;
-  open_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/activate_ref_item"),
-                           QIcon::Normal, QIcon::On);
-
-  open_item_icon.addPixmap(
-      GetPixmap(":/ReferenceExplorer/activate_ref_item", IconStyle::Disabled),
-      QIcon::Disabled, QIcon::On);
-
-  QIcon expand_item_icon;
-  expand_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/expand_ref_item"),
-                             QIcon::Normal, QIcon::On);
-
-  expand_item_icon.addPixmap(
-      GetPixmap(":/ReferenceExplorer/expand_ref_item", IconStyle::Disabled),
-      QIcon::Disabled, QIcon::On);
-
   // Initialize the treeview item buttons
-  d->treeview_item_buttons.open = new QPushButton(open_item_icon, "", this);
+  d->treeview_item_buttons.open = new QPushButton(QIcon(), "", this);
   d->treeview_item_buttons.open->setToolTip(tr("Open"));
 
   connect(d->treeview_item_buttons.open, &QPushButton::pressed, this,
           &GraphicalReferenceExplorer::OnActivateTreeViewItem);
 
-  d->treeview_item_buttons.close =
-      new QPushButton(GetIcon(":/ReferenceExplorer/close_ref_item"), "", this);
-
+  d->treeview_item_buttons.close = new QPushButton(QIcon(), "", this);
   d->treeview_item_buttons.close->setToolTip(tr("Close"));
 
   connect(d->treeview_item_buttons.close, &QPushButton::pressed, this,
           &GraphicalReferenceExplorer::OnCloseTreeViewItem);
 
-  d->treeview_item_buttons.expand = new QPushButton(expand_item_icon, "", this);
+  d->treeview_item_buttons.expand = new QPushButton(QIcon(), "", this);
   d->treeview_item_buttons.expand->setToolTip(tr("Expand"));
 
   connect(d->treeview_item_buttons.expand, &QPushButton::pressed, this,
@@ -236,6 +216,10 @@ void GraphicalReferenceExplorer::InitializeWidgets() {
 
   connect(d->context_menu.menu, &QMenu::triggered, this,
           &GraphicalReferenceExplorer::OnContextMenuActionTriggered);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &GraphicalReferenceExplorer::OnThemeChange);
+  UpdateIcons();
 }
 
 void GraphicalReferenceExplorer::InstallModel(
@@ -420,6 +404,31 @@ void GraphicalReferenceExplorer::UpdateTreeViewItemButtons() {
   }
 }
 
+void GraphicalReferenceExplorer::UpdateIcons() {
+  d->treeview_item_buttons.close->setIcon(
+      GetIcon(":/ReferenceExplorer/close_ref_item"));
+
+  QIcon open_item_icon;
+  open_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/activate_ref_item"),
+                           QIcon::Normal, QIcon::On);
+
+  open_item_icon.addPixmap(
+      GetPixmap(":/ReferenceExplorer/activate_ref_item", IconStyle::Disabled),
+      QIcon::Disabled, QIcon::On);
+
+  d->treeview_item_buttons.open->setIcon(open_item_icon);
+
+  QIcon expand_item_icon;
+  expand_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/expand_ref_item"),
+                             QIcon::Normal, QIcon::On);
+
+  expand_item_icon.addPixmap(
+      GetPixmap(":/ReferenceExplorer/expand_ref_item", IconStyle::Disabled),
+      QIcon::Disabled, QIcon::On);
+
+  d->treeview_item_buttons.expand->setIcon(expand_item_icon);
+}
+
 void GraphicalReferenceExplorer::OnModelReset() {
   auto display_root_warning = d->model->HasAlternativeRoot();
   d->alternative_root_warning->setVisible(display_root_warning);
@@ -569,6 +578,11 @@ void GraphicalReferenceExplorer::OnExpandTreeViewItem() {
 
   const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
   ExpandRefExplorerItem(index);
+}
+
+void GraphicalReferenceExplorer::OnThemeChange(const QPalette &,
+                                               const CodeViewTheme &) {
+  UpdateIcons();
 }
 
 }  // namespace mx::gui

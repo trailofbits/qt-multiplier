@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <multiplier/ui/IThemeManager.h>
+
 #include <QTreeView>
 
 namespace mx::gui {
@@ -22,6 +24,13 @@ class InformationExplorerTreeView final : public QTreeView {
  protected:
   void drawRow(QPainter *painter, const QStyleOptionViewItem &option,
                const QModelIndex &index) const override;
+
+ private:
+  void InstallItemDelegate();
+
+ private slots:
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 };
 
 }  // namespace mx::gui

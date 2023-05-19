@@ -6,8 +6,13 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
+#include "HistoryLabelBuilder.h"
+
 #include <multiplier/ui/HistoryWidget.h>
 #include <multiplier/ui/Icons.h>
+#include <multiplier/ui/Assert.h>
+
+#include <multiplier/Index.h>
 
 #include <QHBoxLayout>
 #include <QIcon>
@@ -17,13 +22,10 @@
 
 #include <atomic>
 #include <list>
-#include <multiplier/Index.h>
-#include <multiplier/ui/Assert.h>
 #include <vector>
 
-#include "HistoryLabelBuilder.h"
-
 namespace mx::gui {
+
 namespace {
 
 static std::atomic<std::uint64_t> gNextItemId(0);
@@ -105,29 +107,26 @@ HistoryWidget::HistoryWidget(const Index &index_,
     : QWidget(parent),
       d(new PrivateData(index_, file_cache_, max_history_size)) {
 
-  d->back_icon = GetIcon(":/Icons/HistoryWidget/HistoryBack");
-  d->forward_icon = GetIcon(":/Icons/HistoryWidget/HistoryForward");
-
   InitializeWidgets();
+
+  UpdateIcons();
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &HistoryWidget::OnThemeChange);
 }
 
 HistoryWidget::~HistoryWidget(void) {}
 
-//! Set the icon size.
 void HistoryWidget::SetIconSize(QSize size) {
   d->back_button->setIconSize(size);
   d->forward_button->setIconSize(size);
 }
 
-//! Tells the history what our current location is.
 void HistoryWidget::SetCurrentLocation(RawEntityId id,
                                        std::optional<QString> opt_label) {
   d->next_item.reset();
   d->next_item.emplace(id, std::move(opt_label));
 }
 
-//! Commits our "last current" location to the history. This makes our last
-//! current location visible in the history menu.
 void HistoryWidget::CommitCurrentLocationToHistory(void) {
   if (!d->next_item.has_value()) {
     return;
@@ -219,9 +218,6 @@ void HistoryWidget::InitializeWidgets(void) {
   d->forward_button = new QToolButton(this);
   d->forward_button->setPopupMode(QToolButton::MenuButtonPopup);
   d->forward_button->setDefaultAction(d->forward_action);
-
-  d->back_button->setIcon(d->back_icon);
-  d->forward_button->setIcon(d->forward_icon);
 
   connect(d->back_action, &QAction::triggered, this,
           &HistoryWidget::OnNavigateBack);
@@ -338,7 +334,14 @@ void HistoryWidget::UpdateMenus(void) {
   d->forward_button->setEnabled(0 < num_forward_actions);
 }
 
-//! Called when we have computed a name for the history item.
+void HistoryWidget::UpdateIcons() {
+  d->back_icon = GetIcon(":/Icons/HistoryWidget/HistoryBack");
+  d->forward_icon = GetIcon(":/Icons/HistoryWidget/HistoryForward");
+
+  d->back_button->setIcon(d->back_icon);
+  d->forward_button->setIcon(d->forward_icon);
+}
+
 void HistoryWidget::OnLabelForItem(std::uint64_t item_id,
                                    const QString &label) {
   for (Item &item : d->item_list) {
@@ -350,10 +353,6 @@ void HistoryWidget::OnLabelForItem(std::uint64_t item_id,
   }
 }
 
-//! Called when the back button is pressed to navigate backward through history.
-//! We distinguish this from the forward menu case because if this is our first
-//! navigation away from our "present location" then we just-in-time materialize
-//! the present location into a history item.
 void HistoryWidget::OnNavigateBack(void) {
   Assert(d->current_item_it != d->item_list.begin(), "Too far back");
 
@@ -366,13 +365,6 @@ void HistoryWidget::OnNavigateBack(void) {
   OnNavigateBackToHistoryItem(&dummy);
 }
 
-//! Called when the forward button is pressed to navigate forward through
-//! history. We distinguish this from the back menu case, because if we navigate
-//! forward to our "original present" location (i.e. where we started from
-//! before engaging with the history menu) then we just-in-time remove that item
-//! from history. This is so that, upon returning to the present, the present
-//! is allowed to change (with followup clicks and such) without there being a
-//! random record of our "former present" stuck within the history menu.
 void HistoryWidget::OnNavigateForward(void) {
   Assert(d->current_item_it != d->item_list.end(), "Too far forward");
 
@@ -384,10 +376,6 @@ void HistoryWidget::OnNavigateForward(void) {
   OnNavigateForwardToHistoryItem(&dummy);
 }
 
-//! Called when a specific history item in the back button's drop-down menu of
-//! history items is clicked. We distinguish this from the forward menu case
-//! because if this is our first navigation away from our "present location"
-//! then we just-in-time materialize the present location into a history item.
 void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
   QVariant item_index_var = action->data();
   if (!item_index_var.isValid()) {
@@ -415,14 +403,6 @@ void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
   emit GoToEntity(original_id, canonical_id);
 }
 
-//! Called when a specific history item in the forward button's drop-down menu
-//! of history items is clicked. We distinguish this from the back menu case,
-//! because if we navigate forward to our "original present" location (i.e.
-//! where we started from before engaging with the history menu) then we
-//! just-in-time remove that item from history. This is so that, upon returning
-//! to the present, the present is allowed to change (with followup clicks and
-//! such) without there being a random record of our "former present" stuck
-//! within the history menu.
 void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
   QVariant item_index_var = action->data();
   if (!item_index_var.isValid()) {
@@ -463,6 +443,10 @@ void HistoryWidget::PrivateData::NavigateForwardToHistoryItem(
   } else {
     current_item_it = next_item_it;
   }
+}
+
+void HistoryWidget::OnThemeChange(const QPalette &, const CodeViewTheme &) {
+  UpdateIcons();
 }
 
 }  // namespace mx::gui

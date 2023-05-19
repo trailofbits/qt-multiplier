@@ -8,6 +8,8 @@
 
 #include "PreviewableReferenceExplorer.h"
 
+#include <multiplier/ui/IThemeManager.h>
+
 #include <QWidget>
 
 namespace mx::gui {
@@ -90,6 +92,9 @@ class QuickReferenceExplorer final : public QWidget {
   GenerateWindowName(const RawEntityId &entity_id,
                      IReferenceExplorerModel::ExpansionMode mode);
 
+  //! Update the widget icons to match the active theme
+  void UpdateIcons();
+
  private slots:
   //! Restores the widget visibility when the application gains focus
   void OnApplicationStateChange(Qt::ApplicationState state);
@@ -99,6 +104,10 @@ class QuickReferenceExplorer final : public QWidget {
 
   //! Called when the entity name resolution has finished
   void EntityNameFutureStatusChanged();
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 };
 
 }  // namespace mx::gui
