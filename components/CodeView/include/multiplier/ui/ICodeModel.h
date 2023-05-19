@@ -20,10 +20,21 @@ class ICodeModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
+  enum class ModelState {
+    Uninitialized,
+    UpdateInProgress,
+    UpdateFailed,
+    UpdateCancelled,
+    Ready,
+  };
+
   //! Custom data roles
   enum {
     //! Token category, used for syntax coloring
     TokenCategoryRole = Qt::UserRole + 1,
+
+    //! Tells us the `ModelState` of the model.
+    ModelStateRole,
 
     //! The RawEntityId value for the specified model index
     TokenIdRole,

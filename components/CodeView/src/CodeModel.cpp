@@ -15,16 +15,6 @@
 #include <unordered_set>
 
 namespace mx::gui {
-namespace {
-
-enum class ModelState {
-  UpdateInProgress,
-  UpdateFailed,
-  UpdateCancelled,
-  Ready,
-};
-
-}  // namespace
 
 struct CodeModel::PrivateData final {
   PrivateData(const FileLocationCache &file_location_cache_,
@@ -35,25 +25,26 @@ struct CodeModel::PrivateData final {
   FileLocationCache file_location_cache;
   Index index;
 
-  ModelState model_state{ModelState::Ready};
+  ModelState model_state{ModelState::Uninitialized};
   std::optional<RawEntityId> opt_entity_id;
 
   const IndexedTokenRangeData::Line *last_line_cache{nullptr};
   const IndexedTokenRangeData::Column *last_column_cache{nullptr};
   IndexedTokenRangeData tokens;
 
-  const IndexedTokenRangeData::Line *LinePointerCast(const QModelIndex &index);
+  const IndexedTokenRangeData::Line *LinePointerCast(
+      const QModelIndex &index);
 
-  const IndexedTokenRangeData::Column *
-  ColumnPointerCast(const QModelIndex &index);
+  const IndexedTokenRangeData::Column *ColumnPointerCast(
+      const QModelIndex &index);
 
   IDatabase::Ptr database;
   QFuture<IDatabase::IndexedTokenRangeDataResult> future_result;
   QFutureWatcher<IDatabase::IndexedTokenRangeDataResult> future_watcher;
 };
 
-const IndexedTokenRangeData::Line *
-CodeModel::PrivateData::LinePointerCast(const QModelIndex &model_index) {
+const IndexedTokenRangeData::Line *CodeModel::PrivateData::LinePointerCast(
+    const QModelIndex &model_index) {
   const void *ptr = model_index.constInternalPointer();
   if (last_line_cache == ptr) {
     return last_line_cache;
@@ -71,8 +62,8 @@ CodeModel::PrivateData::LinePointerCast(const QModelIndex &model_index) {
   return nullptr;
 }
 
-const IndexedTokenRangeData::Column *
-CodeModel::PrivateData::ColumnPointerCast(const QModelIndex &model_index) {
+const IndexedTokenRangeData::Column *CodeModel::PrivateData::ColumnPointerCast(
+    const QModelIndex &model_index) {
   const void *ptr = model_index.constInternalPointer();
   if (ptr == last_column_cache) {
     return last_column_cache;
@@ -114,7 +105,9 @@ std::optional<RawEntityId> CodeModel::GetEntity(void) const {
 void CodeModel::SetEntity(RawEntityId raw_id) {
   CancelRunningRequest();
 
+  auto prev_state = d->model_state;
   emit beginResetModel();
+  d->model_state = ModelState::UpdateInProgress;
 
   EntityId eid(raw_id);
   if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
@@ -122,14 +115,13 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   }
 
   if (d->opt_entity_id.has_value() && d->opt_entity_id.value() == raw_id) {
+    d->model_state = prev_state;
     emit endResetModel();
     return;
   }
 
   d->opt_entity_id = std::nullopt;
   d->future_result = d->database->RequestIndexedTokenRangeData(raw_id);
-
-  d->model_state = ModelState::UpdateInProgress;
   d->future_watcher.setFuture(d->future_result);
 
   emit endResetModel();
@@ -183,7 +175,7 @@ QModelIndex CodeModel::parent(const QModelIndex &child) const {
     auto row_index = static_cast<unsigned>(child.row());
     return createIndex(child.row(), 0, &(d->tokens.lines[row_index]));
 
-    // Otherwise it's a line, or its the root, so give us back the root.
+  // Otherwise it's a line, or its the root, so give us back the root.
   } else {
     return QModelIndex();
   }
@@ -208,7 +200,12 @@ int CodeModel::columnCount(const QModelIndex &parent) const {
 QVariant CodeModel::data(const QModelIndex &index, int role) const {
 
   QVariant value;
+
+  // We're dealing with the root node.
   if (!index.isValid()) {
+    if (role == ICodeModel::ModelStateRole) {
+      value.setValue(int(d->model_state));
+    }
     return value;
   }
 
@@ -224,12 +221,16 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
       }
     }
 
-    // We're dealing with a column of data. Specifically, a token, or a fragment
-    // of a token.
+  // We're dealing with a column of data. Specifically, a token, or a fragment
+  // of a token.
   } else if (auto col = d->ColumnPointerCast(index)) {
     switch (role) {
-      case Qt::DisplayRole: value.setValue(col->data); break;
-      case ICodeModel::TokenCategoryRole: value.setValue(col->category); break;
+      case Qt::DisplayRole:
+        value.setValue(col->data);
+        break;
+      case ICodeModel::TokenCategoryRole:
+        value.setValue(col->category);
+        break;
       case ICodeModel::TokenIdRole:
         value.setValue(d->tokens.tokens[col->token_index].id().Pack());
         break;
@@ -238,8 +239,7 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
         break;
       case ICodeModel::RelatedEntityIdRole:
       case ICodeModel::RealRelatedEntityIdRole:
-        if (auto eid =
-                d->tokens.tokens[col->token_index].related_entity_id().Pack();
+        if (auto eid = d->tokens.tokens[col->token_index].related_entity_id().Pack();
             eid != kInvalidEntityId) {
           value.setValue(eid);
         }
@@ -248,7 +248,8 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
       // TODO(pag): Consider removing this role. It would be better to have the
       //            taint browser go and ask the database for the statement
       //            containing an token id, or just a general entity id.
-      case ICodeModel::EntityIdOfStmtContainingTokenRole: break;
+      case ICodeModel::EntityIdOfStmtContainingTokenRole:
+        break;
     }
   }
 
