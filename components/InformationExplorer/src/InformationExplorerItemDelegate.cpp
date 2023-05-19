@@ -11,6 +11,7 @@
 #include "Utils.h"
 
 #include <multiplier/ui/TokenPainter.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <QFontMetrics>
 #include <QPainter>
@@ -27,7 +28,7 @@ InformationExplorerItemDelegate::InformationExplorerItemDelegate(
     : QStyledItemDelegate(parent),
       d(new PrivateData) {
 
-  d->code_view_theme = GetDefaultCodeViewTheme();
+  d->code_view_theme = IThemeManager::Get().GetCodeViewTheme();
 
   TokenPainterConfiguration painter_config(d->code_view_theme);
   d->token_painter = std::make_unique<TokenPainter>(painter_config);

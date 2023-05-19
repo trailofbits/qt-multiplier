@@ -81,6 +81,7 @@ target_link_libraries("mx_referenceexplorer"
     "mx_util"
     "mx_codeview"
     "mx_globalhighlighter"
+    "mx_thememanager"
 )
 
 target_include_directories("mx_referenceexplorer" PRIVATE

@@ -9,6 +9,7 @@
 #include <QWidget>
 
 #include <multiplier/ui/ICodeView.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <multiplier/Index.h>
 
@@ -55,6 +56,9 @@ class QuickCodeView final : public QWidget {
                          const FileLocationCache &file_location_cache,
                          RawEntityId entity_id);
 
+  //! Updates the widget icons to match the active theme
+  void UpdateIcons();
+
   //! Used to start window dragging
   void OnTitleFrameMousePress(QMouseEvent *event);
 
@@ -74,6 +78,10 @@ class QuickCodeView final : public QWidget {
   //! Forwards a subset of ICodeView::TokenTriggered events
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
                         const QModelIndex &index);
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
  signals:
   //! \brief This signal will only fire for TokenAction::Type::Keyboard events

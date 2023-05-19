@@ -32,20 +32,10 @@ add_executable("Multiplier" ${executable_type}
 
   src/meta_types.h
   src/meta_types.cpp
-
-  src/Theme.h
-  src/Theme.cpp
   
   src/Style.h
   src/Style.cpp
 )
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  target_sources("Multiplier" PRIVATE
-    src/macos_utils.h
-    src/macos_utils.mm
-  )
-endif()
 
 target_sources("Multiplier" PRIVATE
   Resources/resources.qrc
@@ -74,6 +64,8 @@ target_link_libraries("Multiplier"
     "mx_widgets"
     "mx_informationexplorer"
     "mx_globalhighlighter"
+    "mx_codeviewtheme"
+    "mx_thememanager"
 )
 
 enable_qt_properties("Multiplier")

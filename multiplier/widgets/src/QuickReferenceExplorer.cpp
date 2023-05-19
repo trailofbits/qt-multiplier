@@ -31,6 +31,9 @@ struct QuickReferenceExplorer::PrivateData final {
   bool closed{false};
   IReferenceExplorerModel::ExpansionMode expansion_mode;
 
+  QPushButton *close_button{nullptr};
+  QPushButton *save_to_new_ref_explorer_button{nullptr};
+
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
 
@@ -57,6 +60,9 @@ QuickReferenceExplorer::QuickReferenceExplorer(
 
   InitializeWidgets(index, file_location_cache, entity_id, expansion_mode, mode,
                     highlighter);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &QuickReferenceExplorer::OnThemeChange);
 }
 
 QuickReferenceExplorer::~QuickReferenceExplorer() {
@@ -133,24 +139,22 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->future_watcher.setFuture(d->entity_name_future);
 
   // Save as new button
-  auto save_to_new_ref_explorer_button = new QPushButton(
-      GetIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"), "", this);
+  d->save_to_new_ref_explorer_button = new QPushButton(QIcon(), "", this);
+  d->save_to_new_ref_explorer_button->setToolTip(tr("Save to new tab"));
+  d->save_to_new_ref_explorer_button->setSizePolicy(QSizePolicy::Minimum,
+                                                    QSizePolicy::Minimum);
 
-  save_to_new_ref_explorer_button->setToolTip(tr("Save to new tab"));
-  save_to_new_ref_explorer_button->setSizePolicy(QSizePolicy::Minimum,
-                                                 QSizePolicy::Minimum);
-
-  connect(save_to_new_ref_explorer_button, &QPushButton::clicked, this,
+  connect(d->save_to_new_ref_explorer_button, &QPushButton::clicked, this,
           &QuickReferenceExplorer::OnSaveReferenceExplorer);
 
   // Close button
-  auto close_button = new QPushButton(
+  d->close_button = new QPushButton(
       GetIcon(":/Icons/QuickReferenceExplorer/Close"), "", this);
 
-  close_button->setToolTip(tr("Close"));
-  close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+  d->close_button->setToolTip(tr("Close"));
+  d->close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
 
-  connect(close_button, &QPushButton::clicked, this,
+  connect(d->close_button, &QPushButton::clicked, this,
           &QuickReferenceExplorer::close);
 
   // Setup the layout
@@ -158,13 +162,15 @@ void QuickReferenceExplorer::InitializeWidgets(
   title_frame_layout->setContentsMargins(0, 0, 0, 0);
   title_frame_layout->addWidget(d->window_title);
   title_frame_layout->addStretch();
-  title_frame_layout->addWidget(save_to_new_ref_explorer_button);
-  title_frame_layout->addWidget(close_button);
+  title_frame_layout->addWidget(d->save_to_new_ref_explorer_button);
+  title_frame_layout->addWidget(d->close_button);
 
   auto title_frame = new QWidget(this);
   title_frame->installEventFilter(this);
   title_frame->setContentsMargins(0, 0, 0, 0);
   title_frame->setLayout(title_frame_layout);
+
+  UpdateIcons();
 
   //
   // Contents
@@ -296,6 +302,18 @@ QString QuickReferenceExplorer::GenerateWindowName(
 
   auto entity_name = tr("Entity ID #") + QString::number(entity_id);
   return GenerateWindowName(entity_name, mode);
+}
+
+void QuickReferenceExplorer::UpdateIcons() {
+  d->save_to_new_ref_explorer_button->setIcon(
+      GetIcon(":/Icons/QuickReferenceExplorer/SaveToNewTab"));
+
+  d->close_button->setIcon(GetIcon(":/Icons/QuickReferenceExplorer/Close"));
+}
+
+void QuickReferenceExplorer::OnThemeChange(const QPalette &,
+                                           const CodeViewTheme &) {
+  UpdateIcons();
 }
 
 }  // namespace mx::gui

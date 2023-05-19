@@ -11,7 +11,6 @@
 #include "InformationExplorerItemDelegate.h"
 
 #include <multiplier/ui/IInformationExplorerModel.h>
-#include <multiplier/ui/CodeViewTheme.h>
 
 #include <QPainter>
 
@@ -20,7 +19,10 @@ namespace mx::gui {
 InformationExplorerTreeView::InformationExplorerTreeView(QWidget *parent)
     : QTreeView(parent) {
 
-  setItemDelegate(new InformationExplorerItemDelegate());
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &InformationExplorerTreeView::OnThemeChange);
+
+  InstallItemDelegate();
 }
 
 InformationExplorerTreeView::~InformationExplorerTreeView() {}
@@ -29,7 +31,7 @@ void InformationExplorerTreeView::drawRow(QPainter *painter,
                                           const QStyleOptionViewItem &option,
                                           const QModelIndex &index) const {
 
-  auto code_view_theme = GetDefaultCodeViewTheme();
+  auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
   auto background_color = (option.state & QStyle::State_Selected) != 0
                               ? code_view_theme.selected_line_background_color
                               : code_view_theme.default_background_color;
@@ -43,6 +45,22 @@ void InformationExplorerTreeView::drawRow(QPainter *painter,
   painter->fillRect(option.rect, QBrush(background_color));
 
   QTreeView::drawRow(painter, option, index);
+}
+
+void InformationExplorerTreeView::InstallItemDelegate() {
+  auto old_item_delegate = itemDelegate();
+  if (old_item_delegate != nullptr) {
+    old_item_delegate->deleteLater();
+  }
+
+  setItemDelegate(new InformationExplorerItemDelegate());
+}
+
+void InformationExplorerTreeView::OnThemeChange(const QPalette &,
+                                                const CodeViewTheme &) {
+
+  InstallItemDelegate();
+  update();
 }
 
 }  // namespace mx::gui

@@ -12,8 +12,6 @@
 
 namespace mx::gui {
 
-bool gUseDarkTheme = true;
-
 // clang-format off
 const CodeViewTheme kDefaultDarkCodeViewTheme{
   // Font name

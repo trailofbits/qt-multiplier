@@ -46,6 +46,7 @@ target_link_libraries("mx_informationexplorer"
     "mx_util"
     "mx_historywidget"
     "mx_globalhighlighter"
+    "mx_thememanager"
 )
 
 target_include_directories("mx_informationexplorer" PRIVATE
