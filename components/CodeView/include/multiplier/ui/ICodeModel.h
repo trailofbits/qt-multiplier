@@ -31,9 +31,6 @@ class ICodeModel : public QAbstractItemModel {
     //! A line number integer for the specified model index
     LineNumberRole,
 
-    //! Returns the group id (if any) of the specified model index
-    TokenGroupIdRole,
-
     //! The RawEntityId value associated with the "related entity" of this
     //! token.
     RelatedEntityIdRole,

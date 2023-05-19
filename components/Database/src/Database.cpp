@@ -37,11 +37,10 @@ Database::RequestEntityInformation(RawEntityId entity_id) {
 }
 
 QFuture<IDatabase::IndexedTokenRangeDataResult>
-Database::RequestIndexedTokenRangeData(
-    RawEntityId entity_id, IndexedTokenRangeDataRequestType request_type) {
+Database::RequestIndexedTokenRangeData(RawEntityId entity_id) {
   return QtConcurrent::run(QThreadPool::globalInstance(),
                            GetIndexedTokenRangeData, d->index,
-                           d->file_location_cache, entity_id, request_type);
+                           d->file_location_cache, entity_id);
 }
 
 QFuture<OptionalName> Database::RequestEntityName(RawEntityId fragment_id) {

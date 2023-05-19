@@ -50,13 +50,13 @@ class GoToLineWidget final : public QWidget {
 
  public slots:
   //! Shows the widget
-  void Activate(std::uint64_t max_line_number);
+  void Activate(unsigned max_line_number);
 
   //! Hides the widget
   void Deactivate();
 
  signals:
-  void LineNumberChanged(std::uint64_t line_number);
+  void LineNumberChanged(unsigned line_number);
 };
 
 }  // namespace mx::gui

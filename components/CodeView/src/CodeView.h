@@ -111,8 +111,12 @@ class CodeView final : public ICodeView {
   bool ScrollToLineNumberInternal(unsigned line);
 
  public:
+  //  // A `(row, column)` pair identifying a token position.
+  //  using TokenPosition = std::pair<int, int>;
+
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
+
     //! A single token map entry
     struct Entry final {
       int cursor_start{};
@@ -128,21 +132,17 @@ class CodeView final : public ICodeView {
         block_number_to_unique_token_id_list;
 
     //! This maps a line number to a block number
-    std::unordered_map<std::size_t, int> line_number_to_block_number;
+    std::unordered_map<unsigned, int> line_number_to_block_number;
 
     //! This maps a block number to a line number
-    std::unordered_map<int, std::size_t> block_number_to_line_number;
-
-    //! This maps a token group to a list of unique token identifiers
-    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>
-        token_group_id_to_unique_token_id_list;
+    std::unordered_map<int, unsigned> block_number_to_line_number;
 
     //! This maps related entity ids to a list of unique token identifiers
     std::unordered_map<RawEntityId, std::vector<std::uint64_t>>
         related_entity_id_to_unique_token_id_list;
 
     //! The highest line number that we have encountered
-    std::uint64_t highest_line_number{};
+    unsigned highest_line_number{};
   };
 
   //! Creates a unique token identifier from the given code model index
@@ -179,7 +179,7 @@ class CodeView final : public ICodeView {
   //! Adds highlights for tokens to an existing extra selection list
   static void HighlightTokensForRelatedEntityID(
       const TokenMap &token_map, const QTextCursor &text_cursor,
-      RawEntityId related_entity_id,
+      const QModelIndex &model_index,
       QList<QTextEdit::ExtraSelection> &selection_list,
       const CodeViewTheme &theme);
 

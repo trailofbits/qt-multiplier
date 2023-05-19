@@ -81,7 +81,7 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
 
       //! A line node references the original index and the column list node
       struct LineData final {
-        std::uint64_t line_number{};
+        unsigned line_number{};
         QModelIndex original_model_index;
         ID child_id{};
       };

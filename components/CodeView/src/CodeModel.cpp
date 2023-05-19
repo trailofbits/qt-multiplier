@@ -15,7 +15,6 @@
 #include <unordered_set>
 
 namespace mx::gui {
-
 namespace {
 
 enum class ModelState {
@@ -25,7 +24,7 @@ enum class ModelState {
   Ready,
 };
 
-}
+}  // namespace
 
 struct CodeModel::PrivateData final {
   PrivateData(const FileLocationCache &file_location_cache_,
@@ -39,18 +38,76 @@ struct CodeModel::PrivateData final {
   ModelState model_state{ModelState::Ready};
   std::optional<RawEntityId> opt_entity_id;
 
+  const IndexedTokenRangeData::Line *last_line_cache{nullptr};
+  const IndexedTokenRangeData::Column *last_column_cache{nullptr};
+  IndexedTokenRangeData tokens;
+
+  const IndexedTokenRangeData::Line *LinePointerCast(const QModelIndex &index);
+
+  const IndexedTokenRangeData::Column *
+  ColumnPointerCast(const QModelIndex &index);
+
   IDatabase::Ptr database;
   QFuture<IDatabase::IndexedTokenRangeDataResult> future_result;
   QFutureWatcher<IDatabase::IndexedTokenRangeDataResult> future_watcher;
-
-  Context context;
 };
+
+const IndexedTokenRangeData::Line *
+CodeModel::PrivateData::LinePointerCast(const QModelIndex &model_index) {
+  const void *ptr = model_index.constInternalPointer();
+  if (last_line_cache == ptr) {
+    return last_line_cache;
+  }
+
+  auto line = reinterpret_cast<const IndexedTokenRangeData::Line *>(ptr);
+  if (auto num_lines = tokens.lines.size()) {
+    auto first = tokens.lines.data();
+    auto last = &(first[num_lines - 1u]);
+    if (first <= line && line <= last) {
+      last_line_cache = line;
+      return line;
+    }
+  }
+  return nullptr;
+}
+
+const IndexedTokenRangeData::Column *
+CodeModel::PrivateData::ColumnPointerCast(const QModelIndex &model_index) {
+  const void *ptr = model_index.constInternalPointer();
+  if (ptr == last_column_cache) {
+    return last_column_cache;
+  }
+
+  unsigned row = static_cast<unsigned>(model_index.row());
+  auto num_lines = tokens.lines.size();
+  if (row >= num_lines) {  // Make unsafe :-P
+    return nullptr;
+  }
+
+  const IndexedTokenRangeData::Line &line = tokens.lines[row];
+  last_line_cache = &line;
+
+  unsigned col = static_cast<unsigned>(model_index.column());
+  auto num_cols = line.columns.size();
+  if (col >= num_cols) {
+    return nullptr;
+  }
+
+  auto tok = reinterpret_cast<const IndexedTokenRangeData::Column *>(ptr);
+  auto first = line.columns.data();
+  auto last = &(first[num_cols - 1u]);
+  if (first <= tok && tok <= last) {
+    last_column_cache = tok;
+    return tok;
+  }
+  return nullptr;
+}
 
 CodeModel::~CodeModel() {
   CancelRunningRequest();
 }
 
-std::optional<RawEntityId> CodeModel::GetEntity() const {
+std::optional<RawEntityId> CodeModel::GetEntity(void) const {
   return d->opt_entity_id;
 }
 
@@ -60,8 +117,6 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   emit beginResetModel();
 
   EntityId eid(raw_id);
-  VariantId vid = eid.Unpack();
-
   if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
     raw_id = EntityId(frag_id.value()).Pack();
   }
@@ -72,25 +127,7 @@ void CodeModel::SetEntity(RawEntityId raw_id) {
   }
 
   d->opt_entity_id = std::nullopt;
-
-  if (std::holds_alternative<FileId>(vid)) {
-    d->future_result = d->database->RequestIndexedTokenRangeData(
-        raw_id, IDatabase::IndexedTokenRangeDataRequestType::File);
-
-  } else if (std::holds_alternative<FileTokenId>(vid)) {
-    d->future_result = d->database->RequestIndexedTokenRangeData(
-        raw_id, IDatabase::IndexedTokenRangeDataRequestType::File);
-
-  } else if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
-    d->future_result = d->database->RequestIndexedTokenRangeData(
-        raw_id, IDatabase::IndexedTokenRangeDataRequestType::Fragment);
-
-  } else {
-    d->model_state = ModelState::UpdateFailed;
-    emit endResetModel();
-
-    return;
-  }
+  d->future_result = d->database->RequestIndexedTokenRangeData(raw_id);
 
   d->model_state = ModelState::UpdateInProgress;
   d->future_watcher.setFuture(d->future_result);
@@ -104,196 +141,118 @@ bool CodeModel::IsReady() const {
 
 QModelIndex CodeModel::index(int row, int column,
                              const QModelIndex &parent) const {
+  //  if (!hasIndex(row, column, parent)) {
+  //    return QModelIndex();
+  //  }
 
-  Context::Node::ID parent_node_id{};
   if (parent.isValid()) {
-    parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
-  }
-
-  const auto &parent_node = d->context.node_map[parent_node_id];
-  if (std::holds_alternative<Context::Node::RootData>(parent_node.data)) {
-    if (column != 0) {
-      return QModelIndex();
-    }
-
-    auto unsigned_row = static_cast<std::size_t>(row);
-
-    const auto &root_data = std::get<Context::Node::RootData>(parent_node.data);
-    if (unsigned_row >= root_data.child_id_list.size()) {
-      return QModelIndex();
-    }
-
-    const auto &child_id = root_data.child_id_list[unsigned_row];
-    return createIndex(row, column, child_id);
-
-  } else if (std::holds_alternative<Context::Node::LineData>(
-                 parent_node.data)) {
     if (row != 0) {
       return QModelIndex();
     }
 
-    const auto &line_data = std::get<Context::Node::LineData>(parent_node.data);
-    return createIndex(row, column, line_data.child_id);
+    auto line = d->LinePointerCast(parent);
+    if (!line) {
+      return QModelIndex();
+    }
 
+    if (auto col_index = static_cast<unsigned>(column);
+        col_index < line->columns.size()) {
+      auto col = &(line->columns[col_index]);
+      return createIndex(parent.row(), column, col);
+    }
+  } else {
+    if (column != 0) {
+      return QModelIndex();
+    }
+
+    if (auto row_index = static_cast<unsigned>(row);
+        row_index < d->tokens.lines.size()) {
+      return createIndex(row, 0, &(d->tokens.lines[row_index]));
+    }
+  }
+
+  return QModelIndex();
+}
+
+QModelIndex CodeModel::parent(const QModelIndex &child) const {
+
+  if (!child.isValid()) {
+    return QModelIndex();
+
+  } else if (auto col = d->ColumnPointerCast(child)) {
+    auto row_index = static_cast<unsigned>(child.row());
+    return createIndex(child.row(), 0, &(d->tokens.lines[row_index]));
+
+    // Otherwise it's a line, or its the root, so give us back the root.
   } else {
     return QModelIndex();
   }
 }
 
-QModelIndex CodeModel::parent(const QModelIndex &child) const {
-  if (!child.isValid()) {
-    return QModelIndex();
-  }
-
-  Context::Node::ID parent_id{};
-
-  {
-    auto node_id = static_cast<Context::Node::ID>(child.internalId());
-    const auto &node = d->context.node_map[node_id];
-
-    parent_id = node.parent_id;
-  }
-
-  if (parent_id == 0) {
-    return QModelIndex();
-  }
-
-  Context::Node::ID grandparent_id{};
-
-  {
-    const auto &node = d->context.node_map[parent_id];
-    grandparent_id = node.parent_id;
-  }
-
-  if (grandparent_id != 0) {
-    return QModelIndex();
-  }
-
-  const auto &grandparent_node = d->context.node_map[grandparent_id];
-
-  if (!std::holds_alternative<Context::Node::RootData>(grandparent_node.data)) {
-    return QModelIndex();
-  }
-
-  const auto &root_data =
-      std::get<Context::Node::RootData>(grandparent_node.data);
-
-  auto it = std::find(root_data.child_id_list.begin(),
-                      root_data.child_id_list.end(), parent_id);
-
-  if (it == root_data.child_id_list.end()) {
-    return QModelIndex();
-  }
-
-  auto parent_row =
-      static_cast<int>(std::distance(root_data.child_id_list.begin(), it));
-
-  return createIndex(parent_row, 0, parent_id);
-}
-
 int CodeModel::rowCount(const QModelIndex &parent) const {
-  Context::Node::ID parent_node_id{};
-  if (parent.isValid()) {
-    parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
-  }
-
-  const auto &parent_node = d->context.node_map[parent_node_id];
-  if (std::holds_alternative<Context::Node::RootData>(parent_node.data)) {
-    const auto &root_data = std::get<Context::Node::RootData>(parent_node.data);
-    return static_cast<int>(root_data.child_id_list.size());
-
-  } else if (std::holds_alternative<Context::Node::LineData>(
-                 parent_node.data)) {
-    return 1;
-
+  if (!parent.isValid()) {  // Root item.
+    return static_cast<int>(d->tokens.lines.size());
   } else {
     return 0;
   }
 }
 
 int CodeModel::columnCount(const QModelIndex &parent) const {
-  Context::Node::ID parent_node_id{};
-  if (parent.isValid()) {
-    parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
+  if (auto line = d->LinePointerCast(parent)) {
+    return static_cast<int>(line->columns.size());
+  } else {
+    return 1;
   }
-
-  const auto &parent_node = d->context.node_map[parent_node_id];
-  if (std::holds_alternative<Context::Node::LineData>(parent_node.data)) {
-    const auto &line_data = std::get<Context::Node::LineData>(parent_node.data);
-
-    const auto &column_list_node = d->context.node_map[line_data.child_id];
-    const auto &column_list_data =
-        std::get<Context::Node::ColumnListData>(column_list_node.data);
-
-    return static_cast<int>(column_list_data.column_list.size());
-  }
-
-  return 1;
 }
 
 QVariant CodeModel::data(const QModelIndex &index, int role) const {
-  auto node_id = static_cast<Context::Node::ID>(index.internalId());
-  const auto &node = d->context.node_map[node_id];
 
   QVariant value;
+  if (!index.isValid()) {
+    return value;
+  }
 
-  if (std::holds_alternative<Context::Node::LineData>(node.data)) {
-    const auto &line_data = std::get<Context::Node::LineData>(node.data);
+  // We're dealing with a line of data.
+  if (auto line = d->LinePointerCast(index)) {
 
-    if (role == Qt::DisplayRole) {
-      value.setValue(QString::number(line_data.line_number));
+    if (line->number) {
+      if (role == Qt::DisplayRole) {
+        value.setValue(QString::number(line->number));
 
-    } else if (role == ICodeModel::LineNumberRole) {
-      value.setValue(line_data.line_number);
+      } else if (role == ICodeModel::LineNumberRole) {
+        value.setValue(line->number);
+      }
     }
 
-  } else if (std::holds_alternative<Context::Node::ColumnListData>(node.data)) {
-    const auto &column_list_data =
-        std::get<Context::Node::ColumnListData>(node.data);
+    // We're dealing with a column of data. Specifically, a token, or a fragment
+    // of a token.
+  } else if (auto col = d->ColumnPointerCast(index)) {
+    switch (role) {
+      case Qt::DisplayRole: value.setValue(col->data); break;
+      case ICodeModel::TokenCategoryRole: value.setValue(col->category); break;
+      case ICodeModel::TokenIdRole:
+        value.setValue(d->tokens.tokens[col->token_index].id().Pack());
+        break;
+      case ICodeModel::LineNumberRole:
+        value = index.parent().data(ICodeModel::LineNumberRole);
+        break;
+      case ICodeModel::RelatedEntityIdRole:
+      case ICodeModel::RealRelatedEntityIdRole:
+        if (auto eid =
+                d->tokens.tokens[col->token_index].related_entity_id().Pack();
+            eid != kInvalidEntityId) {
+          value.setValue(eid);
+        }
+        break;
 
-    auto unsigned_column = static_cast<std::size_t>(index.column());
-    if (unsigned_column >= column_list_data.column_list.size()) {
-      return QVariant();
-    }
-
-    const auto &column = column_list_data.column_list[unsigned_column];
-
-    if (role == Qt::DisplayRole) {
-      value.setValue(column.data);
-
-    } else if (role == ICodeModel::TokenCategoryRole) {
-      value.setValue(static_cast<std::uint32_t>(column.token_category));
-
-    } else if (role == ICodeModel::TokenIdRole) {
-      value.setValue(static_cast<std::uint64_t>(column.token_id));
-
-    } else if (role == ICodeModel::LineNumberRole) {
-      auto parent_index = index.parent();
-      value = parent_index.data(ICodeModel::LineNumberRole);
-
-    } else if (role == ICodeModel::TokenGroupIdRole) {
-      if (column.opt_token_group_id.has_value()) {
-        value.setValue(column.opt_token_group_id.value());
-      }
-
-    } else if (role == ICodeModel::RelatedEntityIdRole ||
-               role == ICodeModel::RealRelatedEntityIdRole) {
-      if (column.related_entity_id != kInvalidEntityId) {
-        value.setValue(static_cast<std::uint64_t>(column.related_entity_id));
-      }
-
-    } else if (role == ICodeModel::EntityIdOfStmtContainingTokenRole) {
-      if (column.statement_entity_id != kInvalidEntityId) {
-        value.setValue(static_cast<std::uint64_t>(column.statement_entity_id));
-      }
+      // TODO(pag): Consider removing this role. It would be better to have the
+      //            taint browser go and ask the database for the statement
+      //            containing an token id, or just a general entity id.
+      case ICodeModel::EntityIdOfStmtContainingTokenRole: break;
     }
   }
 
   return value;
-}
-
-CodeModel::Context::Node::ID CodeModel::GenerateNodeID(Context &context) {
-  return ++context.node_id_generator;
 }
 
 CodeModel::CodeModel(const FileLocationCache &file_location_cache,
@@ -315,121 +274,30 @@ void CodeModel::CancelRunningRequest() {
 
   d->future_result.cancel();
   d->future_result.waitForFinished();
-
   d->future_result = {};
 }
 
 void CodeModel::FutureResultStateChanged() {
   emit beginResetModel();
 
-  d->context = {};
-
   if (d->future_result.isCanceled()) {
     d->model_state = ModelState::UpdateCancelled;
     emit endResetModel();
-
     return;
   }
 
-  auto future_result = d->future_result.takeResult();
+  IDatabase::IndexedTokenRangeDataResult future_result =
+      d->future_result.takeResult();
+
   if (!future_result.Succeeded()) {
     d->model_state = ModelState::UpdateFailed;
     emit endResetModel();
-
     return;
   }
 
-  IndexedTokenRangeData indexed_token_range_data = future_result.TakeValue();
-  d->opt_entity_id = indexed_token_range_data.requested_id;
-
-  auto token_count = indexed_token_range_data.start_of_token.size() - 1u;
-
-  Context::Node::RootData root_data;
-
-  std::size_t line_number{};
-  Context::Node::ColumnListData column_list_data;
-
-  auto L_saveRow = [&]() {
-    auto line_node_id = GenerateNodeID(d->context);
-    auto column_list_node_id = GenerateNodeID(d->context);
-
-    // Generate a line node
-    Context::Node line_node;
-    line_node.id = line_node_id;
-    line_node.parent_id = 0;
-
-    Context::Node::LineData line_data;
-    line_data.line_number = line_number;
-    line_data.child_id = column_list_node_id;
-
-    line_node.data = std::move(line_data);
-
-    // Generate the column list node
-    Context::Node column_list_node;
-    column_list_node.id = column_list_node_id;
-    column_list_node.parent_id = line_node_id;
-
-    column_list_node.data = std::move(column_list_data);
-
-    // Save the nodes
-    d->context.node_map.insert(
-        {column_list_node_id, std::move(column_list_node)});
-
-    d->context.node_map.insert({line_node_id, std::move(line_node)});
-
-    // Update the root node
-    root_data.child_id_list.push_back(line_node_id);
-
-    column_list_data = {};
-  };
-
-  for (std::size_t i = 0; i < token_count; ++i) {
-    auto token_start = indexed_token_range_data.start_of_token[i];
-    auto token_end = indexed_token_range_data.start_of_token[i + 1];
-    auto token_length = token_end - token_start;
-
-    Context::Node::ColumnListData::Column col = {};
-    col.token_id = indexed_token_range_data.token_ids[i];
-    col.related_entity_id = indexed_token_range_data.related_entity_ids[i];
-    col.statement_entity_id =
-        indexed_token_range_data.statement_containing_token[i];
-
-    col.token_category = indexed_token_range_data.token_categories[i];
-
-    auto frag_id_index = indexed_token_range_data.fragment_id_index[i];
-    if (auto frag_id = indexed_token_range_data.fragment_ids[frag_id_index];
-        frag_id != kInvalidEntityId) {
-      col.opt_token_group_id.emplace(frag_id);
-    }
-
-    line_number =
-        static_cast<std::size_t>(indexed_token_range_data.line_number[i]);
-
-    qsizetype line_number_adjust = 0;
-    if (indexed_token_range_data.data[token_end - 1] == QChar::LineSeparator) {
-      line_number_adjust = 1;
-    }
-
-    col.data = indexed_token_range_data.data.mid(
-        token_start, token_length - line_number_adjust);
-
-    column_list_data.column_list.push_back(std::move(col));
-
-    if (line_number_adjust) {
-      L_saveRow();
-    }
-  }
-
-  // Flush the last row.
-  if (!column_list_data.column_list.empty()) {
-    L_saveRow();
-  }
-
-  Context::Node root_node;
-  root_node.data = std::move(root_data);
-
-  d->context.node_map.insert({0, std::move(root_node)});
-
+  d->last_line_cache = nullptr;
+  d->last_column_cache = nullptr;
+  d->tokens = future_result.TakeValue();
   d->model_state = ModelState::Ready;
   emit endResetModel();
 }

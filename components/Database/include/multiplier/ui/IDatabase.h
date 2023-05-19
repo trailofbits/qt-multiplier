@@ -63,7 +63,6 @@ class IDatabase {
   static Ptr Create(const Index &index,
                     const FileLocationCache &file_location_cache);
 
-
   //! The output of an entity information request
   using EntityInformationResult = Result<EntityInformation, RPCErrorCode>;
 
@@ -82,8 +81,8 @@ class IDatabase {
   };
 
   //! Requests the specified file
-  virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
-      RawEntityId entity_id, IndexedTokenRangeDataRequestType request_type) = 0;
+  virtual QFuture<IndexedTokenRangeDataResult>
+  RequestIndexedTokenRangeData(RawEntityId entity_id) = 0;
 
   //! An optional name
   using OptionalName = std::optional<QString>;

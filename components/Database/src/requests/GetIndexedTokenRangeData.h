@@ -17,7 +17,6 @@ namespace mx::gui {
 void GetIndexedTokenRangeData(
     QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id,
-    IDatabase::IndexedTokenRangeDataRequestType request_type);
+    RawEntityId entity_id);
 
 }  // namespace mx::gui

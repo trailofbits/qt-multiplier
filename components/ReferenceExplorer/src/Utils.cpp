@@ -66,13 +66,13 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity,
 
     for (Token tok : macro.generate_expansion_tokens()) {
       if (Token pt = tok.parsed_token()) {
-        std::cerr << "PT " << pt.id() << ' ' << pt.data() << '\n';
+//        std::cerr << "PT " << pt.id() << ' ' << pt.data() << '\n';
         if (auto nd = NamedDeclContaining(pt);
             !std::holds_alternative<NotAnEntity>(nd)) {
           return nd;
         }
       } else {
-        std::cerr << "ET " << tok.id() << ' ' << tok.data() << '\n';
+//        std::cerr << "ET " << tok.id() << ' ' << tok.data() << '\n';
       }
     }
 

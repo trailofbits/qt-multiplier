@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <concepts>
 #include <stdexcept>
 #include <utility>
 #include <variant>
@@ -15,9 +16,8 @@ namespace mx::gui {
 template <typename ValueType, typename ErrorType>
 class Result final {
  private:
-  bool destroyed{true};
   mutable bool checked{false};
-  std::variant<ValueType, ErrorType> data;
+  std::variant<std::monostate, ValueType, ErrorType> data;
 
  public:
   Result(void);
@@ -34,16 +34,27 @@ class Result final {
   const ValueType *operator->(void) const;
 
   Result(const ValueType &value);
-  Result(ValueType &&value): destroyed(false), data(std::forward<ValueType>(value)) {}
+  Result(ValueType &&value)
+      : data(std::forward<ValueType>(value)) {}
 
   Result(const ErrorType &error);
-  Result(ErrorType &&error):  destroyed(false), data(std::forward<ErrorType>(error)) {}
+  Result(ErrorType &&error)
+      : data(std::forward<ErrorType>(error)) {}
 
-  Result(Result &&other) noexcept;
+  Result(Result && other) noexcept;
   Result &operator=(Result &&other) noexcept;
 
-  Result(const Result &) = delete;
-  Result &operator=(const Result &) = delete;
+  Result &operator=(const Result &that) requires std::copyable<ValueType> &&
+                                                 std::copyable<ErrorType> {
+    Result self(that);
+    *this = std::move(self);
+    return *this;
+  }
+
+  Result(const Result &that) requires std::copyable<ValueType> &&
+                                      std::copyable<ErrorType>
+      : checked(false),
+        data(that.data) {}
 
  private:
   void VerifyState(void) const;
@@ -80,10 +91,7 @@ ErrorType Result<ValueType, ErrorType>::TakeError(void) {
   VerifyChecked();
   VerifyFailed();
 
-  auto error = std::move(std::get<ErrorType>(data));
-  destroyed = true;
-
-  return error;
+  return std::move(std::get<ErrorType>(data));
 }
 
 template <typename ValueType, typename ErrorType>
@@ -101,10 +109,7 @@ ValueType Result<ValueType, ErrorType>::TakeValue(void) {
   VerifyChecked();
   VerifySucceeded();
 
-  auto value = std::move(std::get<ValueType>(data));
-  destroyed = true;
-
-  return value;
+  return std::move(std::get<ValueType>(data));
 }
 
 template <typename ValueType, typename ErrorType>
@@ -114,18 +119,15 @@ const ValueType *Result<ValueType, ErrorType>::operator->(void) const {
 
 template <typename ValueType, typename ErrorType>
 Result<ValueType, ErrorType>::Result(const ValueType &value)
-    : destroyed(false),
-      data(value) {}
+    : data(value) {}
 
 template <typename ValueType, typename ErrorType>
 Result<ValueType, ErrorType>::Result(const ErrorType &error)
-    : destroyed(false),
-      data(error) {}
+    : data(error) {}
 
 template <typename ValueType, typename ErrorType>
 Result<ValueType, ErrorType>::Result(Result &&other) noexcept
-    : destroyed(std::exchange(other.destroyed, false)),
-      checked(std::exchange(other.checked, true)),
+    : checked(std::exchange(other.checked, true)),
       data(std::exchange(other.data, ErrorType())) {}
 
 template <typename ValueType, typename ErrorType>
@@ -134,13 +136,12 @@ Result<ValueType, ErrorType>::operator=(Result &&other) noexcept {
   Result that(std::forward<Result>(other));
   data = std::exchange(that.data, ErrorType());
   checked = std::exchange(that.checked, true);
-  destroyed = std::exchange(that.destroyed, false);
   return *this;
 }
 
 template <typename ValueType, typename ErrorType>
 void Result<ValueType, ErrorType>::VerifyState(void) const {
-  if (!destroyed) {
+  if (!std::holds_alternative<std::monostate>(data)) {
     return;
   }
 #ifndef NDEBUG

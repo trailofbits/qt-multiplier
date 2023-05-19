@@ -35,23 +35,23 @@ HighlightingModelProxy::~HighlightingModelProxy() {}
 
 QVariant HighlightingModelProxy::data(const QModelIndex &index,
                                       int role) const {
+  QVariant ret = QIdentityProxyModel::data(index, role);
   if (role != Qt::BackgroundRole && role != Qt::ForegroundRole) {
-    return QIdentityProxyModel::data(index, role);
+    return ret;
   }
 
   auto entity_id_var = sourceModel()->data(index, d->entity_id_data_role);
   if (!entity_id_var.isValid()) {
-    return QVariant();
+    return ret;
   }
 
   auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
-
   auto highlight_it = d->entity_highlight_list.find(entity_id);
   if (highlight_it == d->entity_highlight_list.end()) {
-    return QVariant();
+    return ret;
   }
 
-  const auto &background_color = highlight_it->second;
+  const QColor &background_color = highlight_it->second;
   if (role == Qt::BackgroundRole) {
     return background_color;
   }

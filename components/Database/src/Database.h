@@ -21,9 +21,8 @@ class Database final : public IDatabase {
   RequestEntityInformation(RawEntityId entity_id) override;
 
   //! \copybrief IDatabase::RequestIndexedTokenRangeData
-  virtual QFuture<IndexedTokenRangeDataResult> RequestIndexedTokenRangeData(
-      RawEntityId entity_id,
-      IndexedTokenRangeDataRequestType request_type) override;
+  virtual QFuture<IndexedTokenRangeDataResult>
+  RequestIndexedTokenRangeData(RawEntityId entity_id) override;
 
   //! \copybrief IDatabase::RequestEntityName
   virtual QFuture<OptionalName>
