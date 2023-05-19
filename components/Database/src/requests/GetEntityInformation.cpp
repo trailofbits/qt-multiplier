@@ -12,9 +12,12 @@
 #include <multiplier/Entities/ArraySubscriptExpr.h>
 #include <multiplier/Entities/BinaryOperator.h>
 #include <multiplier/Entities/CallExpr.h>
+#include <multiplier/Entities/CastExpr.h>
 #include <multiplier/Entities/ConditionalOperator.h>
 #include <multiplier/Entities/DefineMacroDirective.h>
 #include <multiplier/Entities/DoStmt.h>
+#include <multiplier/Entities/EnumConstantDecl.h>
+#include <multiplier/Entities/EnumDecl.h>
 #include <multiplier/Entities/File.h>
 #include <multiplier/Entities/ForStmt.h>
 #include <multiplier/Entities/Fragment.h>
@@ -24,6 +27,7 @@
 #include <multiplier/Entities/MacroExpansion.h>
 #include <multiplier/Entities/MemberExpr.h>
 #include <multiplier/Entities/NamedDecl.h>
+#include <multiplier/Entities/RecordDecl.h>
 #include <multiplier/Entities/SwitchStmt.h>
 #include <multiplier/Entities/UnaryOperator.h>
 #include <multiplier/Entities/WhileStmt.h>
@@ -124,22 +128,22 @@ static mx::TokenRange FindLine(mx::Stmt prev_stmt) {
     switch (stmt.kind()) {
 
       // Don't ascend too far up the statement parentage.
-      case mx::StmtKind::CASE_STMT:
-      case mx::StmtKind::DEFAULT_STMT:
-      case mx::StmtKind::LABEL_STMT:
-      case mx::StmtKind::COMPOUND_STMT:
-      case mx::StmtKind::SWITCH_STMT:
-      case mx::StmtKind::DO_STMT:
-      case mx::StmtKind::WHILE_STMT:
-      case mx::StmtKind::FOR_STMT:
-      case mx::StmtKind::IF_STMT:
-      case mx::StmtKind::CXX_TRY_STMT:
-      case mx::StmtKind::CXX_FOR_RANGE_STMT:
-      case mx::StmtKind::CXX_CATCH_STMT:
-      case mx::StmtKind::COROUTINE_BODY_STMT:  // Not sure what this is.
+      case StmtKind::CASE_STMT:
+      case StmtKind::DEFAULT_STMT:
+      case StmtKind::LABEL_STMT:
+      case StmtKind::COMPOUND_STMT:
+      case StmtKind::SWITCH_STMT:
+      case StmtKind::DO_STMT:
+      case StmtKind::WHILE_STMT:
+      case StmtKind::FOR_STMT:
+      case StmtKind::IF_STMT:
+      case StmtKind::CXX_TRY_STMT:
+      case StmtKind::CXX_FOR_RANGE_STMT:
+      case StmtKind::CXX_CATCH_STMT:
+      case StmtKind::COROUTINE_BODY_STMT:  // Not sure what this is.
         goto done;
 
-      case mx::StmtKind::DECL_STMT:
+      case StmtKind::DECL_STMT:
         prev_stmt = std::move(stmt);
         goto done;
 
@@ -153,48 +157,94 @@ done:
   return prev_stmt.tokens().strip_whitespace();
 }
 
+//! Fill `info` with information about the variable `var`.
+static void FillTypeInformation(
+    const FileLocationCache &file_location_cache,
+    EntityInformation &info, const TypeDecl &entity, Reference ref) {
+
+  // TODO(pag): Do better with these.
+  (void) entity;
+
+  if (auto du = ref.as_declaration()) {
+    EntityInformation::Selection *sel = &(info.uses.emplace_back());
+    sel->display_role.setValue(du->tokens().strip_whitespace());
+    sel->entity_role = du.value();
+    sel->location = GetLocation(du->tokens(), file_location_cache);
+
+  } else if (auto su = ref.as_statement()) {
+    Stmt orig_su = su.value();
+    for (; su; su = su->parent_statement()) {
+      if (CastExpr::from(su.value())) {
+        EntityInformation::Selection *sel = &(info.type_casts.emplace_back());
+        sel->display_role.setValue(su->tokens().strip_whitespace());
+        sel->entity_role = orig_su;
+        sel->location = GetLocation(su->tokens(), file_location_cache);
+        return;
+      }
+    }
+
+    EntityInformation::Selection *sel = &(info.uses.emplace_back());
+    sel->display_role.setValue(orig_su.tokens().strip_whitespace());
+    sel->entity_role = orig_su;
+    sel->location = GetLocation(orig_su.tokens(), file_location_cache);
+    return;
+  }
+}
+
+//! Fill `info` with information about the variable `var`.
+static void FillTypeInformation(
+    const FileLocationCache &file_location_cache,
+    EntityInformation &info, TypeDecl entity) {
+
+  for (Reference ref : entity.references()) {
+    FillTypeInformation(file_location_cache, info, entity, std::move(ref));
+  }
+}
+
 //! Fill `info` with information about the variable `var` as used by the
 //! statement `stmt`.
 static void FillVariableUsedByStatementInformation(
     const FileLocationCache &file_location_cache,
     EntityInformation &info, Stmt stmt) {
 
-  Assert(stmt.kind() == StmtKind::DECL_REF_EXPR, "Unexpected user statement");
+  bool is_field = stmt.kind() == StmtKind::MEMBER_EXPR;
+  Assert(is_field || stmt.kind() == StmtKind::DECL_REF_EXPR,
+         "Unexpected user statement");
 
   EntityInformation::Selection *sel = nullptr;
   Stmt child = stmt;
   std::optional<Stmt> parent = child.parent_statement();
   for (; parent; child = parent.value(), parent = parent->parent_statement()) {
     switch (parent->kind()) {
-      case mx::StmtKind::SWITCH_STMT:
+      case StmtKind::SWITCH_STMT:
         if (auto switch_ = SwitchStmt::from(parent);
             switch_ && switch_->condition() == child) {
           goto conditional_use;
         } else {
           goto generic_use;
         }
-      case mx::StmtKind::DO_STMT:
+      case StmtKind::DO_STMT:
         if (auto do_ = DoStmt::from(parent);
             do_ && do_->condition() == child) {
           goto conditional_use;
         } else {
           goto generic_use;
         }
-      case mx::StmtKind::WHILE_STMT:
+      case StmtKind::WHILE_STMT:
         if (auto while_ = WhileStmt::from(parent);
             while_ && while_->condition() == child) {
           goto conditional_use;
         } else {
           goto generic_use;
         }
-      case mx::StmtKind::FOR_STMT:
+      case StmtKind::FOR_STMT:
         if (auto for_ = ForStmt::from(parent);
             for_ && for_->condition() == child) {
           goto conditional_use;
         } else {
           goto generic_use;
         }
-      case mx::StmtKind::IF_STMT:
+      case StmtKind::IF_STMT:
         if (auto if_ = IfStmt::from(parent);
             if_ && if_->condition() == child) {
           goto conditional_use;
@@ -203,17 +253,17 @@ static void FillVariableUsedByStatementInformation(
         }
 
       // This is going to be something like: `var;`. It's a useless use.
-      case mx::StmtKind::CASE_STMT:
-      case mx::StmtKind::DEFAULT_STMT:
-      case mx::StmtKind::LABEL_STMT:
-      case mx::StmtKind::COMPOUND_STMT:
-      case mx::StmtKind::CXX_TRY_STMT:
-      case mx::StmtKind::CXX_FOR_RANGE_STMT:
-      case mx::StmtKind::CXX_CATCH_STMT:
-      case mx::StmtKind::COROUTINE_BODY_STMT:
+      case StmtKind::CASE_STMT:
+      case StmtKind::DEFAULT_STMT:
+      case StmtKind::LABEL_STMT:
+      case StmtKind::COMPOUND_STMT:
+      case StmtKind::CXX_TRY_STMT:
+      case StmtKind::CXX_FOR_RANGE_STMT:
+      case StmtKind::CXX_CATCH_STMT:
+      case StmtKind::COROUTINE_BODY_STMT:
         goto generic_use;
 
-      case mx::StmtKind::UNARY_OPERATOR:
+      case StmtKind::UNARY_OPERATOR:
         if (auto uop = UnaryOperator::from(parent)) {
           switch (uop->opcode()) {
             case UnaryOperatorKind::ADDRESS_OF:
@@ -225,7 +275,7 @@ static void FillVariableUsedByStatementInformation(
           }
         }
         continue;
-      case mx::StmtKind::BINARY_OPERATOR:
+      case StmtKind::BINARY_OPERATOR:
         if (auto bin = BinaryOperator::from(parent)) {
           switch (bin->opcode()) {
             case mx::BinaryOperatorKind::ASSIGN:
@@ -254,25 +304,28 @@ static void FillVariableUsedByStatementInformation(
           }
         }
         continue;
-      case mx::StmtKind::CONDITIONAL_OPERATOR:
+      case StmtKind::CONDITIONAL_OPERATOR:
         if (auto cond = ConditionalOperator::from(parent);
             cond && cond->condition() == child) {
           goto conditional_use;
         } else {
           continue;
         }
-      case mx::StmtKind::MEMBER_EXPR:
+      case StmtKind::MEMBER_EXPR:
         if (auto member = MemberExpr::from(parent);
             member && member->base() == child && member->is_arrow()) {
           goto dereference_use;
         }
+        if (is_field) {
+          goto generic_use;
+        }
         continue;
-      case mx::StmtKind::ARRAY_SUBSCRIPT_EXPR:
+      case StmtKind::ARRAY_SUBSCRIPT_EXPR:
         if (auto arr = ArraySubscriptExpr::from(parent)) {
           goto dereference_use;
         }
         continue;
-      case mx::StmtKind::CALL_EXPR:
+      case StmtKind::CALL_EXPR:
         if (auto call = CallExpr::from(parent)) {
           if (call->callee() == child) {
             goto dereference_use;
@@ -284,9 +337,9 @@ static void FillVariableUsedByStatementInformation(
           }
         }
         continue;
-      case mx::StmtKind::DECL_STMT:
-      case mx::StmtKind::DESIGNATED_INIT_EXPR:
-      case mx::StmtKind::DESIGNATED_INIT_UPDATE_EXPR:
+      case StmtKind::DECL_STMT:
+      case StmtKind::DESIGNATED_INIT_EXPR:
+      case StmtKind::DESIGNATED_INIT_UPDATE_EXPR:
         goto assigned_to_use;
       default:
         break;
@@ -347,7 +400,7 @@ conditional_use:
 //! Fill `info` with information about the variable `var`.
 static void FillVariableInformation(
     const FileLocationCache &file_location_cache,
-    EntityInformation &info, VarDecl var) {
+    EntityInformation &info, const ValueDecl &var) {
 
   for (Reference ref : var.references()) {
     if (std::optional<Stmt> stmt = ref.as_statement()) {
@@ -431,6 +484,55 @@ static void FillFunctionInformation(
       break;
     }
   }
+
+  // Find the local variables.
+  for (const mx::Decl &var : func.declarations_in_context()) {
+    if (auto vd = mx::VarDecl::from(var)) {
+      EntityInformation::Selection *sel = vd->kind() == DeclKind::PARM_VAR ?
+                                          &(info.parameters.emplace_back()) :
+                                          &(info.variables.emplace_back());
+      sel->display_role.setValue(vd->token());
+      sel->entity_role = vd.value();
+      sel->location = GetLocation(vd->tokens(), file_location_cache);
+    }
+  }
+}
+
+//! Fill `info` with information about the variable `var`.
+static void FillEnumInformation(
+    const FileLocationCache &file_location_cache,
+    EntityInformation &info, EnumDecl entity) {
+
+  for (mx::EnumConstantDecl ec : entity.enumerators()) {
+    EntityInformation::Selection &sel = info.enumerators.emplace_back();
+    sel.display_role.setValue(ec.token());
+    sel.entity_role = ec;
+    sel.location = GetLocation(ec.tokens(), file_location_cache);
+  }
+}
+
+//! Fill `info` with information about the variable `var`.
+static void FillRecordInformation(
+    const FileLocationCache &file_location_cache,
+    EntityInformation &info, RecordDecl entity) {
+
+  // Find the local variables.
+  for (const mx::Decl &decl : entity.declarations_in_context()) {
+    if (auto vd = mx::VarDecl::from(decl)) {
+      EntityInformation::Selection &sel = info.variables.emplace_back();
+      sel.display_role.setValue(vd->token());
+      sel.entity_role = vd.value();
+      sel.location = GetLocation(vd->tokens(), file_location_cache);
+
+    } else if (auto fd = mx::FieldDecl::from(decl)) {
+      EntityInformation::Selection &sel = info.members.emplace_back();
+      sel.display_role.setValue(fd->token());
+      sel.entity_role = fd.value();
+      sel.location = GetLocation(fd->tokens(), file_location_cache);
+    }
+
+    // TODO(pag): FunctionDecl, CXXMethodDecl, etc.
+  }
 }
 
 //! Fill `info` with information about the declaration `entity`.
@@ -480,6 +582,28 @@ static EntityInformation GetDeclInformation(
   } else if (auto var = VarDecl::from(entity)) {
     FillVariableInformation(file_location_cache, info,
                             std::move(var.value()));
+
+  } else if (auto field = FieldDecl::from(entity)) {
+    FillVariableInformation(file_location_cache, info,
+                            field.value());
+
+  } else if (auto enumerator = EnumConstantDecl::from(entity)) {
+    FillVariableInformation(file_location_cache, info,
+                            enumerator.value());
+
+  } else if (auto enum_ = EnumDecl::from(entity)) {
+
+    FillEnumInformation(file_location_cache, info,
+                        std::move(enum_.value()));
+
+  } else if (auto tag = RecordDecl::from(entity)) {
+    FillRecordInformation(file_location_cache, info,
+                          std::move(tag.value()));
+  }
+
+  if (auto type = TypeDecl::from(entity)) {
+    FillTypeInformation(file_location_cache, info,
+                        std::move(type.value()));
   }
 
   return info;

@@ -390,6 +390,10 @@ void InformationExplorerModel::ImportEntityInformation(
   const Filler filler_list[] = {
       {{tr("Definitions")}, entity_information.definitions},
       {{tr("Declarations")}, entity_information.declarations},
+      {{tr("Enumerators")}, entity_information.enumerators},
+      {{tr("Member variables")}, entity_information.members},
+      {{tr("Parameters")}, entity_information.parameters},
+      {{tr("Variables")}, entity_information.variables},
       {{tr("Callees")}, entity_information.callees},
       {{tr("Callers")}, entity_information.callers},
       {{tr("Pointers")}, entity_information.pointers},
@@ -399,6 +403,7 @@ void InformationExplorerModel::ImportEntityInformation(
       {{tr("Dereferences")}, entity_information.dereferences},
       {{tr("Call arguments")}, entity_information.arguments},
       {{tr("Conditional tests")}, entity_information.tests},
+      {{tr("Casts")}, entity_information.type_casts},
       {{tr("Uses")}, entity_information.uses},
       {{tr("Includes")}, entity_information.includes},
       {{tr("Included by")}, entity_information.include_bys},
