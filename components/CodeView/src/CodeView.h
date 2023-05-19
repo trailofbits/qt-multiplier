@@ -111,9 +111,6 @@ class CodeView final : public ICodeView {
   bool ScrollToLineNumberInternal(unsigned line);
 
  public:
-  //  // A `(row, column)` pair identifying a token position.
-  //  using TokenPosition = std::pair<int, int>;
-
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
 
@@ -215,9 +212,6 @@ class CodeView final : public ICodeView {
 
   //! Called when the cursor position has changed.
   void OnCursorMoved(void);
-
-  //! Called when the model is about to be reset
-  void OnModelAboutToBeReset();
 
   friend class ICodeView;
 };

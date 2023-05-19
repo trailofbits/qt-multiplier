@@ -37,13 +37,7 @@
 #include <vector>
 
 namespace mx::gui {
-
 namespace {
-
-enum class ModelState {
-  Ready,
-  Updating,
-};
 
 const int kHoverMsecsTimer{2000};
 
@@ -59,7 +53,6 @@ class QPlainTextEditMod final : public QPlainTextEdit {
 }  // namespace
 
 struct CodeView::PrivateData final {
-  ModelState model_state{ModelState::Ready};
   QAbstractItemModel *model{nullptr};
 
   int version{0};
@@ -182,13 +175,20 @@ void CodeView::SetWordWrapping(bool enabled) {
 }
 
 bool CodeView::ScrollToLineNumber(unsigned line) {
-  d->deferred_scroll_to_line.reset();
-  if (d->model_state != ModelState::Ready) {
+
+  auto model_state_var = d->model->data(QModelIndex(),
+                                        ICodeModel::ModelStateRole);
+  Assert(model_state_var.isValid(), "This should always work");
+  ICodeModel::ModelState state = static_cast<ICodeModel::ModelState>(
+      model_state_var.toInt());
+
+  if (state == ICodeModel::ModelState::Ready) {
+    d->deferred_scroll_to_line.reset();
+    return ScrollToLineNumberInternal(line);
+  } else {
     d->deferred_scroll_to_line = line;
     return false;
   }
-
-  return ScrollToLineNumberInternal(line);
 }
 
 CodeView::CodeView(QAbstractItemModel *model, QWidget *parent)
@@ -281,9 +281,6 @@ void CodeView::InstallModel(QAbstractItemModel *model) {
 
   connect(d->model, &QAbstractItemModel::modelReset, this,
           &CodeView::OnModelReset);
-
-  connect(d->model, &QAbstractItemModel::modelAboutToBeReset, this,
-          &CodeView::OnModelAboutToBeReset);
 
   connect(d->model, &QAbstractItemModel::dataChanged, this,
           &CodeView::OnDataChange);
@@ -895,8 +892,6 @@ void CodeView::OnModelReset() {
   document->setDefaultFont(d->text_edit->font());
   d->text_edit->setDocument(document);
 
-  d->model_state = ModelState::Ready;
-
   UpdateGutterWidth();
   UpdateBaseExtraSelections();
   UpdateTabStopDistance();
@@ -904,10 +899,16 @@ void CodeView::OnModelReset() {
   // If there was a request to scroll to a line, but the document wasn't ready
   // at the time of the request, then enact the scroll now.
   if (d->deferred_scroll_to_line.has_value()) {
-    auto line_number = d->deferred_scroll_to_line.value();
-    d->deferred_scroll_to_line = std::nullopt;
-
-    ScrollToLineNumberInternal(line_number);
+    auto model_state_var = d->model->data(QModelIndex(),
+                                          ICodeModel::ModelStateRole);
+    Assert(model_state_var.isValid(), "This should always work");
+    ICodeModel::ModelState state = static_cast<ICodeModel::ModelState>(
+        model_state_var.toInt());
+    if (state == ICodeModel::ModelState::Ready) {
+      auto line_number = d->deferred_scroll_to_line.value();
+      d->deferred_scroll_to_line = std::nullopt;
+      ScrollToLineNumberInternal(line_number);
+    }
   }
 
   emit DocumentChanged();
@@ -1008,10 +1009,6 @@ bool CodeView::ScrollToLineNumberInternal(unsigned line) {
 
 void CodeView::OnCursorMoved(void) {
   HandleNewCursor(d->text_edit->textCursor());
-}
-
-void CodeView::OnModelAboutToBeReset() {
-  d->model_state = ModelState::Updating;
 }
 
 void CodeView::OnSearchParametersChange(
