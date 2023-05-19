@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <multiplier/ui/IThemeManager.h>
+
 #include <QAction>
 #include <QSize>
 #include <QString>
@@ -23,6 +25,7 @@ class FileLocationCache;
 }  // namespace mx
 namespace mx::gui {
 
+//! \todo Hide the implementation details
 class HistoryWidget final : public QWidget {
   Q_OBJECT
 
@@ -32,6 +35,7 @@ class HistoryWidget final : public QWidget {
  private:
   void InitializeWidgets(void);
   void UpdateMenus(void);
+  void UpdateIcons();
 
  public:
   HistoryWidget(const Index &index_, const FileLocationCache &file_cache_,
@@ -54,10 +58,41 @@ class HistoryWidget final : public QWidget {
   void GoToEntity(RawEntityId original_id, RawEntityId canonical_id);
 
  private slots:
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
+
+  //! Called when the back button is pressed to navigate backward through history.
+  //! We distinguish this from the forward menu case because if this is our first
+  //! navigation away from our "present location" then we just-in-time materialize
+  //! the present location into a history item.
   void OnNavigateBack(void);
+
+  //! Called when the forward button is pressed to navigate forward through
+  //! history. We distinguish this from the back menu case, because if we navigate
+  //! forward to our "original present" location (i.e. where we started from
+  //! before engaging with the history menu) then we just-in-time remove that item
+  //! from history. This is so that, upon returning to the present, the present
+  //! is allowed to change (with followup clicks and such) without there being a
+  //! random record of our "former present" stuck within the history menu.
   void OnNavigateForward(void);
+
+  //! Called when a specific history item in the back button's drop-down menu of
+  //! history items is clicked. We distinguish this from the forward menu case
+  //! because if this is our first navigation away from our "present location"
+  //! then we just-in-time materialize the present location into a history item.
   void OnNavigateBackToHistoryItem(QAction *action);
+
+  //! Called when a specific history item in the forward button's drop-down menu
+  //! of history items is clicked. We distinguish this from the back menu case,
+  //! because if we navigate forward to our "original present" location (i.e.
+  //! where we started from before engaging with the history menu) then we
+  //! just-in-time remove that item from history. This is so that, upon returning
+  //! to the present, the present is allowed to change (with followup clicks and
+  //! such) without there being a random record of our "former present" stuck
+  //! within the history menu.
   void OnNavigateForwardToHistoryItem(QAction *action);
+
+  //! Called when we have computed a name for the history item.
   void OnLabelForItem(std::uint64_t item_id, const QString &label);
 };
 

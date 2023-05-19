@@ -10,7 +10,6 @@
 #include "GoToLineWidget.h"
 
 #include <multiplier/ui/Assert.h>
-#include <multiplier/ui/CodeViewTheme.h>
 
 #include <multiplier/Entities/TokenCategory.h>
 
@@ -200,6 +199,9 @@ CodeView::CodeView(QAbstractItemModel *model, QWidget *parent)
 
   SetWordWrapping(false);
   OnModelReset();
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &CodeView::OnThemeChange);
 }
 
 bool CodeView::eventFilter(QObject *obj, QEvent *event) {
@@ -347,7 +349,8 @@ void CodeView::InitializeWidgets() {
           &CodeView::OnGoToLine);
 
   // This will also cause a model reset update
-  SetTheme(GetDefaultCodeViewTheme());
+  const auto &theme = IThemeManager::Get().GetCodeViewTheme();
+  SetTheme(theme);
 
   // NOTE(pag): This has to go last, as it requires all things to be
   //            initialized.
@@ -1084,6 +1087,11 @@ void CodeView::OnGoToLineTriggered() {
 
 void CodeView::OnGoToLine(unsigned line_number) {
   ScrollToLineNumber(line_number);
+}
+
+void CodeView::OnThemeChange(const QPalette &,
+                             const CodeViewTheme &code_view_theme) {
+  SetTheme(code_view_theme);
 }
 
 }  // namespace mx::gui

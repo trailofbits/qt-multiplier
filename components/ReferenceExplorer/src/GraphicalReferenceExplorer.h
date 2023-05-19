@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
+#include <multiplier/ui/IThemeManager.h>
 
 namespace mx::gui {
 
@@ -58,6 +59,9 @@ class GraphicalReferenceExplorer final : public IReferenceExplorer {
   //! Updates the treeview item hover buttons
   void UpdateTreeViewItemButtons();
 
+  //! Updates the icons based on the active theme
+  void UpdateIcons();
+
  private slots:
   //! Used to expand and resize the items after a model reset
   void OnModelReset();
@@ -101,6 +105,10 @@ class GraphicalReferenceExplorer final : public IReferenceExplorer {
 
   //! Called when the "expand" item button has been pressed
   void OnExpandTreeViewItem();
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
   friend class ReferenceExplorer;
 };

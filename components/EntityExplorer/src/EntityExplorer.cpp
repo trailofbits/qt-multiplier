@@ -11,6 +11,7 @@
 #include "CategoryComboBox.h"
 
 #include <multiplier/ui/Assert.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <QBrush>
 #include <QCheckBox>
@@ -48,7 +49,7 @@ EntityExplorer::EntityExplorer(IEntityExplorerModel *model, QWidget *parent)
 }
 
 void EntityExplorer::InitializeWidgets() {
-  CodeViewTheme theme = GetDefaultCodeViewTheme();
+  const auto &theme = IThemeManager::Get().GetCodeViewTheme();
 
   auto list_view_item_delegate = new EntityExplorerItemDelegate(theme, this);
 

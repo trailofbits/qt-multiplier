@@ -14,15 +14,8 @@
 
 namespace mx::gui {
 
-CodeViewTheme GetDefaultCodeViewTheme(std::optional<bool> dark_mode) {
-  if (!dark_mode.has_value()) {
-    dark_mode = gUseDarkTheme;
-  }
-  if (dark_mode.value()) {
-    return kDefaultDarkCodeViewTheme;
-  } else {
-    return kDefaultLightCodeViewTheme;
-  }
+CodeViewTheme GetCodeViewTheme(const bool &dark) {
+  return dark ? kDefaultDarkCodeViewTheme : kDefaultLightCodeViewTheme;
 }
 
 QColor CodeViewTheme::ForegroundColor(TokenCategory category) const {

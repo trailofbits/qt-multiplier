@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/ui/ISearchWidget.h>
+#include <multiplier/ui/IThemeManager.h>
 
 namespace mx::gui {
 
@@ -49,6 +50,9 @@ class SearchWidget final : public ISearchWidget {
   //! Helper method for OnShowPreviousResult and OnShowNextResult
   void ShowResult();
 
+  //! Updates the icons based on the active theme
+  void UpdateIcons();
+
  private slots:
   //! Called whenever the search pattern changes
   void OnSearchInputTextChanged(const QString &text);
@@ -67,6 +71,10 @@ class SearchWidget final : public ISearchWidget {
 
   //! Called when the show next result button is pressed
   void OnShowNextResult();
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
  public slots:
   //! \copybrief ISearchWidget::Activate

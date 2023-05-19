@@ -26,7 +26,7 @@ target_link_libraries("mx_util"
     "multiplier::mx-api"
 
   PUBLIC
-    "mx_codeviewtheme"
+    "mx_thememanager"
 )
 
 target_include_directories("mx_util" PRIVATE

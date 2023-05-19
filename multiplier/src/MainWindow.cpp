@@ -18,6 +18,8 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/IInformationExplorer.h>
 #include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/CodeViewTheme.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <multiplier/Entities/StmtKind.h>
 
@@ -118,6 +120,21 @@ MainWindow::~MainWindow() {}
 void MainWindow::InitializeWidgets() {
   d->view_menu = new QMenu(tr("View"));
   menuBar()->addMenu(d->view_menu);
+
+  auto view_theme_menu = new QMenu(tr("Theme"));
+  d->view_menu->addMenu(view_theme_menu);
+
+  auto view_theme_dark_action = new QAction(tr("Dark"));
+  view_theme_menu->addAction(view_theme_dark_action);
+
+  auto view_theme_light_action = new QAction(tr("Light"));
+  view_theme_menu->addAction(view_theme_light_action);
+
+  connect(view_theme_dark_action, &QAction::triggered, this,
+          &MainWindow::OnSetDarkTheme);
+
+  connect(view_theme_light_action, &QAction::triggered, this,
+          &MainWindow::OnSetLightTheme);
 
   d->enable_code_preview_action = new QAction(tr("Code preview"));
   d->enable_code_preview_action->setCheckable(true);
@@ -961,6 +978,14 @@ void MainWindow::OnRefExplorerModeSelected(QAction *action) {
   auto ref_explorer_int_mode = action->data().toInt();
   d->ref_explorer_mode =
       static_cast<IReferenceExplorer::Mode>(ref_explorer_int_mode);
+}
+
+void MainWindow::OnSetDarkTheme() {
+  mx::gui::IThemeManager::Get().SetTheme(true);
+}
+
+void MainWindow::OnSetLightTheme() {
+  mx::gui::IThemeManager::Get().SetTheme(false);
 }
 
 }  // namespace mx::gui

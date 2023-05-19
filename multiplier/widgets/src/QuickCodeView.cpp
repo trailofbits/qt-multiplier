@@ -26,6 +26,7 @@ namespace mx::gui {
 
 struct QuickCodeView::PrivateData final {
   bool closed{false};
+  QPushButton *close_button{nullptr};
 
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
@@ -119,20 +120,19 @@ void QuickCodeView::InitializeWidgets(
   d->future_watcher.setFuture(d->entity_name_future);
 
   // Close button
-  auto close_button =
-      new QPushButton(GetIcon(":/Icons/QuickCodeView/Close"), "", this);
+  d->close_button = new QPushButton(QIcon(), "", this);
 
-  close_button->setToolTip(tr("Close"));
-  close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+  d->close_button->setToolTip(tr("Close"));
+  d->close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
 
-  connect(close_button, &QPushButton::clicked, this, &QuickCodeView::close);
+  connect(d->close_button, &QPushButton::clicked, this, &QuickCodeView::close);
 
   // Setup the layout
   auto title_frame_layout = new QHBoxLayout();
   title_frame_layout->setContentsMargins(0, 0, 0, 0);
   title_frame_layout->addWidget(d->window_title);
   title_frame_layout->addStretch();
-  title_frame_layout->addWidget(close_button);
+  title_frame_layout->addWidget(d->close_button);
 
   auto title_frame = new QWidget(this);
   title_frame->installEventFilter(this);
@@ -167,6 +167,15 @@ void QuickCodeView::InitializeWidgets(
   main_layout->addLayout(contents_layout);
 
   setLayout(main_layout);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &QuickCodeView::OnThemeChange);
+
+  UpdateIcons();
+}
+
+void QuickCodeView::UpdateIcons() {
+  d->close_button->setIcon(GetIcon(":/Icons/QuickCodeView/Close"));
 }
 
 void QuickCodeView::OnTitleFrameMousePress(QMouseEvent *event) {
@@ -228,6 +237,10 @@ void QuickCodeView::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 
     case ICodeView::TokenAction::Type::Hover: break;
   }
+}
+
+void QuickCodeView::OnThemeChange(const QPalette &, const CodeViewTheme &) {
+  UpdateIcons();
 }
 
 }  // namespace mx::gui
