@@ -111,8 +111,8 @@ class CodeView final : public ICodeView {
   bool ScrollToLineNumberInternal(unsigned line);
 
  public:
-//  // A `(row, column)` pair identifying a token position.
-//  using TokenPosition = std::pair<int, int>;
+  //  // A `(row, column)` pair identifying a token position.
+  //  using TokenPosition = std::pair<int, int>;
 
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
@@ -179,7 +179,7 @@ class CodeView final : public ICodeView {
   //! Adds highlights for tokens to an existing extra selection list
   static void HighlightTokensForRelatedEntityID(
       const TokenMap &token_map, const QTextCursor &text_cursor,
-      RawEntityId related_entity_id,
+      const QModelIndex &model_index,
       QList<QTextEdit::ExtraSelection> &selection_list,
       const CodeViewTheme &theme);
 

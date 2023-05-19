@@ -814,9 +814,18 @@ void CodeView::ConfigureTextFormatFromTheme(
 
 void CodeView::HighlightTokensForRelatedEntityID(
     const TokenMap &token_map, const QTextCursor &text_cursor,
-    RawEntityId related_entity_id,
+    const QModelIndex &model_index,
     QList<QTextEdit::ExtraSelection> &selection_list,
     const CodeViewTheme &theme) {
+
+  QVariant related_entity_id_var =
+      model_index.data(ICodeModel::RealRelatedEntityIdRole);
+
+  if (!related_entity_id_var.isValid()) {
+    return;
+  }
+
+  auto related_entity_id = qvariant_cast<std::uint64_t>(related_entity_id_var);
 
   auto unique_token_id_list =
       token_map.related_entity_id_to_unique_token_id_list.at(related_entity_id);
@@ -832,10 +841,11 @@ void CodeView::HighlightTokensForRelatedEntityID(
 
     selection.cursor.setPosition(token_map_entry.cursor_start,
                                  QTextCursor::MoveMode::MoveAnchor);
+
     selection.cursor.setPosition(token_map_entry.cursor_end,
                                  QTextCursor::MoveMode::KeepAnchor);
 
-    selection_list.prepend(std::move(selection));
+    selection_list.append(std::move(selection));
   }
 }
 
@@ -959,34 +969,24 @@ void CodeView::HandleNewCursor(const QTextCursor &cursor) {
   selection.cursor.clearSelection();
   extra_selections.prepend(selection);
 
-  auto opt_model_index = GetQModelIndexFromTextCursor(d->token_map, cursor);
-
   // Try to highlight all entities related to the entity on which the cursor
   // is hovering.
   //
   // NOTE(pag): We use `RealRelatedEntityIdRole` instead of the usual
   //            `RelatedEntityIdRole` because the code preview alters
   //            the related entity ID to be the token ID via a proxy model.
-  if (opt_model_index.has_value()) {
-    auto unique_token_id = GetUniqueTokenIdentifier(opt_model_index.value());
-    const auto &token_map_entry = d->token_map.data.at(unique_token_id);
-    QVariant related_entity_id_var =
-        token_map_entry.model_index.data(ICodeModel::RealRelatedEntityIdRole);
+  auto opt_model_index = GetQModelIndexFromTextCursor(d->token_map, cursor);
 
-    if (related_entity_id_var.isValid()) {
-      auto related_entity_id =
-          qvariant_cast<std::uint64_t>(related_entity_id_var);
-      HighlightTokensForRelatedEntityID(d->token_map, cursor, related_entity_id,
-                                        extra_selections, d->theme);
-    }
+  if (opt_model_index.has_value()) {
+    const auto &model_index = opt_model_index.value();
+    HighlightTokensForRelatedEntityID(d->token_map, cursor, model_index,
+                                      extra_selections, d->theme);
+
+    // Tell users of the code view when the cursor moves.
+    emit CursorMoved(model_index);
   }
 
   d->text_edit->setExtraSelections(extra_selections);
-
-  // Tell users of the code view when the cursor moves.
-  if (opt_model_index.has_value()) {
-    emit CursorMoved(opt_model_index.value());
-  }
 }
 
 bool CodeView::ScrollToLineNumberInternal(unsigned line) {
