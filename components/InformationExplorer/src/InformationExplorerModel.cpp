@@ -443,7 +443,8 @@ void InformationExplorerModel::ImportEntityInformation(
           }
 
         } else {
-          property.path.back().append(QString::number(entity_id));
+          auto suffix = QString(" #") + QString::number(entity_id);
+          property.path.back().append(suffix);
         }
       };
 
