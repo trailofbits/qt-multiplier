@@ -32,9 +32,6 @@ add_library("mx_database"
 
   src/requests/GetRelatedEntities.h
   src/requests/GetRelatedEntities.cpp
-
-  src/requests/GetTokenTree.h
-  src/requests/GetTokenTree.cpp
 )
 
 target_link_libraries("mx_database"

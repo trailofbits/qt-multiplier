@@ -17,6 +17,7 @@
 #include <multiplier/Entities/Stmt.h>
 #include <multiplier/Entities/Token.h>
 #include <multiplier/ui/Assert.h>
+#include <multiplier/Analysis/TokenTree.h>
 
 namespace mx::gui {
 namespace {
@@ -49,8 +50,8 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   std::string_view utf8_data = tok.data();
   QString utf16_data;
   if (!utf8_data.empty()) {
-    utf16_data = QString::fromUtf8(
-        utf8_data.data(), static_cast<qsizetype>(utf8_data.size()));
+    utf16_data = QString::fromUtf8(utf8_data.data(),
+                                   static_cast<qsizetype>(utf8_data.size()));
   }
 
   // Split the token for lines and such.
@@ -60,14 +61,10 @@ static void RenderToken(const FileLocationCache &file_location_cache,
 
   for (QChar ch : utf16_data) {
     switch (ch.unicode()) {
-      case QChar::Tabulation:
-        col.data.append(QChar::Tabulation);
-        break;
+      case QChar::Tabulation: col.data.append(QChar::Tabulation); break;
 
       case QChar::Space:
-      case QChar::Nbsp:
-        col.data.append(QChar::Space);
-        break;
+      case QChar::Nbsp: col.data.append(QChar::Space); break;
 
       case QChar::ParagraphSeparator:
       case QChar::LineFeed:
@@ -95,14 +92,11 @@ static void RenderToken(const FileLocationCache &file_location_cache,
         break;
       }
 
-      case QChar::CarriageReturn:
-        continue;
+      case QChar::CarriageReturn: continue;
 
       // TODO(pag): Consult with QFontMetrics or something else to determine
       //            if this character is visible?
-      default:
-        col.data.append(ch);
-        break;
+      default: col.data.append(ch); break;
     }
   }
 
@@ -121,8 +115,7 @@ static bool IsTopLevelToken(const Token &tok) {
 
   for (Macro m : Macro::containing(tok)) {
     switch (m.kind()) {
-      case MacroKind::ARGUMENT:
-        continue;
+      case MacroKind::ARGUMENT: continue;
 
       // Directive tokens are always top level.
       case MacroKind::PARAMETER:
@@ -141,8 +134,7 @@ static bool IsTopLevelToken(const Token &tok) {
       case MacroKind::INCLUDE_DIRECTIVE:
       case MacroKind::INCLUDE_NEXT_DIRECTIVE:
       case MacroKind::INCLUDE_MACROS_DIRECTIVE:
-      case MacroKind::IMPORT_DIRECTIVE:
-        return true;
+      case MacroKind::IMPORT_DIRECTIVE: return true;
 
       // These all exist in the `MacroExpansion::intermediate_children` or
       // `MacroExpansion::replacement_children`
@@ -150,8 +142,7 @@ static bool IsTopLevelToken(const Token &tok) {
       case MacroKind::STRINGIFY:
       case MacroKind::CONCATENATE:
       case MacroKind::VA_OPT:
-      case MacroKind::VA_OPT_ARGUMENT:
-        return false;
+      case MacroKind::VA_OPT_ARGUMENT: return false;
 
       // Check if `tok` is in the use.
       case MacroKind::SUBSTITUTION:
@@ -214,8 +205,33 @@ static void FixupLineNumbers(const FileLocationCache &file_location_cache,
 
 void GetIndexedTokenRangeData(
     QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
-    const Index &, const FileLocationCache &file_location_cache,
-    TokenTree tree, const std::unique_ptr<TokenTreeVisitor> &visitor) {
+    const Index &index, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id) {
+
+  VariantEntity ent = index.entity(entity_id);
+  if (std::holds_alternative<NotAnEntity>(ent)) {
+    result_promise.addResult(RPCErrorCode::InvalidEntityID);
+    return;
+  }
+
+  TokenTree tree;
+  if (std::holds_alternative<File>(ent)) {
+    tree = TokenTree::from(std::get<File>(ent));
+
+  } else if (std::holds_alternative<Fragment>(ent)) {
+    tree = TokenTree::from(std::get<Fragment>(ent));
+
+  } else if (auto frag = Fragment::containing(ent)) {
+    tree = TokenTree::from(frag.value());
+
+  } else if (auto file = File::containing(ent)) {
+    tree = TokenTree::from(file.value());
+
+  } else {
+    // TODO(pag): Support token trees for types? That would go in mx-api.
+    result_promise.addResult(RPCErrorCode::UnsupportedTokenTreeEntityType);
+    return;
+  }
 
   IndexedTokenRangeData res;
   std::optional<Fragment> frag = Fragment::containing(tree);
@@ -227,6 +243,7 @@ void GetIndexedTokenRangeData(
     res.requested_id = file->id().Pack();
   }
 
+  auto visitor = std::make_unique<TokenTreeVisitor>();
   res.tokens = tree.serialize(*visitor);
 
   res.lines.emplace_back();
