@@ -29,7 +29,9 @@
 #include <multiplier/Entities/NamedDecl.h>
 #include <multiplier/Entities/RecordDecl.h>
 #include <multiplier/Entities/SwitchStmt.h>
+#include <multiplier/Entities/TypeTraitExpr.h>
 #include <multiplier/Entities/UnaryOperator.h>
+#include <multiplier/Entities/UnaryExprOrTypeTraitExpr.h>
 #include <multiplier/Entities/WhileStmt.h>
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/Util.h>
@@ -176,6 +178,14 @@ static void FillTypeInformation(
     for (; su; su = su->parent_statement()) {
       if (CastExpr::from(su.value())) {
         EntityInformation::Selection *sel = &(info.type_casts.emplace_back());
+        sel->display_role.setValue(su->tokens().strip_whitespace());
+        sel->entity_role = orig_su;
+        sel->location = GetLocation(su->tokens(), file_location_cache);
+        return;
+
+      } else if (TypeTraitExpr::from(su.value()) ||
+                 UnaryExprOrTypeTraitExpr::from(su.value())) {
+        EntityInformation::Selection *sel = &(info.uses.emplace_back());
         sel->display_role.setValue(su->tokens().strip_whitespace());
         sel->entity_role = orig_su;
         sel->location = GetLocation(su->tokens(), file_location_cache);
@@ -340,6 +350,11 @@ static void FillVariableUsedByStatementInformation(
       case StmtKind::DECL_STMT:
       case StmtKind::DESIGNATED_INIT_EXPR:
       case StmtKind::DESIGNATED_INIT_UPDATE_EXPR:
+        for (auto init : parent->children()) {
+          if (init == child) {
+            goto assigned_from_use;
+          }
+        }
         goto assigned_to_use;
       default:
         break;
