@@ -322,6 +322,7 @@ static void FillVariableUsedByStatementInformation(
           }
         }
         continue;
+      case StmtKind::COMPOUND_ASSIGN_OPERATOR:
       case StmtKind::BINARY_OPERATOR:
         if (auto bin = BinaryOperator::from(parent)) {
           switch (bin->opcode()) {
@@ -517,7 +518,8 @@ static void FillFunctionInformation(
       // If we didn't find a caller, then it's probably an `address_ofs`.
       {
         EntityInformation::Selection &sel = info.pointers.emplace_back();
-        sel.display_role.setValue(FindLine(result_promise, stmt.value()));
+        sel.display_role.setValue(
+            FindLine(result_promise, stmt.value()).strip_whitespace());
         sel.entity_role = stmt.value();
         sel.location =
             GetLocation(result_promise, stmt->tokens(), file_location_cache);
