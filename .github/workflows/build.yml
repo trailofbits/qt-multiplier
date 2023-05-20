@@ -36,7 +36,7 @@ jobs:
     with:
       platform: macos-12
       build_type: ${{ matrix.build_type }}
-      cxx_common_tag: v0.3.1
+      cxx_common_tag: v0.3.2
 
   linux:
     strategy:
@@ -49,4 +49,4 @@ jobs:
     with:
       platform: ubuntu-22.04
       build_type: ${{ matrix.build_type }}
-      cxx_common_tag: v0.3.1
+      cxx_common_tag: v0.3.2
