@@ -93,10 +93,11 @@ jobs:
 
       - name: Install cxx-common
         run: |
+          # Note the ubuntu link has been changed since v4.0.0
           if [[ "$OSTYPE" == "darwin"* ]]; then
             folder_name="vcpkg_macos-12_llvm-16-pasta_xcode-14.2_amd64"
           else
-            folder_name="vcpkg_ubuntu-22.04_llvm-16-pasta_amd64"
+            folder_name="vcpkg_ubuntu-v2-22.04_llvm-16-pasta_amd64"
           fi
 
           archive_name="${folder_name}.tar.xz"
