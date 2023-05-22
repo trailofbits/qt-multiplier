@@ -49,37 +49,12 @@ EntityExplorer::EntityExplorer(IEntityExplorerModel *model, QWidget *parent)
 }
 
 void EntityExplorer::InitializeWidgets() {
-  const auto &theme = IThemeManager::Get().GetCodeViewTheme();
-
-  auto list_view_item_delegate = new EntityExplorerItemDelegate(theme, this);
-
   d->list_view = new QListView(this);
   d->list_view->setSelectionMode(
       QAbstractItemView::SelectionMode::SingleSelection);
 
   d->list_view->setSelectionBehavior(
       QAbstractItemView::SelectionBehavior::SelectRows);
-
-  d->list_view->setItemDelegate(list_view_item_delegate);
-
-  QPalette p = d->list_view->palette();
-  auto changed_palette = false;
-  if (theme.selected_line_background_color.isValid() &&
-      theme.selected_line_background_color != theme.default_background_color) {
-    p.setColor(QPalette::ColorGroup::Normal, QPalette::ColorRole::Highlight,
-               theme.selected_line_background_color);
-    changed_palette = true;
-  }
-
-  if (theme.default_background_color.isValid()) {
-    p.setColor(QPalette::ColorGroup::Normal, QPalette::ColorRole::Base,
-               theme.default_background_color);
-    changed_palette = true;
-  }
-
-  if (changed_palette) {
-    d->list_view->setPalette(p);
-  }
 
   d->filter_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
   connect(d->filter_widget, &ISearchWidget::SearchParametersChanged, this,
@@ -117,6 +92,12 @@ void EntityExplorer::InitializeWidgets() {
 
   setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &EntityExplorer::OnThemeChange);
+
+  OnThemeChange(IThemeManager::Get().GetPalette(),
+                IThemeManager::Get().GetCodeViewTheme());
 }
 
 void EntityExplorer::InstallModel(IEntityExplorerModel *model) {
@@ -134,6 +115,18 @@ void EntityExplorer::InstallModel(IEntityExplorerModel *model) {
           &EntityExplorer::OnModelReset);
 
   OnModelReset();
+}
+
+void EntityExplorer::InstallItemDelegate(const CodeViewTheme &code_view_theme) {
+  auto old_item_delegate = d->list_view->itemDelegate();
+  if (old_item_delegate != nullptr) {
+    old_item_delegate->deleteLater();
+  }
+
+  auto list_view_item_delegate =
+      new EntityExplorerItemDelegate(code_view_theme, this);
+
+  d->list_view->setItemDelegate(list_view_item_delegate);
 }
 
 //! Try to open the token related to a specific model index.
@@ -219,6 +212,11 @@ void EntityExplorer::OnCategoryChange(
   }
 
   d->model->SetTokenCategoryFilter(token_category_set);
+}
+
+void EntityExplorer::OnThemeChange(const QPalette &,
+                                   const CodeViewTheme &code_view_theme) {
+  InstallItemDelegate(code_view_theme);
 }
 
 }  // namespace mx::gui
