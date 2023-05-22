@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <QEvent>
 #include <QWidget>
@@ -40,8 +41,10 @@ class EntityExplorer final : public IEntityExplorer {
   //! Installs the specified model, taking ownership of it
   void InstallModel(IEntityExplorerModel *model);
 
- private slots:
+  //! Installs the item delegate that paints the tokens
+  void InstallItemDelegate(const CodeViewTheme &code_view_theme);
 
+ private slots:
   //! Try to open the token related to a specific model index.
   void SelectionChanged(const QModelIndex &index, const QModelIndex &previous);
 
@@ -57,6 +60,10 @@ class EntityExplorer final : public IEntityExplorer {
 
   //! Called when the token category filter changes
   void OnCategoryChange(const std::optional<TokenCategory> &opt_token_category);
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
   friend class IEntityExplorer;
 };
