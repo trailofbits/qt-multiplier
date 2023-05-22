@@ -8,7 +8,9 @@
 
 #include "GetEntityInformation.h"
 
-#include <filesystem>
+#include <multiplier/ui/Assert.h>
+#include <multiplier/ui/Util.h>
+
 #include <multiplier/Entities/ArraySubscriptExpr.h>
 #include <multiplier/Entities/BinaryOperator.h>
 #include <multiplier/Entities/CallExpr.h>
@@ -33,17 +35,21 @@
 #include <multiplier/Entities/UnaryOperator.h>
 #include <multiplier/Entities/UnaryExprOrTypeTraitExpr.h>
 #include <multiplier/Entities/WhileStmt.h>
-#include <multiplier/ui/Assert.h>
-#include <multiplier/ui/Util.h>
 
-#include <iostream>
+#include <filesystem>
 
 namespace mx::gui {
 namespace {
 
-static std::optional<EntityInformation::Location> GetLocation(
-    const TokenRange &toks, const FileLocationCache &file_location_cache) {
+static std::optional<EntityInformation::Location>
+GetLocation(const QPromise<IDatabase::EntityInformationResult> &result_promise,
+            const TokenRange &toks,
+            const FileLocationCache &file_location_cache) {
   for (Token tok : toks.file_tokens()) {
+    if (result_promise.isCanceled()) {
+      return std::nullopt;
+    }
+
     auto file = File::containing(tok);
     if (!file) {
       continue;
@@ -59,12 +65,22 @@ static std::optional<EntityInformation::Location> GetLocation(
 }
 
 // Fill in the macros used within a given token range.
-static void FillUsedMacros(const FileLocationCache &file_location_cache,
-                           EntityInformation &info, const TokenRange &tokens) {
+static void FillUsedMacros(
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, EntityInformation &info,
+    const TokenRange &tokens) {
   std::vector<PackedMacroId> seen;
 
   for (Token tok : tokens) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
     for (Macro macro : Macro::containing(tok)) {
+      if (result_promise.isCanceled()) {
+        return;
+      }
+
       macro = macro.root();
       if (macro.kind() != MacroKind::EXPANSION) {
         break;
@@ -88,11 +104,16 @@ static void FillUsedMacros(const FileLocationCache &file_location_cache,
 
       TokenRange use_tokens = exp->use_tokens();
       for (Token use_tok : use_tokens) {
+        if (result_promise.isCanceled()) {
+          return;
+        }
+
         if (use_tok.category() == TokenCategory::MACRO_NAME) {
           EntityInformation::Selection &sel = info.macros_used.emplace_back();
           sel.display_role.setValue(use_tok);
           sel.entity_role = std::move(exp.value());
-          sel.location = GetLocation(use_tokens, file_location_cache);
+          sel.location =
+              GetLocation(result_promise, use_tokens, file_location_cache);
           break;
         }
       }
@@ -124,9 +145,15 @@ static void FillUsedMacros(const FileLocationCache &file_location_cache,
 //}
 
 //! Find the statement that value represents the current line of code.
-static mx::TokenRange FindLine(mx::Stmt prev_stmt) {
+static mx::TokenRange
+FindLine(const QPromise<IDatabase::EntityInformationResult> &result_promise,
+         mx::Stmt prev_stmt) {
   // Find implicit casts with the return value
   for (mx::Stmt stmt : mx::Stmt::containing(prev_stmt)) {
+    if (result_promise.isCanceled()) {
+      return {};
+    }
+
     switch (stmt.kind()) {
 
       // Don't ascend too far up the statement parentage.
@@ -145,13 +172,9 @@ static mx::TokenRange FindLine(mx::Stmt prev_stmt) {
       case StmtKind::COROUTINE_BODY_STMT:  // Not sure what this is.
         goto done;
 
-      case StmtKind::DECL_STMT:
-        prev_stmt = std::move(stmt);
-        goto done;
+      case StmtKind::DECL_STMT: prev_stmt = std::move(stmt); goto done;
 
-      default:
-        prev_stmt = std::move(stmt);
-        break;
+      default: prev_stmt = std::move(stmt); break;
     }
   }
 
@@ -161,8 +184,9 @@ done:
 
 //! Fill `info` with information about the variable `var`.
 static void FillTypeInformation(
-    const FileLocationCache &file_location_cache,
-    EntityInformation &info, const TypeDecl &entity, Reference ref) {
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, EntityInformation &info,
+    const TypeDecl &entity, Reference ref) {
 
   // TODO(pag): Do better with these.
   (void) entity;
@@ -171,16 +195,22 @@ static void FillTypeInformation(
     EntityInformation::Selection *sel = &(info.uses.emplace_back());
     sel->display_role.setValue(du->tokens().strip_whitespace());
     sel->entity_role = du.value();
-    sel->location = GetLocation(du->tokens(), file_location_cache);
+    sel->location =
+        GetLocation(result_promise, du->tokens(), file_location_cache);
 
   } else if (auto su = ref.as_statement()) {
     Stmt orig_su = su.value();
     for (; su; su = su->parent_statement()) {
+      if (result_promise.isCanceled()) {
+        return;
+      }
+
       if (CastExpr::from(su.value())) {
         EntityInformation::Selection *sel = &(info.type_casts.emplace_back());
         sel->display_role.setValue(su->tokens().strip_whitespace());
         sel->entity_role = orig_su;
-        sel->location = GetLocation(su->tokens(), file_location_cache);
+        sel->location =
+            GetLocation(result_promise, su->tokens(), file_location_cache);
         return;
 
       } else if (TypeTraitExpr::from(su.value()) ||
@@ -188,7 +218,8 @@ static void FillTypeInformation(
         EntityInformation::Selection *sel = &(info.uses.emplace_back());
         sel->display_role.setValue(su->tokens().strip_whitespace());
         sel->entity_role = orig_su;
-        sel->location = GetLocation(su->tokens(), file_location_cache);
+        sel->location =
+            GetLocation(result_promise, su->tokens(), file_location_cache);
         return;
       }
     }
@@ -196,26 +227,34 @@ static void FillTypeInformation(
     EntityInformation::Selection *sel = &(info.uses.emplace_back());
     sel->display_role.setValue(orig_su.tokens().strip_whitespace());
     sel->entity_role = orig_su;
-    sel->location = GetLocation(orig_su.tokens(), file_location_cache);
+    sel->location =
+        GetLocation(result_promise, orig_su.tokens(), file_location_cache);
     return;
   }
 }
 
 //! Fill `info` with information about the variable `var`.
 static void FillTypeInformation(
-    const FileLocationCache &file_location_cache,
-    EntityInformation &info, TypeDecl entity) {
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, EntityInformation &info,
+    TypeDecl entity) {
 
   for (Reference ref : entity.references()) {
-    FillTypeInformation(file_location_cache, info, entity, std::move(ref));
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
+    FillTypeInformation(result_promise, file_location_cache, info, entity,
+                        std::move(ref));
   }
 }
 
 //! Fill `info` with information about the variable `var` as used by the
 //! statement `stmt`.
 static void FillVariableUsedByStatementInformation(
-    const FileLocationCache &file_location_cache,
-    EntityInformation &info, Stmt stmt) {
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, EntityInformation &info,
+    Stmt stmt) {
 
   bool is_field = stmt.kind() == StmtKind::MEMBER_EXPR;
   Assert(is_field || stmt.kind() == StmtKind::DECL_REF_EXPR,
@@ -225,6 +264,10 @@ static void FillVariableUsedByStatementInformation(
   Stmt child = stmt;
   std::optional<Stmt> parent = child.parent_statement();
   for (; parent; child = parent.value(), parent = parent->parent_statement()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
     switch (parent->kind()) {
       case StmtKind::SWITCH_STMT:
         if (auto switch_ = SwitchStmt::from(parent);
@@ -234,8 +277,7 @@ static void FillVariableUsedByStatementInformation(
           goto generic_use;
         }
       case StmtKind::DO_STMT:
-        if (auto do_ = DoStmt::from(parent);
-            do_ && do_->condition() == child) {
+        if (auto do_ = DoStmt::from(parent); do_ && do_->condition() == child) {
           goto conditional_use;
         } else {
           goto generic_use;
@@ -255,8 +297,7 @@ static void FillVariableUsedByStatementInformation(
           goto generic_use;
         }
       case StmtKind::IF_STMT:
-        if (auto if_ = IfStmt::from(parent);
-            if_ && if_->condition() == child) {
+        if (auto if_ = IfStmt::from(parent); if_ && if_->condition() == child) {
           goto conditional_use;
         } else {
           goto generic_use;
@@ -270,18 +311,14 @@ static void FillVariableUsedByStatementInformation(
       case StmtKind::CXX_TRY_STMT:
       case StmtKind::CXX_FOR_RANGE_STMT:
       case StmtKind::CXX_CATCH_STMT:
-      case StmtKind::COROUTINE_BODY_STMT:
-        goto generic_use;
+      case StmtKind::COROUTINE_BODY_STMT: goto generic_use;
 
       case StmtKind::UNARY_OPERATOR:
         if (auto uop = UnaryOperator::from(parent)) {
           switch (uop->opcode()) {
-            case UnaryOperatorKind::ADDRESS_OF:
-              goto address_of_use;
-            case UnaryOperatorKind::DEREF:
-              goto dereference_use;
-            default:
-              break;
+            case UnaryOperatorKind::ADDRESS_OF: goto address_of_use;
+            case UnaryOperatorKind::DEREF: goto dereference_use;
+            default: break;
           }
         }
         continue;
@@ -309,8 +346,7 @@ static void FillVariableUsedByStatementInformation(
               if (bin->lhs() == child) {
                 goto generic_use;
               }
-            default:
-              break;
+            default: break;
           }
         }
         continue;
@@ -356,8 +392,7 @@ static void FillVariableUsedByStatementInformation(
           }
         }
         goto assigned_to_use;
-      default:
-        break;
+      default: break;
     }
   }
 
@@ -366,78 +401,90 @@ generic_use:
   sel = &(info.uses.emplace_back());
   sel->display_role.setValue(child.tokens().strip_whitespace());
   sel->entity_role = stmt;
-  sel->location = GetLocation(stmt.tokens(), file_location_cache);
+  sel->location =
+      GetLocation(result_promise, stmt.tokens(), file_location_cache);
   return;
 
 argument_use:
   sel = &(info.arguments.emplace_back());
   sel->display_role.setValue(parent->tokens().strip_whitespace());
   sel->entity_role = stmt;
-  sel->location = GetLocation(stmt.tokens(), file_location_cache);
+  sel->location =
+      GetLocation(result_promise, stmt.tokens(), file_location_cache);
   return;
 
 assigned_to_use:
   sel = &(info.assigned_tos.emplace_back());
   sel->display_role.setValue(parent->tokens().strip_whitespace());
   sel->entity_role = stmt;
-  sel->location = GetLocation(stmt.tokens(), file_location_cache);
+  sel->location =
+      GetLocation(result_promise, stmt.tokens(), file_location_cache);
   return;
 
 assigned_from_use:
   sel = &(info.assignments.emplace_back());
   sel->display_role.setValue(parent->tokens().strip_whitespace());
   sel->entity_role = stmt;
-  sel->location = GetLocation(stmt.tokens(), file_location_cache);
+  sel->location =
+      GetLocation(result_promise, stmt.tokens(), file_location_cache);
   return;
 
 address_of_use:
   sel = &(info.address_ofs.emplace_back());
   sel->display_role.setValue(parent->tokens().strip_whitespace());
   sel->entity_role = stmt;
-  sel->location = GetLocation(stmt.tokens(), file_location_cache);
+  sel->location =
+      GetLocation(result_promise, stmt.tokens(), file_location_cache);
   return;
 
 dereference_use:
   sel = &(info.dereferences.emplace_back());
   sel->display_role.setValue(parent->tokens().strip_whitespace());
   sel->entity_role = stmt;
-  sel->location = GetLocation(stmt.tokens(), file_location_cache);
+  sel->location =
+      GetLocation(result_promise, stmt.tokens(), file_location_cache);
   return;
 
 conditional_use:
   sel = &(info.tests.emplace_back());
   sel->display_role.setValue(child.tokens().strip_whitespace());
   sel->entity_role = stmt;
-  sel->location = GetLocation(stmt.tokens(), file_location_cache);
+  sel->location =
+      GetLocation(result_promise, stmt.tokens(), file_location_cache);
   return;
 }
 
 //! Fill `info` with information about the variable `var`.
 static void FillVariableInformation(
-    const FileLocationCache &file_location_cache,
-    EntityInformation &info, const ValueDecl &var) {
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, EntityInformation &info,
+    const ValueDecl &var) {
 
   for (Reference ref : var.references()) {
     if (std::optional<Stmt> stmt = ref.as_statement()) {
-      FillVariableUsedByStatementInformation(file_location_cache, info,
-                                             std::move(stmt.value()));
+      FillVariableUsedByStatementInformation(
+          result_promise, file_location_cache, info, std::move(stmt.value()));
     }
   }
 }
 
 //! Fill `info` with information about the function `func`.
 static void FillFunctionInformation(
-    const FileLocationCache &file_location_cache,
-    EntityInformation &info, FunctionDecl func) {
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, EntityInformation &info,
+    FunctionDecl func) {
 
   for (Reference ref : func.references()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
 
     if (auto designator = ref.as_designator()) {
       TokenRange tokens = designator->tokens();
       EntityInformation::Selection &sel = info.pointers.emplace_back();
       sel.display_role.setValue(tokens.strip_whitespace());
       sel.entity_role = designator.value();
-      sel.location = GetLocation(tokens, file_location_cache);
+      sel.location = GetLocation(result_promise, tokens, file_location_cache);
       continue;
     }
 
@@ -445,6 +492,10 @@ static void FillFunctionInformation(
 
       // Look for direct calls. This is replicating `FunctionDecl::callers`.
       for (CallExpr call : CallExpr::containing(stmt.value())) {
+        if (result_promise.isCanceled()) {
+          return;
+        }
+
         if (std::optional<FunctionDecl> callee = call.direct_callee()) {
           if (callee.value() != func) {
             continue;
@@ -452,7 +503,8 @@ static void FillFunctionInformation(
 
           EntityInformation::Selection &sel = info.callers.emplace_back();
           sel.entity_role = call;
-          sel.location = GetLocation(call.tokens(), file_location_cache);
+          sel.location =
+              GetLocation(result_promise, call.tokens(), file_location_cache);
           for (FunctionDecl caller : FunctionDecl::containing(call)) {
             sel.display_role.setValue(caller.token());
             break;
@@ -465,9 +517,14 @@ static void FillFunctionInformation(
       // If we didn't find a caller, then it's probably an `address_ofs`.
       {
         EntityInformation::Selection &sel = info.pointers.emplace_back();
-        sel.display_role.setValue(FindLine(stmt.value()));
+        sel.display_role.setValue(FindLine(result_promise, stmt.value()));
         sel.entity_role = stmt.value();
-        sel.location = GetLocation(stmt->tokens(), file_location_cache);
+        sel.location =
+            GetLocation(result_promise, stmt->tokens(), file_location_cache);
+
+        if (result_promise.isCanceled()) {
+          return;
+        }
       }
     }
 
@@ -481,6 +538,10 @@ static void FillFunctionInformation(
   //            and fragments.
   Fragment frag = Fragment::containing(func);
   for (CallExpr call : CallExpr::in(frag)) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
     std::optional<FunctionDecl> callee = call.direct_callee();
     if (!callee) {
       continue;  // TODO(pag): Look at how SciTools renders indirect callees.
@@ -488,6 +549,10 @@ static void FillFunctionInformation(
 
     // Make sure the callee is nested inside of `entity` (i.e. `func`).
     for (FunctionDecl callee_func : FunctionDecl::containing(call)) {
+      if (result_promise.isCanceled()) {
+        return;
+      }
+
       if (callee_func != func) {
         continue;
       }
@@ -495,55 +560,74 @@ static void FillFunctionInformation(
       EntityInformation::Selection &sel = info.callees.emplace_back();
       sel.display_role.setValue(callee->token());
       sel.entity_role = call;
-      sel.location = GetLocation(call.tokens(), file_location_cache);
+      sel.location =
+          GetLocation(result_promise, call.tokens(), file_location_cache);
       break;
     }
   }
 
   // Find the local variables.
   for (const mx::Decl &var : func.declarations_in_context()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
     if (auto vd = mx::VarDecl::from(var)) {
-      EntityInformation::Selection *sel = vd->kind() == DeclKind::PARM_VAR ?
-                                          &(info.parameters.emplace_back()) :
-                                          &(info.variables.emplace_back());
+      EntityInformation::Selection *sel =
+          vd->kind() == DeclKind::PARM_VAR ? &(info.parameters.emplace_back())
+                                           : &(info.variables.emplace_back());
       sel->display_role.setValue(vd->token());
       sel->entity_role = vd.value();
-      sel->location = GetLocation(vd->tokens(), file_location_cache);
+      sel->location =
+          GetLocation(result_promise, vd->tokens(), file_location_cache);
     }
   }
 }
 
 //! Fill `info` with information about the variable `var`.
 static void FillEnumInformation(
-    const FileLocationCache &file_location_cache,
-    EntityInformation &info, EnumDecl entity) {
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, EntityInformation &info,
+    EnumDecl entity) {
 
   for (mx::EnumConstantDecl ec : entity.enumerators()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
     EntityInformation::Selection &sel = info.enumerators.emplace_back();
     sel.display_role.setValue(ec.token());
     sel.entity_role = ec;
-    sel.location = GetLocation(ec.tokens(), file_location_cache);
+    sel.location =
+        GetLocation(result_promise, ec.tokens(), file_location_cache);
   }
 }
 
 //! Fill `info` with information about the variable `var`.
 static void FillRecordInformation(
-    const FileLocationCache &file_location_cache,
-    EntityInformation &info, RecordDecl entity) {
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, EntityInformation &info,
+    RecordDecl entity) {
 
   // Find the local variables.
   for (const mx::Decl &decl : entity.declarations_in_context()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
     if (auto vd = mx::VarDecl::from(decl)) {
       EntityInformation::Selection &sel = info.variables.emplace_back();
       sel.display_role.setValue(vd->token());
       sel.entity_role = vd.value();
-      sel.location = GetLocation(vd->tokens(), file_location_cache);
+      sel.location =
+          GetLocation(result_promise, vd->tokens(), file_location_cache);
 
     } else if (auto fd = mx::FieldDecl::from(decl)) {
       EntityInformation::Selection &sel = info.members.emplace_back();
       sel.display_role.setValue(fd->token());
       sel.entity_role = fd.value();
-      sel.location = GetLocation(fd->tokens(), file_location_cache);
+      sel.location =
+          GetLocation(result_promise, fd->tokens(), file_location_cache);
     }
 
     // TODO(pag): FunctionDecl, CXXMethodDecl, etc.
@@ -552,6 +636,7 @@ static void FillRecordInformation(
 
 //! Fill `info` with information about the declaration `entity`.
 static EntityInformation GetDeclInformation(
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
     const FileLocationCache &file_location_cache, NamedDecl entity) {
 
   std::string_view name = entity.name();
@@ -559,7 +644,8 @@ static EntityInformation GetDeclInformation(
   EntityInformation info;
   info.id = entity.id().Pack();
   info.entity.entity_role = entity;
-  info.entity.location = GetLocation(entity.tokens(), file_location_cache);
+  info.entity.location =
+      GetLocation(result_promise, entity.tokens(), file_location_cache);
 
   if (!name.empty()) {
     info.entity.display_role.setValue(entity.token());
@@ -567,6 +653,10 @@ static EntityInformation GetDeclInformation(
 
   // Fill all redeclarations.
   for (NamedDecl redecl : entity.redeclarations()) {
+    if (result_promise.isCanceled()) {
+      return info;
+    }
+
     EntityInformation::Selection *sel = nullptr;
     if (redecl.is_definition()) {
       sel = &(info.definitions.emplace_back());
@@ -574,11 +664,12 @@ static EntityInformation GetDeclInformation(
       sel = &(info.declarations.emplace_back());
     }
     // Collect all macros used by all redeclarations.
-    FillUsedMacros(file_location_cache, info, redecl.tokens());
+    FillUsedMacros(result_promise, file_location_cache, info, redecl.tokens());
 
     sel->display_role.setValue(redecl.token());
     sel->entity_role = redecl;
-    sel->location = GetLocation(redecl.tokens(), file_location_cache);
+    sel->location =
+        GetLocation(result_promise, redecl.tokens(), file_location_cache);
 
     // Try to get a name from elsewhere if we're missing it.
     if (!info.entity.display_role.isValid()) {
@@ -591,33 +682,33 @@ static EntityInformation GetDeclInformation(
 
   // If this is a function, then look at who it calls, and who calls it.
   if (auto func = FunctionDecl::from(entity)) {
-    FillFunctionInformation(file_location_cache, info,
+    FillFunctionInformation(result_promise, file_location_cache, info,
                             std::move(func.value()));
 
   } else if (auto var = VarDecl::from(entity)) {
-    FillVariableInformation(file_location_cache, info,
+    FillVariableInformation(result_promise, file_location_cache, info,
                             std::move(var.value()));
 
   } else if (auto field = FieldDecl::from(entity)) {
-    FillVariableInformation(file_location_cache, info,
+    FillVariableInformation(result_promise, file_location_cache, info,
                             field.value());
 
   } else if (auto enumerator = EnumConstantDecl::from(entity)) {
-    FillVariableInformation(file_location_cache, info,
+    FillVariableInformation(result_promise, file_location_cache, info,
                             enumerator.value());
 
   } else if (auto enum_ = EnumDecl::from(entity)) {
 
-    FillEnumInformation(file_location_cache, info,
+    FillEnumInformation(result_promise, file_location_cache, info,
                         std::move(enum_.value()));
 
   } else if (auto tag = RecordDecl::from(entity)) {
-    FillRecordInformation(file_location_cache, info,
+    FillRecordInformation(result_promise, file_location_cache, info,
                           std::move(tag.value()));
   }
 
   if (auto type = TypeDecl::from(entity)) {
-    FillTypeInformation(file_location_cache, info,
+    FillTypeInformation(result_promise, file_location_cache, info,
                         std::move(type.value()));
   }
 
@@ -626,13 +717,15 @@ static EntityInformation GetDeclInformation(
 
 //! Fill `info` with information about the macro `entity`.
 static EntityInformation GetMacroInformation(
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
     const FileLocationCache &file_location_cache,
     const DefineMacroDirective &entity) {
 
   EntityInformation info;
   info.id = entity.id().Pack();
   info.entity.display_role.setValue(entity.name());
-  info.entity.location = GetLocation(entity.use_tokens(), file_location_cache);
+  info.entity.location =
+      GetLocation(result_promise, entity.use_tokens(), file_location_cache);
   info.entity.entity_role = entity;
 
   return info;
@@ -640,8 +733,8 @@ static EntityInformation GetMacroInformation(
 
 //! Fill `info` with information about the file `entity`.
 static EntityInformation GetFileInformation(
-    const FileLocationCache &file_location_cache,
-    const File &entity) {
+    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    const FileLocationCache &file_location_cache, const File &entity) {
 
   EntityInformation info;
   info.id = entity.id().Pack();
@@ -654,21 +747,29 @@ static EntityInformation GetFileInformation(
   }
 
   for (IncludeLikeMacroDirective inc : IncludeLikeMacroDirective::in(entity)) {
+    if (result_promise.isCanceled()) {
+      return info;
+    }
+
     if (std::optional<File> file = inc.included_file()) {
       EntityInformation::Selection &sel = info.includes.emplace_back();
       TokenRange tokens = inc.use_tokens();
       sel.entity_role = std::move(inc);
-      sel.location = GetLocation(tokens, file_location_cache);
+      sel.location = GetLocation(result_promise, tokens, file_location_cache);
       sel.display_role.setValue(tokens.strip_whitespace());
     }
   }
 
   for (Reference ref : entity.references()) {
+    if (result_promise.isCanceled()) {
+      return info;
+    }
+
     if (auto inc = IncludeLikeMacroDirective::from(ref.as_macro())) {
       if (auto file = File::containing(inc.value())) {
         TokenRange tokens = inc->use_tokens();
         EntityInformation::Selection &sel = info.include_bys.emplace_back();
-        sel.location = GetLocation(tokens, file_location_cache);
+        sel.location = GetLocation(result_promise, tokens, file_location_cache);
         sel.entity_role = inc.value();
 
         for (std::filesystem::path path : file->paths()) {
@@ -682,18 +783,29 @@ static EntityInformation GetFileInformation(
 
   for (Fragment frag : entity.fragments()) {
     for (DefineMacroDirective def : DefineMacroDirective::in(frag)) {
-      EntityInformation::Selection &sel = info.top_level_entities.emplace_back();
+      if (result_promise.isCanceled()) {
+        return info;
+      }
+
+      EntityInformation::Selection &sel =
+          info.top_level_entities.emplace_back();
       sel.display_role.setValue(def.name());
       sel.entity_role = def;
-      sel.location = GetLocation(def.use_tokens(), file_location_cache);
+      sel.location =
+          GetLocation(result_promise, def.use_tokens(), file_location_cache);
     }
 
     for (Decl decl : frag.top_level_declarations()) {
+      if (result_promise.isCanceled()) {
+        return info;
+      }
+
       if (auto nd = NamedDecl::from(decl); nd && !nd->name().empty()) {
         EntityInformation::Selection &sel =
             info.top_level_entities.emplace_back();
         sel.display_role.setValue(nd->token());
-        sel.location = GetLocation(nd->tokens(), file_location_cache);
+        sel.location =
+            GetLocation(result_promise, nd->tokens(), file_location_cache);
         sel.entity_role = nd.value();
       }
     }
@@ -723,18 +835,18 @@ void GetEntityInformation(
 
   if (std::holds_alternative<Decl>(entity)) {
     if (auto named = NamedDecl::from(std::get<Decl>(entity))) {
-      info.emplace(GetDeclInformation(file_location_cache,
+      info.emplace(GetDeclInformation(result_promise, file_location_cache,
                                       named->canonical_declaration()));
     }
 
   } else if (std::holds_alternative<Macro>(entity)) {
     if (auto def = DefineMacroDirective::from(std::get<Macro>(entity))) {
-      info.emplace(GetMacroInformation(file_location_cache,
+      info.emplace(GetMacroInformation(result_promise, file_location_cache,
                                        std::move(def.value())));
     }
 
   } else if (std::holds_alternative<File>(entity)) {
-    info.emplace(GetFileInformation(file_location_cache,
+    info.emplace(GetFileInformation(result_promise, file_location_cache,
                                     std::move(std::get<File>(entity))));
   }
 
