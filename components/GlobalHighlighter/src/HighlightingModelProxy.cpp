@@ -14,7 +14,7 @@ namespace mx::gui {
 
 struct HighlightingModelProxy::PrivateData final {
   int entity_id_data_role{};
-  EntityHighlightList entity_highlight_list;
+  EntityColorMap entity_color_map;
 };
 
 HighlightingModelProxy::HighlightingModelProxy(QAbstractItemModel *source_model,
@@ -46,12 +46,12 @@ QVariant HighlightingModelProxy::data(const QModelIndex &index,
   }
 
   auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
-  auto highlight_it = d->entity_highlight_list.find(entity_id);
-  if (highlight_it == d->entity_highlight_list.end()) {
+  auto entity_color_map_it = d->entity_color_map.find(entity_id);
+  if (entity_color_map_it == d->entity_color_map.end()) {
     return ret;
   }
 
-  const QColor &background_color = highlight_it->second;
+  const QColor &background_color = entity_color_map_it->second;
   if (role == Qt::BackgroundRole) {
     return background_color;
   }
@@ -59,10 +59,10 @@ QVariant HighlightingModelProxy::data(const QModelIndex &index,
   return GetBestForegroundColor(background_color);
 }
 
-void HighlightingModelProxy::OnEntityHighlightListChange(
-    const EntityHighlightList &entity_highlight_list) {
+void HighlightingModelProxy::OnEntityColorMapChange(
+    const EntityColorMap &entity_color_map) {
 
-  d->entity_highlight_list = entity_highlight_list;
+  d->entity_color_map = entity_color_map;
 
   emit dataChanged(QModelIndex(), QModelIndex(), {Qt::BackgroundRole});
 }

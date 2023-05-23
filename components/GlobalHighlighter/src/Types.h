@@ -13,9 +13,18 @@
 #include <QColor>
 
 #include <unordered_map>
+#include <unordered_set>
 
 namespace mx::gui {
 
-using EntityHighlightList = std::unordered_map<RawEntityId, QColor>;
+using EntityColorMap = std::unordered_map<RawEntityId, QColor>;
+
+struct EntityHighlight final {
+  QString name;
+  QColor color;
+  std::unordered_set<RawEntityId> entity_id_list;
+};
+
+using EntityHighlightList = std::vector<EntityHighlight>;
 
 }  // namespace mx::gui

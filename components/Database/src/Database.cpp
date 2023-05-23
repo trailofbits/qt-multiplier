@@ -48,7 +48,7 @@ QFuture<OptionalName> Database::RequestEntityName(RawEntityId fragment_id) {
                            d->index, fragment_id);
 }
 
-QFuture<IDatabase::EntityIDList>
+QFuture<IDatabase::RelatedEntitiesResult>
 Database::GetRelatedEntities(RawEntityId entity_id) {
   return QtConcurrent::run(QThreadPool::globalInstance(),
                            mx::gui::GetRelatedEntities, d->index, entity_id);

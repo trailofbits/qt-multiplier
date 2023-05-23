@@ -90,11 +90,21 @@ class IDatabase {
   //! Starts a name resolution request for the given entity
   virtual QFuture<OptionalName> RequestEntityName(RawEntityId fragment_id) = 0;
 
-  //! A list of entity IDs
-  using EntityIDList = std::unordered_set<RawEntityId>;
+  //! A list of related entities
+  struct RelatedEntities final {
+    //! The name of the entity used to perform the request
+    QString name;
+
+    //! A list of related entity IDs
+    std::unordered_set<RawEntityId> entity_id_list;
+  };
+
+  //! Either the result of the GetRelatedEntities request or an RPC error
+  using RelatedEntitiesResult = Result<RelatedEntities, RPCErrorCode>;
 
   //! Requests a list of all the entities related to the given one
-  virtual QFuture<EntityIDList> GetRelatedEntities(RawEntityId entity_id) = 0;
+  virtual QFuture<RelatedEntitiesResult>
+  GetRelatedEntities(RawEntityId entity_id) = 0;
 
   //! A single entity query result
   struct EntityQueryResult final {

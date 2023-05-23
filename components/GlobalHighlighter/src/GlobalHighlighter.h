@@ -26,12 +26,13 @@ class GlobalHighlighter final : public IGlobalHighlighter {
   CreateModelProxy(QAbstractItemModel *source_model,
                    int entity_id_data_role) override;
 
+ public slots:
   //! \copybrief IGlobalHighlighter::AddEntity
-  virtual void SetEntityColor(RawEntityId entity_id,
+  virtual void SetEntityColor(const RawEntityId &entity_id,
                               const QColor &color) override;
 
   //! \copybrief IGlobalHighlighter::RemoveEntity
-  virtual void RemoveEntity(RawEntityId entity_id) override;
+  virtual void RemoveEntity(const RawEntityId &entity_id) override;
 
   //! \copybrief IGlobalHighlighter::Clear
   virtual void Clear() override;
@@ -45,8 +46,14 @@ class GlobalHighlighter final : public IGlobalHighlighter {
                     const FileLocationCache &file_location_cache,
                     QWidget *parent);
 
+  //! Starts a new Related Entities requests
   void StartRequest(const RawEntityId &entity_id);
+
+  //! Cancels any active request
   void CancelRequest();
+
+  //! Updates the on-screen item list
+  void UpdateItemList();
 
  private slots:
   //! Called when the entity name resolution has finished
@@ -54,8 +61,7 @@ class GlobalHighlighter final : public IGlobalHighlighter {
 
  signals:
   //! Signals the proxy models that the highlight set has changed
-  void
-  EntityHighlightListChanged(const EntityHighlightList &entity_highlight_list);
+  void EntityColorMapChanged(const EntityColorMap &entity_highlight_list);
 
   friend class IGlobalHighlighter;
 };

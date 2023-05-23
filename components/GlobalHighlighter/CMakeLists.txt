@@ -15,6 +15,13 @@ add_library("mx_globalhighlighter"
 
   src/HighlightingModelProxy.h
   src/HighlightingModelProxy.cpp
+
+  src/GlobalHighlighterItem.h
+  src/GlobalHighlighterItem.cpp
+)
+
+target_sources("mx_globalhighlighter" INTERFACE
+  Resources/Resources.qrc
 )
 
 target_link_libraries("mx_globalhighlighter"

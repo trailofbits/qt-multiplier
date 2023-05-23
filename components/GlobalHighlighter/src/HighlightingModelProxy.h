@@ -35,8 +35,7 @@ class HighlightingModelProxy final : public QIdentityProxyModel {
 
  public slots:
   //! Triggers a model reset without a source model reindex
-  void
-  OnEntityHighlightListChange(const EntityHighlightList &entity_highlight_list);
+  void OnEntityColorMapChange(const EntityColorMap &entity_highlight_list);
 
   //! Forwards the modelAboutToBeReset signal
   void OnModelAboutToBeReset();
