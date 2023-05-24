@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/Icons/GlobalHighlighter">
+        <file alias="Delete">Icons/delete.png</file>
+    </qresource>
+</RCC>

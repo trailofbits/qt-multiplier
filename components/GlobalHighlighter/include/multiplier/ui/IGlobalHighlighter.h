@@ -29,15 +29,6 @@ class IGlobalHighlighter : public QWidget {
   virtual QAbstractItemModel *CreateModelProxy(QAbstractItemModel *source_model,
                                                int entity_id_data_role) = 0;
 
-  //! Adds (or updates) the specified highlight
-  virtual void SetEntityColor(RawEntityId entity_id, const QColor &color) = 0;
-
-  //! Removes the given entity to the highlight list
-  virtual void RemoveEntity(RawEntityId entity_id) = 0;
-
-  //! Clears the highlight list
-  virtual void Clear() = 0;
-
   //! Constructor
   IGlobalHighlighter(QWidget *parent) : QWidget(parent) {}
 
@@ -49,6 +40,17 @@ class IGlobalHighlighter : public QWidget {
 
   //! Disabled copy assignment operator
   IGlobalHighlighter &operator=(const IGlobalHighlighter &) = delete;
+
+ public slots:
+  //! Adds (or updates) the specified highlight
+  virtual void SetEntityColor(const RawEntityId &entity_id,
+                              const QColor &color) = 0;
+
+  //! Removes the given entity to the highlight list
+  virtual void RemoveEntity(const RawEntityId &entity_id) = 0;
+
+  //! Clears the highlight list
+  virtual void Clear() = 0;
 };
 
 }  // namespace mx::gui

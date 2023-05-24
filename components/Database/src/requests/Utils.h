@@ -8,14 +8,15 @@
 
 #pragma once
 
-#include <multiplier/ui/IDatabase.h>
+#include <multiplier/Index.h>
 
-#include <QPromise>
+#include <QString>
+
+#include <optional>
 
 namespace mx::gui {
 
-void GetRelatedEntities(
-    QPromise<IDatabase::RelatedEntitiesResult> &related_entities_promise,
-    const Index &index, RawEntityId entity_id);
+std::optional<QString> LookupEntityName(const Index &index,
+                                        RawEntityId entity_id);
 
 }  // namespace mx::gui

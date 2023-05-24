@@ -7,31 +7,14 @@
 */
 
 #include "GetEntityName.h"
-
-#include <multiplier/ui/Util.h>
-
-#include <multiplier/Entities/Token.h>
-#include <multiplier/Entities/TokenKind.h>
+#include "Utils.h"
 
 namespace mx::gui {
 
 void GetEntityName(QPromise<OptionalName> &entity_name_promise,
                    const Index &index, RawEntityId entity_id) {
 
-  VariantEntity variant_entity = index.entity(entity_id);
-
-  auto opt_name = NameOfEntity(variant_entity);
-  if (opt_name.has_value() && opt_name->isEmpty()) {
-    opt_name = std::nullopt;
-  }
-
-  if (!opt_name.has_value()) {
-    auto tokens = TokensToString(variant_entity);
-    if (!tokens.isEmpty()) {
-      opt_name = std::move(tokens);
-    }
-  }
-
+  auto opt_name = LookupEntityName(index, entity_id);
   entity_name_promise.addResult(opt_name);
 }
 

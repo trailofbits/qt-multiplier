@@ -29,7 +29,7 @@ class Database final : public IDatabase {
   RequestEntityName(RawEntityId fragment_id) override;
 
   //! \copybrief IDatabase::GetRelatedEntities
-  virtual QFuture<EntityIDList>
+  virtual QFuture<RelatedEntitiesResult>
   GetRelatedEntities(RawEntityId entity_id) override;
 
   //! \copybrief IDatabase::QueryEntities
