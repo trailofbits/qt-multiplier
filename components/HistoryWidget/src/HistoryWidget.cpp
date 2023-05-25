@@ -423,7 +423,7 @@ void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
 
 void HistoryWidget::PrivateData::NavigateBackToHistoryItem(
     ItemList::iterator next_item_it) {
-  Assert(2u <= item_list.size(), "Invalid history list");
+  Assert(!item_list.empty(), "Invalid history list");
   current_item_it = next_item_it;
 }
 

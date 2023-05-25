@@ -112,8 +112,8 @@ static void FillUsedMacros(
           EntityInformation::Selection &sel = info.macros_used.emplace_back();
           sel.display_role.setValue(use_tok);
           sel.entity_role = std::move(exp.value());
-          sel.location =
-              GetLocation(result_promise, use_tokens, file_location_cache);
+          sel.location = GetLocation(
+              result_promise, use_tok, file_location_cache);
           break;
         }
       }
