@@ -63,6 +63,9 @@ class IDatabase {
   static Ptr Create(const Index &index,
                     const FileLocationCache &file_location_cache);
 
+  //! Get the canonical entity for `eid`.
+  virtual QFuture<VariantEntity> RequestCanonicalEntity(RawEntityId eid) = 0;
+
   //! The output of an entity information request
   using EntityInformationResult = Result<EntityInformation, RPCErrorCode>;
 

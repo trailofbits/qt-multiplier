@@ -16,6 +16,9 @@ class Database final : public IDatabase {
   //! Destructor
   virtual ~Database() override;
 
+  //! \copybrief IDatabase::RequestCanonicalEntity
+  virtual QFuture<VariantEntity> RequestCanonicalEntity(RawEntityId eid) override;
+
   //! \copybrief IDatabase::RequestEntityInformation
   virtual QFuture<EntityInformationResult>
   RequestEntityInformation(RawEntityId entity_id) override;
