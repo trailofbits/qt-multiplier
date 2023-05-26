@@ -72,6 +72,9 @@ class QuickCodeView final : public QWidget {
   //! Restores the widget visibility when the application gains focus
   void OnApplicationStateChange(Qt::ApplicationState state);
 
+  //! Tells us when we probably have the entity available.
+  void OnEntityRequestFutureStatusChanged();
+
   //! Updates the window name with the entity name request output
   void EntityNameFutureStatusChanged();
 

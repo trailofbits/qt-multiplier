@@ -32,8 +32,14 @@ struct QuickCodeView::PrivateData final {
   QLabel *window_title{nullptr};
 
   IDatabase::Ptr database;
+
+  ICodeModel *model{nullptr};
+
+  QFuture<VariantEntity> entity_future;
+  QFutureWatcher<VariantEntity> entity_future_watcher;
+
   QFuture<std::optional<QString>> entity_name_future;
-  QFutureWatcher<std::optional<QString>> future_watcher;
+  QFutureWatcher<std::optional<QString>> entity_name_future_watcher;
 };
 
 QuickCodeView::QuickCodeView(const Index &index,
@@ -43,9 +49,14 @@ QuickCodeView::QuickCodeView(const Index &index,
       d(new PrivateData) {
 
   d->database = IDatabase::Create(index, file_location_cache);
-  connect(&d->future_watcher,
+
+  connect(&d->entity_name_future_watcher,
           &QFutureWatcher<QFuture<std::optional<QString>>>::finished, this,
           &QuickCodeView::EntityNameFutureStatusChanged);
+
+  connect(&d->entity_future_watcher,
+          &QFutureWatcher<QFuture<VariantEntity>>::finished, this,
+          &QuickCodeView::OnEntityRequestFutureStatusChanged);
 
   InitializeWidgets(index, file_location_cache, entity_id);
 }
@@ -107,6 +118,13 @@ void QuickCodeView::InitializeWidgets(
           &QuickCodeView::OnApplicationStateChange);
 
   //
+  // Code model
+  //
+
+  ICodeModel *main_model = ICodeModel::Create(file_location_cache, index, this);
+  d->model = new CodePreviewModelAdapter(main_model, this);
+
+  //
   // Title bar
   //
 
@@ -115,9 +133,13 @@ void QuickCodeView::InitializeWidgets(
   auto window_name = tr("Entity ID #") + QString::number(entity_id);
   d->window_title = new QLabel(window_name);
 
-  // Start a request to fetch the real entity name
+  // Start a request to fetch the real entity name.
   d->entity_name_future = d->database->RequestEntityName(entity_id);
-  d->future_watcher.setFuture(d->entity_name_future);
+  d->entity_name_future_watcher.setFuture(d->entity_name_future);
+
+  // Start a request to fetch the canonical entity.
+  d->entity_future = d->database->RequestCanonicalEntity(entity_id);
+  d->entity_future_watcher.setFuture(d->entity_future);
 
   // Close button
   d->close_button = new QPushButton(QIcon(), "", this);
@@ -143,15 +165,11 @@ void QuickCodeView::InitializeWidgets(
   // Contents
   //
 
-  auto main_model = ICodeModel::Create(file_location_cache, index, this);
-  auto proxy_model = new CodePreviewModelAdapter(main_model, this);
-  auto view = ICodeView::Create(proxy_model, this);
+  auto view = ICodeView::Create(d->model, this);
   view->SetWordWrapping(true);
 
   connect(view, &ICodeView::TokenTriggered, this,
           &QuickCodeView::OnTokenTriggered);
-
-  proxy_model->SetEntity(entity_id);
 
   auto contents_layout = new QVBoxLayout();
   contents_layout->setContentsMargins(0, 0, 0, 0);
@@ -207,6 +225,22 @@ void QuickCodeView::OnApplicationStateChange(Qt::ApplicationState state) {
 
   auto window_is_visible = state == Qt::ApplicationActive;
   setVisible(window_is_visible);
+}
+
+//! Tells us when we probably have the entity available.
+void QuickCodeView::OnEntityRequestFutureStatusChanged() {
+  if (d->entity_future.isCanceled()) {
+    return;
+  }
+
+  VariantEntity ent = d->entity_future.takeResult();
+  if (std::holds_alternative<NotAnEntity>(ent)) {
+    return;
+  }
+
+  // Set the contents.
+  EntityId eid(ent);
+  d->model->SetEntity(eid.Pack());
 }
 
 void QuickCodeView::EntityNameFutureStatusChanged() {

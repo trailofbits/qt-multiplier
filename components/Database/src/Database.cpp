@@ -36,6 +36,21 @@ Database::RequestEntityInformation(RawEntityId entity_id) {
                            d->index, d->file_location_cache, entity_id);
 }
 
+//! \copybrief IDatabase::RequestCanonicalEntity
+QFuture<VariantEntity> Database::RequestCanonicalEntity(RawEntityId entity_id) {
+  return QtConcurrent::run(
+      QThreadPool::globalInstance(),
+      [] (const Index &index, RawEntityId eid) -> VariantEntity {
+        VariantEntity ent = index.entity(eid);
+        if (std::holds_alternative<Decl>(ent)) {
+          return std::get<Decl>(ent).canonical_declaration();
+        } else {
+          return ent;
+        }
+      },
+      d->index, entity_id);
+}
+
 QFuture<IDatabase::IndexedTokenRangeDataResult>
 Database::RequestIndexedTokenRangeData(RawEntityId entity_id) {
   return QtConcurrent::run(QThreadPool::globalInstance(),
