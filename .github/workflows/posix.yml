@@ -76,6 +76,8 @@ jobs:
             brew link qt@6
 
           else
+            sudo apt update
+
             sudo apt install -y \
               clang \
               ccache \
