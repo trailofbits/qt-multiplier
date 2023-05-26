@@ -92,6 +92,11 @@ TokenRange FileTokens(const VariantEntity &ent);
 //! Get the first file token associated with an entity.
 Token FirstFileToken(const VariantEntity &ent);
 
+//! Create a new token range, derived from `toks`, that introduces/injects
+//! fake whitespace between `toks`. This is nifty when you want to render out
+//! a parsed token range for human consumption.
+TokenRange InjectWhitespace(const TokenRange &toks);
+
 //! Return the name of an entity.
 std::optional<QString> NameOfEntity(const VariantEntity &ent);
 
