@@ -179,7 +179,7 @@ FindLine(const QPromise<IDatabase::EntityInformationResult> &result_promise,
   }
 
 done:
-  return prev_stmt.tokens().strip_whitespace();
+  return InjectWhitespace(prev_stmt.tokens().strip_whitespace());
 }
 
 //! Fill `info` with information about the variable `var`.
@@ -193,7 +193,8 @@ static void FillTypeInformation(
 
   if (auto du = ref.as_declaration()) {
     EntityInformation::Selection *sel = &(info.uses.emplace_back());
-    sel->display_role.setValue(du->tokens().strip_whitespace());
+    sel->display_role.setValue(
+        InjectWhitespace(du->tokens().strip_whitespace()));
     sel->entity_role = du.value();
     sel->location =
         GetLocation(result_promise, du->tokens(), file_location_cache);
@@ -207,7 +208,8 @@ static void FillTypeInformation(
 
       if (CastExpr::from(su.value())) {
         EntityInformation::Selection *sel = &(info.type_casts.emplace_back());
-        sel->display_role.setValue(su->tokens().strip_whitespace());
+        sel->display_role.setValue(
+            InjectWhitespace(su->tokens().strip_whitespace()));
         sel->entity_role = orig_su;
         sel->location =
             GetLocation(result_promise, su->tokens(), file_location_cache);
@@ -216,7 +218,8 @@ static void FillTypeInformation(
       } else if (TypeTraitExpr::from(su.value()) ||
                  UnaryExprOrTypeTraitExpr::from(su.value())) {
         EntityInformation::Selection *sel = &(info.uses.emplace_back());
-        sel->display_role.setValue(su->tokens().strip_whitespace());
+        sel->display_role.setValue(
+            InjectWhitespace(su->tokens().strip_whitespace()));
         sel->entity_role = orig_su;
         sel->location =
             GetLocation(result_promise, su->tokens(), file_location_cache);
@@ -225,7 +228,8 @@ static void FillTypeInformation(
     }
 
     EntityInformation::Selection *sel = &(info.uses.emplace_back());
-    sel->display_role.setValue(orig_su.tokens().strip_whitespace());
+    sel->display_role.setValue(InjectWhitespace(
+        orig_su.tokens().strip_whitespace()));
     sel->entity_role = orig_su;
     sel->location =
         GetLocation(result_promise, orig_su.tokens(), file_location_cache);
@@ -400,7 +404,8 @@ static void FillVariableUsedByStatementInformation(
   // Fall-through case.
 generic_use:
   sel = &(info.uses.emplace_back());
-  sel->display_role.setValue(child.tokens().strip_whitespace());
+  sel->display_role.setValue(
+      InjectWhitespace(child.tokens().strip_whitespace()));
   sel->entity_role = stmt;
   sel->location =
       GetLocation(result_promise, stmt.tokens(), file_location_cache);
@@ -408,7 +413,8 @@ generic_use:
 
 argument_use:
   sel = &(info.arguments.emplace_back());
-  sel->display_role.setValue(parent->tokens().strip_whitespace());
+  sel->display_role.setValue(
+      InjectWhitespace(parent->tokens().strip_whitespace()));
   sel->entity_role = stmt;
   sel->location =
       GetLocation(result_promise, stmt.tokens(), file_location_cache);
@@ -416,7 +422,8 @@ argument_use:
 
 assigned_to_use:
   sel = &(info.assigned_tos.emplace_back());
-  sel->display_role.setValue(parent->tokens().strip_whitespace());
+  sel->display_role.setValue(
+      InjectWhitespace(parent->tokens().strip_whitespace()));
   sel->entity_role = stmt;
   sel->location =
       GetLocation(result_promise, stmt.tokens(), file_location_cache);
@@ -424,7 +431,8 @@ assigned_to_use:
 
 assigned_from_use:
   sel = &(info.assignments.emplace_back());
-  sel->display_role.setValue(parent->tokens().strip_whitespace());
+  sel->display_role.setValue(
+      InjectWhitespace(parent->tokens().strip_whitespace()));
   sel->entity_role = stmt;
   sel->location =
       GetLocation(result_promise, stmt.tokens(), file_location_cache);
@@ -432,7 +440,8 @@ assigned_from_use:
 
 address_of_use:
   sel = &(info.address_ofs.emplace_back());
-  sel->display_role.setValue(parent->tokens().strip_whitespace());
+  sel->display_role.setValue(
+      InjectWhitespace(parent->tokens().strip_whitespace()));
   sel->entity_role = stmt;
   sel->location =
       GetLocation(result_promise, stmt.tokens(), file_location_cache);
@@ -440,7 +449,8 @@ address_of_use:
 
 dereference_use:
   sel = &(info.dereferences.emplace_back());
-  sel->display_role.setValue(parent->tokens().strip_whitespace());
+  sel->display_role.setValue(
+      InjectWhitespace(parent->tokens().strip_whitespace()));
   sel->entity_role = stmt;
   sel->location =
       GetLocation(result_promise, stmt.tokens(), file_location_cache);
@@ -448,7 +458,8 @@ dereference_use:
 
 conditional_use:
   sel = &(info.tests.emplace_back());
-  sel->display_role.setValue(child.tokens().strip_whitespace());
+  sel->display_role.setValue(
+      InjectWhitespace(child.tokens().strip_whitespace()));
   sel->entity_role = stmt;
   sel->location =
       GetLocation(result_promise, stmt.tokens(), file_location_cache);
@@ -483,7 +494,7 @@ static void FillFunctionInformation(
     if (auto designator = ref.as_designator()) {
       TokenRange tokens = designator->tokens();
       EntityInformation::Selection &sel = info.pointers.emplace_back();
-      sel.display_role.setValue(tokens.strip_whitespace());
+      sel.display_role.setValue(InjectWhitespace(tokens.strip_whitespace()));
       sel.entity_role = designator.value();
       sel.location = GetLocation(result_promise, tokens, file_location_cache);
       continue;
@@ -519,7 +530,7 @@ static void FillFunctionInformation(
       {
         EntityInformation::Selection &sel = info.pointers.emplace_back();
         sel.display_role.setValue(
-            FindLine(result_promise, stmt.value()).strip_whitespace());
+            FindLine(result_promise, stmt.value()));
         sel.entity_role = stmt.value();
         sel.location =
             GetLocation(result_promise, stmt->tokens(), file_location_cache);
