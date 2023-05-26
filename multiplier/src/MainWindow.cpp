@@ -9,6 +9,7 @@
 #include "QuickReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
 #include "QuickCodeView.h"
+#include "MxTabWidget.h"
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/HistoryWidget.h>
@@ -249,7 +250,7 @@ void MainWindow::CreateInfoExplorerDock() {
 }
 
 void MainWindow::CreateReferenceExplorerDock() {
-  d->ref_explorer_tab_widget = new QTabWidget(this);
+  d->ref_explorer_tab_widget = new MxTabWidget(this);
   d->ref_explorer_tab_widget->setDocumentMode(true);
   d->ref_explorer_tab_widget->setTabsClosable(true);
 
@@ -287,7 +288,7 @@ void MainWindow::OnCloseActiveCodeViewTab() {
 }
 
 void MainWindow::CreateCodeView() {
-  auto tab_widget = new QTabWidget();
+  auto tab_widget = new MxTabWidget();
   tab_widget->setTabsClosable(true);
   tab_widget->setDocumentMode(true);
   tab_widget->setTabBarAutoHide(false);

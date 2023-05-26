@@ -21,6 +21,9 @@ add_library("mx_widgets" STATIC
 
   src/QuickCodeView.h
   src/QuickCodeView.cpp
+
+  src/MxTabWidget.h
+  src/MxTabWidget.cpp
 )
 
 target_include_directories("mx_widgets" SYSTEM INTERFACE
