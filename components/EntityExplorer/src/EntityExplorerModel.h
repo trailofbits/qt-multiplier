@@ -56,7 +56,8 @@ class EntityExplorerModel final : public IEntityExplorerModel,
 
  public slots:
   //! Starts a new search request
-  virtual void Search(const QString &name, const bool &exact_name) override;
+  virtual void Search(const QString &name,
+                      const SearchMode &search_mode) override;
 
   //! Cancels the active search, if any
   virtual void CancelSearch() override;

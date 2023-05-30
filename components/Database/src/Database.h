@@ -17,7 +17,8 @@ class Database final : public IDatabase {
   virtual ~Database() override;
 
   //! \copybrief IDatabase::RequestCanonicalEntity
-  virtual QFuture<VariantEntity> RequestCanonicalEntity(RawEntityId eid) override;
+  virtual QFuture<VariantEntity>
+  RequestCanonicalEntity(RawEntityId eid) override;
 
   //! \copybrief IDatabase::RequestEntityInformation
   virtual QFuture<EntityInformationResult>
@@ -36,9 +37,9 @@ class Database final : public IDatabase {
   GetRelatedEntities(RawEntityId entity_id) override;
 
   //! \copybrief IDatabase::QueryEntities
-  virtual QFuture<bool> QueryEntities(QueryEntitiesReceiver &receiver,
-                                      const QString &name,
-                                      const bool &exact_name) override;
+  virtual QFuture<bool>
+  QueryEntities(QueryEntitiesReceiver &receiver, const QString &string,
+                const QueryEntitiesMode &query_mode) override;
 
  private:
   struct PrivateData;

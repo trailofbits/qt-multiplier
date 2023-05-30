@@ -127,11 +127,17 @@ class IDatabase {
   //! A data batch receiver for EntityQueryResult objects
   using QueryEntitiesReceiver = IBatchedDataTypeReceiver<EntityQueryResult>;
 
-  //! Queries the internal index for all entities named like `name`
+  //! String matching mode for QueryEntities
+  enum class QueryEntitiesMode {
+    ExactMatch,
+    ContainingString,
+  };
+
+  //! Queries the internal index for all entities matching the search criteria
   //! \return True in case of success, or false otherwise
   virtual QFuture<bool> QueryEntities(QueryEntitiesReceiver &receiver,
-                                      const QString &name,
-                                      const bool &exact_name) = 0;
+                                      const QString &string,
+                                      const QueryEntitiesMode &query_mode) = 0;
 
   //! Disabled copy constructor
   IDatabase(const IDatabase &) = delete;

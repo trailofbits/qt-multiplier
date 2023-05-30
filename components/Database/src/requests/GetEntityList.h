@@ -18,7 +18,8 @@
 namespace mx::gui {
 
 void GetEntityList(QPromise<bool> &result_promise, const Index &index,
-                   IDatabase::QueryEntitiesReceiver *receiver, QString name,
-                   bool exact_name);
+                   IDatabase::QueryEntitiesReceiver *receiver,
+                   const QString &string,
+                   const IDatabase::QueryEntitiesMode &query_mode);
 
 }  // namespace mx::gui

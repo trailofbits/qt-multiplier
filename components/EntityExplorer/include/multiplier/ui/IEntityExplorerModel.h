@@ -30,6 +30,12 @@ class IEntityExplorerModel : public QAbstractItemModel {
     TokenRole = Qt::UserRole + 1,
   };
 
+  //! Search modes supported by the `IEntityExplorerModel::Search` method
+  enum class SearchMode {
+    ExactMatch,
+    Containing,
+  };
+
   //! Factory method
   static IEntityExplorerModel *
   Create(const Index &index, const FileLocationCache &file_location_cache,
@@ -68,7 +74,7 @@ class IEntityExplorerModel : public QAbstractItemModel {
 
  public slots:
   //! Starts a new search request
-  virtual void Search(const QString &name, const bool &exact_name) = 0;
+  virtual void Search(const QString &name, const SearchMode &search_mode) = 0;
 
   //! Cancels the active search, if any
   virtual void CancelSearch() = 0;

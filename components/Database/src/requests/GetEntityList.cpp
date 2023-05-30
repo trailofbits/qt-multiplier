@@ -22,22 +22,34 @@ const std::size_t kBatchSize{512};
 }  // namespace
 
 void GetEntityList(QPromise<bool> &result_promise, const Index &index,
-                   IDatabase::QueryEntitiesReceiver *receiver, QString name,
-                   bool exact_name) {
+                   IDatabase::QueryEntitiesReceiver *receiver,
+                   const QString &string,
+                   const IDatabase::QueryEntitiesMode &query_mode) {
 
   IDatabase::QueryEntitiesReceiver::DataBatch data_batch;
-  std::string name_as_std_string = name.toStdString();
+  std::string std_string = string.toStdString();
 
-  for (NamedEntity named_entity : index.query_entities(name_as_std_string)) {
+  for (NamedEntity named_entity : index.query_entities(std_string)) {
     if (result_promise.isCanceled()) {
       return;
     }
 
     if (std::holds_alternative<NamedDecl>(named_entity)) {
       NamedDecl &named_decl = std::get<NamedDecl>(named_entity);
+
       std::string_view decl_name = named_decl.name();
-      if (decl_name.empty() ||
-          (exact_name && decl_name != name_as_std_string)) {
+      if (decl_name.empty()) {
+        continue;
+      }
+
+      auto skip_entity{true};
+      if (query_mode == IDatabase::QueryEntitiesMode::ExactMatch) {
+        skip_entity = decl_name != std_string;
+      } else {
+        skip_entity = decl_name.find(std_string) == 0;
+      }
+
+      if (skip_entity) {
         continue;
       }
 
@@ -55,12 +67,23 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
       });
 
     } else if (std::holds_alternative<DefineMacroDirective>(named_entity)) {
-      DefineMacroDirective &macro = std::get<DefineMacroDirective>(named_entity);
+      DefineMacroDirective &macro =
+          std::get<DefineMacroDirective>(named_entity);
 
       Token name_token = macro.name();
       std::string_view macro_name = name_token.data();
-      if (macro_name.empty() ||
-          (exact_name && macro_name != name_as_std_string)) {
+      if (macro_name.empty()) {
+        continue;
+      }
+
+      auto skip_entity{true};
+      if (query_mode == IDatabase::QueryEntitiesMode::ExactMatch) {
+        skip_entity = macro_name != std_string;
+      } else {
+        skip_entity = macro_name.find(std_string) == 0;
+      }
+
+      if (skip_entity) {
         continue;
       }
 
