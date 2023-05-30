@@ -40,7 +40,7 @@ Database::RequestEntityInformation(RawEntityId entity_id) {
 QFuture<VariantEntity> Database::RequestCanonicalEntity(RawEntityId entity_id) {
   return QtConcurrent::run(
       QThreadPool::globalInstance(),
-      [] (const Index &index, RawEntityId eid) -> VariantEntity {
+      [](const Index &index, RawEntityId eid) -> VariantEntity {
         VariantEntity ent = index.entity(eid);
         if (std::holds_alternative<Decl>(ent)) {
           return std::get<Decl>(ent).canonical_declaration();
@@ -70,10 +70,10 @@ Database::GetRelatedEntities(RawEntityId entity_id) {
 }
 
 QFuture<bool> Database::QueryEntities(QueryEntitiesReceiver &receiver,
-                                      const QString &name,
-                                      const bool &exact_name) {
+                                      const QString &string,
+                                      const QueryEntitiesMode &query_mode) {
   return QtConcurrent::run(QThreadPool::globalInstance(), GetEntityList,
-                           d->index, &receiver, name, exact_name);
+                           d->index, &receiver, string, query_mode);
 }
 
 Database::Database(const Index &index,

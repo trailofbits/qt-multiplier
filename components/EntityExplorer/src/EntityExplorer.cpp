@@ -21,6 +21,7 @@
 #include <QPalette>
 #include <QSortFilterProxyModel>
 #include <QVBoxLayout>
+#include <QRadioButton>
 
 namespace mx::gui {
 
@@ -31,7 +32,8 @@ struct EntityExplorer::PrivateData final {
   QListView *list_view{nullptr};
 
   QLineEdit *search_input{nullptr};
-  QCheckBox *exact_search{nullptr};
+  QRadioButton *exact_match_radio{nullptr};
+  QRadioButton *containing_radio{nullptr};
 };
 
 EntityExplorer::~EntityExplorer() {}
@@ -60,7 +62,7 @@ void EntityExplorer::InitializeWidgets() {
   connect(d->filter_widget, &ISearchWidget::SearchParametersChanged, this,
           &EntityExplorer::OnSearchParametersChange);
 
-  auto search_parameters_layout = new QHBoxLayout();
+  auto search_parameters_layout = new QVBoxLayout();
 
   d->search_input = new QLineEdit(this);
   d->search_input->setClearButtonEnabled(true);
@@ -71,12 +73,22 @@ void EntityExplorer::InitializeWidgets() {
 
   search_parameters_layout->addWidget(d->search_input);
 
-  d->exact_search = new QCheckBox(tr("Exact"), this);
+  auto query_mode_layout = new QHBoxLayout();
+  d->exact_match_radio = new QRadioButton(tr("Exact match"), this);
+  query_mode_layout->addWidget(d->exact_match_radio);
 
-  connect(d->exact_search, &QCheckBox::stateChanged, this,
+  d->exact_match_radio->setChecked(true);
+
+  connect(d->exact_match_radio, &QRadioButton::toggled, this,
           &EntityExplorer::QueryParametersChanged);
 
-  search_parameters_layout->addWidget(d->exact_search);
+  d->containing_radio = new QRadioButton(tr("Containing"), this);
+  query_mode_layout->addWidget(d->containing_radio);
+
+  connect(d->containing_radio, &QRadioButton::toggled, this,
+          &EntityExplorer::QueryParametersChanged);
+
+  search_parameters_layout->addLayout(query_mode_layout);
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
@@ -183,7 +195,18 @@ void EntityExplorer::QueryParametersChanged() {
     return;
   }
 
-  d->model->Search(d->search_input->text(), d->exact_search->isChecked());
+  std::optional<IEntityExplorerModel::SearchMode> opt_search_mode;
+  if (d->exact_match_radio->isChecked()) {
+    opt_search_mode = IEntityExplorerModel::SearchMode::ExactMatch;
+
+  } else if (d->containing_radio->isChecked()) {
+    opt_search_mode = IEntityExplorerModel::SearchMode::Containing;
+  }
+
+  Assert(opt_search_mode.has_value(),
+         "Invalid query mode state in the Entity Explorer widget");
+
+  d->model->Search(d->search_input->text(), opt_search_mode.value());
 }
 
 void EntityExplorer::OnCategoryChange(

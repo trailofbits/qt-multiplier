@@ -161,11 +161,16 @@ int EntityExplorerModel::columnCount(const QModelIndex &) const {
   return 1;
 }
 
-void EntityExplorerModel::Search(const QString &name, const bool &exact_name) {
+void EntityExplorerModel::Search(const QString &name,
+                                 const SearchMode &search_mode) {
   CancelSearch();
 
+  auto query_mode = search_mode == SearchMode::ExactMatch
+                        ? IDatabase::QueryEntitiesMode::ExactMatch
+                        : IDatabase::QueryEntitiesMode::ContainingString;
+
   d->request_status_future =
-      d->database->QueryEntities(*this, name, exact_name);
+      d->database->QueryEntities(*this, name, query_mode);
 
   d->future_watcher.setFuture(d->request_status_future);
 
