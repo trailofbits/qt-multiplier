@@ -37,6 +37,7 @@
 #include <QShortcut>
 #include <QTreeView>
 #include <QColorDialog>
+#include <QActionGroup>
 
 namespace mx::gui {
 
@@ -86,6 +87,7 @@ struct MainWindow::PrivateData final {
 
   IReferenceExplorer::Mode ref_explorer_mode{
       IReferenceExplorer::Mode::TextView};
+  bool enable_quick_ref_explorer_code_preview{false};
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
 
@@ -142,33 +144,13 @@ void MainWindow::InitializeWidgets() {
   d->enable_code_preview_action->setChecked(false);
   d->view_menu->addAction(d->enable_code_preview_action);
 
-  auto ref_explorer_view_menu = new QMenu(tr("Reference Explorer"));
-  d->view_menu->addMenu(ref_explorer_view_menu);
-
-  auto ref_explorer_text_mode = new QAction(tr("Text mode"));
-  ref_explorer_text_mode->setData(
-      static_cast<int>(IReferenceExplorer::Mode::TextView));
-  ref_explorer_view_menu->addAction(ref_explorer_text_mode);
-
-  auto ref_explorer_tree_mode = new QAction(tr("Tree view"));
-  ref_explorer_tree_mode->setData(
-      static_cast<int>(IReferenceExplorer::Mode::TreeView));
-  ref_explorer_view_menu->addAction(ref_explorer_tree_mode);
-
-  auto ref_explorer_split_mode = new QAction(tr("Split"));
-  ref_explorer_split_mode->setData(
-      static_cast<int>(IReferenceExplorer::Mode::Split));
-  ref_explorer_view_menu->addAction(ref_explorer_split_mode);
-
-  connect(ref_explorer_view_menu, &QMenu::triggered, this,
-          &MainWindow::OnRefExplorerModeSelected);
-
   setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
   setTabPosition(Qt::RightDockWidgetArea, QTabWidget::East);
   setTabPosition(Qt::TopDockWidgetArea, QTabWidget::North);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
+  CreateRefExplorerMenuOptions();
   CreateGlobalHighlighter();
   CreateProjectExplorerDock();
   CreateEntityExplorerDock();
@@ -400,7 +382,8 @@ void MainWindow::OpenReferenceExplorer(
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache, entity_id, expansion_mode,
-      d->ref_explorer_mode, *d->global_highlighter, this);
+      d->ref_explorer_mode, d->enable_quick_ref_explorer_code_preview,
+      *d->global_highlighter, this);
 
   connect(d->quick_ref_explorer.get(),
           &QuickReferenceExplorer::SaveReferenceExplorer, this,
@@ -528,6 +511,52 @@ void MainWindow::CloseCodePreviewPopup() {
 void MainWindow::CloseAllPopups() {
   CloseQuickRefExplorerPopup();
   CloseCodePreviewPopup();
+}
+
+void MainWindow::CreateRefExplorerMenuOptions() {
+  auto main_menu = new QMenu(tr("Reference Explorer"));
+  d->view_menu->addMenu(main_menu);
+
+  auto mode_menu = new QMenu(tr("Mode"));
+  main_menu->addMenu(mode_menu);
+
+  connect(mode_menu, &QMenu::triggered, this,
+          &MainWindow::OnRefExplorerModeSelected);
+
+  auto mode_action_group = new QActionGroup(this);
+
+  for (const auto &mode :
+       {IReferenceExplorer::Mode::TextView, IReferenceExplorer::Mode::TreeView,
+        IReferenceExplorer::Mode::Split}) {
+
+    QString label;
+    switch (mode) {
+      case IReferenceExplorer::Mode::TextView: label = tr("Text view"); break;
+
+      case IReferenceExplorer::Mode::TreeView: label = tr("Tree view"); break;
+
+      case IReferenceExplorer::Mode::Split: label = tr("Split"); break;
+    }
+
+    auto mode_action = new QAction(label);
+    mode_action_group->addAction(mode_action);
+
+    mode_action->setData(static_cast<int>(mode));
+    mode_action->setCheckable(true);
+    if (mode == d->ref_explorer_mode) {
+      mode_action->setChecked(true);
+    }
+
+    mode_menu->addAction(mode_action);
+  }
+
+  auto code_preview_action = new QAction(tr("Enable code preview"));
+  code_preview_action->setCheckable(true);
+  code_preview_action->setChecked(d->enable_quick_ref_explorer_code_preview);
+  main_menu->addAction(code_preview_action);
+
+  connect(code_preview_action, &QAction::toggled, this,
+          &MainWindow::OnRefExplorerCodePreviewToggled);
 }
 
 ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
@@ -979,6 +1008,8 @@ void MainWindow::OnRefExplorerModeSelected(QAction *action) {
   auto ref_explorer_int_mode = action->data().toInt();
   d->ref_explorer_mode =
       static_cast<IReferenceExplorer::Mode>(ref_explorer_int_mode);
+
+  action->setChecked(true);
 }
 
 void MainWindow::OnSetDarkTheme() {
@@ -987,6 +1018,10 @@ void MainWindow::OnSetDarkTheme() {
 
 void MainWindow::OnSetLightTheme() {
   mx::gui::IThemeManager::Get().SetTheme(false);
+}
+
+void MainWindow::OnRefExplorerCodePreviewToggled(const bool &checked) {
+  d->enable_quick_ref_explorer_code_preview = checked;
 }
 
 }  // namespace mx::gui

@@ -24,8 +24,8 @@ class QuickReferenceExplorer final : public QWidget {
       const Index &index, const FileLocationCache &file_location_cache,
       RawEntityId entity_id,
       const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-      const IReferenceExplorer::Mode &mode, IGlobalHighlighter &highlighter,
-      QWidget *parent = nullptr);
+      const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
+      IGlobalHighlighter &highlighter, QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickReferenceExplorer() override;
@@ -71,7 +71,8 @@ class QuickReferenceExplorer final : public QWidget {
       const Index &index, const FileLocationCache &file_location_cache,
       RawEntityId entity_id,
       const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-      const IReferenceExplorer::Mode &mode, IGlobalHighlighter &highlighter);
+      const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
+      IGlobalHighlighter &highlighter);
 
   //! Used to start window dragging
   void OnTitleFrameMousePress(QMouseEvent *event);

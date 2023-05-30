@@ -55,6 +55,9 @@ class MainWindow final : public QMainWindow {
   void CloseCodePreviewPopup();
   void CloseAllPopups();
 
+  //! Creates the menus needed to configure the reference explorer
+  void CreateRefExplorerMenuOptions();
+
   //! Tell the history back/forward button widget that our current location has
   //! changed.
   void UpdateLocatiomFromWidget(QWidget *widget);
@@ -113,6 +116,9 @@ class MainWindow final : public QMainWindow {
 
   //! Called when the view->theme->light action is selected
   void OnSetLightTheme();
+
+  //! Called when toggling the code preview setting of the ref explorer
+  void OnRefExplorerCodePreviewToggled(const bool &checked);
 };
 
 }  // namespace mx::gui

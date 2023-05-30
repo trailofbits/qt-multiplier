@@ -51,8 +51,8 @@ QuickReferenceExplorer::QuickReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
     RawEntityId entity_id,
     const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-    const IReferenceExplorer::Mode &mode, IGlobalHighlighter &highlighter,
-    QWidget *parent)
+    const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
+    IGlobalHighlighter &highlighter, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
@@ -62,7 +62,7 @@ QuickReferenceExplorer::QuickReferenceExplorer(
           &QuickReferenceExplorer::EntityNameFutureStatusChanged);
 
   InitializeWidgets(index, file_location_cache, entity_id, expansion_mode, mode,
-                    highlighter);
+                    show_code_preview, highlighter);
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
           &QuickReferenceExplorer::OnThemeChange);
@@ -127,7 +127,8 @@ void QuickReferenceExplorer::InitializeWidgets(
     const Index &index, const FileLocationCache &file_location_cache,
     RawEntityId entity_id,
     const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-    const IReferenceExplorer::Mode &mode, IGlobalHighlighter &highlighter) {
+    const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
+    IGlobalHighlighter &highlighter) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -192,7 +193,8 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->model->AppendEntityById(entity_id, expansion_mode, QModelIndex());
 
   d->reference_explorer = new PreviewableReferenceExplorer(
-      index, file_location_cache, d->model, mode, highlighter, this);
+      index, file_location_cache, d->model, mode, show_code_preview,
+      highlighter, this);
 
   connect(d->reference_explorer,
           &PreviewableReferenceExplorer::SelectedItemChanged, this,

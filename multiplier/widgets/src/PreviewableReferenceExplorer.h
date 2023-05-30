@@ -24,6 +24,7 @@ class PreviewableReferenceExplorer final : public QWidget {
                                const FileLocationCache &file_location_cache,
                                IReferenceExplorerModel *model,
                                const IReferenceExplorer::Mode &mode,
+                               const bool &show_code_preview,
                                IGlobalHighlighter &highlighter,
                                QWidget *parent = nullptr);
 
@@ -49,6 +50,7 @@ class PreviewableReferenceExplorer final : public QWidget {
                          mx::FileLocationCache file_location_cache,
                          IReferenceExplorerModel *model,
                          const IReferenceExplorer::Mode &mode,
+                         const bool &show_code_preview,
                          IGlobalHighlighter &highlighter);
 
   //! Schedules a post-update scroll-to-line operation
