@@ -32,11 +32,13 @@ struct PreviewableReferenceExplorer::PrivateData final {
 PreviewableReferenceExplorer::PreviewableReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
     IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
-    IGlobalHighlighter &highlighter, QWidget *parent)
+    const bool &show_code_preview, IGlobalHighlighter &highlighter,
+    QWidget *parent)
     : QWidget(parent),
       d(new PrivateData()) {
 
-  InitializeWidgets(index, file_location_cache, model, mode, highlighter);
+  InitializeWidgets(index, file_location_cache, model, mode, show_code_preview,
+                    highlighter);
 }
 
 PreviewableReferenceExplorer::~PreviewableReferenceExplorer() {}
@@ -48,7 +50,7 @@ IReferenceExplorerModel *PreviewableReferenceExplorer::Model() {
 void PreviewableReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
     IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
-    IGlobalHighlighter &highlighter) {
+    const bool &show_code_preview, IGlobalHighlighter &highlighter) {
 
   d->reference_explorer =
       IReferenceExplorer::Create(model, mode, this, &highlighter);
@@ -78,9 +80,11 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   d->splitter->addWidget(d->reference_explorer);
   d->splitter->addWidget(d->code_view);
 
-  const auto &primary_screen = *QGuiApplication::primaryScreen();
-  auto screen_width = primary_screen.virtualSize().width();
-  d->splitter->setSizes({screen_width, 0});
+  if (!show_code_preview) {
+    const auto &primary_screen = *QGuiApplication::primaryScreen();
+    auto screen_width = primary_screen.virtualSize().width();
+    d->splitter->setSizes({screen_width, 0});
+  }
 
   setContentsMargins(0, 0, 0, 0);
 
