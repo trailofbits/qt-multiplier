@@ -59,6 +59,9 @@ class QuickReferenceExplorer final : public QWidget {
   //! Used to handle window movements
   virtual bool eventFilter(QObject *obj, QEvent *event) override;
 
+  //! Used to update the size grip position
+  virtual void resizeEvent(QResizeEvent *event) override;
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;

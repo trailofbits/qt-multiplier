@@ -21,6 +21,8 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <QFutureWatcher>
+#include <QSizeGrip>
+#include <QGridLayout>
 
 #include <optional>
 
@@ -33,6 +35,7 @@ struct QuickReferenceExplorer::PrivateData final {
 
   QPushButton *close_button{nullptr};
   QPushButton *save_to_new_ref_explorer_button{nullptr};
+  QSizeGrip *size_grip{nullptr};
 
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
@@ -109,6 +112,15 @@ bool QuickReferenceExplorer::eventFilter(QObject *, QEvent *event) {
   }
 
   return false;
+}
+
+void QuickReferenceExplorer::resizeEvent(QResizeEvent *event) {
+  QPoint size_grip_pos(width() - d->size_grip->width(),
+                       height() - d->size_grip->height());
+
+  d->size_grip->move(size_grip_pos);
+
+  QWidget::resizeEvent(event);
 }
 
 void QuickReferenceExplorer::InitializeWidgets(
@@ -193,7 +205,7 @@ void QuickReferenceExplorer::InitializeWidgets(
                                        QSizePolicy::Expanding);
 
   auto contents_layout = new QVBoxLayout();
-  contents_layout->setContentsMargins(0, 0, 0, 0);
+  contents_layout->setContentsMargins(2, 2, 2, 2);
   contents_layout->addWidget(d->reference_explorer);
 
   //
@@ -204,6 +216,9 @@ void QuickReferenceExplorer::InitializeWidgets(
   main_layout->setContentsMargins(0, 0, 0, 0);
   main_layout->addWidget(title_frame);
   main_layout->addLayout(contents_layout);
+
+  d->size_grip = new QSizeGrip(this);
+  d->size_grip->resize(12, 12);
 
   setLayout(main_layout);
 }

@@ -74,6 +74,7 @@ void PreviewableReferenceExplorer::InitializeWidgets(
           &PreviewableReferenceExplorer::TokenTriggered);
 
   d->splitter = new QSplitter(Qt::Horizontal, this);
+  d->splitter->setHandleWidth(6);
   d->splitter->addWidget(d->reference_explorer);
   d->splitter->addWidget(d->code_view);
 
