@@ -63,6 +63,7 @@ void ReferenceExplorer::InitializeWidgets(
   setContentsMargins(0, 0, 0, 0);
 
   auto splitter = new QSplitter(Qt::Vertical, this);
+  splitter->setHandleWidth(6);
   splitter->setContentsMargins(0, 0, 0, 0);
   splitter->addWidget(d->graphical_view);
   splitter->addWidget(d->text_view);
