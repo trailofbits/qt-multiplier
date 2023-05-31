@@ -559,8 +559,9 @@ void MainWindow::CreateRefExplorerMenuOptions() {
           &MainWindow::OnRefExplorerCodePreviewToggled);
 }
 
-ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
-                                         QString tab_name) {
+ICodeView *
+MainWindow::CreateNewCodeView(RawEntityId file_entity_id, QString tab_name,
+                              const std::optional<QString> &opt_file_path) {
 
   auto code_model = ICodeModel::Create(d->file_location_cache, d->index, this);
   auto proxy_model = d->global_highlighter->CreateModelProxy(
@@ -579,7 +580,13 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   code_view->setProperty(kFileIdProperty, static_cast<quint64>(file_entity_id));
 
   auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
+
+  auto tab_index = central_tab_widget->count();
   central_tab_widget->addTab(code_view, tab_name);
+
+  if (opt_file_path.has_value()) {
+    central_tab_widget->setTabToolTip(tab_index, opt_file_path.value());
+  }
 
   connect(code_view, &ICodeView::TokenTriggered, this,
           &MainWindow::OnTokenTriggered);
@@ -590,9 +597,10 @@ ICodeView *MainWindow::CreateNewCodeView(RawEntityId file_entity_id,
   return code_view;
 }
 
-ICodeView *
-MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
-                                    std::optional<QString> opt_tab_name) {
+ICodeView *MainWindow::GetOrCreateFileCodeView(
+    RawEntityId file_id, std::optional<QString> opt_tab_name,
+    const std::optional<QString> &opt_file_path) {
+
   QTabWidget *tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
 
   for (auto i = 0; i < tab_widget->count(); ++i) {
@@ -608,7 +616,7 @@ MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
   }
 
   if (opt_tab_name.has_value()) {
-    return CreateNewCodeView(file_id, opt_tab_name.value());
+    return CreateNewCodeView(file_id, opt_tab_name.value(), opt_file_path);
   }
 
   for (auto [path, id] : d->index.file_paths()) {
@@ -617,7 +625,8 @@ MainWindow::GetOrCreateFileCodeView(RawEntityId file_id,
     }
 
     QString tab_name = QString::fromStdString(path.filename().generic_string());
-    return CreateNewCodeView(file_id, tab_name);
+    QString file_path = QString::fromStdString(path.generic_string());
+    return CreateNewCodeView(file_id, tab_name, file_path);
   }
 
   return nullptr;
@@ -705,14 +714,13 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
 
 void MainWindow::OnProjectExplorerFileClicked(RawEntityId file_id,
                                               QString tab_name,
-                                              Qt::KeyboardModifiers,
-                                              Qt::MouseButtons) {
+                                              const QString &file_path) {
   CloseAllPopups();
   OpenEntityInfo(file_id);
 
   auto *central_tab_widget = dynamic_cast<QTabWidget *>(centralWidget());
   QWidget *current_tab = central_tab_widget->currentWidget();
-  QWidget *next_tab = GetOrCreateFileCodeView(file_id, tab_name);
+  QWidget *next_tab = GetOrCreateFileCodeView(file_id, tab_name, file_path);
   if (!next_tab) {
     return;
   }

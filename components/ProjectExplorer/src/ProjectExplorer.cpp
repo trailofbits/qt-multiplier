@@ -228,8 +228,10 @@ void ProjectExplorer::OnFileTreeItemClicked(const QModelIndex &index) {
 
   const auto file_id = qvariant_cast<RawEntityId>(opt_file_id_var);
   auto file_name_var = d->model_proxy->data(index);
-  emit FileClicked(file_id, file_name_var.toString(), qApp->keyboardModifiers(),
-                   qApp->mouseButtons());
+  auto file_path_var =
+      d->model_proxy->data(index, IFileTreeModel::AbsolutePathRole);
+
+  emit FileClicked(file_id, file_name_var.toString(), file_path_var.toString());
 }
 
 void ProjectExplorer::OnSearchParametersChange(

@@ -62,18 +62,19 @@ class MainWindow final : public QMainWindow {
   //! changed.
   void UpdateLocatiomFromWidget(QWidget *widget);
 
-  ICodeView *CreateNewCodeView(RawEntityId file_entity_id, QString tab_name);
-
   ICodeView *
-  GetOrCreateFileCodeView(RawEntityId file_id,
-                          std::optional<QString> opt_tab_name = std::nullopt);
+  CreateNewCodeView(RawEntityId file_entity_id, QString tab_name,
+                    const std::optional<QString> &opt_file_path = std::nullopt);
+
+  ICodeView *GetOrCreateFileCodeView(
+      RawEntityId file_id, std::optional<QString> opt_tab_name = std::nullopt,
+      const std::optional<QString> &opt_file_path = std::nullopt);
 
  private slots:
   //! Called when a file name in the project explorer (list of indexed files) is
   //! clicked.
   void OnProjectExplorerFileClicked(RawEntityId file_id, QString file_name,
-                                    Qt::KeyboardModifiers modifiers,
-                                    Qt::MouseButtons buttons);
+                                    const QString &file_path);
 
   //! Called when we interact with a token in a main file view, or in a code
   //! preview, e.g. a reference browser code view.
