@@ -38,15 +38,35 @@ struct ContextMenu final {
   QAction *sort_descending_order{nullptr};
 };
 
+void SaveExpandedNodeListHelper(std::vector<QModelIndex> &expanded_node_list,
+                                const QTreeView &tree_view,
+                                const QModelIndex &root) {
+
+  const auto &model = *tree_view.model();
+
+  for (int i = 0; i < model.rowCount(root); ++i) {
+    auto index = model.index(i, 0, root);
+
+    if (tree_view.isExpanded(index)) {
+      expanded_node_list.push_back(index);
+    }
+
+    SaveExpandedNodeListHelper(expanded_node_list, tree_view, index);
+  }
+}
+
 }  // namespace
 
 struct ProjectExplorer::PrivateData final {
   IFileTreeModel *model{nullptr};
   QSortFilterProxyModel *model_proxy{nullptr};
+  std::vector<QModelIndex> expanded_node_list;
+
   QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
-  ContextMenu context_menu;
   QWidget *alternative_root_warning{nullptr};
+
+  ContextMenu context_menu;
 };
 
 ProjectExplorer::~ProjectExplorer() {}
@@ -75,6 +95,12 @@ void ProjectExplorer::InitializeWidgets() {
   d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
   connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
           &ProjectExplorer::OnSearchParametersChange);
+
+  connect(d->search_widget, &ISearchWidget::Activated, this,
+          &ProjectExplorer::OnStartSearching);
+
+  connect(d->search_widget, &ISearchWidget::Deactivated, this,
+          &ProjectExplorer::OnStopSearching);
 
   // Create the alternative root item warning
   auto root_warning_label = new QLabel();
@@ -164,6 +190,28 @@ void ProjectExplorer::InstallModel(IFileTreeModel *model) {
   OnModelReset();
 }
 
+std::vector<QModelIndex> ProjectExplorer::SaveExpandedNodeList() {
+  std::vector<QModelIndex> expanded_node_list;
+  SaveExpandedNodeListHelper(expanded_node_list, *d->tree_view, QModelIndex());
+
+  for (auto &expanded_node : expanded_node_list) {
+    expanded_node = d->model_proxy->mapToSource(expanded_node);
+  }
+
+  return expanded_node_list;
+}
+
+void ProjectExplorer::ApplyExpandedNodeList(
+    const std::vector<QModelIndex> &expanded_node_list) {
+
+  d->tree_view->collapseAll();
+
+  for (auto expanded_node : expanded_node_list) {
+    expanded_node = d->model_proxy->mapFromSource(expanded_node);
+    d->tree_view->expand(expanded_node);
+  }
+}
+
 //! Try to open the file related to a specific model index.
 void ProjectExplorer::SelectionChanged(const QModelIndex &index,
                                        const QModelIndex &) {
@@ -213,7 +261,6 @@ void ProjectExplorer::OnSearchParametersChange(
   selection_model.select(QModelIndex(), QItemSelectionModel::Clear);
 
   d->model_proxy->setFilterRegularExpression(regex);
-
   d->tree_view->expandRecursively(QModelIndex());
   d->tree_view->resizeColumnToContents(0);
 }
@@ -290,15 +337,23 @@ void ProjectExplorer::OnContextMenuActionTriggered(QAction *action) {
 }
 
 void ProjectExplorer::OnModelReset() {
+  d->expanded_node_list.clear();
+
   auto display_root_warning = d->model->HasAlternativeRoot();
   d->alternative_root_warning->setVisible(display_root_warning);
-
-  d->tree_view->expandRecursively(QModelIndex());
-  d->tree_view->resizeColumnToContents(0);
 }
 
 void ProjectExplorer::OnDisableCustomRootLinkClicked() {
   d->model->SetDefaultRoot();
+}
+
+void ProjectExplorer::OnStartSearching() {
+  d->expanded_node_list = SaveExpandedNodeList();
+}
+
+void ProjectExplorer::OnStopSearching() {
+  ApplyExpandedNodeList(d->expanded_node_list);
+  d->expanded_node_list.clear();
 }
 
 }  // namespace mx::gui
