@@ -810,7 +810,7 @@ void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
 void MainWindow::OnHistoryNavigationEntitySelected(RawEntityId,
                                                    RawEntityId canonical_id) {
   CloseAllPopups();
-  OpenEntityInfo(canonical_id);
+  // OpenEntityInfo(canonical_id);
   OpenEntityCode(canonical_id);
 }
 
