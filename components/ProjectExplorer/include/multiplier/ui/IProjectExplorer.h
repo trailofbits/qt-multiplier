@@ -38,7 +38,7 @@ class IProjectExplorer : public QWidget {
  signals:
   //! Emitted when a file has been clicked
   void FileClicked(RawEntityId file_id, QString file_name,
-                   Qt::KeyboardModifiers modifiers, Qt::MouseButtons buttons);
+                   const QString &file_path);
 };
 
 }  // namespace mx::gui
