@@ -111,6 +111,12 @@ class CodeView final : public ICodeView {
   //! Scrolls the view to the specified entity id (internal)
   bool ScrollToLineNumberInternal(unsigned line);
 
+  //! Sets the given text zoom
+  void SetZoom(const qreal &font_point_size);
+
+  //! Sets the given text zoom delta
+  void SetZoomDelta(const qreal &font_point_size_delta);
+
  public:
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
@@ -217,6 +223,15 @@ class CodeView final : public ICodeView {
   //! Called by the theme manager
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);
+
+  //! Called by the zoom-in shortcut
+  void OnZoomIn();
+
+  //! Called by the zoom-out shortcut
+  void OnZoomOut();
+
+  //! Called by the reset zoom shortcut
+  void OnResetZoom();
 
   friend class ICodeView;
 };

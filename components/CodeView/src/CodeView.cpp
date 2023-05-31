@@ -78,6 +78,11 @@ struct CodeView::PrivateData final {
   QShortcut *go_to_line_shortcut{nullptr};
   GoToLineWidget *go_to_line_widget{nullptr};
 
+  qreal default_font_point_size{};
+  QShortcut *zoom_in_shortcut{nullptr};
+  QShortcut *zoom_out_shortcut{nullptr};
+  QShortcut *reset_zoom_shortcut{nullptr};
+
   std::optional<unsigned> deferred_scroll_to_line;
   QList<QTextEdit::ExtraSelection> extra_selection_list;
 };
@@ -88,6 +93,8 @@ void CodeView::SetTheme(const CodeViewTheme &theme) {
   QFont font(d->theme.font_name);
   font.setStyleHint(QFont::TypeWriter);
   setFont(font);
+
+  d->default_font_point_size = font.pointSizeF();
 
   auto palette = d->text_edit->palette();
   palette.setColor(QPalette::Window, d->theme.default_background_color);
@@ -175,11 +182,11 @@ void CodeView::SetWordWrapping(bool enabled) {
 
 bool CodeView::ScrollToLineNumber(unsigned line) {
 
-  auto model_state_var = d->model->data(QModelIndex(),
-                                        ICodeModel::ModelStateRole);
+  auto model_state_var =
+      d->model->data(QModelIndex(), ICodeModel::ModelStateRole);
   Assert(model_state_var.isValid(), "This should always work");
-  ICodeModel::ModelState state = static_cast<ICodeModel::ModelState>(
-      model_state_var.toInt());
+  ICodeModel::ModelState state =
+      static_cast<ICodeModel::ModelState>(model_state_var.toInt());
 
   if (state == ICodeModel::ModelState::Ready) {
     d->deferred_scroll_to_line.reset();
@@ -348,6 +355,21 @@ void CodeView::InitializeWidgets() {
   connect(d->go_to_line_widget, &GoToLineWidget::LineNumberChanged, this,
           &CodeView::OnGoToLine);
 
+  // Initialize the zoom shortcuts. The reset zoom does not have a standard
+  // keybinding. Most programs use CTRL+Numpad0 but it is not uncommon
+  // to lack a numpad nowdays. Rebind it to CTRL+0 like browsers do.
+  d->zoom_in_shortcut =
+      new QShortcut(QKeySequence::ZoomIn, this, this, &CodeView::OnZoomIn,
+                    Qt::WidgetWithChildrenShortcut);
+
+  d->zoom_out_shortcut =
+      new QShortcut(QKeySequence::ZoomOut, this, this, &CodeView::OnZoomOut,
+                    Qt::WidgetWithChildrenShortcut);
+
+  d->reset_zoom_shortcut =
+      new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this, this,
+                    &CodeView::OnResetZoom, Qt::WidgetWithChildrenShortcut);
+
   // This will also cause a model reset update
   const auto &theme = IThemeManager::Get().GetCodeViewTheme();
   SetTheme(theme);
@@ -509,18 +531,7 @@ void CodeView::OnTextEditTextZoom(QWheelEvent *event) {
     return;
   }
 
-  auto font = d->text_edit->font();
-
-  qreal point_size = font.pointSizeF() + delta;
-  if (point_size <= 0.0) {
-    return;
-  }
-
-  font.setPointSizeF(point_size);
-  setFont(font);
-
-  UpdateTabStopDistance();
-  UpdateGutterWidth();
+  SetZoomDelta(delta);
 }
 
 void CodeView::UpdateTabStopDistance() {
@@ -902,11 +913,11 @@ void CodeView::OnModelReset() {
   // If there was a request to scroll to a line, but the document wasn't ready
   // at the time of the request, then enact the scroll now.
   if (d->deferred_scroll_to_line.has_value()) {
-    auto model_state_var = d->model->data(QModelIndex(),
-                                          ICodeModel::ModelStateRole);
+    auto model_state_var =
+        d->model->data(QModelIndex(), ICodeModel::ModelStateRole);
     Assert(model_state_var.isValid(), "This should always work");
-    ICodeModel::ModelState state = static_cast<ICodeModel::ModelState>(
-        model_state_var.toInt());
+    ICodeModel::ModelState state =
+        static_cast<ICodeModel::ModelState>(model_state_var.toInt());
     if (state == ICodeModel::ModelState::Ready) {
       auto line_number = d->deferred_scroll_to_line.value();
       d->deferred_scroll_to_line = std::nullopt;
@@ -1010,6 +1021,28 @@ bool CodeView::ScrollToLineNumberInternal(unsigned line) {
   return SetCursorPosition(text_block.position(), std::nullopt);
 }
 
+void CodeView::SetZoom(const qreal &font_point_size) {
+  auto font = this->font();
+  font.setPointSizeF(font_point_size);
+
+  setFont(font);
+  d->text_edit->setFont(font);
+  d->gutter->setFont(font);
+
+  UpdateTabStopDistance();
+  UpdateGutterWidth();
+}
+
+void CodeView::SetZoomDelta(const qreal &font_point_size_delta) {
+  auto font = this->font();
+  auto font_point_size = font.pointSizeF() + font_point_size_delta;
+  if (font_point_size <= 1.0 || font_point_size >= 100) {
+    return;
+  }
+
+  SetZoom(font_point_size);
+}
+
 void CodeView::OnCursorMoved(void) {
   HandleNewCursor(d->text_edit->textCursor());
 }
@@ -1092,6 +1125,18 @@ void CodeView::OnGoToLine(unsigned line_number) {
 void CodeView::OnThemeChange(const QPalette &,
                              const CodeViewTheme &code_view_theme) {
   SetTheme(code_view_theme);
+}
+
+void CodeView::OnZoomIn() {
+  SetZoomDelta(1.0);
+}
+
+void CodeView::OnZoomOut() {
+  SetZoomDelta(-1.0);
+}
+
+void CodeView::OnResetZoom() {
+  SetZoom(d->default_font_point_size);
 }
 
 }  // namespace mx::gui
