@@ -34,8 +34,13 @@ class ProjectExplorer final : public IProjectExplorer {
   //! Installs the model, updating the UI state
   void InstallModel(IFileTreeModel *model);
 
- private slots:
+  //! Returns the list of nodes that have been expanded
+  std::vector<QModelIndex> SaveExpandedNodeList();
 
+  //! Expands the given set of model nodes
+  void ApplyExpandedNodeList(const std::vector<QModelIndex> &index_list);
+
+ private slots:
   //! Try to open the file related to a specific model index.
   void SelectionChanged(const QModelIndex &index, const QModelIndex &previous);
 
@@ -57,6 +62,12 @@ class ProjectExplorer final : public IProjectExplorer {
 
   //! Called when the user disables the custom root item from the warning widget
   void OnDisableCustomRootLinkClicked();
+
+  //! Called right after search is enabled to save the node expansion status
+  void OnStartSearching();
+
+  //! Called right after search is disabled to restore the node expansion status
+  void OnStopSearching();
 
   friend class IProjectExplorer;
 };

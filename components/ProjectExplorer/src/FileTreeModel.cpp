@@ -420,7 +420,7 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
     return QVariant();
   }
 
-  if (role == AbsolutePathRole) {
+  if (role == AbsolutePathRole || role == Qt::ToolTipRole) {
     return GetNodeAbsolutePath(d->node_map, node_id);
 
   } else if (role == InternalIdentifierRole) {
