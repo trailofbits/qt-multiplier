@@ -434,7 +434,7 @@ void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
   if (!related_entity_id_var.isValid()) {
     CloseAllPopups();
     return;
-  
+  }
 
   OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
                         IReferenceExplorerModel::CallHierarchyMode);
