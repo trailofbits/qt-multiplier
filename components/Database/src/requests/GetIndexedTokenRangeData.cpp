@@ -17,7 +17,7 @@
 #include <multiplier/Entities/Stmt.h>
 #include <multiplier/Entities/Token.h>
 #include <multiplier/ui/Assert.h>
-#include <multiplier/Analysis/TokenTree.h>
+#include <multiplier/TokenTree.h>
 
 namespace mx::gui {
 namespace {
