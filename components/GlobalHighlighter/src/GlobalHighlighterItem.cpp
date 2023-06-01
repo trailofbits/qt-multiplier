@@ -23,6 +23,9 @@ struct GlobalHighlighterItem::PrivateData final {
   //! The main raw entity id for this highlight
   RawEntityId entity_id;
 
+  //! The label containing the entity name
+  QLabel *entity_name{nullptr};
+
   //! The highlight color
   QColor color;
 
@@ -35,6 +38,14 @@ struct GlobalHighlighterItem::PrivateData final {
 
 GlobalHighlighterItem::~GlobalHighlighterItem() {}
 
+bool GlobalHighlighterItem::eventFilter(QObject *object, QEvent *event) {
+  if (object == d->entity_name && event->type() == QEvent::MouseButtonPress) {
+    emit EntityClicked(d->entity_id);
+  }
+
+  return false;
+}
+
 GlobalHighlighterItem::GlobalHighlighterItem(const RawEntityId &entity_id,
                                              const QString &label,
                                              const QColor &color,
@@ -45,8 +56,13 @@ GlobalHighlighterItem::GlobalHighlighterItem(const RawEntityId &entity_id,
   d->entity_id = entity_id;
   d->color = color;
 
+  setContentsMargins(0, 0, 0, 0);
+
   auto layout = new QHBoxLayout();
-  layout->addWidget(new QLabel(label));
+
+  d->entity_name = new QLabel(label);
+  d->entity_name->installEventFilter(this);
+  layout->addWidget(d->entity_name);
 
   d->change_color_button = new QPushButton("");
   layout->addWidget(d->change_color_button);

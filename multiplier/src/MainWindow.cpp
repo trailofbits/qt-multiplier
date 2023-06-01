@@ -155,12 +155,12 @@ void MainWindow::InitializeWidgets() {
 
   CreateMacroExplorerDock();
   CreateRefExplorerMenuOptions();
-  CreateGlobalHighlighter();
   CreateProjectExplorerDock();
   CreateEntityExplorerDock();
   CreateInfoExplorerDock();
   CreateCodeView();
   CreateReferenceExplorerDock();
+  CreateGlobalHighlighter();
 
   tabifyDockWidget(d->project_explorer_dock, d->entity_explorer_dock);
   tabifyDockWidget(d->entity_explorer_dock, d->macro_explorer_dock);
@@ -210,7 +210,7 @@ void MainWindow::CreateEntityExplorerDock() {
   d->entity_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
 
   connect(d->entity_explorer, &IEntityExplorer::EntityAction, this,
-          &MainWindow::OnEntityExplorerEntityClicked);
+          &MainWindow::OnOpenEntity);
 
   d->view_menu->addAction(d->entity_explorer_dock->toggleViewAction());
 
@@ -351,14 +351,15 @@ void MainWindow::CreateGlobalHighlighter() {
   d->global_highlighter =
       IGlobalHighlighter::Create(d->index, d->file_location_cache, this);
 
-  auto dock = new QDockWidget(tr("Highlight Explorer"), this);
+  connect(d->global_highlighter, &IGlobalHighlighter::EntityClicked, this,
+          &MainWindow::OnOpenEntity);
+
+  auto dock = new QDockWidget(d->global_highlighter->windowTitle(), this);
   dock->setWidget(d->global_highlighter);
-  dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+  dock->setAllowedAreas(Qt::LeftDockWidgetArea);
 
   d->view_menu->addAction(dock->toggleViewAction());
-  addDockWidget(Qt::LeftDockWidgetArea, dock);
-
-  dock->hide();
+  tabifyDockWidget(d->entity_explorer_dock, dock);
 }
 
 void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
@@ -433,7 +434,7 @@ void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
   if (!related_entity_id_var.isValid()) {
     CloseAllPopups();
     return;
-  }
+  
 
   OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
                         IReferenceExplorerModel::CallHierarchyMode);
@@ -842,7 +843,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
   }
 }
 
-void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
+void MainWindow::OnOpenEntity(RawEntityId entity_id) {
   CloseAllPopups();
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
   OpenEntityInfo(entity_id);
