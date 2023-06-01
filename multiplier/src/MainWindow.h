@@ -101,7 +101,7 @@ class MainWindow final : public QMainWindow {
 
   //! Called when an entity in the entity explorer / filter, which allows us to
   //! search for entities by name/type, is clicked.
-  void OnEntityExplorerEntityClicked(RawEntityId entity_id);
+  void OnOpenEntity(RawEntityId entity_id);
 
   //! Called when the history menu is used to go back/forward to some specific
   //! entity ID.

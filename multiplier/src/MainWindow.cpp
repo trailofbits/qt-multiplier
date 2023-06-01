@@ -204,7 +204,7 @@ void MainWindow::CreateEntityExplorerDock() {
   d->entity_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
 
   connect(d->entity_explorer, &IEntityExplorer::EntityAction, this,
-          &MainWindow::OnEntityExplorerEntityClicked);
+          &MainWindow::OnOpenEntity);
 
   d->view_menu->addAction(d->entity_explorer_dock->toggleViewAction());
 
@@ -331,6 +331,9 @@ void MainWindow::CreateCodeView() {
 void MainWindow::CreateGlobalHighlighter() {
   d->global_highlighter =
       IGlobalHighlighter::Create(d->index, d->file_location_cache, this);
+
+  connect(d->global_highlighter, &IGlobalHighlighter::EntityClicked, this,
+          &MainWindow::OnOpenEntity);
 
   auto dock = new QDockWidget(d->global_highlighter->windowTitle(), this);
   dock->setWidget(d->global_highlighter);
@@ -806,7 +809,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
   }
 }
 
-void MainWindow::OnEntityExplorerEntityClicked(RawEntityId entity_id) {
+void MainWindow::OnOpenEntity(RawEntityId entity_id) {
   CloseAllPopups();
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
   OpenEntityInfo(entity_id);
