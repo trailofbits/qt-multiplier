@@ -158,8 +158,7 @@ void GlobalHighlighter::UpdateItemList() {
   auto layout = new QVBoxLayout();
 
   for (const auto &entity_highlight : d->entity_highlight_list) {
-
-    const auto &primary_entity_id = *entity_highlight.entity_id_list.begin();
+    const auto &primary_entity_id = entity_highlight.primary_entity_id;
 
     for (const auto &raw_entity_id : entity_highlight.entity_id_list) {
       d->entity_color_map.insert({raw_entity_id, entity_highlight.color});
@@ -198,6 +197,7 @@ void GlobalHighlighter::EntityListFutureStatusChanged() {
   {
     const auto &request_data = request_result.TakeValue();
 
+    inc_entity_highlight.primary_entity_id = request_data.primary_entity_id;
     inc_entity_highlight.name = request_data.name;
     inc_entity_highlight.entity_id_list = request_data.entity_id_list;
     inc_entity_highlight.color = d->operation.color;

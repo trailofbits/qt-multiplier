@@ -32,18 +32,27 @@ void GetRelatedEntities(
     return;
   }
 
+  std::optional<RawEntityId> opt_primary_entity_id;
+
   if (std::holds_alternative<Decl>(ent)) {
     for (Decl redecl : std::get<Decl>(ent).redeclarations()) {
       if (related_entities_promise.isCanceled()) {
         return;
       }
 
-      related_entities.entity_id_list.insert(redecl.id().Pack());
+      auto current_entity_id = redecl.id().Pack();
+      if (!opt_primary_entity_id.has_value()) {
+        opt_primary_entity_id = current_entity_id;
+      }
+
+      related_entities.entity_id_list.insert(current_entity_id);
     }
   } else {
+    opt_primary_entity_id = entity_id;
     related_entities.entity_id_list.insert(entity_id);
   }
 
+  related_entities.primary_entity_id = opt_primary_entity_id.value();
   related_entities_promise.addResult(std::move(related_entities));
 }
 

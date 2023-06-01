@@ -98,6 +98,9 @@ class IDatabase {
     //! The name of the entity used to perform the request
     QString name;
 
+    //! Primary entity id
+    RawEntityId primary_entity_id{};
+
     //! A list of related entity IDs
     std::unordered_set<RawEntityId> entity_id_list;
   };
