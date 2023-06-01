@@ -19,6 +19,7 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/IInformationExplorer.h>
 #include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/IMacroExplorer.h>
 #include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/IThemeManager.h>
 
@@ -75,6 +76,7 @@ struct MainWindow::PrivateData final {
 
   IProjectExplorer *project_explorer{nullptr};
   IEntityExplorer *entity_explorer{nullptr};
+  IMacroExplorer *macro_explorer{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
@@ -94,6 +96,7 @@ struct MainWindow::PrivateData final {
   QDockWidget *project_explorer_dock{nullptr};
   QDockWidget *entity_explorer_dock{nullptr};
   QDockWidget *info_explorer_dock{nullptr};
+  QDockWidget *macro_explorer_dock{nullptr};
   IInformationExplorerModel *info_explorer_model{nullptr};
 
   IGlobalHighlighter *global_highlighter{nullptr};
@@ -150,6 +153,7 @@ void MainWindow::InitializeWidgets() {
   setTabPosition(Qt::TopDockWidgetArea, QTabWidget::North);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
+  CreateMacroExplorerDock();
   CreateRefExplorerMenuOptions();
   CreateGlobalHighlighter();
   CreateProjectExplorerDock();
@@ -158,7 +162,9 @@ void MainWindow::InitializeWidgets() {
   CreateCodeView();
   CreateReferenceExplorerDock();
 
-  tabifyDockWidget(d->entity_explorer_dock, d->project_explorer_dock);
+  tabifyDockWidget(d->project_explorer_dock, d->entity_explorer_dock);
+  tabifyDockWidget(d->entity_explorer_dock, d->macro_explorer_dock);
+  d->project_explorer_dock->raise();
   setDocumentMode(false);
 }
 
@@ -229,6 +235,19 @@ void MainWindow::CreateInfoExplorerDock() {
 
   d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
   addDockWidget(Qt::LeftDockWidgetArea, d->info_explorer_dock);
+}
+
+void MainWindow::CreateMacroExplorerDock() {
+  d->macro_explorer = IMacroExplorer::Create(
+      d->index, d->file_location_cache, this);
+
+  d->macro_explorer_dock = new QDockWidget(tr("Macro Explorer"), this);
+  d->macro_explorer_dock->setWidget(d->macro_explorer);
+  d->macro_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+
+  d->view_menu->addAction(d->macro_explorer_dock->toggleViewAction());
+
+  addDockWidget(Qt::LeftDockWidgetArea, d->macro_explorer_dock);
 }
 
 void MainWindow::CreateReferenceExplorerDock() {
@@ -332,7 +351,7 @@ void MainWindow::CreateGlobalHighlighter() {
   d->global_highlighter =
       IGlobalHighlighter::Create(d->index, d->file_location_cache, this);
 
-  auto dock = new QDockWidget(tr("Global Highlighter"), this);
+  auto dock = new QDockWidget(tr("Highlight Explorer"), this);
   dock->setWidget(d->global_highlighter);
   dock->setAllowedAreas(Qt::AllDockWidgetAreas);
 
@@ -383,7 +402,7 @@ void MainWindow::OpenReferenceExplorer(
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache, entity_id, expansion_mode,
       d->ref_explorer_mode, d->enable_quick_ref_explorer_code_preview,
-      *d->global_highlighter, this);
+      *d->global_highlighter, *d->macro_explorer, this);
 
   connect(d->quick_ref_explorer.get(),
           &QuickReferenceExplorer::SaveReferenceExplorer, this,
@@ -459,6 +478,44 @@ void MainWindow::OpenTokenEntityInfo(QModelIndex index) {
   OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var));
 }
 
+void MainWindow::ExpandMacro(QModelIndex index, bool local) {
+
+  QVariant related_entity_id_var =
+      index.data(ICodeModel::RealRelatedEntityIdRole);
+
+  if (!related_entity_id_var.isValid()) {
+    return;
+  }
+
+  RawEntityId eid = qvariant_cast<RawEntityId>(related_entity_id_var);
+  VariantId vid = EntityId(eid).Unpack();
+  if (!std::holds_alternative<MacroId>(vid)) {
+    return;
+  }
+
+  MacroId mid = std::get<MacroId>(vid);
+  if (mid.kind != MacroKind::DEFINE_DIRECTIVE &&
+      mid.kind != MacroKind::SUBSTITUTION) {
+    return;
+  }
+
+  RawEntityId local_to = kInvalidEntityId;
+  if (local) {
+    QVariant token_id_var = index.data(ICodeModel::TokenIdRole);
+    if (!token_id_var.isValid()) {
+      return;
+    }
+
+    local_to = qvariant_cast<RawEntityId>(token_id_var);
+    vid = EntityId(local_to).Unpack();
+    if (!std::holds_alternative<MacroTokenId>(vid)) {
+      return;
+    }
+  }
+
+  d->macro_explorer->AddMacro(eid, local_to);
+}
+
 void MainWindow::OpenCodePreview(const QModelIndex &index) {
   CloseAllPopups();
 
@@ -472,7 +529,8 @@ void MainWindow::OpenCodePreview(const QModelIndex &index) {
   auto related_entity_id = qvariant_cast<RawEntityId>(related_entity_id_var);
 
   d->quick_code_view = std::make_unique<QuickCodeView>(
-      d->index, d->file_location_cache, related_entity_id, this);
+      d->index, d->file_location_cache, related_entity_id,
+      *d->global_highlighter, *d->macro_explorer, this);
 
   connect(d->quick_code_view.get(), &QuickCodeView::TokenTriggered, this,
           &MainWindow::OnTokenTriggered);
@@ -563,11 +621,15 @@ ICodeView *
 MainWindow::CreateNewCodeView(RawEntityId file_entity_id, QString tab_name,
                               const std::optional<QString> &opt_file_path) {
 
-  auto code_model = ICodeModel::Create(d->file_location_cache, d->index, this);
-  auto proxy_model = d->global_highlighter->CreateModelProxy(
-      code_model, kHighlightEntityIdRole);
+  ICodeModel *code_model = d->macro_explorer->CreateCodeModel(
+      d->file_location_cache, d->index, this);
 
-  auto code_view = ICodeView::Create(proxy_model);
+  QAbstractItemModel *proxy_model =
+      d->global_highlighter->CreateModelProxy(
+          code_model, kHighlightEntityIdRole);
+
+  ICodeView *code_view = ICodeView::Create(proxy_model);
+
   code_model->SetEntity(file_entity_id);
 
   code_view->SetWordWrapping(false);
@@ -799,6 +861,9 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
     } else if (keyboard_button.key == Qt::Key_I) {
       d->info_explorer_dock->show();
       OpenTokenEntityInfo(index);
+
+    } else if (keyboard_button.key == Qt::Key_E) {
+      ExpandMacro(index, true  /* local */);
 
     } else if (keyboard_button.key == Qt::Key_Enter) {
       // Like in IDA Pro, pressing Enter while the cursor is on a use of that

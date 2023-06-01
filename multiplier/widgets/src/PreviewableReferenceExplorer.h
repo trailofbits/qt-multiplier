@@ -9,6 +9,7 @@
 #include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/IMacroExplorer.h>
 
 #include <QWidget>
 
@@ -26,6 +27,7 @@ class PreviewableReferenceExplorer final : public QWidget {
                                const IReferenceExplorer::Mode &mode,
                                const bool &show_code_preview,
                                IGlobalHighlighter &highlighter,
+                               IMacroExplorer &macro_explorer,
                                QWidget *parent = nullptr);
 
   //! Destructor
@@ -51,7 +53,8 @@ class PreviewableReferenceExplorer final : public QWidget {
                          IReferenceExplorerModel *model,
                          const IReferenceExplorer::Mode &mode,
                          const bool &show_code_preview,
-                         IGlobalHighlighter &highlighter);
+                         IGlobalHighlighter &highlighter,
+                         IMacroExplorer &macro_explorer);
 
   //! Schedules a post-update scroll-to-line operation
   void SchedulePostUpdateLineScrollCommand(unsigned line_number);

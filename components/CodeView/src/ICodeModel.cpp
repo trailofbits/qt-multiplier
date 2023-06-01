@@ -17,4 +17,8 @@ ICodeModel *ICodeModel::Create(const FileLocationCache &file_location_cache,
   return new CodeModel(file_location_cache, index, parent);
 }
 
+//! Tells this code view to use the `TokenTreeVisitor` to expand some
+//! macros.
+void ICodeModel::OnExpandMacros(const TokenTreeVisitor *) {}
+
 }  // namespace mx::gui

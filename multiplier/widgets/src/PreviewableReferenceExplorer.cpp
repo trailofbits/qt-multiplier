@@ -33,12 +33,12 @@ PreviewableReferenceExplorer::PreviewableReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
     IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
     const bool &show_code_preview, IGlobalHighlighter &highlighter,
-    QWidget *parent)
+    IMacroExplorer &macro_explorer, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData()) {
 
   InitializeWidgets(index, file_location_cache, model, mode, show_code_preview,
-                    highlighter);
+                    highlighter, macro_explorer);
 }
 
 PreviewableReferenceExplorer::~PreviewableReferenceExplorer() {}
@@ -50,7 +50,8 @@ IReferenceExplorerModel *PreviewableReferenceExplorer::Model() {
 void PreviewableReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
     IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
-    const bool &show_code_preview, IGlobalHighlighter &highlighter) {
+    const bool &show_code_preview, IGlobalHighlighter &highlighter,
+    IMacroExplorer &macro_explorer) {
 
   d->reference_explorer =
       IReferenceExplorer::Create(model, mode, this, &highlighter);
@@ -66,12 +67,13 @@ void PreviewableReferenceExplorer::InitializeWidgets(
           &PreviewableReferenceExplorer::OnRowsInserted);
 
   d->code_model = new CodePreviewModelAdapter(
-      ICodeModel::Create(file_location_cache, index), this);
+      macro_explorer.CreateCodeModel(file_location_cache, index), this);
 
   auto model_proxy = highlighter.CreateModelProxy(
       d->code_model, ICodeModel::RealRelatedEntityIdRole);
 
-  d->code_view = ICodeView::Create(model_proxy);
+  d->code_view = ICodeView::Create(model_proxy, this);
+
   connect(d->code_view, &ICodeView::TokenTriggered, this,
           &PreviewableReferenceExplorer::TokenTriggered);
 

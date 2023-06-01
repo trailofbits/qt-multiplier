@@ -44,7 +44,9 @@ struct QuickCodeView::PrivateData final {
 
 QuickCodeView::QuickCodeView(const Index &index,
                              const FileLocationCache &file_location_cache,
-                             RawEntityId entity_id, QWidget *parent)
+                             RawEntityId entity_id,
+                             IGlobalHighlighter &highlighter,
+                             IMacroExplorer &macro_explorer, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
@@ -58,7 +60,8 @@ QuickCodeView::QuickCodeView(const Index &index,
           &QFutureWatcher<QFuture<VariantEntity>>::finished, this,
           &QuickCodeView::OnEntityRequestFutureStatusChanged);
 
-  InitializeWidgets(index, file_location_cache, entity_id);
+  InitializeWidgets(index, file_location_cache, entity_id, highlighter,
+                    macro_explorer);
 }
 
 QuickCodeView::~QuickCodeView() {}
@@ -107,7 +110,8 @@ bool QuickCodeView::eventFilter(QObject *, QEvent *event) {
 
 void QuickCodeView::InitializeWidgets(
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id) {
+    RawEntityId entity_id, IGlobalHighlighter &highlighter,
+    IMacroExplorer &macro_explorer) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -121,8 +125,12 @@ void QuickCodeView::InitializeWidgets(
   // Code model
   //
 
-  ICodeModel *main_model = ICodeModel::Create(file_location_cache, index, this);
+  ICodeModel *main_model = macro_explorer.CreateCodeModel(
+      file_location_cache, index, this);
   d->model = new CodePreviewModelAdapter(main_model, this);
+
+  QAbstractItemModel *model_proxy = highlighter.CreateModelProxy(
+      d->model, ICodeModel::RealRelatedEntityIdRole);
 
   //
   // Title bar
@@ -165,7 +173,7 @@ void QuickCodeView::InitializeWidgets(
   // Contents
   //
 
-  auto view = ICodeView::Create(d->model, this);
+  ICodeView *view = ICodeView::Create(model_proxy, this);
   view->SetWordWrapping(true);
 
   connect(view, &ICodeView::TokenTriggered, this,

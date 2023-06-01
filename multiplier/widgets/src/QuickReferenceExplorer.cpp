@@ -52,7 +52,8 @@ QuickReferenceExplorer::QuickReferenceExplorer(
     RawEntityId entity_id,
     const IReferenceExplorerModel::ExpansionMode &expansion_mode,
     const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
-    IGlobalHighlighter &highlighter, QWidget *parent)
+    IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
+    QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
@@ -62,7 +63,7 @@ QuickReferenceExplorer::QuickReferenceExplorer(
           &QuickReferenceExplorer::EntityNameFutureStatusChanged);
 
   InitializeWidgets(index, file_location_cache, entity_id, expansion_mode, mode,
-                    show_code_preview, highlighter);
+                    show_code_preview, highlighter, macro_explorer);
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
           &QuickReferenceExplorer::OnThemeChange);
@@ -128,7 +129,7 @@ void QuickReferenceExplorer::InitializeWidgets(
     RawEntityId entity_id,
     const IReferenceExplorerModel::ExpansionMode &expansion_mode,
     const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
-    IGlobalHighlighter &highlighter) {
+    IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -194,7 +195,7 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   d->reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, mode, show_code_preview,
-      highlighter, this);
+      highlighter, macro_explorer, this);
 
   connect(d->reference_explorer,
           &PreviewableReferenceExplorer::SelectedItemChanged, this,

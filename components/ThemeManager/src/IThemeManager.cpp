@@ -12,12 +12,11 @@
 #include <multiplier/ui/Assert.h>
 
 namespace mx::gui {
-
 namespace {
 
 QApplication *application_ptr{nullptr};
 
-}
+}  // namespace
 
 void IThemeManager::Initialize(QApplication &application) {
   Assert(application_ptr == nullptr,

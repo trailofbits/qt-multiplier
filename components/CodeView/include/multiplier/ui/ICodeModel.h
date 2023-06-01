@@ -13,6 +13,12 @@
 
 #include <QAbstractItemModel>
 
+namespace mx {
+class Token;
+class TokenRange;
+class TokenTreeVisitor;
+}  // namespace mx
+
 namespace mx::gui {
 
 //! An item-based model for the ICodeView widget
@@ -81,6 +87,11 @@ class ICodeModel : public QAbstractItemModel {
 
   //! Disabled copy assignment operator
   ICodeModel &operator=(const ICodeModel &) = delete;
+
+ public slots:
+  //! Tells this code view to use the `TokenTreeVisitor` to expand some
+  //! macros.
+  virtual void OnExpandMacros(const TokenTreeVisitor *);
 };
 
 }  // namespace mx::gui

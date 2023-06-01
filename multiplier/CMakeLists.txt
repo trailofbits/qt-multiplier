@@ -64,6 +64,7 @@ target_link_libraries("Multiplier"
     "mx_widgets"
     "mx_informationexplorer"
     "mx_globalhighlighter"
+    "mx_macroexplorer"
     "mx_codeviewtheme"
     "mx_thememanager"
 )

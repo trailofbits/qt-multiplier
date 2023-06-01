@@ -38,6 +38,7 @@ class MainWindow final : public QMainWindow {
   void CreateProjectExplorerDock();
   void CreateEntityExplorerDock();
   void CreateInfoExplorerDock();
+  void CreateMacroExplorerDock();
   void CreateReferenceExplorerDock();
   void CreateCodeView();
   void CreateGlobalHighlighter();
@@ -48,6 +49,7 @@ class MainWindow final : public QMainWindow {
   void OpenTokenReferenceExplorer(QModelIndex index);
   void OpenTokenTaintExplorer(QModelIndex index);
   void OpenTokenEntityInfo(QModelIndex index);
+  void ExpandMacro(QModelIndex index, bool local);
   void OpenReferenceExplorer(RawEntityId entity_id,
                              IReferenceExplorerModel::ExpansionMode mode);
   void OpenCodePreview(const QModelIndex &index);

@@ -14,6 +14,9 @@
 
 namespace mx::gui {
 
+class IGlobalHighlighter;
+class IMacroExplorer;
+
 //! A reference explorer for context menus
 class QuickReferenceExplorer final : public QWidget {
   Q_OBJECT
@@ -25,7 +28,8 @@ class QuickReferenceExplorer final : public QWidget {
       RawEntityId entity_id,
       const IReferenceExplorerModel::ExpansionMode &expansion_mode,
       const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
-      IGlobalHighlighter &highlighter, QWidget *parent = nullptr);
+      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
+      QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickReferenceExplorer() override;
@@ -72,7 +76,7 @@ class QuickReferenceExplorer final : public QWidget {
       RawEntityId entity_id,
       const IReferenceExplorerModel::ExpansionMode &expansion_mode,
       const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
-      IGlobalHighlighter &highlighter);
+      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer);
 
   //! Used to start window dragging
   void OnTitleFrameMousePress(QMouseEvent *event);
