@@ -167,6 +167,10 @@ void GlobalHighlighter::UpdateItemList() {
 
     auto item = new GlobalHighlighterItem(
         primary_entity_id, entity_highlight.name, entity_highlight.color, this);
+
+    connect(item, &GlobalHighlighterItem::EntityClicked, this,
+            &GlobalHighlighter::EntityClicked);
+
     layout->addWidget(item);
   }
 

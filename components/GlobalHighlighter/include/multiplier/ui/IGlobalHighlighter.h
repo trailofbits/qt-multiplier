@@ -51,6 +51,10 @@ class IGlobalHighlighter : public QWidget {
 
   //! Clears the highlight list
   virtual void Clear() = 0;
+
+ signals:
+  //! Emitted when an entity is clicked in the highlight browser
+  void EntityClicked(const RawEntityId &entity_id);
 };
 
 }  // namespace mx::gui

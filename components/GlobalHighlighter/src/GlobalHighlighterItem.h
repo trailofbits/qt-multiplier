@@ -29,6 +29,10 @@ class GlobalHighlighterItem final : public QWidget {
   //! Disabled copy assignment operator
   GlobalHighlighterItem &operator=(const GlobalHighlighterItem &) = delete;
 
+ protected:
+  //! Used to make QLabel widgets clickable
+  virtual bool eventFilter(QObject *object, QEvent *event) override;
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
@@ -57,6 +61,9 @@ class GlobalHighlighterItem final : public QWidget {
 
   //! Emitted when the highlight should be deleted
   void Deleted(const RawEntityId &entity_id);
+
+  //! Emitted when this entity is activated
+  void EntityClicked(const RawEntityId &entity_id);
 
   friend class GlobalHighlighter;
 };
