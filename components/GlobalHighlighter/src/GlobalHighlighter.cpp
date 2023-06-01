@@ -100,6 +100,8 @@ GlobalHighlighter::GlobalHighlighter(
   d->index = index;
   d->file_location_cache = file_location_cache;
 
+  setWindowTitle(tr("Highlight Explorer"));
+
   d->database = IDatabase::Create(d->index, d->file_location_cache);
   connect(&d->future_watcher,
           &QFutureWatcher<QFuture<IDatabase::RelatedEntitiesResult>>::finished,
