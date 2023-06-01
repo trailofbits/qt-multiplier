@@ -26,9 +26,6 @@ class CodeModel final : public ICodeModel {
   //! Destructor
   virtual ~CodeModel() override;
 
-  //! \copybrief ICodeModel::GetEntity
-  virtual std::optional<RawEntityId> GetEntity(void) const override;
-
   //! \copybrief ICodeModel::SetEntity
   virtual void SetEntity(RawEntityId id) override;
 
@@ -68,6 +65,10 @@ class CodeModel final : public ICodeModel {
   void FutureResultStateChanged(void);
 
   friend class ICodeModel;
+
+ public slots:
+  //! \copybrief ICodeModel::OnExpandMacros
+  virtual void OnExpandMacros(const TokenTreeVisitor *) override;
 };
 
 }  // namespace mx::gui

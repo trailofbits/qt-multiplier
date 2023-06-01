@@ -203,10 +203,43 @@ static void FixupLineNumbers(const FileLocationCache &file_location_cache,
 
 }  // namespace
 
+void GetExpandedTokenRangeData(
+    QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    const Index &, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id, TokenTree tree, const TokenTreeVisitor *vis) {
+
+  IndexedTokenRangeData res;
+  std::optional<Fragment> frag = Fragment::containing(tree);
+  std::optional<File> file = File::containing(tree);
+  if (frag) {
+    res.response_id = frag->id().Pack();
+
+  } else if (file) {
+    res.response_id = file->id().Pack();
+  }
+
+  res.requested_id = entity_id;
+  res.tokens = tree.serialize(*vis);
+  res.lines.emplace_back();
+
+  unsigned tok_index = 0u;
+  for (Token tok : res.tokens) {
+    RenderToken(file_location_cache, res, std::move(tok), tok_index++);
+  }
+
+  if (res.lines.back().columns.empty()) {
+    res.lines.pop_back();
+  }
+
+  FixupLineNumbers(file_location_cache, res);
+
+  result_promise.addResult(std::move(res));
+}
+
 void GetIndexedTokenRangeData(
     QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id) {
+    RawEntityId entity_id, const TokenTreeVisitor *vis) {
 
   VariantEntity ent = index.entity(entity_id);
   if (std::holds_alternative<NotAnEntity>(ent)) {
@@ -233,33 +266,13 @@ void GetIndexedTokenRangeData(
     return;
   }
 
-  IndexedTokenRangeData res;
-  std::optional<Fragment> frag = Fragment::containing(tree);
-  std::optional<File> file = File::containing(tree);
-  if (frag) {
-    res.requested_id = frag->id().Pack();
-
-  } else if (file) {
-    res.requested_id = file->id().Pack();
+  TokenTreeVisitor empty_vis;
+  if (!vis) {
+    vis = &empty_vis;
   }
 
-  auto visitor = std::make_unique<TokenTreeVisitor>();
-  res.tokens = tree.serialize(*visitor);
-
-  res.lines.emplace_back();
-
-  unsigned tok_index = 0u;
-  for (Token tok : res.tokens) {
-    RenderToken(file_location_cache, res, std::move(tok), tok_index++);
-  }
-
-  if (res.lines.back().columns.empty()) {
-    res.lines.pop_back();
-  }
-
-  FixupLineNumbers(file_location_cache, res);
-
-  result_promise.addResult(std::move(res));
+  GetExpandedTokenRangeData(result_promise, index, file_location_cache,
+                            entity_id, std::move(tree), vis);
 }
 
 }  // namespace mx::gui

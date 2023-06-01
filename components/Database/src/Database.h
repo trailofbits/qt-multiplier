@@ -26,7 +26,13 @@ class Database final : public IDatabase {
 
   //! \copybrief IDatabase::RequestIndexedTokenRangeData
   virtual QFuture<IndexedTokenRangeDataResult>
-  RequestIndexedTokenRangeData(RawEntityId entity_id) override;
+  RequestIndexedTokenRangeData(RawEntityId entity_id,
+                               const TokenTreeVisitor *vis) override;
+
+  //! \copybrief IDatabase::RequestExpandedTokenRangeData
+  virtual QFuture<IndexedTokenRangeDataResult>
+  RequestExpandedTokenRangeData(RawEntityId entity_id, const TokenTree &tree,
+                                const TokenTreeVisitor *vis) override;
 
   //! \copybrief IDatabase::RequestEntityName
   virtual QFuture<OptionalName>

@@ -45,11 +45,11 @@ class MainWindow final : public QMainWindow {
   void OpenEntityRelatedToToken(const QModelIndex &index);
   void OpenEntityCode(RawEntityId entity_id, bool canonicalize = true);
   void OpenEntityInfo(RawEntityId entity_id);
-  void OpenTokenContextMenu(QModelIndex index);
-  void OpenTokenReferenceExplorer(QModelIndex index);
-  void OpenTokenTaintExplorer(QModelIndex index);
-  void OpenTokenEntityInfo(QModelIndex index);
-  void ExpandMacro(QModelIndex index, bool local);
+  void OpenTokenContextMenu(const QModelIndex &index);
+  void OpenTokenReferenceExplorer(const QModelIndex &index);
+  void OpenTokenTaintExplorer(const QModelIndex &index);
+  void OpenTokenEntityInfo(const QModelIndex &index);
+  void ExpandMacro(const QModelIndex &index, bool local);
   void OpenReferenceExplorer(RawEntityId entity_id,
                              IReferenceExplorerModel::ExpansionMode mode);
   void OpenCodePreview(const QModelIndex &index);

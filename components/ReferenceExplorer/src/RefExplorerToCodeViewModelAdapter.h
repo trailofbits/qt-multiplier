@@ -37,10 +37,6 @@ class RefExplorerToCodeViewModelAdapter final : public ICodeModel {
   //! Enables or disables breadcrumbs
   void SetBreadcrumbsVisibility(const bool &enable);
 
-  //! \copybrief ICodeModel::GetEntity
-  //! \todo This method needs to be removed from the interface
-  [[noreturn]] virtual std::optional<RawEntityId> GetEntity() const override;
-
   //! \copybrief ICodeModel::SetEntity
   //! \todo This method needs to be removed from the interface
   [[noreturn]] virtual void SetEntity(RawEntityId id) override;

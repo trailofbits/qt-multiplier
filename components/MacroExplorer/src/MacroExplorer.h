@@ -37,8 +37,8 @@ class MacroExplorer final : public IMacroExplorer {
 
  public slots:
   //! \copybrief IMacroExplorer::AddMacro
-  virtual void AddMacro(RawEntityId macro_id,
-                        RawEntityId at_token_id) override;
+  virtual void AddMacro(RawEntityId macro_id, RawEntityId token_id,
+                        bool local) override;
 
  private slots:
   void RemoveMacro(RawEntityId macro_id);

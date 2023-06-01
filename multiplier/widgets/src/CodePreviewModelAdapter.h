@@ -29,10 +29,6 @@ class CodePreviewModelAdapter final : public ICodeModel {
   //! Destructor
   virtual ~CodePreviewModelAdapter(void) = default;
 
-  //! Asks the model for the currently showing entity. This is usually a file
-  //! id or a fragment id.
-  virtual std::optional<RawEntityId> GetEntity(void) const Q_DECL_FINAL;
-
   //! Asks the model to fetch the specified entity.
   virtual void SetEntity(RawEntityId id) Q_DECL_FINAL;
 
@@ -54,6 +50,9 @@ class CodePreviewModelAdapter final : public ICodeModel {
 
   //! Returns the data for the specified role
   virtual QVariant data(const QModelIndex &index, int role) const override;
+
+ public slots:
+  virtual void OnExpandMacros(const TokenTreeVisitor *) override;
 
  private:
   ICodeModel *const next;

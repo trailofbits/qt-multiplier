@@ -361,7 +361,7 @@ void MainWindow::CreateGlobalHighlighter() {
   dock->hide();
 }
 
-void MainWindow::OpenTokenContextMenu(QModelIndex index) {
+void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
   QVariant action_data;
   action_data.setValue(index);
 
@@ -425,7 +425,7 @@ void MainWindow::OpenReferenceExplorer(
   d->quick_ref_explorer->show();
 }
 
-void MainWindow::OpenTokenReferenceExplorer(QModelIndex index) {
+void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
 
   QVariant related_entity_id_var =
       index.data(ICodeModel::RealRelatedEntityIdRole);
@@ -439,7 +439,7 @@ void MainWindow::OpenTokenReferenceExplorer(QModelIndex index) {
                         IReferenceExplorerModel::CallHierarchyMode);
 }
 
-void MainWindow::OpenTokenTaintExplorer(QModelIndex index) {
+void MainWindow::OpenTokenTaintExplorer(const QModelIndex &index) {
 
   QVariant related_stmt_id_var =
       index.data(ICodeModel::EntityIdOfStmtContainingTokenRole);
@@ -466,7 +466,7 @@ void MainWindow::OpenTokenTaintExplorer(QModelIndex index) {
   CloseAllPopups();
 }
 
-void MainWindow::OpenTokenEntityInfo(QModelIndex index) {
+void MainWindow::OpenTokenEntityInfo(const QModelIndex &index) {
 
   QVariant related_entity_id_var =
       index.data(ICodeModel::RealRelatedEntityIdRole);
@@ -478,42 +478,11 @@ void MainWindow::OpenTokenEntityInfo(QModelIndex index) {
   OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var));
 }
 
-void MainWindow::ExpandMacro(QModelIndex index, bool local) {
-
-  QVariant related_entity_id_var =
-      index.data(ICodeModel::RealRelatedEntityIdRole);
-
-  if (!related_entity_id_var.isValid()) {
-    return;
+void MainWindow::ExpandMacro(const QModelIndex &index, bool local) {
+  if (auto macro_token_opt = ICodeModel::MacroExpansionPoint(index)) {
+    d->macro_explorer->AddMacro(macro_token_opt->first, macro_token_opt->second,
+                                local);
   }
-
-  RawEntityId eid = qvariant_cast<RawEntityId>(related_entity_id_var);
-  VariantId vid = EntityId(eid).Unpack();
-  if (!std::holds_alternative<MacroId>(vid)) {
-    return;
-  }
-
-  MacroId mid = std::get<MacroId>(vid);
-  if (mid.kind != MacroKind::DEFINE_DIRECTIVE &&
-      mid.kind != MacroKind::SUBSTITUTION) {
-    return;
-  }
-
-  RawEntityId local_to = kInvalidEntityId;
-  if (local) {
-    QVariant token_id_var = index.data(ICodeModel::TokenIdRole);
-    if (!token_id_var.isValid()) {
-      return;
-    }
-
-    local_to = qvariant_cast<RawEntityId>(token_id_var);
-    vid = EntityId(local_to).Unpack();
-    if (!std::holds_alternative<MacroTokenId>(vid)) {
-      return;
-    }
-  }
-
-  d->macro_explorer->AddMacro(eid, local_to);
 }
 
 void MainWindow::OpenCodePreview(const QModelIndex &index) {

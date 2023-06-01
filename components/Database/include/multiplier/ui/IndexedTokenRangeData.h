@@ -26,6 +26,9 @@ class IndexedTokenRangeData final {
   //! Entity ID associated with the request.
   RawEntityId requested_id;
 
+  //! Entity ID associated with the response.
+  RawEntityId response_id;
+
   //! Range of tokens in this data.
   TokenRange tokens;
 

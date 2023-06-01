@@ -248,15 +248,6 @@ void RefExplorerToCodeViewModelAdapter::SetBreadcrumbsVisibility(
   emit endResetModel();
 }
 
-std::optional<RawEntityId>
-RefExplorerToCodeViewModelAdapter::GetEntity() const {
-  Assert(
-      false,
-      "Invalid virtual method call: RefExplorerToCodeViewModelAdapter::GetEntity");
-
-  __builtin_unreachable();
-}
-
 void RefExplorerToCodeViewModelAdapter::SetEntity(RawEntityId) {
   Assert(
       false,

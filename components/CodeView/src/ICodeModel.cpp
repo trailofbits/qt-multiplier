@@ -8,13 +8,51 @@
 
 #include "CodeModel.h"
 
+#include <multiplier/Entities/MacroKind.h>
 #include <multiplier/ui/ICodeModel.h>
+
+#include <QModelIndex>
+#include <QVariant>
 
 namespace mx::gui {
 
 ICodeModel *ICodeModel::Create(const FileLocationCache &file_location_cache,
                                const Index &index, QObject *parent) {
   return new CodeModel(file_location_cache, index, parent);
+}
+
+std::optional<std::pair<RawEntityId, RawEntityId>>
+ICodeModel::MacroExpansionPoint(const QModelIndex &index) {
+  QVariant related_entity_id_var = index.data(RealRelatedEntityIdRole);
+
+  if (!related_entity_id_var.isValid()) {
+    return std::nullopt;
+  }
+
+  RawEntityId macro_eid = qvariant_cast<RawEntityId>(related_entity_id_var);
+  VariantId macro_vid = EntityId(macro_eid).Unpack();
+  if (!std::holds_alternative<MacroId>(macro_vid)) {
+    return std::nullopt;
+  }
+
+  MacroId mid = std::get<MacroId>(macro_vid);
+  if (mid.kind != MacroKind::DEFINE_DIRECTIVE &&
+      mid.kind != MacroKind::SUBSTITUTION) {
+    return std::nullopt;
+  }
+
+  QVariant token_id_var = index.data(ICodeModel::TokenIdRole);
+  if (!token_id_var.isValid()) {
+    return std::nullopt;
+  }
+
+  RawEntityId token_eid = qvariant_cast<RawEntityId>(token_id_var);
+  VariantId token_vid = EntityId(token_eid).Unpack();
+  if (!std::holds_alternative<MacroTokenId>(token_vid)) {
+    return std::nullopt;
+  }
+
+  return std::pair<RawEntityId, RawEntityId>(macro_eid, token_eid);
 }
 
 //! Tells this code view to use the `TokenTreeVisitor` to expand some

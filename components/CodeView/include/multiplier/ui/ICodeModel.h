@@ -9,11 +9,14 @@
 #pragma once
 
 #include <multiplier/Types.h>
-#include <multiplier/Index.h>
 
 #include <QAbstractItemModel>
 
+#include <utility>
+
 namespace mx {
+class FileLocationCache;
+class Index;
 class Token;
 class TokenRange;
 class TokenTreeVisitor;
@@ -66,9 +69,8 @@ class ICodeModel : public QAbstractItemModel {
   static ICodeModel *Create(const FileLocationCache &file_location_cache,
                             const Index &index, QObject *parent = nullptr);
 
-  //! Asks the model for the currently showing entity. This is usually a file
-  //! id or a fragment id.
-  virtual std::optional<RawEntityId> GetEntity() const = 0;
+  static std::optional<std::pair<RawEntityId, RawEntityId>>
+  MacroExpansionPoint(const QModelIndex &index);
 
   //! Asks the model to fetch the specified entity.
   virtual void SetEntity(RawEntityId id) = 0;
