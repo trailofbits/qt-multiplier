@@ -57,8 +57,8 @@ const CodeViewTheme kDefaultDarkCodeViewTheme{
   { },
 
   {
-    { TokenCategory::WHITESPACE, QColor::fromRgb(20, 20, 20) },
-    { TokenCategory::UNKNOWN, QColor::fromRgb(20, 20, 20) },
+    { TokenCategory::WHITESPACE, QColor::fromRgb(105, 104, 97) },
+    { TokenCategory::UNKNOWN, QColor::fromRgb(28, 1, 4) },
     { TokenCategory::IDENTIFIER, QColor::fromRgb(114, 114, 114) },
     { TokenCategory::MACRO_NAME, QColor::fromRgb(121, 244, 241) },
     { TokenCategory::MACRO_PARAMETER_NAME, QColor::fromRgb(114, 111, 58) },
@@ -152,7 +152,7 @@ const CodeViewTheme kDefaultLightCodeViewTheme{
   { },
 
   {
-    { TokenCategory::WHITESPACE, QColor::fromRgb(2, 2, 2) },
+    { TokenCategory::WHITESPACE, QColor::fromRgb(0, 0, 255) },
     { TokenCategory::UNKNOWN, QColor::fromRgb(2, 2, 2) },
     { TokenCategory::IDENTIFIER, QColor::fromRgb(19, 19, 19) },
     { TokenCategory::MACRO_NAME, QColor::fromRgb(128, 0, 128) },

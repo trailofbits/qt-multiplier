@@ -21,6 +21,10 @@
 #include <optional>
 #include <unordered_set>
 
+namespace mx {
+class TokenTree;
+class TokenTreeVisitor;
+}  // namespace mx
 namespace mx::gui {
 
 //! A generic template that defines a batched data receiver
@@ -77,15 +81,16 @@ class IDatabase {
   using IndexedTokenRangeDataResult =
       Result<IndexedTokenRangeData, RPCErrorCode>;
 
-  //! Request type for RequestIndexedTokenRangeData
-  enum class IndexedTokenRangeDataRequestType {
-    Fragment,
-    File,
-  };
+  //! Requests the specified file / fragment.
+  virtual QFuture<IndexedTokenRangeDataResult>
+  RequestIndexedTokenRangeData(RawEntityId entity_id,
+                               const TokenTreeVisitor *vis) = 0;
 
   //! Requests the specified file
   virtual QFuture<IndexedTokenRangeDataResult>
-  RequestIndexedTokenRangeData(RawEntityId entity_id) = 0;
+  RequestExpandedTokenRangeData(RawEntityId entity_id,
+                                const TokenTree &tree,
+                                const TokenTreeVisitor *vis) = 0;
 
   //! An optional name
   using OptionalName = std::optional<QString>;

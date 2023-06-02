@@ -32,17 +32,17 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   IndexedTokenRangeData::Line *line = &(res.lines.back());
 
   // Try to get a number for this line.
-  unsigned prev_line_number = line->number;
   unsigned line_number_from_tok = 0u;
-  if (std::holds_alternative<FileTokenId>(tok.id().Unpack())) {
-    if (auto line_col = tok.location(file_location_cache)) {
-      if (prev_line_number && prev_line_number != line_col->first) {
-        qDebug() << "Line number doesn't match expectations for token"
-                 << tok.id().Pack();
+  VariantId token_vid = tok.id().Unpack();
+  if (std::holds_alternative<FileTokenId>(token_vid)) {
+    FileId fid(std::get<FileTokenId>(token_vid).file_id);
+    if (EntityId(fid) == res.file_id) {
+      if (auto line_col = tok.location(file_location_cache)) {
+        line_number_from_tok = line_col->first;
+        if (!line->number) {
+          line->number = line_col->first;
+        }
       }
-
-      line_number_from_tok = line_col->first;
-      line->number = line_col->first;
     }
   }
 
@@ -203,10 +203,48 @@ static void FixupLineNumbers(const FileLocationCache &file_location_cache,
 
 }  // namespace
 
+void GetExpandedTokenRangeData(
+    QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    const Index &, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id, TokenTree tree, const TokenTreeVisitor *vis) {
+
+  IndexedTokenRangeData res;
+  std::optional<Fragment> frag = Fragment::containing(tree);
+  std::optional<File> file = File::containing(tree);
+
+  if (frag) {
+    res.response_id = frag->id().Pack();
+
+  } else if (file) {
+    res.response_id = file->id().Pack();
+  }
+
+  if (file) {
+    res.file_id = file->id().Pack();
+  }
+
+  res.requested_id = entity_id;
+  res.tokens = tree.serialize(*vis);
+  res.lines.emplace_back();
+
+  unsigned tok_index = 0u;
+  for (Token tok : res.tokens) {
+    RenderToken(file_location_cache, res, std::move(tok), tok_index++);
+  }
+
+  if (res.lines.back().columns.empty()) {
+    res.lines.pop_back();
+  }
+
+  FixupLineNumbers(file_location_cache, res);
+
+  result_promise.addResult(std::move(res));
+}
+
 void GetIndexedTokenRangeData(
     QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id) {
+    RawEntityId entity_id, const TokenTreeVisitor *vis) {
 
   VariantEntity ent = index.entity(entity_id);
   if (std::holds_alternative<NotAnEntity>(ent)) {
@@ -233,33 +271,13 @@ void GetIndexedTokenRangeData(
     return;
   }
 
-  IndexedTokenRangeData res;
-  std::optional<Fragment> frag = Fragment::containing(tree);
-  std::optional<File> file = File::containing(tree);
-  if (frag) {
-    res.requested_id = frag->id().Pack();
-
-  } else if (file) {
-    res.requested_id = file->id().Pack();
+  TokenTreeVisitor empty_vis;
+  if (!vis) {
+    vis = &empty_vis;
   }
 
-  auto visitor = std::make_unique<TokenTreeVisitor>();
-  res.tokens = tree.serialize(*visitor);
-
-  res.lines.emplace_back();
-
-  unsigned tok_index = 0u;
-  for (Token tok : res.tokens) {
-    RenderToken(file_location_cache, res, std::move(tok), tok_index++);
-  }
-
-  if (res.lines.back().columns.empty()) {
-    res.lines.pop_back();
-  }
-
-  FixupLineNumbers(file_location_cache, res);
-
-  result_promise.addResult(std::move(res));
+  GetExpandedTokenRangeData(result_promise, index, file_location_cache,
+                            entity_id, std::move(tree), vis);
 }
 
 }  // namespace mx::gui

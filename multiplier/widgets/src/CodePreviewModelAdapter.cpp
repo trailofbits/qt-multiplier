@@ -19,8 +19,8 @@ CodePreviewModelAdapter::CodePreviewModelAdapter(ICodeModel *model,
   connect(next, &ICodeModel::modelReset, this, &ICodeModel::modelReset);
 }
 
-std::optional<RawEntityId> CodePreviewModelAdapter::GetEntity(void) const {
-  return next->GetEntity();
+void CodePreviewModelAdapter::OnExpandMacros(const TokenTreeVisitor *vis) {
+  next->OnExpandMacros(vis);
 }
 
 void CodePreviewModelAdapter::SetEntity(RawEntityId id) {

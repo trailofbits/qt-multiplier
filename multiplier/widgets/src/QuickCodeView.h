@@ -10,6 +10,8 @@
 
 #include <multiplier/ui/ICodeView.h>
 #include <multiplier/ui/IThemeManager.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/IMacroExplorer.h>
 
 #include <multiplier/Index.h>
 
@@ -23,7 +25,10 @@ class QuickCodeView final : public QWidget {
   //! Constructor
   QuickCodeView(const Index &index,
                 const FileLocationCache &file_location_cache,
-                RawEntityId entity_id, QWidget *parent = nullptr);
+                RawEntityId entity_id,
+                IGlobalHighlighter &highlighter,
+                IMacroExplorer &macro_explorer,
+                QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickCodeView() override;
@@ -54,7 +59,9 @@ class QuickCodeView final : public QWidget {
   //! Initializes the internal widgets
   void InitializeWidgets(const Index &index,
                          const FileLocationCache &file_location_cache,
-                         RawEntityId entity_id);
+                         RawEntityId entity_id,
+                         IGlobalHighlighter &highlighter,
+                         IMacroExplorer &macro_explorer);
 
   //! Updates the widget icons to match the active theme
   void UpdateIcons();

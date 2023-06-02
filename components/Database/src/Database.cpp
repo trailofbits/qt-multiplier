@@ -52,10 +52,21 @@ QFuture<VariantEntity> Database::RequestCanonicalEntity(RawEntityId entity_id) {
 }
 
 QFuture<IDatabase::IndexedTokenRangeDataResult>
-Database::RequestIndexedTokenRangeData(RawEntityId entity_id) {
+Database::RequestIndexedTokenRangeData(RawEntityId entity_id,
+                                       const TokenTreeVisitor *vis) {
   return QtConcurrent::run(QThreadPool::globalInstance(),
                            GetIndexedTokenRangeData, d->index,
-                           d->file_location_cache, entity_id);
+                           d->file_location_cache, entity_id, vis);
+}
+
+QFuture<IDatabase::IndexedTokenRangeDataResult>
+Database::RequestExpandedTokenRangeData(
+    RawEntityId entity_id, const TokenTree &tree,
+    const TokenTreeVisitor *vis) {
+  return QtConcurrent::run(QThreadPool::globalInstance(),
+                           GetExpandedTokenRangeData, d->index,
+                           d->file_location_cache, entity_id,
+                           tree, vis);
 }
 
 QFuture<OptionalName> Database::RequestEntityName(RawEntityId fragment_id) {

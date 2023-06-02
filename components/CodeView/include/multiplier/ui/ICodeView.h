@@ -18,6 +18,7 @@
 namespace mx {
 class Token;
 class TokenRange;
+class TokenTreeVisitor;
 }  // namespace mx
 
 namespace mx::gui {
@@ -75,7 +76,7 @@ class ICodeView : public QWidget {
   virtual void SetTabWidth(std::size_t width) = 0;
 
   //! Constructor
-  ICodeView(QWidget *parent) : QWidget(parent) {}
+  inline ICodeView(QWidget *parent) : QWidget(parent) {}
 
   //! Destructor
   virtual ~ICodeView() override = default;

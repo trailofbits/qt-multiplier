@@ -24,7 +24,13 @@ namespace mx::gui {
 class IndexedTokenRangeData final {
  public:
   //! Entity ID associated with the request.
-  RawEntityId requested_id;
+  RawEntityId requested_id{kInvalidEntityId};
+
+  //! Entity ID associated with the response.
+  RawEntityId response_id{kInvalidEntityId};
+
+  //! File ID associated with the "base" tokens. This affects line numbering.
+  RawEntityId file_id{kInvalidEntityId};
 
   //! Range of tokens in this data.
   TokenRange tokens;

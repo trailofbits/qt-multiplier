@@ -9,14 +9,20 @@
 #pragma once
 
 #include <multiplier/ui/IDatabase.h>
+#include <multiplier/TokenTree.h>
 
 #include <QPromise>
 
 namespace mx::gui {
 
+void GetExpandedTokenRangeData(
+    QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    const Index &, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id, TokenTree tree, const TokenTreeVisitor *vis);
+
 void GetIndexedTokenRangeData(
     QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id);
+    RawEntityId entity_id, const TokenTreeVisitor *vis);
 
 }  // namespace mx::gui

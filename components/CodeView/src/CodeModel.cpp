@@ -9,6 +9,7 @@
 #include "CodeModel.h"
 
 #include <multiplier/ui/IDatabase.h>
+#include <multiplier/TokenTree.h>
 
 #include <QFutureWatcher>
 
@@ -25,8 +26,10 @@ struct CodeModel::PrivateData final {
   FileLocationCache file_location_cache;
   Index index;
 
+  const TokenTreeVisitor empty_macro_expansion_config{};
+  const TokenTreeVisitor *macro_expansion_config{&empty_macro_expansion_config};
+
   ModelState model_state{ModelState::Uninitialized};
-  std::optional<RawEntityId> opt_entity_id;
 
   const IndexedTokenRangeData::Line *last_line_cache{nullptr};
   const IndexedTokenRangeData::Column *last_column_cache{nullptr};
@@ -98,30 +101,17 @@ CodeModel::~CodeModel() {
   CancelRunningRequest();
 }
 
-std::optional<RawEntityId> CodeModel::GetEntity(void) const {
-  return d->opt_entity_id;
-}
-
 void CodeModel::SetEntity(RawEntityId raw_id) {
+  if (d->tokens.requested_id == raw_id || d->tokens.response_id == raw_id) {
+    return;  // Don't change anything.
+  }
+
   CancelRunningRequest();
 
-  auto prev_state = d->model_state;
   emit beginResetModel();
   d->model_state = ModelState::UpdateInProgress;
-
-  EntityId eid(raw_id);
-  if (std::optional<FragmentId> frag_id = FragmentId::from(eid)) {
-    raw_id = EntityId(frag_id.value()).Pack();
-  }
-
-  if (d->opt_entity_id.has_value() && d->opt_entity_id.value() == raw_id) {
-    d->model_state = prev_state;
-    emit endResetModel();
-    return;
-  }
-
-  d->opt_entity_id = std::nullopt;
-  d->future_result = d->database->RequestIndexedTokenRangeData(raw_id);
+  d->future_result = d->database->RequestIndexedTokenRangeData(
+      raw_id, d->macro_expansion_config);
   d->future_watcher.setFuture(d->future_result);
 
   emit endResetModel();
@@ -279,11 +269,8 @@ void CodeModel::CancelRunningRequest() {
 }
 
 void CodeModel::FutureResultStateChanged() {
-  emit beginResetModel();
-
   if (d->future_result.isCanceled()) {
     d->model_state = ModelState::UpdateCancelled;
-    emit endResetModel();
     return;
   }
 
@@ -292,15 +279,48 @@ void CodeModel::FutureResultStateChanged() {
 
   if (!future_result.Succeeded()) {
     d->model_state = ModelState::UpdateFailed;
-    emit endResetModel();
     return;
   }
 
+  // Check if anything actually changed.
+  IndexedTokenRangeData new_tokens = future_result.TakeValue();
+  if (new_tokens.requested_id == d->tokens.requested_id &&
+      new_tokens.response_id == d->tokens.response_id &&
+      new_tokens.tokens == d->tokens.tokens)  {
+    d->model_state = ModelState::Ready;
+    return;
+  }
+
+  emit beginResetModel();
   d->last_line_cache = nullptr;
   d->last_column_cache = nullptr;
-  d->tokens = future_result.TakeValue();
+  d->tokens = std::move(new_tokens);
   d->model_state = ModelState::Ready;
   emit endResetModel();
+}
+
+void CodeModel::OnExpandMacros(const TokenTreeVisitor *visitor) {
+  if (visitor) {
+    d->macro_expansion_config = visitor;
+  } else {
+    d->macro_expansion_config = &(d->empty_macro_expansion_config);
+  }
+
+  if (!IsReady()) {
+    return;
+  }
+
+  std::optional<TokenTree> tt = TokenTree::from(d->tokens.tokens);
+  if (!tt) {
+    return;
+  }
+
+  CancelRunningRequest();
+
+  d->model_state = ModelState::UpdateInProgress;
+  d->future_result = d->database->RequestExpandedTokenRangeData(
+      d->tokens.requested_id, tt.value(), d->macro_expansion_config);
+  d->future_watcher.setFuture(d->future_result);
 }
 
 }  // namespace mx::gui
