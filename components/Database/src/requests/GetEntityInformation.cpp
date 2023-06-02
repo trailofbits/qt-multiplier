@@ -27,6 +27,7 @@
 #include <multiplier/Entities/IfStmt.h>
 #include <multiplier/Entities/IncludeLikeMacroDirective.h>
 #include <multiplier/Entities/MacroExpansion.h>
+#include <multiplier/Entities/MacroParameter.h>
 #include <multiplier/Entities/MemberExpr.h>
 #include <multiplier/Entities/NamedDecl.h>
 #include <multiplier/Entities/RecordDecl.h>
@@ -740,6 +741,58 @@ static EntityInformation GetMacroInformation(
   info.entity.location =
       GetLocation(result_promise, entity.use_tokens(), file_location_cache);
   info.entity.entity_role = entity;
+
+  info.definitions.emplace_back(info.entity);
+
+  // Find the local variables.
+  for (const MacroOrToken &mt : entity.parameters()) {
+    if (result_promise.isCanceled()) {
+      return info;
+    }
+
+    if (!std::holds_alternative<Macro>(mt)) {
+      continue;
+    }
+
+    const Macro &macro = std::get<Macro>(mt);
+    std::optional<MacroParameter> mp = MacroParameter::from(macro);
+    if (!mp) {
+      continue;
+    }
+
+    EntityInformation::Selection *sel = &(info.parameters.emplace_back());
+    TokenRange tokens = mp->use_tokens();
+    if (Token name_tok = mp->name()) {
+      if (entity.is_variadic()) {
+        sel->display_role.setValue(tokens);
+      } else {
+        sel->display_role.setValue(name_tok);
+      }
+
+    } else if (entity.is_variadic()) {
+      sel->display_role.setValue(QString("__VA_ARGS__"));
+    }
+
+    sel->entity_role = mp.value();
+    sel->location = GetLocation(result_promise, tokens, file_location_cache);
+  }
+
+  for (Reference ref : entity.references()) {
+    if (result_promise.isCanceled()) {
+      return info;
+    }
+
+    auto exp = MacroExpansion::from(ref.as_macro());
+    if (!exp) {
+      continue;
+    }
+
+    TokenRange tokens = exp->use_tokens();
+    EntityInformation::Selection *sel = &(info.uses.emplace_back());
+    sel->display_role.setValue(InjectWhitespace(tokens.strip_whitespace()));
+    sel->entity_role = exp.value();
+    sel->location = GetLocation(result_promise, tokens, file_location_cache);
+  }
 
   return info;
 }
