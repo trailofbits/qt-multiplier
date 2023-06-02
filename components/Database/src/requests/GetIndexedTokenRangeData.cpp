@@ -32,17 +32,17 @@ static void RenderToken(const FileLocationCache &file_location_cache,
   IndexedTokenRangeData::Line *line = &(res.lines.back());
 
   // Try to get a number for this line.
-  unsigned prev_line_number = line->number;
   unsigned line_number_from_tok = 0u;
-  if (std::holds_alternative<FileTokenId>(tok.id().Unpack())) {
-    if (auto line_col = tok.location(file_location_cache)) {
-      if (prev_line_number && prev_line_number != line_col->first) {
-        qDebug() << "Line number doesn't match expectations for token"
-                 << tok.id().Pack();
+  VariantId token_vid = tok.id().Unpack();
+  if (std::holds_alternative<FileTokenId>(token_vid)) {
+    FileId fid(std::get<FileTokenId>(token_vid).file_id);
+    if (EntityId(fid) == res.file_id) {
+      if (auto line_col = tok.location(file_location_cache)) {
+        line_number_from_tok = line_col->first;
+        if (!line->number) {
+          line->number = line_col->first;
+        }
       }
-
-      line_number_from_tok = line_col->first;
-      line->number = line_col->first;
     }
   }
 
@@ -211,11 +211,16 @@ void GetExpandedTokenRangeData(
   IndexedTokenRangeData res;
   std::optional<Fragment> frag = Fragment::containing(tree);
   std::optional<File> file = File::containing(tree);
+
   if (frag) {
     res.response_id = frag->id().Pack();
 
   } else if (file) {
     res.response_id = file->id().Pack();
+  }
+
+  if (file) {
+    res.file_id = file->id().Pack();
   }
 
   res.requested_id = entity_id;
