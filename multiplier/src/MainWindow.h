@@ -49,7 +49,7 @@ class MainWindow final : public QMainWindow {
   void OpenTokenReferenceExplorer(const QModelIndex &index);
   void OpenTokenTaintExplorer(const QModelIndex &index);
   void OpenTokenEntityInfo(const QModelIndex &index);
-  void ExpandMacro(const QModelIndex &index, bool local);
+  void ExpandMacro(const QModelIndex &index);
   void OpenReferenceExplorer(RawEntityId entity_id,
                              IReferenceExplorerModel::ExpansionMode mode);
   void OpenCodePreview(const QModelIndex &index);

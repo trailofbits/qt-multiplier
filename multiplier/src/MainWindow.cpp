@@ -97,6 +97,7 @@ struct MainWindow::PrivateData final {
   QDockWidget *entity_explorer_dock{nullptr};
   QDockWidget *info_explorer_dock{nullptr};
   QDockWidget *macro_explorer_dock{nullptr};
+  QDockWidget *highlight_explorer_dock{nullptr};
   IInformationExplorerModel *info_explorer_model{nullptr};
 
   IGlobalHighlighter *global_highlighter{nullptr};
@@ -164,7 +165,10 @@ void MainWindow::InitializeWidgets() {
 
   tabifyDockWidget(d->project_explorer_dock, d->entity_explorer_dock);
   tabifyDockWidget(d->entity_explorer_dock, d->macro_explorer_dock);
+  tabifyDockWidget(d->macro_explorer_dock, d->highlight_explorer_dock);
+
   d->project_explorer_dock->raise();
+
   setDocumentMode(false);
 }
 
@@ -354,12 +358,12 @@ void MainWindow::CreateGlobalHighlighter() {
   connect(d->global_highlighter, &IGlobalHighlighter::EntityClicked, this,
           &MainWindow::OnOpenEntity);
 
-  auto dock = new QDockWidget(d->global_highlighter->windowTitle(), this);
-  dock->setWidget(d->global_highlighter);
-  dock->setAllowedAreas(Qt::LeftDockWidgetArea);
+  d->highlight_explorer_dock = new QDockWidget(
+      d->global_highlighter->windowTitle(), this);
+  d->highlight_explorer_dock->setWidget(d->global_highlighter);
+  d->highlight_explorer_dock->setAllowedAreas(Qt::LeftDockWidgetArea);
 
-  d->view_menu->addAction(dock->toggleViewAction());
-  tabifyDockWidget(d->entity_explorer_dock, dock);
+  d->view_menu->addAction(d->highlight_explorer_dock->toggleViewAction());
 }
 
 void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
@@ -479,10 +483,10 @@ void MainWindow::OpenTokenEntityInfo(const QModelIndex &index) {
   OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var));
 }
 
-void MainWindow::ExpandMacro(const QModelIndex &index, bool local) {
+void MainWindow::ExpandMacro(const QModelIndex &index) {
   if (auto macro_token_opt = ICodeModel::MacroExpansionPoint(index)) {
-    d->macro_explorer->AddMacro(macro_token_opt->first, macro_token_opt->second,
-                                local);
+    d->macro_explorer->AddMacro(macro_token_opt->first,
+                                macro_token_opt->second);
   }
 }
 
@@ -833,7 +837,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       OpenTokenEntityInfo(index);
 
     } else if (keyboard_button.key == Qt::Key_E) {
-      ExpandMacro(index, true  /* local */);
+      ExpandMacro(index);
 
     } else if (keyboard_button.key == Qt::Key_Enter) {
       // Like in IDA Pro, pressing Enter while the cursor is on a use of that

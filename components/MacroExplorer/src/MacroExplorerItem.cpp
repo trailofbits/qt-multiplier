@@ -30,7 +30,7 @@ struct MacroExplorerItem::PrivateData final {
 MacroExplorerItem::~MacroExplorerItem() {}
 
 MacroExplorerItem::MacroExplorerItem(
-    RawEntityId entity_id, const QString &name_label,
+    RawEntityId entity_id, bool is_global, const QString &name_label,
     const std::optional<QString> &opt_location_label, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
@@ -38,6 +38,10 @@ MacroExplorerItem::MacroExplorerItem(
   d->entity_id = entity_id;
 
   QString label = name_label;
+  if (is_global) {
+    label = "<B><U>" + label + "</U></B>";
+  }
+
   if (opt_location_label.has_value()) {
     label += "<BR /><small><i>" + opt_location_label.value() + "</i></small>";
   }

@@ -51,8 +51,7 @@ class IMacroExplorer : public QWidget {
       const Index &index, QObject *parent = nullptr) = 0;
 
  public slots:
-  virtual void AddMacro(RawEntityId macro_id, RawEntityId token_id,
-                        bool local) = 0;
+  virtual void AddMacro(RawEntityId macro_id, RawEntityId token_id) = 0;
 };
 
 }  // namespace mx::gui

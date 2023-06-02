@@ -120,7 +120,7 @@ void MacroExplorer::AlwaysExpandMacro(const DefineMacroDirective &def) {
   std::string_view def_name = def.name().data();
 
   MacroExplorerItem *item = new MacroExplorerItem(
-      eid,
+      eid, true,
       QString::fromUtf8(
           def_name.data(), static_cast<qsizetype>(def_name.size())),
       GetLocation(def.name(), d->file_location_cache),
@@ -155,7 +155,7 @@ void MacroExplorer::ExpandSpecificMacro(const DefineMacroDirective &def,
   }
 
   auto item = new MacroExplorerItem(
-      eid,
+      eid, false,
       QString::fromUtf8(
           def_name.data(), static_cast<qsizetype>(def_name.size())),
       loc_name,
@@ -180,7 +180,7 @@ void MacroExplorer::ExpandSpecificSubstitution(const Token &use_tok,
 
   std::string_view def_name = use_tok.data();
   auto item = new MacroExplorerItem(
-      eid,
+      eid, false,
       QString::fromUtf8(
           def_name.data(), static_cast<qsizetype>(def_name.size())),
       GetLocation(use_tok, d->file_location_cache),
@@ -232,8 +232,7 @@ void MacroExplorer::UpdateList(void) {
   d->scroll_layout->addStretch();
 }
 
-void MacroExplorer::AddMacro(RawEntityId macro_id, RawEntityId token_id,
-                             bool local) {
+void MacroExplorer::AddMacro(RawEntityId macro_id, RawEntityId token_id) {
   VariantEntity macro_ent = d->index.entity(macro_id);
   VariantEntity token_ent = d->index.entity(token_id);
   if (!std::holds_alternative<Macro>(macro_ent) ||
@@ -248,11 +247,7 @@ void MacroExplorer::AddMacro(RawEntityId macro_id, RawEntityId token_id,
     if (auto exp = MacroExpansion::from(containing_macro)) {
       if (auto def = exp->definition()) {
         if (def.value() == macro) {
-          if (local) {
-            ExpandSpecificMacro(def.value(), exp.value());
-          } else {
-            AlwaysExpandMacro(def.value());
-          }
+          ExpandSpecificMacro(def.value(), exp.value());
           return;
         }
       }

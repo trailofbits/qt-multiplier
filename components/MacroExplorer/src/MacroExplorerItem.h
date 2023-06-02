@@ -36,7 +36,7 @@ class MacroExplorerItem final : public QWidget {
 
   //! Constructor
   MacroExplorerItem(
-      RawEntityId entity_id, const QString &name_label,
+      RawEntityId entity_id, bool is_global, const QString &name_label,
       const std::optional<QString> &opt_location_label=std::nullopt,
       QWidget *parent=nullptr);
 
