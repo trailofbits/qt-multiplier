@@ -154,6 +154,7 @@ void MainWindow::InitializeWidgets() {
   setTabPosition(Qt::TopDockWidgetArea, QTabWidget::North);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
+  CreateGlobalHighlighter();
   CreateMacroExplorerDock();
   CreateRefExplorerMenuOptions();
   CreateProjectExplorerDock();
@@ -161,7 +162,6 @@ void MainWindow::InitializeWidgets() {
   CreateInfoExplorerDock();
   CreateCodeView();
   CreateReferenceExplorerDock();
-  CreateGlobalHighlighter();
 
   tabifyDockWidget(d->project_explorer_dock, d->entity_explorer_dock);
   tabifyDockWidget(d->entity_explorer_dock, d->macro_explorer_dock);
