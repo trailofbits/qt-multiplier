@@ -25,6 +25,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 #include <vector>
+#include <mutex>
 
 namespace mx::gui {
 
