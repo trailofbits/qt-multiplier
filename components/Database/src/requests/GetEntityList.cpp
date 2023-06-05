@@ -60,6 +60,7 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
 
       Fragment fragment = Fragment::containing(named_decl);
       data_batch.push_back(IDatabase::EntityQueryResult{
+          named_decl.id().Pack(),
           fragment,
           File::containing(fragment),
           std::move(name_token),
@@ -89,6 +90,7 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
 
       Fragment fragment = Fragment::containing(macro);
       data_batch.push_back(IDatabase::EntityQueryResult{
+          name_token.id().Pack(),
           fragment,
           File::containing(fragment),
           std::move(name_token),

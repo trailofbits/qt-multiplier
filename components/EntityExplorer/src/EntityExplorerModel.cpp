@@ -139,6 +139,9 @@ QVariant EntityExplorerModel::data(const QModelIndex &index, int role) const {
 
   } else if (role == EntityExplorerModel::TokenRole) {
     value.setValue(row->name_token);
+
+  } else if (role == EntityExplorerModel::TokenIdRole) {
+    value.setValue(static_cast<qulonglong>(row->entity_id));
   }
 
   return value;

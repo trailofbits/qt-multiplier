@@ -208,7 +208,8 @@ void MainWindow::CreateProjectExplorerDock() {
 void MainWindow::CreateEntityExplorerDock() {
   auto entity_explorer_model =
       IEntityExplorerModel::Create(d->index, d->file_location_cache, this);
-  d->entity_explorer = IEntityExplorer::Create(entity_explorer_model, this);
+  d->entity_explorer = IEntityExplorer::Create(entity_explorer_model, this,
+                                               d->global_highlighter);
 
   d->entity_explorer_dock = new QDockWidget(tr("Entity Explorer"), this);
   d->entity_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
@@ -242,8 +243,8 @@ void MainWindow::CreateInfoExplorerDock() {
 }
 
 void MainWindow::CreateMacroExplorerDock() {
-  d->macro_explorer = IMacroExplorer::Create(
-      d->index, d->file_location_cache, this);
+  d->macro_explorer =
+      IMacroExplorer::Create(d->index, d->file_location_cache, this);
 
   d->macro_explorer_dock = new QDockWidget(tr("Macro Explorer"), this);
   d->macro_explorer_dock->setWidget(d->macro_explorer);
@@ -358,8 +359,8 @@ void MainWindow::CreateGlobalHighlighter() {
   connect(d->global_highlighter, &IGlobalHighlighter::EntityClicked, this,
           &MainWindow::OnOpenEntity);
 
-  d->highlight_explorer_dock = new QDockWidget(
-      d->global_highlighter->windowTitle(), this);
+  d->highlight_explorer_dock =
+      new QDockWidget(d->global_highlighter->windowTitle(), this);
   d->highlight_explorer_dock->setWidget(d->global_highlighter);
   d->highlight_explorer_dock->setAllowedAreas(Qt::LeftDockWidgetArea);
 
@@ -598,9 +599,8 @@ MainWindow::CreateNewCodeView(RawEntityId file_entity_id, QString tab_name,
   ICodeModel *code_model = d->macro_explorer->CreateCodeModel(
       d->file_location_cache, d->index, this);
 
-  QAbstractItemModel *proxy_model =
-      d->global_highlighter->CreateModelProxy(
-          code_model, kHighlightEntityIdRole);
+  QAbstractItemModel *proxy_model = d->global_highlighter->CreateModelProxy(
+      code_model, kHighlightEntityIdRole);
 
   ICodeView *code_view = ICodeView::Create(proxy_model);
 

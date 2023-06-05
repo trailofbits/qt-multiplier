@@ -37,6 +37,7 @@ target_link_libraries("mx_entityexplorer"
     "mx_searchwidget"
     "mx_database"
     "mx_codeviewtheme"
+    "mx_globalhighlighter"
 )
 
 target_include_directories("mx_entityexplorer" PRIVATE

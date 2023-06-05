@@ -119,6 +119,9 @@ class IDatabase {
 
   //! A single entity query result
   struct EntityQueryResult final {
+    //! The entity id of this result
+    RawEntityId entity_id{};
+
     //! The fragment containing this token
     Fragment fragment;
 

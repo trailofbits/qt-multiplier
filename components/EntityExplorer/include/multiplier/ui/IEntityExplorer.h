@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/ui/IEntityExplorerModel.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
 
 #include <QWidget>
 
@@ -27,8 +28,9 @@ class IEntityExplorer : public QWidget {
 
  public:
   //! Factory method
-  static IEntityExplorer *Create(IEntityExplorerModel *model,
-                                 QWidget *parent = nullptr);
+  static IEntityExplorer *
+  Create(IEntityExplorerModel *model, QWidget *parent = nullptr,
+         IGlobalHighlighter *global_highlighter = nullptr);
 
   //! Constructor
   IEntityExplorer(QWidget *parent) : QWidget(parent) {}

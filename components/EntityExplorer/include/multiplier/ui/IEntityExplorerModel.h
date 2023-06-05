@@ -28,6 +28,9 @@ class IEntityExplorerModel : public QAbstractItemModel {
   enum ItemDataRole {
     //! Returns a Token object
     TokenRole = Qt::UserRole + 1,
+
+    //! Returns the RawEntityId value
+    TokenIdRole,
   };
 
   //! Search modes supported by the `IEntityExplorerModel::Search` method

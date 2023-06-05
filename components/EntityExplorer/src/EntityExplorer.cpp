@@ -42,12 +42,13 @@ IEntityExplorerModel *EntityExplorer::Model() {
   return d->model;
 }
 
-EntityExplorer::EntityExplorer(IEntityExplorerModel *model, QWidget *parent)
+EntityExplorer::EntityExplorer(IEntityExplorerModel *model, QWidget *parent,
+                               IGlobalHighlighter *global_highlighter)
     : IEntityExplorer(parent),
       d(new PrivateData) {
 
   InitializeWidgets();
-  InstallModel(model);
+  InstallModel(model, global_highlighter);
 }
 
 void EntityExplorer::InitializeWidgets() {
@@ -112,9 +113,17 @@ void EntityExplorer::InitializeWidgets() {
                 IThemeManager::Get().GetCodeViewTheme());
 }
 
-void EntityExplorer::InstallModel(IEntityExplorerModel *model) {
+void EntityExplorer::InstallModel(IEntityExplorerModel *model,
+                                  IGlobalHighlighter *global_highlighter) {
   d->model = model;
-  d->list_view->setModel(d->model);
+
+  QAbstractItemModel *source_model{d->model};
+  if (global_highlighter != nullptr) {
+    source_model = global_highlighter->CreateModelProxy(
+        source_model, IEntityExplorerModel::TokenIdRole);
+  }
+
+  d->list_view->setModel(source_model);
 
   // Note: this needs to happen after the model has been set in the
   // list view!
@@ -123,7 +132,7 @@ void EntityExplorer::InstallModel(IEntityExplorerModel *model) {
   connect(list_selection_model, &QItemSelectionModel::currentChanged, this,
           &EntityExplorer::SelectionChanged);
 
-  connect(d->model, &QAbstractListModel::modelReset, this,
+  connect(source_model, &QAbstractListModel::modelReset, this,
           &EntityExplorer::OnModelReset);
 
   OnModelReset();
