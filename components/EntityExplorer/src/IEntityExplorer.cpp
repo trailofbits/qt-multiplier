@@ -12,11 +12,12 @@
 
 namespace mx::gui {
 
-IEntityExplorer *IEntityExplorer::Create(IEntityExplorerModel *model,
-                                         QWidget *parent) {
+IEntityExplorer *
+IEntityExplorer::Create(IEntityExplorerModel *model, QWidget *parent,
+                        IGlobalHighlighter *global_highlighter) {
 
   try {
-    return new EntityExplorer(model, parent);
+    return new EntityExplorer(model, parent, global_highlighter);
 
   } catch (const std::bad_alloc &) {
     return nullptr;

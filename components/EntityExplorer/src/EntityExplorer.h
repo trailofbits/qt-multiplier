@@ -33,13 +33,15 @@ class EntityExplorer final : public IEntityExplorer {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  EntityExplorer(IEntityExplorerModel *model, QWidget *parent);
+  EntityExplorer(IEntityExplorerModel *model, QWidget *parent,
+                 IGlobalHighlighter *global_highlighter);
 
   //! Initializes the internal widgets
   void InitializeWidgets();
 
   //! Installs the specified model, taking ownership of it
-  void InstallModel(IEntityExplorerModel *model);
+  void InstallModel(IEntityExplorerModel *model,
+                    IGlobalHighlighter *global_highlighter);
 
   //! Installs the item delegate that paints the tokens
   void InstallItemDelegate(const CodeViewTheme &code_view_theme);

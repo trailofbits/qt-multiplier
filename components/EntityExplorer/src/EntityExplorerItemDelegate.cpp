@@ -62,6 +62,7 @@ void EntityExplorerItemDelegate::ClearWhitespaceReplacement(void) {
 void EntityExplorerItemDelegate::paint(QPainter *painter,
                                        const QStyleOptionViewItem &option,
                                        const QModelIndex &index) const {
+
   if (!index.isValid()) {
     this->QStyledItemDelegate::paint(painter, option, index);
     return;
@@ -69,6 +70,14 @@ void EntityExplorerItemDelegate::paint(QPainter *painter,
 
   QVariant val = index.data(IEntityExplorerModel::TokenRole);
   if (!val.isValid()) {
+    this->QStyledItemDelegate::paint(painter, option, index);
+    return;
+  }
+
+  auto background_var = index.data(Qt::BackgroundRole);
+  auto background_color = background_var.value<QColor>();
+
+  if (background_color.isValid()) {
     this->QStyledItemDelegate::paint(painter, option, index);
     return;
   }

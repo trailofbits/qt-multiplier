@@ -40,7 +40,7 @@ QVariant HighlightingModelProxy::data(const QModelIndex &index,
     return ret;
   }
 
-  auto entity_id_var = sourceModel()->data(index, d->entity_id_data_role);
+  auto entity_id_var = QIdentityProxyModel::data(index, d->entity_id_data_role);
   if (!entity_id_var.isValid()) {
     return ret;
   }
