@@ -605,7 +605,10 @@ void CodeView::UpdateBaseExtraSelections() {
 }
 
 std::uint64_t CodeView::GetUniqueTokenIdentifier(const QModelIndex &index) {
-  return index.internalId();
+  auto node_id = static_cast<std::uint64_t>(index.internalId());
+  auto index_column = static_cast<std::uint64_t>(index.column());
+
+  return (node_id << 32) | index_column;
 }
 
 std::optional<std::size_t>
