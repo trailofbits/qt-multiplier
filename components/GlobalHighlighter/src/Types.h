@@ -9,11 +9,14 @@
 #pragma once
 
 #include <multiplier/Types.h>
+#include <multiplier/Token.h>
 
 #include <QColor>
 
 #include <unordered_map>
 #include <unordered_set>
+
+#include <optional>
 
 namespace mx::gui {
 
@@ -21,6 +24,7 @@ using EntityColorMap = std::unordered_map<RawEntityId, QColor>;
 
 struct EntityHighlight final {
   QString name;
+  std::optional<Token> opt_name_token;
   RawEntityId primary_entity_id{};
   QColor color;
   std::unordered_set<RawEntityId> entity_id_list;
