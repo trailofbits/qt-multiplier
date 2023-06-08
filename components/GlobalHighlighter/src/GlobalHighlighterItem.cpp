@@ -59,6 +59,7 @@ GlobalHighlighterItem::GlobalHighlighterItem(const RawEntityId &entity_id,
   setContentsMargins(0, 0, 0, 0);
 
   auto layout = new QHBoxLayout();
+  layout->setContentsMargins(0, 0, 0, 0);
 
   d->entity_name = new QLabel(label);
   d->entity_name->installEventFilter(this);
