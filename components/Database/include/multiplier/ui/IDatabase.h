@@ -12,6 +12,7 @@
 #include <multiplier/ui/RPCErrorCode.h>
 
 #include <multiplier/Index.h>
+#include <multiplier/Token.h>
 
 #include <QString>
 #include <QFuture>
@@ -88,8 +89,7 @@ class IDatabase {
 
   //! Requests the specified file
   virtual QFuture<IndexedTokenRangeDataResult>
-  RequestExpandedTokenRangeData(RawEntityId entity_id,
-                                const TokenTree &tree,
+  RequestExpandedTokenRangeData(RawEntityId entity_id, const TokenTree &tree,
                                 const TokenTreeVisitor *vis) = 0;
 
   //! An optional name
@@ -102,6 +102,9 @@ class IDatabase {
   struct RelatedEntities final {
     //! The name of the entity used to perform the request
     QString name;
+
+    //! The token containing the entity name (unreliable)
+    std::optional<Token> opt_name_token;
 
     //! Primary entity id
     RawEntityId primary_entity_id{};
