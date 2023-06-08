@@ -10,7 +10,7 @@
 
 #include <multiplier/ui/IThemeManager.h>
 
-#include <multiplier/Index.h>
+#include <multiplier/Token.h>
 
 #include <QWidget>
 
@@ -30,7 +30,7 @@ class GlobalHighlighterItem final : public QWidget {
   GlobalHighlighterItem &operator=(const GlobalHighlighterItem &) = delete;
 
  protected:
-  //! Used to make QLabel widgets clickable
+  //! Used to make the label widgets clickable
   virtual bool eventFilter(QObject *object, QEvent *event) override;
 
  private:
@@ -38,7 +38,8 @@ class GlobalHighlighterItem final : public QWidget {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  GlobalHighlighterItem(const RawEntityId &entity_id, const QString &label,
+  GlobalHighlighterItem(const RawEntityId &entity_id, const QString &name,
+                        const std::optional<Token> &opt_name_token,
                         const QColor &color, QWidget *parent);
 
   //! Updates the button icons based on the active theme

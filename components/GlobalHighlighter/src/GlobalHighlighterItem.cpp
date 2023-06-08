@@ -10,6 +10,7 @@
 #include "GlobalHighlighterItem.h"
 
 #include <multiplier/ui/Icons.h>
+#include <multiplier/ui/ITokenLabel.h>
 
 #include <QHBoxLayout>
 #include <QPushButton>
@@ -24,7 +25,7 @@ struct GlobalHighlighterItem::PrivateData final {
   RawEntityId entity_id;
 
   //! The label containing the entity name
-  QLabel *entity_name{nullptr};
+  QWidget *entity_name{nullptr};
 
   //! The highlight color
   QColor color;
@@ -46,10 +47,10 @@ bool GlobalHighlighterItem::eventFilter(QObject *object, QEvent *event) {
   return false;
 }
 
-GlobalHighlighterItem::GlobalHighlighterItem(const RawEntityId &entity_id,
-                                             const QString &label,
-                                             const QColor &color,
-                                             QWidget *parent)
+GlobalHighlighterItem::GlobalHighlighterItem(
+    const RawEntityId &entity_id, const QString &name,
+    const std::optional<Token> &opt_name_token, const QColor &color,
+    QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
@@ -61,7 +62,12 @@ GlobalHighlighterItem::GlobalHighlighterItem(const RawEntityId &entity_id,
   auto layout = new QHBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
 
-  d->entity_name = new QLabel(label);
+  if (opt_name_token.has_value()) {
+    d->entity_name = ITokenLabel::Create(opt_name_token.value());
+  } else {
+    d->entity_name = new QLabel(name);
+  }
+
   d->entity_name->installEventFilter(this);
   layout->addWidget(d->entity_name);
 

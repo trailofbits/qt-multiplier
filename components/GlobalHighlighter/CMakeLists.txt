@@ -33,6 +33,7 @@ target_link_libraries("mx_globalhighlighter"
     "multiplier::mx-api"
     "mx_database"
     "mx_util"
+    "mx_tokenlabel"
 )
 
 target_include_directories("mx_globalhighlighter" PRIVATE
