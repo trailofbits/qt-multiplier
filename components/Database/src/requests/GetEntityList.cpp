@@ -46,7 +46,7 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
       if (query_mode == IDatabase::QueryEntitiesMode::ExactMatch) {
         skip_entity = decl_name != std_string;
       } else {
-        skip_entity = decl_name.find(std_string) == 0;
+        skip_entity = decl_name.find(std_string) == std::string::npos;
       }
 
       if (skip_entity) {
