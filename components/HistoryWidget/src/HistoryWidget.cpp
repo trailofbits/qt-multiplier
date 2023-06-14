@@ -19,6 +19,7 @@
 #include <QMenu>
 #include <QThreadPool>
 #include <QToolButton>
+#include <QShortcut>
 
 #include <atomic>
 #include <list>
@@ -87,6 +88,9 @@ struct HistoryWidget::PrivateData {
   QToolButton *forward_button{nullptr};
   QAction *forward_action{nullptr};
 
+  QShortcut *back_shortcut{nullptr};
+  QShortcut *forward_shortcut{nullptr};
+
   inline PrivateData(const Index &index_, const FileLocationCache &file_cache_,
                      unsigned max_history_size_)
       : index(index_),
@@ -103,11 +107,16 @@ struct HistoryWidget::PrivateData {
 
 HistoryWidget::HistoryWidget(const Index &index_,
                              const FileLocationCache &file_cache_,
-                             unsigned max_history_size, QWidget *parent)
+                             unsigned max_history_size, QWidget *parent,
+                             const bool &install_global_shortcuts)
     : QWidget(parent),
       d(new PrivateData(index_, file_cache_, max_history_size)) {
 
-  InitializeWidgets();
+  // Since we install the keyboard shortcuts on the widget, the parent
+  // parameters must always be valid
+  Assert(parent != nullptr, "The parent widget must be valid");
+
+  InitializeWidgets(parent, install_global_shortcuts);
 
   UpdateIcons();
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
@@ -204,7 +213,8 @@ void HistoryWidget::PrivateData::AddToHistory(RawEntityId entity_id,
   current_item_it = item_list.end();
 }
 
-void HistoryWidget::InitializeWidgets(void) {
+void HistoryWidget::InitializeWidgets(QWidget *parent,
+                                      const bool &install_global_shortcuts) {
   d->back_action = new QAction(tr("Back"), this);
   d->forward_action = new QAction(tr("Forward"), this);
 
@@ -236,6 +246,33 @@ void HistoryWidget::InitializeWidgets(void) {
 
   layout->addWidget(d->back_button);
   layout->addWidget(d->forward_button);
+
+  // Initialize the keyboard shortcuts for the parent window
+  static bool global_shortcut_installed{false};
+  if (install_global_shortcuts && global_shortcut_installed) {
+    throw std::logic_error("Global shortcuts can only be installed once");
+  }
+
+  global_shortcut_installed = install_global_shortcuts;
+
+  QWidget *shortcut_parent{nullptr};
+  Qt::ShortcutContext shortcut_context{};
+  if (install_global_shortcuts) {
+    shortcut_parent = parent;
+    shortcut_context = Qt::ApplicationShortcut;
+
+  } else {
+    shortcut_parent = this;
+    shortcut_context = Qt::WidgetWithChildrenShortcut;
+  }
+
+  d->back_shortcut =
+      new QShortcut(QKeySequence::Back, shortcut_parent, this,
+                    &HistoryWidget::OnNavigateBack, shortcut_context);
+
+  d->forward_shortcut =
+      new QShortcut(QKeySequence::Forward, shortcut_parent, this,
+                    &HistoryWidget::OnNavigateForward, shortcut_context);
 }
 
 void HistoryWidget::UpdateMenus(void) {
@@ -354,7 +391,9 @@ void HistoryWidget::OnLabelForItem(std::uint64_t item_id,
 }
 
 void HistoryWidget::OnNavigateBack(void) {
-  Assert(d->current_item_it != d->item_list.begin(), "Too far back");
+  if (d->current_item_it == d->item_list.begin()) {
+    return;
+  }
 
   QAction dummy;
   ssize_t index =
@@ -366,7 +405,9 @@ void HistoryWidget::OnNavigateBack(void) {
 }
 
 void HistoryWidget::OnNavigateForward(void) {
-  Assert(d->current_item_it != d->item_list.end(), "Too far forward");
+  if (d->current_item_it == d->item_list.end()) {
+    return;
+  }
 
   QAction dummy;
   ssize_t index =

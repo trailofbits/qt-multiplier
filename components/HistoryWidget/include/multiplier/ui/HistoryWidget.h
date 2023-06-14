@@ -33,13 +33,16 @@ class HistoryWidget final : public QWidget {
   std::unique_ptr<PrivateData> d;
 
  private:
-  void InitializeWidgets(void);
+  void InitializeWidgets(QWidget *parent, const bool &install_global_shortcuts);
   void UpdateMenus(void);
   void UpdateIcons();
 
  public:
+  //! Constructor
+  //! \param parent The parent widget, where the shortcuts will be installed
   HistoryWidget(const Index &index_, const FileLocationCache &file_cache_,
-                unsigned max_history_size = 30, QWidget *parent = nullptr);
+                unsigned max_history_size, QWidget *parent,
+                const bool &install_global_shortcuts);
 
   virtual ~HistoryWidget(void);
 
