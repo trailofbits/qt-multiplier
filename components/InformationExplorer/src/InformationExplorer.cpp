@@ -56,8 +56,9 @@ void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model) {
   auto toolbar = new QToolBar(this);
   layout->addWidget(toolbar);
 
-  d->history_widget = new HistoryWidget(
-      model->GetIndex(), model->GetFileLocationCache(), kMaxHistorySize, this);
+  d->history_widget =
+      new HistoryWidget(model->GetIndex(), model->GetFileLocationCache(),
+                        kMaxHistorySize, this, false);
 
   toolbar->addWidget(d->history_widget);
   toolbar->setIconSize(QSize(16, 16));

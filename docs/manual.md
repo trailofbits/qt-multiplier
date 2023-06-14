@@ -10,7 +10,20 @@ Note that it is advised to use the temporary folder in order to avoid potential 
 
 ## Searching and filtering
 
-All widgets support searching or filtering functionality by pressing the `CMD + F` key combination.
+All widgets support searching or filtering functionality by pressing the following key combinations:
+
+|          | macOS         | KDE Plasma | GNOME                      |
+|----------|---------------|------------|----------------------------|
+| Find     | `Cmd+F`       | `Ctrl+F`   | `Ctrl+F`                   |
+| Next     | `Cmd+G`       | `F3`       | `Ctrl+G`, `F3`             |
+| Previous | `Cmd+Shift+G` | `Shift+F3` | `Ctrl+Shift+G`, `Shift+F3` |
+
+## History
+
+|         | macOS    | KDE Plasma | GNOME      |
+|---------|----------|------------|------------|
+| Back    | `Cmd+[` | `Alt+Left` | `Alt+Left` |
+| Forward | `Cmd+]` | `Alt+Left` | `Alt+Left` |
 
 ## Code view
 
@@ -29,9 +42,9 @@ With the text cursor on a token:
 
 ## Entity Explorer
 
-The entity explorer works like a full database search. Enter the search string and optionally select `Exact` to perform exact matching.
+The entity explorer works like a full database search. Enter the search string and either select `Exact` or `Containing`.
 
-Results can be further filtered either by category (using the combo box at the top) or with the `CMD + F` shortcut.
+Results can be further filtered either by category (using the combo box at the top) or with the searching and filtering shortcuts.
 
 ## Reference Explorer
 
@@ -77,9 +90,11 @@ The `[+]` comments means that it may be possible to further expand an item and p
 #### Key bindings for the text view
 
 * `B` toggles breadcrumbs
-* `+` (or `Shift + =`) expands an item. `CMD + LClick` on the `[+]` comment has the same effect.
+* `+` (or `Shift + =`) expands an item. `Cmd + LClick` on the `[+]` comment has the same effect.
 * `-` deletes a reference from the view
-* `Return`, `CMD + LClick` with the cursor on a token opens the selected reference in the main window
+* `Return`, `Cmd + LClick` with the cursor on a token opens the selected reference in the main window
+
+If you are on another platform, substitute the `Cmd` key with `Ctrl`.
 
 ### Graphical view
 
