@@ -8,8 +8,10 @@
 
 #include "Utils.h"
 
+#include <multiplier/Types.h>
+
 #include <utility>
-#include <iostream>
+
 namespace mx::gui {
 
 VariantEntity NamedEntityContaining(const VariantEntity &entity,
@@ -157,7 +159,7 @@ References(const VariantEntity &entity) {
 
     MX_FOR_EACH_ENTITY_CATEGORY(REFERENCES_TO_CATEGORY, REFERENCES_TO_CATEGORY,
                                 MX_IGNORE_ENTITY_CATEGORY,
-                                REFERENCES_TO_CATEGORY, REFERENCES_TO_CATEGORY)
+                                REFERENCES_TO_CATEGORY, REFERENCES_TO_CATEGORY, REFERENCES_TO_CATEGORY)
   } else {
     co_return;
   }
