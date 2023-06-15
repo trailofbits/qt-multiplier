@@ -17,6 +17,7 @@
 
 #include <QVBoxLayout>
 #include <QToolBar>
+#include <QHeaderView>
 
 namespace mx::gui {
 
@@ -76,6 +77,7 @@ void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model) {
   d->tree_view->setAllColumnsShowFocus(true);
   d->tree_view->setTreePosition(0);
   d->tree_view->setTextElideMode(Qt::TextElideMode::ElideMiddle);
+  d->tree_view->header()->setStretchLastSection(true);
   layout->addWidget(d->tree_view);
 
   d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
@@ -143,6 +145,8 @@ void InformationExplorer::ExpandAllNodes() {
       }
     }
   }
+
+  d->tree_view->resizeColumnToContents(0);
 }
 
 void InformationExplorer::OnModelReset() {
