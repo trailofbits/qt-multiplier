@@ -13,15 +13,10 @@
 #include <multiplier/Index.h>
 
 #include <QPromise>
-#include <QString>
-
-#include <optional>
 
 namespace mx::gui {
 
-using OptionalName = std::optional<QString>;
-
-void GetEntityName(QPromise<OptionalName> &entity_name_promise,
+void GetEntityName(QPromise<Token> &entity_name_promise,
                    const Index &index, RawEntityId entity_id);
 
 }  // namespace mx::gui

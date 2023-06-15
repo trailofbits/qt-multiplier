@@ -35,8 +35,7 @@ class Database final : public IDatabase {
                                 const TokenTreeVisitor *vis) override;
 
   //! \copybrief IDatabase::RequestEntityName
-  virtual QFuture<OptionalName>
-  RequestEntityName(RawEntityId fragment_id) override;
+  virtual QFuture<Token> RequestEntityName(RawEntityId fragment_id) override;
 
   //! \copybrief IDatabase::GetRelatedEntities
   virtual QFuture<RelatedEntitiesResult>

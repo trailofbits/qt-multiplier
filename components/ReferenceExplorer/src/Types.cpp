@@ -89,9 +89,9 @@ Node Node::Create(const FileLocationCache &file_cache,
   node.node_id = gNextNodeId.fetchAndAddOrdered(1);
   node.expansion_mode = import_mode;
   node.entity_id = IdOfEntity(entity);
-  node.opt_name = NameOfEntity(entity);
   node.expanded = expanded;
   node.opt_breadcrumbs = opt_breadcrumbs;
+  node.opt_name = NameOfEntityAsString(entity);
 
   node.opt_location = Location::Create(file_cache, referenced_entity);
   if (!node.opt_location.has_value()) {

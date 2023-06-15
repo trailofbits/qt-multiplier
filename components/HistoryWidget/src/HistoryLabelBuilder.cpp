@@ -80,7 +80,7 @@ void HistoryLabelBuilder::run(void) {
   // Try to find a named entity that contains `entity`.
   if (VariantEntity containing_entity = NamedDeclContaining(entity);
       IdOfEntity(containing_entity) != IdOfEntity(entity)) {
-    in_label = NameOfEntity(containing_entity);
+    in_label = NameOfEntityAsString(containing_entity);
   }
 
   if (std::holds_alternative<Token>(entity)) {
@@ -91,11 +91,11 @@ void HistoryLabelBuilder::run(void) {
     // name in our label.
     if (VariantEntity related_entity = std::get<Token>(entity).related_entity();
         file_loc == FirstFileToken(related_entity)) {
-      entity_label = NameOfEntity(related_entity);
+      entity_label = NameOfEntityAsString(related_entity);
     }
 
   } else if (std::holds_alternative<Decl>(entity)) {
-    entity_label = NameOfEntity(entity);
+    entity_label = NameOfEntityAsString(entity);
 
   } else if (std::holds_alternative<File>(entity)) {
 

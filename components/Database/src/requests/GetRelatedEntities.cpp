@@ -7,7 +7,6 @@
 */
 
 #include "GetRelatedEntities.h"
-#include "Utils.h"
 
 #include <multiplier/ui/Util.h>
 
@@ -20,18 +19,18 @@ void GetRelatedEntities(
     const Index &index, RawEntityId entity_id) {
 
   IDatabase::RelatedEntities related_entities;
-  auto opt_name = LookupEntityName(index, entity_id);
-  if (!opt_name.has_value() || opt_name->isEmpty()) {
-    related_entities_promise.addResult(RPCErrorCode::InvalidEntityID);
-    return;
-  }
-
-  related_entities.name = opt_name.value();
-
   VariantEntity ent = index.entity(entity_id);
   if (std::holds_alternative<NotAnEntity>(ent)) {
     related_entities_promise.addResult(RPCErrorCode::InvalidEntityID);
     return;
+  }
+
+  // Name.
+  related_entities.opt_name_token = NameOfEntity(ent);
+  if (related_entities.opt_name_token) {
+    std::string_view name = related_entities.opt_name_token.data();
+    related_entities.name = QString::fromUtf8(
+        name.data(), static_cast<qsizetype>(name.size()));
   }
 
   std::optional<RawEntityId> opt_primary_entity_id;
@@ -55,62 +54,6 @@ void GetRelatedEntities(
   }
 
   related_entities.primary_entity_id = opt_primary_entity_id.value();
-
-
-  //
-  // Get the token containing the entity name
-  //
-
-  // Warning: unreliable!
-  //
-  // TODO: There should be an API to acquire the token that is 1:1
-  //       with the entity name
-
-  // First attempt, try to acquire the token containing the entity
-  // name using the related entity id
-  {
-
-    auto token = FirstFileToken(ent);
-
-    auto related_entity_id = token.related_entity_id();
-    auto related_entity = index.entity(related_entity_id);
-
-    auto file_token = FirstFileToken(related_entity);
-
-    auto file_token_view = file_token.data();
-    auto file_token_size = static_cast<qsizetype>(file_token_view.size());
-
-    auto token_name =
-        QString::fromUtf8(file_token_view.data(), file_token_size);
-
-    if (token_name == related_entities.name) {
-      related_entities.opt_name_token = token;
-    }
-  }
-
-  // Second attempt, go through all the file tokens and find
-  // the one and only token matching the entity name. Skip it
-  // if we find more
-  if (!related_entities.opt_name_token.has_value()) {
-    Token token_name;
-    std::size_t match_count{};
-
-    for (const auto &token : FileTokens(ent)) {
-      auto token_view = token.data();
-      auto token_size = static_cast<qsizetype>(token_view.size());
-
-      auto token_string = QString::fromUtf8(token_view.data(), token_size);
-      if (token_string == related_entities.name) {
-        token_name = token;
-        ++match_count;
-      }
-    }
-
-    if (match_count == 1) {
-      related_entities.opt_name_token = token_name;
-    }
-  }
-
 
   related_entities_promise.addResult(std::move(related_entities));
 }

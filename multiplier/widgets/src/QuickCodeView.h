@@ -82,9 +82,6 @@ class QuickCodeView final : public QWidget {
   //! Tells us when we probably have the entity available.
   void OnEntityRequestFutureStatusChanged();
 
-  //! Updates the window name with the entity name request output
-  void EntityNameFutureStatusChanged();
-
   //! Forwards a subset of ICodeView::TokenTriggered events
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
                         const QModelIndex &index);

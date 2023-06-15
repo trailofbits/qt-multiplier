@@ -96,7 +96,7 @@ class IDatabase {
   using OptionalName = std::optional<QString>;
 
   //! Starts a name resolution request for the given entity
-  virtual QFuture<OptionalName> RequestEntityName(RawEntityId fragment_id) = 0;
+  virtual QFuture<Token> RequestEntityName(RawEntityId fragment_id) = 0;
 
   //! A list of related entities
   struct RelatedEntities final {
@@ -104,7 +104,7 @@ class IDatabase {
     QString name;
 
     //! The token containing the entity name (unreliable)
-    std::optional<Token> opt_name_token;
+    Token opt_name_token;
 
     //! Primary entity id
     RawEntityId primary_entity_id{};
