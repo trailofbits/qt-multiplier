@@ -41,8 +41,8 @@ struct QuickReferenceExplorer::PrivateData final {
   QLabel *window_title{nullptr};
 
   IDatabase::Ptr database;
-  QFuture<std::optional<QString>> entity_name_future;
-  QFutureWatcher<std::optional<QString>> future_watcher;
+  QFuture<Token> entity_name_future;
+  QFutureWatcher<Token> future_watcher;
 
   PreviewableReferenceExplorer *reference_explorer{nullptr};
 };
@@ -279,14 +279,20 @@ void QuickReferenceExplorer::EntityNameFutureStatusChanged() {
     return;
   }
 
-  auto opt_entity_name = d->entity_name_future.takeResult();
-  if (!opt_entity_name.has_value()) {
+  Token opt_entity_name = d->entity_name_future.takeResult();
+  if (!opt_entity_name) {
     return;
   }
 
-  const auto &entity_name = opt_entity_name.value();
+  std::string_view entity_name = opt_entity_name.data();
+  if (entity_name.empty()) {
+    return;
+  }
 
-  auto window_name = GenerateWindowName(entity_name, d->expansion_mode);
+  QString window_name = GenerateWindowName(
+      QString::fromUtf8(entity_name.data(),
+                        static_cast<qsizetype>(entity_name.size())),
+      d->expansion_mode);
   d->window_title->setText(window_name);
 }
 
@@ -297,7 +303,6 @@ void QuickReferenceExplorer::CancelRunningRequest() {
 
   d->entity_name_future.cancel();
   d->entity_name_future.waitForFinished();
-
   d->entity_name_future = {};
 }
 

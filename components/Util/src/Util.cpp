@@ -701,57 +701,127 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
 }
 
 //! Return the name of an entity.
-std::optional<QString> NameOfEntity(const VariantEntity &ent) {
+Token NameOfEntity(const VariantEntity &ent) {
 
   const auto VariantEntityVisitor = Overload{
-      [](const Decl &decl) -> std::optional<QString> {
+      [](const Decl &decl) -> Token {
         if (auto named = NamedDecl::from(decl)) {
-          auto name = named->name();
-          if (!name.empty()) {
-            return QString::fromUtf8(name.data(),
-                                     static_cast<qsizetype>(name.size()));
+          std::string_view name = named->name();
+          Token name_tok = named->token();
+          if (!name.empty() && name == name_tok.data()) {
+            return name_tok;
           }
 
           for (NamedDecl redecl : named->redeclarations()) {
             name = redecl.name();
-            if (!name.empty()) {
-              return QString::fromUtf8(name.data(),
-                                       static_cast<qsizetype>(name.size()));
+            name_tok = named->token();
+            if (!name.empty() && name == name_tok.data()) {
+              return name_tok;
             }
           }
         }
-        return std::nullopt;
+        return Token();
       },
 
-      [](const Macro &macro) -> std::optional<QString> {
+      [](const Macro &macro) -> Token {
         if (auto named = DefineMacroDirective::from(macro)) {
-          auto name = named->name().data();
-          return QString::fromUtf8(name.data(),
-                                   static_cast<qsizetype>(name.size()));
+          return named->name();
 
         } else if (auto param = MacroParameter::from(macro)) {
-          auto name = param->name().data();
-          return QString::fromUtf8(name.data(),
-                                   static_cast<qsizetype>(name.size()));
+          return param->name();
+
+        } else {
+          return Token();
         }
-        return std::nullopt;
       },
 
-      [](const File &file) -> std::optional<QString> {
+      [](const File &file) -> Token {
         for (std::filesystem::path path : file.paths()) {
-          return QString::fromStdString(path.filename().generic_string());
+          SimpleToken tk;
+          tk.data = path.generic_string();
+          tk.category = TokenCategory::FILE_NAME;
+          tk.kind = TokenKind::HEADER_NAME;
+          tk.related_entity = file;
+          std::vector<CustomToken> tokens;
+          tokens.emplace_back(std::move(tk));
+          return TokenRange::create(std::move(tokens)).front();
         }
-        return std::nullopt;
+        return Token();
       },
 
-      [](const Token &token) -> std::optional<QString> {
-        std::string_view d = token.data();
-        return QString::fromUtf8(d.data(), static_cast<qsizetype>(d.size()));
+      [](const Token &token) -> Token {
+        return token;
       },
 
-      [](auto) -> std::optional<QString> { return std::nullopt; }};
-  return std::visit<std::optional<QString>>(VariantEntityVisitor, ent);
+      [](auto) -> Token { return Token(); }};
+
+  return std::visit<Token>(VariantEntityVisitor, ent);
 }
+
+//! Return the name of an entity as a `QString`.
+std::optional<QString> NameOfEntityAsString(const VariantEntity &ent) {
+  if (Token name = NameOfEntity(ent)) {
+    std::string_view data = name.data();
+    if (!data.empty()) {
+      return QString::fromUtf8(data.data(),
+                               static_cast<qsizetype>(data.size()));
+    }
+  }
+  return std::nullopt;
+}
+
+////! Return the name of an entity.
+//std::optional<QString> NameOfEntity(const VariantEntity &ent) {
+//
+//  const auto VariantEntityVisitor = Overload{
+//      [](const Decl &decl) -> std::optional<QString> {
+//        if (auto named = NamedDecl::from(decl)) {
+//          auto name = named->name();
+//          if (!name.empty()) {
+//            return QString::fromUtf8(name.data(),
+//                                     static_cast<qsizetype>(name.size()));
+//          }
+//
+//          for (NamedDecl redecl : named->redeclarations()) {
+//            name = redecl.name();
+//            if (!name.empty()) {
+//              return QString::fromUtf8(name.data(),
+//                                       static_cast<qsizetype>(name.size()));
+//            }
+//          }
+//        }
+//        return std::nullopt;
+//      },
+//
+//      [](const Macro &macro) -> std::optional<QString> {
+//        if (auto named = DefineMacroDirective::from(macro)) {
+//          auto name = named->name().data();
+//          return QString::fromUtf8(name.data(),
+//                                   static_cast<qsizetype>(name.size()));
+//
+//        } else if (auto param = MacroParameter::from(macro)) {
+//          auto name = param->name().data();
+//          return QString::fromUtf8(name.data(),
+//                                   static_cast<qsizetype>(name.size()));
+//        }
+//        return std::nullopt;
+//      },
+//
+//      [](const File &file) -> std::optional<QString> {
+//        for (std::filesystem::path path : file.paths()) {
+//          return QString::fromStdString(path.filename().generic_string());
+//        }
+//        return std::nullopt;
+//      },
+//
+//      [](const Token &token) -> std::optional<QString> {
+//        std::string_view d = token.data();
+//        return QString::fromUtf8(d.data(), static_cast<qsizetype>(d.size()));
+//      },
+//
+//      [](auto) -> std::optional<QString> { return std::nullopt; }};
+//  return std::visit<std::optional<QString>>(VariantEntityVisitor, ent);
+//}
 
 //! Return the tokens of `ent` as a string.
 QString TokensToString(const VariantEntity &ent) {

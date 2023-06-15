@@ -69,7 +69,7 @@ Database::RequestExpandedTokenRangeData(
                            tree, vis);
 }
 
-QFuture<OptionalName> Database::RequestEntityName(RawEntityId fragment_id) {
+QFuture<Token> Database::RequestEntityName(RawEntityId fragment_id) {
   return QtConcurrent::run(QThreadPool::globalInstance(), GetEntityName,
                            d->index, fragment_id);
 }

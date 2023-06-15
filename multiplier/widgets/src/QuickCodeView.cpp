@@ -9,6 +9,7 @@
 
 #include <multiplier/ui/IDatabase.h>
 #include <multiplier/ui/Icons.h>
+#include <multiplier/ui/Util.h>
 
 #include <QVBoxLayout>
 #include <QLabel>
@@ -37,9 +38,6 @@ struct QuickCodeView::PrivateData final {
 
   QFuture<VariantEntity> entity_future;
   QFutureWatcher<VariantEntity> entity_future_watcher;
-
-  QFuture<std::optional<QString>> entity_name_future;
-  QFutureWatcher<std::optional<QString>> entity_name_future_watcher;
 };
 
 QuickCodeView::QuickCodeView(const Index &index,
@@ -51,10 +49,6 @@ QuickCodeView::QuickCodeView(const Index &index,
       d(new PrivateData) {
 
   d->database = IDatabase::Create(index, file_location_cache);
-
-  connect(&d->entity_name_future_watcher,
-          &QFutureWatcher<QFuture<std::optional<QString>>>::finished, this,
-          &QuickCodeView::EntityNameFutureStatusChanged);
 
   connect(&d->entity_future_watcher,
           &QFutureWatcher<QFuture<VariantEntity>>::finished, this,
@@ -140,10 +134,6 @@ void QuickCodeView::InitializeWidgets(
   // name resolution is fast enough
   auto window_name = tr("Entity ID #") + QString::number(entity_id);
   d->window_title = new QLabel(window_name);
-
-  // Start a request to fetch the real entity name.
-  d->entity_name_future = d->database->RequestEntityName(entity_id);
-  d->entity_name_future_watcher.setFuture(d->entity_name_future);
 
   // Start a request to fetch the canonical entity.
   d->entity_future = d->database->RequestCanonicalEntity(entity_id);
@@ -246,25 +236,15 @@ void QuickCodeView::OnEntityRequestFutureStatusChanged() {
     return;
   }
 
+  // Set the name.
+  if (std::optional<QString> opt_entity_name = NameOfEntityAsString(ent)) {
+    d->window_title->setText(
+        tr("Preview for") + " `" + opt_entity_name.value() + "`");
+  }
+
   // Set the contents.
   EntityId eid(ent);
   d->model->SetEntity(eid.Pack());
-}
-
-void QuickCodeView::EntityNameFutureStatusChanged() {
-  if (d->entity_name_future.isCanceled()) {
-    return;
-  }
-
-  auto opt_entity_name = d->entity_name_future.takeResult();
-  if (!opt_entity_name.has_value()) {
-    return;
-  }
-
-  const auto &entity_name = opt_entity_name.value();
-
-  auto window_name = tr("Preview for") + " `" + entity_name + "`";
-  d->window_title->setText(window_name);
 }
 
 void QuickCodeView::OnTokenTriggered(const ICodeView::TokenAction &token_action,

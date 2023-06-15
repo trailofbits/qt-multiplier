@@ -7,15 +7,15 @@
 */
 
 #include "GetEntityName.h"
-#include "Utils.h"
+
+#include <multiplier/ui/Util.h>
 
 namespace mx::gui {
 
-void GetEntityName(QPromise<OptionalName> &entity_name_promise,
+void GetEntityName(QPromise<Token> &entity_name_promise,
                    const Index &index, RawEntityId entity_id) {
-
-  auto opt_name = LookupEntityName(index, entity_id);
-  entity_name_promise.addResult(opt_name);
+  VariantEntity ent = index.entity(entity_id);
+  entity_name_promise.addResult(NameOfEntity(ent));
 }
 
 }  // namespace mx::gui
