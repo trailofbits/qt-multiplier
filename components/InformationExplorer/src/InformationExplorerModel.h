@@ -18,7 +18,9 @@
 namespace mx::gui {
 
 //! Implements the IInformationExplorerModel interface
-class InformationExplorerModel final : public IInformationExplorerModel {
+class InformationExplorerModel final
+    : public IInformationExplorerModel,
+      public IDatabase::RequestEntityInformationReceiver {
   Q_OBJECT
 
  public:
@@ -95,6 +97,9 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   //! Cancels any active request
   void CancelRunningRequest();
 
+  //! Receives data batches from the IDatabase class
+  virtual void OnDataBatch(DataBatch data_batch) override;
+
  public:
   //! Model data
   struct Context final {
@@ -129,9 +134,16 @@ class InformationExplorerModel final : public IInformationExplorerModel {
     std::unordered_map<NodeID, Node> node_map;
   };
 
+  //! A path in the form of Node IDs
+  using NodeIDPath = std::vector<InformationExplorerModel::Context::NodeID>;
+
+  //! A list of NodeIDPath objects. Used to emit row insertions
+  using NodeIDPathList = std::vector<NodeIDPath>;
+
   //! Creates a new property in the node map
   static void
-  CreateProperty(Context &context, const QStringList &path,
+  CreateProperty(Context &context, NodeIDPath &node_id_path,
+                 const QStringList &path,
                  const std::unordered_map<int, QVariant> &value_map = {});
 
   //! Generates a unique node ID
@@ -143,7 +155,12 @@ class InformationExplorerModel final : public IInformationExplorerModel {
   //! Imports the given entity information data
   static void
   ImportEntityInformation(Context &context,
+                          NodeIDPathList &generated_node_id_path_list,
                           const EntityInformation &entity_information);
+
+ private slots:
+  //! Processes all the batches in the queue at fixed interval
+  void ProcessDataBatchQueue();
 
   friend class IInformationExplorerModel;
 };

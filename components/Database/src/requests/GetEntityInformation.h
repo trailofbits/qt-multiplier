@@ -14,9 +14,9 @@
 
 namespace mx::gui {
 
-void GetEntityInformation(
-    QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id);
+void GetEntityInformation(QPromise<bool> &result_promise, const Index &index,
+                          const FileLocationCache &file_location_cache,
+                          IDatabase::RequestEntityInformationReceiver *receiver,
+                          RawEntityId entity_id);
 
 }  // namespace mx::gui

@@ -30,10 +30,12 @@ struct Database::PrivateData {
 
 Database::~Database() {}
 
-QFuture<IDatabase::EntityInformationResult>
-Database::RequestEntityInformation(RawEntityId entity_id) {
+QFuture<bool>
+Database::RequestEntityInformation(RequestEntityInformationReceiver &receiver,
+                                   const RawEntityId &entity_id) {
   return QtConcurrent::run(QThreadPool::globalInstance(), GetEntityInformation,
-                           d->index, d->file_location_cache, entity_id);
+                           d->index, d->file_location_cache, &receiver,
+                           entity_id);
 }
 
 //! \copybrief IDatabase::RequestCanonicalEntity
@@ -60,13 +62,12 @@ Database::RequestIndexedTokenRangeData(RawEntityId entity_id,
 }
 
 QFuture<IDatabase::IndexedTokenRangeDataResult>
-Database::RequestExpandedTokenRangeData(
-    RawEntityId entity_id, const TokenTree &tree,
-    const TokenTreeVisitor *vis) {
+Database::RequestExpandedTokenRangeData(RawEntityId entity_id,
+                                        const TokenTree &tree,
+                                        const TokenTreeVisitor *vis) {
   return QtConcurrent::run(QThreadPool::globalInstance(),
                            GetExpandedTokenRangeData, d->index,
-                           d->file_location_cache, entity_id,
-                           tree, vis);
+                           d->file_location_cache, entity_id, tree, vis);
 }
 
 QFuture<Token> Database::RequestEntityName(RawEntityId fragment_id) {

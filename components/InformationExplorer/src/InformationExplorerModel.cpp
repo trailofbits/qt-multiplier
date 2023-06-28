@@ -12,14 +12,11 @@
 #include <multiplier/ui/Assert.h>
 
 #include <QFutureWatcher>
+#include <QTimer>
 
 namespace mx::gui {
 
 namespace {
-
-QString PathToString(const QStringList &path) {
-  return path.join(".");
-}
 
 static std::optional<QString> GetName(const QVariant &display_role) {
   if (!display_role.isValid()) {
@@ -72,9 +69,11 @@ GetFileName(const std::optional<EntityInformation::Location> &opt_location,
 
 void CreatePropertyHelper(
     InformationExplorerModel::Context &context,
-    const InformationExplorerModel::Context::NodeID &parent_node_id,
-    QStringList path, const std::unordered_map<int, QVariant> &value_map) {
+    InformationExplorerModel::NodeIDPath &generated_node_id_path,
+    InformationExplorerModel::NodeIDPath current_node_id_path, QStringList path,
+    const std::unordered_map<int, QVariant> &value_map) {
 
+  auto parent_node_id = current_node_id_path.back();
   auto &current_node = context.node_map[parent_node_id];
 
   QString current_component = path.front();
@@ -99,6 +98,9 @@ void CreatePropertyHelper(
 
     current_node.child_id_list.push_back(child_id);
     context.node_map.insert({child_id, std::move(property_node)});
+
+    current_node_id_path.push_back(child_id);
+    generated_node_id_path = std::move(current_node_id_path);
 
     return;
   }
@@ -126,21 +128,26 @@ void CreatePropertyHelper(
     context.node_map.insert({child_id, std::move(section_node)});
   }
 
-  CreatePropertyHelper(context, opt_child_id.value(), path, value_map);
+  current_node_id_path.push_back(opt_child_id.value());
+  CreatePropertyHelper(context, generated_node_id_path, current_node_id_path,
+                       path, value_map);
 }
 
 }  // namespace
 
 struct InformationExplorerModel::PrivateData final {
-  IDatabase::Ptr database;
-
   Index index;
   FileLocationCache file_location_cache;
 
   std::optional<RawEntityId> opt_active_entity_id;
 
-  QFuture<IDatabase::EntityInformationResult> future_result;
-  QFutureWatcher<IDatabase::EntityInformationResult> future_watcher;
+  IDatabase::Ptr database;
+  QFuture<bool> request_status_future;
+  QFutureWatcher<bool> future_watcher;
+
+  QTimer import_timer;
+  std::mutex data_batch_mutex;
+  std::vector<DataBatch> data_batch_queue;
 
   Context context;
 };
@@ -161,18 +168,18 @@ void InformationExplorerModel::RequestEntityInformation(
     return;
   }
 
-  emit beginResetModel();
   CancelRunningRequest();
 
+  emit beginResetModel();
   ResetContext(d->context);
-  d->opt_active_entity_id = std::nullopt;
-
-  CreateProperty(d->context, {tr("Updating...")});
-
-  d->future_result = d->database->RequestEntityInformation(entity_id);
-  d->future_watcher.setFuture(d->future_result);
-
   emit endResetModel();
+
+  d->opt_active_entity_id = std::nullopt;
+  d->request_status_future =
+      d->database->RequestEntityInformation(*this, entity_id);
+
+  d->future_watcher.setFuture(d->request_status_future);
+  d->import_timer.start(250);
 }
 
 std::optional<RawEntityId>
@@ -305,30 +312,24 @@ QVariant InformationExplorerModel::data(const QModelIndex &index,
 }
 
 void InformationExplorerModel::FutureResultStateChanged() {
-  emit beginResetModel();
-  ResetContext(d->context);
-
-  if (d->future_result.isCanceled()) {
-    CreateProperty(d->context, {tr("Interrupted")});
+  if (d->request_status_future.isCanceled()) {
+    emit beginResetModel();
+    d->opt_active_entity_id = std::nullopt;
+    ResetContext(d->context);
     emit endResetModel();
+
     return;
   }
 
-  auto future_result = d->future_result.takeResult();
-  if (!future_result.Succeeded()) {
-    CreateProperty(d->context, {tr("Failed")});
+  auto request_status = d->request_status_future.takeResult();
+  if (!request_status) {
+    emit beginResetModel();
+    d->opt_active_entity_id = std::nullopt;
+    ResetContext(d->context);
     emit endResetModel();
+
     return;
   }
-
-  auto entity_information = future_result.TakeValue();
-  ImportEntityInformation(d->context, entity_information);
-
-  if (d->context.node_map.size() > 1) {
-    d->opt_active_entity_id = entity_information.requested_id;
-  }
-
-  emit endResetModel();
 }
 
 InformationExplorerModel::InformationExplorerModel(
@@ -341,30 +342,37 @@ InformationExplorerModel::InformationExplorerModel(
   d->index = index;
   d->file_location_cache = file_location_cache;
 
-  connect(&d->future_watcher,
-          &QFutureWatcher<IDatabase::EntityInformationResult>::finished, this,
+  connect(&d->future_watcher, &QFutureWatcher<QFuture<bool>>::finished, this,
           &InformationExplorerModel::FutureResultStateChanged);
+
+  connect(&d->import_timer, &QTimer::timeout, this,
+          &InformationExplorerModel::ProcessDataBatchQueue);
 
   ResetContext(d->context);
 }
 
 void InformationExplorerModel::CancelRunningRequest() {
-  if (!d->future_result.isRunning()) {
-    return;
-  }
+  d->import_timer.stop();
 
-  d->future_result.cancel();
-  d->future_result.waitForFinished();
-  d->future_result = {};
+  if (d->request_status_future.isRunning()) {
+    d->request_status_future.cancel();
+    d->request_status_future.waitForFinished();
+    d->request_status_future = {};
+  }
+}
+
+void InformationExplorerModel::OnDataBatch(DataBatch data_batch) {
+  std::lock_guard<std::mutex> lock(d->data_batch_mutex);
+  d->data_batch_queue.push_back(std::move(data_batch));
 }
 
 void InformationExplorerModel::CreateProperty(
-    Context &context, const QStringList &path,
+    Context &context, NodeIDPath &node_id_path, const QStringList &path,
     const std::unordered_map<int, QVariant> &value_map) {
 
   Assert(!path.isEmpty(), "The path should not be empty");
 
-  CreatePropertyHelper(context, 0, path, value_map);
+  CreatePropertyHelper(context, node_id_path, {0}, path, value_map);
 }
 
 quintptr InformationExplorerModel::GenerateNodeID(Context &context) {
@@ -380,7 +388,8 @@ void InformationExplorerModel::ResetContext(Context &context) {
 }
 
 void InformationExplorerModel::ImportEntityInformation(
-    Context &context, const EntityInformation &entity_information) {
+    Context &context, NodeIDPathList &generated_node_id_path_list,
+    const EntityInformation &entity_information) {
 
   struct Filler final {
     QStringList base_path;
@@ -417,44 +426,8 @@ void InformationExplorerModel::ImportEntityInformation(
     std::unordered_map<int, QVariant> value_map;
   };
 
-  std::vector<Property> property_list;
-
-  auto L_recalculatePath =
-      [](const std::unordered_map<QString, Property> &property_map,
-         Property &property) {
-        const auto &entity_id_role_var =
-            property.value_map[IInformationExplorerModel::EntityIdRole];
-
-        auto entity_id = qvariant_cast<RawEntityId>(entity_id_role_var);
-
-        // If we are here, the display name is already the same. Attempt to add
-        // the location role to make it easier to read
-        if (property.value_map.count(IInformationExplorerModel::LocationRole) ==
-            1) {
-          const auto &location_role_var =
-              property.value_map[IInformationExplorerModel::LocationRole];
-
-          property.path.append(location_role_var.toString());
-
-          auto key = PathToString(property.path);
-          if (property_map.count(key) > 0) {
-            auto suffix = QString(" #") + QString::number(entity_id);
-            property.path.back().append(suffix);
-          }
-
-        } else {
-          auto suffix = QString(" #") + QString::number(entity_id);
-          property.path.back().append(suffix);
-        }
-      };
-
   for (const Filler &filler : filler_list) {
-    // Items will only be re-parented once at the first display
-    // name conflict and only in the first level.
-    // Additional entries that can't be made unique
-    // by recalculating the path will be discarded.
     std::unordered_map<QString, Property> property_map = {};
-    std::unordered_map<QString, bool> visited_name_map = {};
 
     for (const EntityInformation::Selection &selection :
          filler.source_container) {
@@ -510,70 +483,112 @@ void InformationExplorerModel::ImportEntityInformation(
             {InformationExplorerModel::RawLocationRole, std::move(value)});
       }
 
-      QString property_key = PathToString(property.path);
+      NodeIDPath node_id_path;
+      CreateProperty(context, node_id_path, property.path, property.value_map);
 
-      auto visited_name_map_it = visited_name_map.find(property_key);
-      if (visited_name_map_it != visited_name_map.end()) {
-        auto &fix_previous_entry = visited_name_map_it->second;
-
-        if (fix_previous_entry) {
-          // Keep the old entry as is; it will become the root of our duplicated
-          // entities.
-          //
-          // Then, duplicate this property with a different path and turn off
-          // token painting for it.
-          auto &root_property = property_map[property_key];
-          root_property.value_map.insert(
-              {InformationExplorerModel::AutoExpandRole, false});
-
-          auto old_property = root_property;
-          old_property.value_map.insert(
-              {InformationExplorerModel::ForceTextPaintRole, true});
-
-          L_recalculatePath(property_map, old_property);
-          fix_previous_entry = false;
-
-          property_map.emplace(PathToString(old_property.path), old_property);
-        }
-
-        // Disable token painting for this item. Since the name was duplicated,
-        // we either have a file location or (if one is not available) an
-        // entity id number.
-        property.value_map.insert(
-            {InformationExplorerModel::ForceTextPaintRole, true});
-
-        L_recalculatePath(property_map, property);
-        property_key = PathToString(property.path);
-
-      } else {
-        visited_name_map.insert({property_key, true});
-      }
-
-      property_map.insert({std::move(property_key), std::move(property)});
-    }
-
-    for (auto &property_map_p : property_map) {
-      auto &property = property_map_p.second;
-
-      auto &value_map = property.value_map;
-      value_map.insert({Qt::DisplayRole, property.display_role});
-      property.display_role.clear();
-
-      property_list.push_back(std::move(property));
+      generated_node_id_path_list.push_back(std::move(node_id_path));
     }
   }
-
-  for (auto &property : property_list) {
-    auto &value_map = property.value_map;
-    CreateProperty(context, property.path, std::move(value_map));
-  }
-
-  context.entity_name = entity_information.name;
 
   auto variant_id = EntityId(entity_information.requested_id).Unpack();
   if (std::holds_alternative<FileId>(variant_id)) {
     std::filesystem::path path(context.entity_name.toStdString());
     context.entity_name = QString::fromStdString(path.filename());
+
+  } else {
+    context.entity_name = entity_information.name;
+  }
+}
+
+void InformationExplorerModel::ProcessDataBatchQueue() {
+  if (!d->request_status_future.isRunning()) {
+    d->import_timer.stop();
+  }
+
+  std::vector<DataBatch> data_batch_queue;
+
+  {
+    std::lock_guard<std::mutex> lock(d->data_batch_mutex);
+
+    data_batch_queue = std::move(d->data_batch_queue);
+    d->data_batch_queue.clear();
+  }
+
+  if (data_batch_queue.empty()) {
+    return;
+  }
+
+  NodeIDPathList node_id_path_list;
+  auto old_context = d->context;
+
+  for (const auto &data_batch : data_batch_queue) {
+    for (const auto &entity_information : data_batch) {
+      if (!d->opt_active_entity_id.has_value() ||
+          d->opt_active_entity_id.value() != entity_information.requested_id) {
+
+        d->opt_active_entity_id = entity_information.requested_id;
+      }
+
+      NodeIDPathList new_node_id_path_list;
+      ImportEntityInformation(d->context, new_node_id_path_list,
+                              entity_information);
+
+      node_id_path_list.insert(
+          node_id_path_list.end(),
+          std::make_move_iterator(new_node_id_path_list.begin()),
+          std::make_move_iterator(new_node_id_path_list.end()));
+    }
+  }
+
+  std::unordered_set<Context::NodeID> emitted_node_list;
+
+  for (const auto &node_id_path : node_id_path_list) {
+    const auto &parent_node_id = node_id_path[1];
+
+    const auto &root_node = d->context.node_map[0];
+    auto child_id_list_it =
+        std::find(root_node.child_id_list.begin(),
+                  root_node.child_id_list.end(), parent_node_id);
+
+    auto parent_row_number = static_cast<int>(
+        std::distance(root_node.child_id_list.begin(), child_id_list_it));
+
+    if (old_context.node_map.count(parent_node_id) == 0) {
+      if (emitted_node_list.count(parent_node_id) != 0) {
+        continue;
+      }
+
+      emitted_node_list.insert(parent_node_id);
+
+      emit beginInsertRows(QModelIndex(), parent_row_number, parent_row_number);
+      emit endInsertRows();
+
+      continue;
+    }
+
+    const auto &child_node_id = node_id_path[2];
+
+    if (old_context.node_map.count(child_node_id) == 0) {
+      if (emitted_node_list.count(child_node_id) != 0) {
+        continue;
+      }
+
+      emitted_node_list.insert(child_node_id);
+
+      const auto &parent_node = d->context.node_map[parent_node_id];
+
+      child_id_list_it =
+          std::find(parent_node.child_id_list.begin(),
+                    parent_node.child_id_list.end(), child_node_id);
+
+      auto child_row_number = static_cast<int>(
+          std::distance(parent_node.child_id_list.begin(), child_id_list_it));
+
+      auto parent_index = index(parent_row_number, 0, QModelIndex());
+
+      emit beginInsertRows(parent_index, child_row_number, child_row_number);
+      emit endInsertRows();
+    }
   }
 }
 

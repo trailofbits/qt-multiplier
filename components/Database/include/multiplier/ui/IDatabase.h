@@ -71,12 +71,15 @@ class IDatabase {
   //! Get the canonical entity for `eid`.
   virtual QFuture<VariantEntity> RequestCanonicalEntity(RawEntityId eid) = 0;
 
-  //! The output of an entity information request
-  using EntityInformationResult = Result<EntityInformation, RPCErrorCode>;
+  //! A data batch receiver for EntityInformationResult objects
+  using RequestEntityInformationReceiver =
+      IBatchedDataTypeReceiver<EntityInformation>;
 
   //! Requests detailed information about a particular entity given its ID.
-  virtual QFuture<EntityInformationResult>
-  RequestEntityInformation(RawEntityId entity_id) = 0;
+  //! \return True in case of success, or false otherwise
+  virtual QFuture<bool>
+  RequestEntityInformation(RequestEntityInformationReceiver &receiver,
+                           const RawEntityId &entity_id) = 0;
 
   //! The output of a file or fragment request
   using IndexedTokenRangeDataResult =

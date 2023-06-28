@@ -117,6 +117,9 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model,
   connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
           &InformationExplorer::OnModelReset);
 
+  connect(d->model_proxy, &QAbstractItemModel::rowsInserted, this,
+          &InformationExplorer::OnRowsInserted);
+
   auto tree_selection_model = d->tree_view->selectionModel();
   connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
           &InformationExplorer::OnCurrentItemChanged);
@@ -124,33 +127,9 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model,
   OnModelReset();
 }
 
-void InformationExplorer::ExpandAllNodes() {
-  std::vector<QModelIndex> next_queue{QModelIndex()};
-
-  while (!next_queue.empty()) {
-    auto queue = std::move(next_queue);
-    next_queue.clear();
-
-    for (const auto &index : queue) {
-      if (!ShouldAutoExpand(index)) {
-        continue;
-      }
-
-      d->tree_view->expand(index);
-
-      auto row_count = d->model_proxy->rowCount(index);
-      for (int row{}; row < row_count; ++row) {
-        auto child_index = d->model_proxy->index(row, 0, index);
-        next_queue.push_back(child_index);
-      }
-    }
-  }
-
-  d->tree_view->resizeColumnToContents(0);
-}
-
 void InformationExplorer::OnModelReset() {
-  ExpandAllNodes();
+  d->tree_view->expandRecursively(QModelIndex());
+  d->tree_view->resizeColumnToContents(0);
 
   auto opt_current_entity_id = d->model->GetCurrentEntityID();
   if (!opt_current_entity_id.has_value()) {
@@ -166,6 +145,11 @@ void InformationExplorer::OnModelReset() {
   }
 
   d->history_widget->SetCurrentLocation(current_entity_id);
+}
+
+void InformationExplorer::OnRowsInserted() {
+  d->tree_view->expandRecursively(QModelIndex());
+  d->tree_view->resizeColumnToContents(0);
 }
 
 void InformationExplorer::OnHighlightModelDataChange(const QModelIndex &,
@@ -200,7 +184,9 @@ void InformationExplorer::OnSearchParametersChange(
          "Invalid regex found in CodeView::OnSearchParametersChange");
 
   d->model_proxy->setFilterRegularExpression(regex);
-  ExpandAllNodes();
+
+  d->tree_view->expandRecursively(QModelIndex());
+  d->tree_view->resizeColumnToContents(0);
 }
 
 void InformationExplorer::OnCurrentItemChanged(const QModelIndex &current_index,

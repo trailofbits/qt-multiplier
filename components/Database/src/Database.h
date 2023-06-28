@@ -21,8 +21,9 @@ class Database final : public IDatabase {
   RequestCanonicalEntity(RawEntityId eid) override;
 
   //! \copybrief IDatabase::RequestEntityInformation
-  virtual QFuture<EntityInformationResult>
-  RequestEntityInformation(RawEntityId entity_id) override;
+  virtual QFuture<bool>
+  RequestEntityInformation(RequestEntityInformationReceiver &receiver,
+                           const RawEntityId &entity_id) override;
 
   //! \copybrief IDatabase::RequestIndexedTokenRangeData
   virtual QFuture<IndexedTokenRangeDataResult>

@@ -74,8 +74,9 @@ TEST_CASE("InformationExplorerModel") {
     for (const auto &child_name : {"child0", "child1", "child2"}) {
       QStringList path{parent_name, child_name};
 
+      InformationExplorerModel::NodeIDPath node_id_path;
       auto property_map = GeneratePropertyMap(path);
-      InformationExplorerModel::CreateProperty(context, path,
+      InformationExplorerModel::CreateProperty(context, node_id_path, path,
                                                std::move(property_map));
 
       if (expected_property_map_size == 0) {
