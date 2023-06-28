@@ -42,9 +42,70 @@
 namespace mx::gui {
 namespace {
 
+const std::size_t kBatchSize{512};
+
+std::size_t GetBatchSize(EntityInformation &info) {
+  return info.declarations.size() + info.definitions.size() +
+         info.macros_used.size() + info.callees.size() + info.callers.size() +
+         info.pointers.size() + info.address_ofs.size() +
+         info.dereferences.size() + info.arguments.size() +
+         info.assigned_tos.size() + info.assignments.size() +
+         info.tests.size() + info.uses.size() + info.includes.size() +
+         info.include_bys.size() + info.enumerators.size() +
+         info.parameters.size() + info.variables.size() + info.members.size() +
+         info.type_casts.size() + info.top_level_entities.size();
+}
+
+void SendBatch(IDatabase::RequestEntityInformationReceiver &receiver,
+               EntityInformation &info, bool force = false) {
+  if (!force && GetBatchSize(info) < kBatchSize) {
+    return;
+  }
+
+  IDatabase::RequestEntityInformationReceiver::DataBatch data_batch{info};
+
+  receiver.OnDataBatch(data_batch);
+
+  info.declarations.clear();
+  info.definitions.clear();
+  info.macros_used.clear();
+  info.callees.clear();
+  info.callers.clear();
+  info.pointers.clear();
+  info.address_ofs.clear();
+  info.dereferences.clear();
+  info.arguments.clear();
+  info.assigned_tos.clear();
+  info.assignments.clear();
+  info.tests.clear();
+  info.uses.clear();
+  info.includes.clear();
+  info.include_bys.clear();
+  info.enumerators.clear();
+  info.parameters.clear();
+  info.variables.clear();
+  info.members.clear();
+  info.type_casts.clear();
+  info.top_level_entities.clear();
+}
+
+struct EntityInformationScopedSender final {
+  EntityInformation &info;
+  IDatabase::RequestEntityInformationReceiver &receiver;
+
+  EntityInformationScopedSender(
+      EntityInformation &info_,
+      IDatabase::RequestEntityInformationReceiver &receiver_)
+      : info(info_),
+        receiver(receiver_) {}
+
+  ~EntityInformationScopedSender() {
+    SendBatch(receiver, info, true);
+  }
+};
+
 static std::optional<EntityInformation::Location>
-GetLocation(const QPromise<IDatabase::EntityInformationResult> &result_promise,
-            const TokenRange &toks,
+GetLocation(QPromise<bool> &result_promise, const TokenRange &toks,
             const FileLocationCache &file_location_cache) {
   for (Token tok : toks.file_tokens()) {
     if (result_promise.isCanceled()) {
@@ -66,10 +127,11 @@ GetLocation(const QPromise<IDatabase::EntityInformationResult> &result_promise,
 }
 
 // Fill in the macros used within a given token range.
-static void FillUsedMacros(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, EntityInformation &info,
-    const TokenRange &tokens) {
+static void
+FillUsedMacros(QPromise<bool> &result_promise,
+               IDatabase::RequestEntityInformationReceiver &receiver,
+               const FileLocationCache &file_location_cache,
+               EntityInformation &info, const TokenRange &tokens) {
   std::vector<PackedMacroId> seen;
 
   for (Token tok : tokens) {
@@ -113,13 +175,15 @@ static void FillUsedMacros(
           EntityInformation::Selection &sel = info.macros_used.emplace_back();
           sel.display_role.setValue(use_tok);
           sel.entity_role = std::move(exp.value());
-          sel.location = GetLocation(
-              result_promise, use_tok, file_location_cache);
+          sel.location =
+              GetLocation(result_promise, use_tok, file_location_cache);
           break;
         }
       }
       break;
     }
+
+    SendBatch(receiver, info);
   }
 }
 
@@ -146,9 +210,8 @@ static void FillUsedMacros(
 //}
 
 //! Find the statement that value represents the current line of code.
-static mx::TokenRange
-FindLine(const QPromise<IDatabase::EntityInformationResult> &result_promise,
-         mx::Stmt prev_stmt) {
+static mx::TokenRange FindLine(QPromise<bool> &result_promise,
+                               mx::Stmt prev_stmt) {
   // Find implicit casts with the return value
   for (mx::Stmt stmt : mx::Stmt::containing(prev_stmt)) {
     if (result_promise.isCanceled()) {
@@ -184,10 +247,12 @@ done:
 }
 
 //! Fill `info` with information about the variable `var`.
-static void FillTypeInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, EntityInformation &info,
-    const TypeDecl &entity, Reference ref) {
+static void
+FillTypeInformation(QPromise<bool> &result_promise,
+                    IDatabase::RequestEntityInformationReceiver &receiver,
+                    const FileLocationCache &file_location_cache,
+                    EntityInformation &info, const TypeDecl &entity,
+                    Reference ref) {
 
   // TODO(pag): Do better with these.
   (void) entity;
@@ -206,6 +271,8 @@ static void FillTypeInformation(
       if (result_promise.isCanceled()) {
         return;
       }
+
+      SendBatch(receiver, info);
 
       if (CastExpr::from(su.value())) {
         EntityInformation::Selection *sel = &(info.type_casts.emplace_back());
@@ -229,8 +296,8 @@ static void FillTypeInformation(
     }
 
     EntityInformation::Selection *sel = &(info.uses.emplace_back());
-    sel->display_role.setValue(InjectWhitespace(
-        orig_su.tokens().strip_whitespace()));
+    sel->display_role.setValue(
+        InjectWhitespace(orig_su.tokens().strip_whitespace()));
     sel->entity_role = orig_su;
     sel->location =
         GetLocation(result_promise, orig_su.tokens(), file_location_cache);
@@ -239,25 +306,27 @@ static void FillTypeInformation(
 }
 
 //! Fill `info` with information about the variable `var`.
-static void FillTypeInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, EntityInformation &info,
-    TypeDecl entity) {
+static void
+FillTypeInformation(QPromise<bool> &result_promise,
+                    IDatabase::RequestEntityInformationReceiver &receiver,
+                    const FileLocationCache &file_location_cache,
+                    EntityInformation &info, TypeDecl entity) {
 
   for (Reference ref : entity.references()) {
     if (result_promise.isCanceled()) {
       return;
     }
 
-    FillTypeInformation(result_promise, file_location_cache, info, entity,
-                        std::move(ref));
+    FillTypeInformation(result_promise, receiver, file_location_cache, info,
+                        entity, std::move(ref));
   }
 }
 
 //! Fill `info` with information about the variable `var` as used by the
 //! statement `stmt`.
 static void FillVariableUsedByStatementInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
+    QPromise<bool> &result_promise,
+    IDatabase::RequestEntityInformationReceiver &receiver,
     const FileLocationCache &file_location_cache, EntityInformation &info,
     Stmt stmt) {
 
@@ -272,6 +341,8 @@ static void FillVariableUsedByStatementInformation(
     if (result_promise.isCanceled()) {
       return;
     }
+
+    SendBatch(receiver, info);
 
     switch (parent->kind()) {
       case StmtKind::SWITCH_STMT:
@@ -468,24 +539,27 @@ conditional_use:
 }
 
 //! Fill `info` with information about the variable `var`.
-static void FillVariableInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, EntityInformation &info,
-    const ValueDecl &var) {
+static void
+FillVariableInformation(QPromise<bool> &result_promise,
+                        IDatabase::RequestEntityInformationReceiver &receiver,
+                        const FileLocationCache &file_location_cache,
+                        EntityInformation &info, const ValueDecl &var) {
 
   for (Reference ref : var.references()) {
     if (std::optional<Stmt> stmt = ref.as_statement()) {
-      FillVariableUsedByStatementInformation(
-          result_promise, file_location_cache, info, std::move(stmt.value()));
+      FillVariableUsedByStatementInformation(result_promise, receiver,
+                                             file_location_cache, info,
+                                             std::move(stmt.value()));
     }
   }
 }
 
 //! Fill `info` with information about the function `func`.
-static void FillFunctionInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, EntityInformation &info,
-    FunctionDecl func) {
+static void
+FillFunctionInformation(QPromise<bool> &result_promise,
+                        IDatabase::RequestEntityInformationReceiver &receiver,
+                        const FileLocationCache &file_location_cache,
+                        EntityInformation &info, FunctionDecl func) {
 
   for (Reference ref : func.references()) {
     if (result_promise.isCanceled()) {
@@ -501,6 +575,8 @@ static void FillFunctionInformation(
       continue;
     }
 
+    SendBatch(receiver, info);
+
     if (std::optional<Stmt> stmt = ref.as_statement()) {
 
       // Look for direct calls. This is replicating `FunctionDecl::callers`.
@@ -508,6 +584,8 @@ static void FillFunctionInformation(
         if (result_promise.isCanceled()) {
           return;
         }
+
+        SendBatch(receiver, info);
 
         if (std::optional<FunctionDecl> callee = call.direct_callee()) {
           if (callee.value() != func) {
@@ -530,8 +608,7 @@ static void FillFunctionInformation(
       // If we didn't find a caller, then it's probably an `address_ofs`.
       {
         EntityInformation::Selection &sel = info.pointers.emplace_back();
-        sel.display_role.setValue(
-            FindLine(result_promise, stmt.value()));
+        sel.display_role.setValue(FindLine(result_promise, stmt.value()));
         sel.entity_role = stmt.value();
         sel.location =
             GetLocation(result_promise, stmt->tokens(), file_location_cache);
@@ -552,6 +629,8 @@ static void FillFunctionInformation(
   //            and fragments.
   Fragment frag = Fragment::containing(func);
   for (CallExpr call : CallExpr::in(frag)) {
+    SendBatch(receiver, info);
+
     if (result_promise.isCanceled()) {
       return;
     }
@@ -595,14 +674,17 @@ static void FillFunctionInformation(
       sel->location =
           GetLocation(result_promise, vd->tokens(), file_location_cache);
     }
+
+    SendBatch(receiver, info);
   }
 }
 
 //! Fill `info` with information about the variable `var`.
-static void FillEnumInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, EntityInformation &info,
-    EnumDecl entity) {
+static void
+FillEnumInformation(QPromise<bool> &result_promise,
+                    IDatabase::RequestEntityInformationReceiver &receiver,
+                    const FileLocationCache &file_location_cache,
+                    EntityInformation &info, EnumDecl entity) {
 
   for (mx::EnumConstantDecl ec : entity.enumerators()) {
     if (result_promise.isCanceled()) {
@@ -614,14 +696,17 @@ static void FillEnumInformation(
     sel.entity_role = ec;
     sel.location =
         GetLocation(result_promise, ec.tokens(), file_location_cache);
+
+    SendBatch(receiver, info);
   }
 }
 
 //! Fill `info` with information about the variable `var`.
-static void FillRecordInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, EntityInformation &info,
-    RecordDecl entity) {
+static void
+FillRecordInformation(QPromise<bool> &result_promise,
+                      IDatabase::RequestEntityInformationReceiver &receiver,
+                      const FileLocationCache &file_location_cache,
+                      EntityInformation &info, RecordDecl entity) {
 
   // Find the local variables.
   for (const mx::Decl &decl : entity.declarations_in_context()) {
@@ -644,98 +729,117 @@ static void FillRecordInformation(
           GetLocation(result_promise, fd->tokens(), file_location_cache);
     }
 
+    SendBatch(receiver, info);
+
     // TODO(pag): FunctionDecl, CXXMethodDecl, etc.
   }
 }
 
-//! Fill `info` with information about the declaration `entity`.
-static EntityInformation GetDeclInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, NamedDecl entity) {
-
-  std::string_view name = entity.name();
+//! Fill `info` with information about the file `entity`.
+static void
+GetFileInformation(QPromise<bool> &result_promise,
+                   IDatabase::RequestEntityInformationReceiver &receiver,
+                   const RawEntityId &requested_id,
+                   const FileLocationCache &file_location_cache,
+                   const File &entity) {
 
   EntityInformation info;
+  info.requested_id = requested_id;
   info.id = entity.id().Pack();
   info.entity.entity_role = entity;
-  info.entity.location =
-      GetLocation(result_promise, entity.tokens(), file_location_cache);
 
-  if (!name.empty()) {
-    info.entity.display_role.setValue(entity.token());
+  EntityInformationScopedSender info_auto_sender{info, receiver};
+
+  for (std::filesystem::path path : entity.paths()) {
+    info.entity.display_role.setValue(
+        QString::fromStdString(path.generic_string()));
+    break;
   }
 
-  // Fill all redeclarations.
-  for (NamedDecl redecl : entity.redeclarations()) {
+  for (IncludeLikeMacroDirective inc : IncludeLikeMacroDirective::in(entity)) {
     if (result_promise.isCanceled()) {
-      return info;
+      return;
     }
 
-    EntityInformation::Selection *sel = nullptr;
-    if (redecl.is_definition()) {
-      sel = &(info.definitions.emplace_back());
-    } else {
-      sel = &(info.declarations.emplace_back());
+    if (std::optional<File> file = inc.included_file()) {
+      EntityInformation::Selection &sel = info.includes.emplace_back();
+      TokenRange tokens = inc.use_tokens();
+      sel.entity_role = std::move(inc);
+      sel.location = GetLocation(result_promise, tokens, file_location_cache);
+      sel.display_role.setValue(tokens.strip_whitespace());
     }
-    // Collect all macros used by all redeclarations.
-    FillUsedMacros(result_promise, file_location_cache, info, redecl.tokens());
 
-    sel->display_role.setValue(redecl.token());
-    sel->entity_role = redecl;
-    sel->location =
-        GetLocation(result_promise, redecl.tokens(), file_location_cache);
+    SendBatch(receiver, info);
+  }
 
-    // Try to get a name from elsewhere if we're missing it.
-    if (!info.entity.display_role.isValid()) {
-      name = redecl.name();
-      if (!name.empty()) {
-        info.entity.display_role.setValue(redecl.token());
+  for (Reference ref : entity.references()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
+    if (auto inc = IncludeLikeMacroDirective::from(ref.as_macro())) {
+      if (auto file = File::containing(inc.value())) {
+        TokenRange tokens = inc->use_tokens();
+        EntityInformation::Selection &sel = info.include_bys.emplace_back();
+        sel.location = GetLocation(result_promise, tokens, file_location_cache);
+        sel.entity_role = inc.value();
+
+        for (std::filesystem::path path : file->paths()) {
+          sel.display_role.setValue(
+              QString::fromStdString(path.generic_string()));
+          break;
+        }
+
+        SendBatch(receiver, info);
       }
     }
   }
 
-  // If this is a function, then look at who it calls, and who calls it.
-  if (auto func = FunctionDecl::from(entity)) {
-    FillFunctionInformation(result_promise, file_location_cache, info,
-                            std::move(func.value()));
+  for (Fragment frag : entity.fragments()) {
+    for (DefineMacroDirective def : DefineMacroDirective::in(frag)) {
+      if (result_promise.isCanceled()) {
+        return;
+      }
 
-  } else if (auto var = VarDecl::from(entity)) {
-    FillVariableInformation(result_promise, file_location_cache, info,
-                            std::move(var.value()));
+      EntityInformation::Selection &sel =
+          info.top_level_entities.emplace_back();
+      sel.display_role.setValue(def.name());
+      sel.entity_role = def;
+      sel.location =
+          GetLocation(result_promise, def.use_tokens(), file_location_cache);
 
-  } else if (auto field = FieldDecl::from(entity)) {
-    FillVariableInformation(result_promise, file_location_cache, info,
-                            field.value());
+      SendBatch(receiver, info);
+    }
 
-  } else if (auto enumerator = EnumConstantDecl::from(entity)) {
-    FillVariableInformation(result_promise, file_location_cache, info,
-                            enumerator.value());
+    for (Decl decl : frag.top_level_declarations()) {
+      if (result_promise.isCanceled()) {
+        return;
+      }
 
-  } else if (auto enum_ = EnumDecl::from(entity)) {
+      if (auto nd = NamedDecl::from(decl); nd && !nd->name().empty()) {
+        EntityInformation::Selection &sel =
+            info.top_level_entities.emplace_back();
+        sel.display_role.setValue(nd->token());
+        sel.location =
+            GetLocation(result_promise, nd->tokens(), file_location_cache);
+        sel.entity_role = nd.value();
+      }
 
-    FillEnumInformation(result_promise, file_location_cache, info,
-                        std::move(enum_.value()));
-
-  } else if (auto tag = RecordDecl::from(entity)) {
-    FillRecordInformation(result_promise, file_location_cache, info,
-                          std::move(tag.value()));
+      SendBatch(receiver, info);
+    }
   }
-
-  if (auto type = TypeDecl::from(entity)) {
-    FillTypeInformation(result_promise, file_location_cache, info,
-                        std::move(type.value()));
-  }
-
-  return info;
 }
 
 //! Fill `info` with information about the macro `entity`.
-static EntityInformation GetMacroInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache,
-    const DefineMacroDirective &entity) {
+static void
+GetMacroInformation(QPromise<bool> &result_promise,
+                    IDatabase::RequestEntityInformationReceiver &receiver,
+                    const RawEntityId &requested_id,
+                    const FileLocationCache &file_location_cache,
+                    const DefineMacroDirective &entity) {
 
   EntityInformation info;
+  info.requested_id = requested_id;
   info.id = entity.id().Pack();
   info.entity.display_role.setValue(entity.name());
   info.entity.location =
@@ -744,11 +848,15 @@ static EntityInformation GetMacroInformation(
 
   info.definitions.emplace_back(info.entity);
 
+  EntityInformationScopedSender info_auto_sender{info, receiver};
+
   // Find the local variables.
   for (const MacroOrToken &mt : entity.parameters()) {
     if (result_promise.isCanceled()) {
-      return info;
+      return;
     }
+
+    SendBatch(receiver, info);
 
     if (!std::holds_alternative<Macro>(mt)) {
       continue;
@@ -779,7 +887,7 @@ static EntityInformation GetMacroInformation(
 
   for (Reference ref : entity.references()) {
     if (result_promise.isCanceled()) {
-      return info;
+      return;
     }
 
     auto exp = MacroExpansion::from(ref.as_macro());
@@ -792,137 +900,140 @@ static EntityInformation GetMacroInformation(
     sel->display_role.setValue(InjectWhitespace(tokens.strip_whitespace()));
     sel->entity_role = exp.value();
     sel->location = GetLocation(result_promise, tokens, file_location_cache);
-  }
 
-  return info;
+    SendBatch(receiver, info);
+  }
 }
 
-//! Fill `info` with information about the file `entity`.
-static EntityInformation GetFileInformation(
-    const QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const FileLocationCache &file_location_cache, const File &entity) {
+//! Fill `info` with information about the declaration `entity`.
+static void
+GetDeclInformation(QPromise<bool> &result_promise,
+                   IDatabase::RequestEntityInformationReceiver &receiver,
+                   const RawEntityId &requested_id,
+                   const FileLocationCache &file_location_cache,
+                   NamedDecl entity) {
+
+  std::string_view name = entity.name();
 
   EntityInformation info;
+  info.requested_id = requested_id;
   info.id = entity.id().Pack();
   info.entity.entity_role = entity;
+  info.entity.location =
+      GetLocation(result_promise, entity.tokens(), file_location_cache);
 
-  for (std::filesystem::path path : entity.paths()) {
-    info.entity.display_role.setValue(
-        QString::fromStdString(path.generic_string()));
-    break;
+  EntityInformationScopedSender info_auto_sender{info, receiver};
+
+  if (!name.empty()) {
+    info.entity.display_role.setValue(entity.token());
   }
 
-  for (IncludeLikeMacroDirective inc : IncludeLikeMacroDirective::in(entity)) {
+  // Fill all redeclarations.
+  for (NamedDecl redecl : entity.redeclarations()) {
     if (result_promise.isCanceled()) {
-      return info;
+      return;
     }
 
-    if (std::optional<File> file = inc.included_file()) {
-      EntityInformation::Selection &sel = info.includes.emplace_back();
-      TokenRange tokens = inc.use_tokens();
-      sel.entity_role = std::move(inc);
-      sel.location = GetLocation(result_promise, tokens, file_location_cache);
-      sel.display_role.setValue(tokens.strip_whitespace());
+    EntityInformation::Selection *sel = nullptr;
+    if (redecl.is_definition()) {
+      sel = &(info.definitions.emplace_back());
+    } else {
+      sel = &(info.declarations.emplace_back());
     }
+    // Collect all macros used by all redeclarations.
+    FillUsedMacros(result_promise, receiver, file_location_cache, info,
+                   redecl.tokens());
+
+    sel->display_role.setValue(redecl.token());
+    sel->entity_role = redecl;
+    sel->location =
+        GetLocation(result_promise, redecl.tokens(), file_location_cache);
+
+    // Try to get a name from elsewhere if we're missing it.
+    if (!info.entity.display_role.isValid()) {
+      name = redecl.name();
+      if (!name.empty()) {
+        info.entity.display_role.setValue(redecl.token());
+      }
+    }
+
+    SendBatch(receiver, info);
   }
 
-  for (Reference ref : entity.references()) {
-    if (result_promise.isCanceled()) {
-      return info;
-    }
+  // If this is a function, then look at who it calls, and who calls it.
+  if (auto func = FunctionDecl::from(entity)) {
+    FillFunctionInformation(result_promise, receiver, file_location_cache, info,
+                            std::move(func.value()));
 
-    if (auto inc = IncludeLikeMacroDirective::from(ref.as_macro())) {
-      if (auto file = File::containing(inc.value())) {
-        TokenRange tokens = inc->use_tokens();
-        EntityInformation::Selection &sel = info.include_bys.emplace_back();
-        sel.location = GetLocation(result_promise, tokens, file_location_cache);
-        sel.entity_role = inc.value();
+  } else if (auto var = VarDecl::from(entity)) {
+    FillVariableInformation(result_promise, receiver, file_location_cache, info,
+                            std::move(var.value()));
 
-        for (std::filesystem::path path : file->paths()) {
-          sel.display_role.setValue(
-              QString::fromStdString(path.generic_string()));
-          break;
-        }
-      }
-    }
+  } else if (auto field = FieldDecl::from(entity)) {
+    FillVariableInformation(result_promise, receiver, file_location_cache, info,
+                            field.value());
+
+  } else if (auto enumerator = EnumConstantDecl::from(entity)) {
+    FillVariableInformation(result_promise, receiver, file_location_cache, info,
+                            enumerator.value());
+
+  } else if (auto enum_ = EnumDecl::from(entity)) {
+
+    FillEnumInformation(result_promise, receiver, file_location_cache, info,
+                        std::move(enum_.value()));
+
+  } else if (auto tag = RecordDecl::from(entity)) {
+    FillRecordInformation(result_promise, receiver, file_location_cache, info,
+                          std::move(tag.value()));
   }
 
-  for (Fragment frag : entity.fragments()) {
-    for (DefineMacroDirective def : DefineMacroDirective::in(frag)) {
-      if (result_promise.isCanceled()) {
-        return info;
-      }
-
-      EntityInformation::Selection &sel =
-          info.top_level_entities.emplace_back();
-      sel.display_role.setValue(def.name());
-      sel.entity_role = def;
-      sel.location =
-          GetLocation(result_promise, def.use_tokens(), file_location_cache);
-    }
-
-    for (Decl decl : frag.top_level_declarations()) {
-      if (result_promise.isCanceled()) {
-        return info;
-      }
-
-      if (auto nd = NamedDecl::from(decl); nd && !nd->name().empty()) {
-        EntityInformation::Selection &sel =
-            info.top_level_entities.emplace_back();
-        sel.display_role.setValue(nd->token());
-        sel.location =
-            GetLocation(result_promise, nd->tokens(), file_location_cache);
-        sel.entity_role = nd.value();
-      }
-    }
+  if (auto type = TypeDecl::from(entity)) {
+    FillTypeInformation(result_promise, receiver, file_location_cache, info,
+                        std::move(type.value()));
   }
 
-  return info;
+  SendBatch(receiver, info);
 }
 
 }  // namespace
 
-void GetEntityInformation(
-    QPromise<IDatabase::EntityInformationResult> &result_promise,
-    const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id) {
+void GetEntityInformation(QPromise<bool> &result_promise, const Index &index,
+                          const FileLocationCache &file_location_cache,
+                          IDatabase::RequestEntityInformationReceiver *receiver,
+                          RawEntityId entity_id) {
 
   VariantEntity entity = index.entity(entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
-    result_promise.addResult(RPCErrorCode::InvalidEntityID);
+    result_promise.addResult(false);
     return;
   }
-
-  std::optional<EntityInformation> info;
 
   if (std::holds_alternative<Token>(entity)) {
     entity = std::get<Token>(entity).related_entity();
   }
 
+  auto succeeded{false};
   if (std::holds_alternative<Decl>(entity)) {
     if (auto named = NamedDecl::from(std::get<Decl>(entity))) {
-      info.emplace(GetDeclInformation(result_promise, file_location_cache,
-                                      named->canonical_declaration()));
+      GetDeclInformation(result_promise, *receiver, entity_id,
+                         file_location_cache, named->canonical_declaration());
+      succeeded = true;
     }
 
   } else if (std::holds_alternative<Macro>(entity)) {
     if (auto def = DefineMacroDirective::from(std::get<Macro>(entity))) {
-      info.emplace(GetMacroInformation(result_promise, file_location_cache,
-                                       std::move(def.value())));
+      GetMacroInformation(result_promise, *receiver, entity_id,
+                          file_location_cache, std::move(def.value()));
+      succeeded = true;
     }
 
   } else if (std::holds_alternative<File>(entity)) {
-    info.emplace(GetFileInformation(result_promise, file_location_cache,
-                                    std::move(std::get<File>(entity))));
+    GetFileInformation(result_promise, *receiver, entity_id,
+                       file_location_cache, std::move(std::get<File>(entity)));
+    succeeded = true;
   }
 
-  if (!info.has_value()) {
-    result_promise.addResult(RPCErrorCode::InvalidInformationRequestType);
-    return;
-  }
-
-  info->requested_id = entity_id;
-  result_promise.addResult(std::move(info.value()));
+  result_promise.addResult(succeeded);
 }
 
 }  // namespace mx::gui

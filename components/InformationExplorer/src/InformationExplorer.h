@@ -38,12 +38,12 @@ class InformationExplorer final : public IInformationExplorer {
   void InstallModel(IInformationExplorerModel *model,
                     IGlobalHighlighter *global_highlighter);
 
-  //! Expands all the nodes in the tree view
-  void ExpandAllNodes();
-
  private slots:
   //! Used to auto-expand nodes at each model reset
   void OnModelReset();
+
+  //! Called when new rows are inserted
+  void OnRowsInserted();
 
   //! Called when the data in the model changes
   void OnHighlightModelDataChange(const QModelIndex &top_left,
