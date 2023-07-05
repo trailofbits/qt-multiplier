@@ -112,7 +112,6 @@ class MainWindow final : public QMainWindow {
   void OnInformationExplorerSelectionChange(const QModelIndex &index);
   void OnCloseActiveCodeViewTab();
   void OnCloseActiveRefExplorerTab();
-  void OnRefExplorerModeSelected(QAction *action);
 
   //! Called when the view->theme->dark action is selected
   void OnSetDarkTheme();

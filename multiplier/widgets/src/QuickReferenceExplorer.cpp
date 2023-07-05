@@ -51,9 +51,8 @@ QuickReferenceExplorer::QuickReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
     RawEntityId entity_id,
     const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-    const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
-    IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
-    QWidget *parent)
+    const bool &show_code_preview, IGlobalHighlighter &highlighter,
+    IMacroExplorer &macro_explorer, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
@@ -62,7 +61,7 @@ QuickReferenceExplorer::QuickReferenceExplorer(
           &QFutureWatcher<QFuture<std::optional<QString>>>::finished, this,
           &QuickReferenceExplorer::EntityNameFutureStatusChanged);
 
-  InitializeWidgets(index, file_location_cache, entity_id, expansion_mode, mode,
+  InitializeWidgets(index, file_location_cache, entity_id, expansion_mode,
                     show_code_preview, highlighter, macro_explorer);
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
@@ -128,8 +127,8 @@ void QuickReferenceExplorer::InitializeWidgets(
     const Index &index, const FileLocationCache &file_location_cache,
     RawEntityId entity_id,
     const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-    const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
-    IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer) {
+    const bool &show_code_preview, IGlobalHighlighter &highlighter,
+    IMacroExplorer &macro_explorer) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -194,8 +193,8 @@ void QuickReferenceExplorer::InitializeWidgets(
   d->model->AppendEntityById(entity_id, expansion_mode, QModelIndex());
 
   d->reference_explorer = new PreviewableReferenceExplorer(
-      index, file_location_cache, d->model, mode, show_code_preview,
-      highlighter, macro_explorer, this);
+      index, file_location_cache, d->model, show_code_preview, highlighter,
+      macro_explorer, this);
 
   connect(d->reference_explorer,
           &PreviewableReferenceExplorer::SelectedItemChanged, this,
@@ -307,11 +306,12 @@ void QuickReferenceExplorer::CancelRunningRequest() {
 }
 
 QString QuickReferenceExplorer::GenerateWindowName(
-    const QString &entity_name, IReferenceExplorerModel::ExpansionMode mode) {
+    const QString &entity_name,
+    IReferenceExplorerModel::ExpansionMode expansion_mode) {
 
   auto quoted_entity_name = QString("`") + entity_name + "`";
 
-  switch (mode) {
+  switch (expansion_mode) {
     case IReferenceExplorerModel::CallHierarchyMode:
       return tr("Call hierarchy of ") + quoted_entity_name;
 
@@ -321,10 +321,11 @@ QString QuickReferenceExplorer::GenerateWindowName(
 }
 
 QString QuickReferenceExplorer::GenerateWindowName(
-    const RawEntityId &entity_id, IReferenceExplorerModel::ExpansionMode mode) {
+    const RawEntityId &entity_id,
+    IReferenceExplorerModel::ExpansionMode expansion_mode) {
 
   auto entity_name = tr("Entity ID #") + QString::number(entity_id);
-  return GenerateWindowName(entity_name, mode);
+  return GenerateWindowName(entity_name, expansion_mode);
 }
 
 void QuickReferenceExplorer::UpdateIcons() {

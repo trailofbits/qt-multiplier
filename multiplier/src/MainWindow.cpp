@@ -87,8 +87,6 @@ struct MainWindow::PrivateData final {
   QShortcut *close_active_ref_explorer_tab_shortcut{nullptr};
   QShortcut *close_active_code_tab_shortcut{nullptr};
 
-  IReferenceExplorer::Mode ref_explorer_mode{
-      IReferenceExplorer::Mode::TextView};
   bool enable_quick_ref_explorer_code_preview{false};
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
@@ -407,8 +405,8 @@ void MainWindow::OpenReferenceExplorer(
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
       d->index, d->file_location_cache, entity_id, expansion_mode,
-      d->ref_explorer_mode, d->enable_quick_ref_explorer_code_preview,
-      *d->global_highlighter, *d->macro_explorer, this);
+      d->enable_quick_ref_explorer_code_preview, *d->global_highlighter,
+      *d->macro_explorer, this);
 
   connect(d->quick_ref_explorer.get(),
           &QuickReferenceExplorer::SaveReferenceExplorer, this,
@@ -549,39 +547,6 @@ void MainWindow::CloseAllPopups() {
 void MainWindow::CreateRefExplorerMenuOptions() {
   auto main_menu = new QMenu(tr("Reference Explorer"));
   d->view_menu->addMenu(main_menu);
-
-  auto mode_menu = new QMenu(tr("Mode"));
-  main_menu->addMenu(mode_menu);
-
-  connect(mode_menu, &QMenu::triggered, this,
-          &MainWindow::OnRefExplorerModeSelected);
-
-  auto mode_action_group = new QActionGroup(this);
-
-  for (const auto &mode :
-       {IReferenceExplorer::Mode::TextView, IReferenceExplorer::Mode::TreeView,
-        IReferenceExplorer::Mode::Split}) {
-
-    QString label;
-    switch (mode) {
-      case IReferenceExplorer::Mode::TextView: label = tr("Text view"); break;
-
-      case IReferenceExplorer::Mode::TreeView: label = tr("Tree view"); break;
-
-      case IReferenceExplorer::Mode::Split: label = tr("Split"); break;
-    }
-
-    auto mode_action = new QAction(label);
-    mode_action_group->addAction(mode_action);
-
-    mode_action->setData(static_cast<int>(mode));
-    mode_action->setCheckable(true);
-    if (mode == d->ref_explorer_mode) {
-      mode_action->setChecked(true);
-    }
-
-    mode_menu->addAction(mode_action);
-  }
 
   auto code_preview_action = new QAction(tr("Enable code preview"));
   code_preview_action->setCheckable(true);
@@ -1049,14 +1014,6 @@ void MainWindow::OnCloseActiveRefExplorerTab() {
   OnReferenceExplorerTabBarClose(current_index);
 
   d->ref_explorer_tab_widget->setFocus();
-}
-
-void MainWindow::OnRefExplorerModeSelected(QAction *action) {
-  auto ref_explorer_int_mode = action->data().toInt();
-  d->ref_explorer_mode =
-      static_cast<IReferenceExplorer::Mode>(ref_explorer_int_mode);
-
-  action->setChecked(true);
 }
 
 void MainWindow::OnSetDarkTheme() {

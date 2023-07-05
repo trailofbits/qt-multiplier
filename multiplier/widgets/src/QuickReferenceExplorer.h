@@ -27,9 +27,8 @@ class QuickReferenceExplorer final : public QWidget {
       const Index &index, const FileLocationCache &file_location_cache,
       RawEntityId entity_id,
       const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-      const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
-      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
-      QWidget *parent = nullptr);
+      const bool &show_code_preview, IGlobalHighlighter &highlighter,
+      IMacroExplorer &macro_explorer, QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickReferenceExplorer() override;
@@ -75,8 +74,8 @@ class QuickReferenceExplorer final : public QWidget {
       const Index &index, const FileLocationCache &file_location_cache,
       RawEntityId entity_id,
       const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-      const IReferenceExplorer::Mode &mode, const bool &show_code_preview,
-      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer);
+      const bool &show_code_preview, IGlobalHighlighter &highlighter,
+      IMacroExplorer &macro_explorer);
 
   //! Used to start window dragging
   void OnTitleFrameMousePress(QMouseEvent *event);
@@ -93,12 +92,12 @@ class QuickReferenceExplorer final : public QWidget {
   //! Generate a new window name for the given entity name
   static QString
   GenerateWindowName(const QString &entity_name,
-                     IReferenceExplorerModel::ExpansionMode mode);
+                     IReferenceExplorerModel::ExpansionMode expansion_mode);
 
   //! Generate a new window name for the given entity id
   static QString
   GenerateWindowName(const RawEntityId &entity_id,
-                     IReferenceExplorerModel::ExpansionMode mode);
+                     IReferenceExplorerModel::ExpansionMode expansion_mode);
 
   //! Update the widget icons to match the active theme
   void UpdateIcons();
