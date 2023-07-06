@@ -25,10 +25,10 @@ class QuickReferenceExplorer final : public QWidget {
   //! Constructor
   QuickReferenceExplorer(
       const Index &index, const FileLocationCache &file_location_cache,
-      RawEntityId entity_id,
-      const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-      const bool &show_code_preview, IGlobalHighlighter &highlighter,
-      IMacroExplorer &macro_explorer, QWidget *parent = nullptr);
+      RawEntityId entity_id, const bool &show_code_preview,
+      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
+      const IReferenceExplorerModel::ReferenceType &reference_type,
+      QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickReferenceExplorer() override;
@@ -72,10 +72,9 @@ class QuickReferenceExplorer final : public QWidget {
   //! Initializes the internal widgets
   void InitializeWidgets(
       const Index &index, const FileLocationCache &file_location_cache,
-      RawEntityId entity_id,
-      const IReferenceExplorerModel::ExpansionMode &expansion_mode,
-      const bool &show_code_preview, IGlobalHighlighter &highlighter,
-      IMacroExplorer &macro_explorer);
+      RawEntityId entity_id, const bool &show_code_preview,
+      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
+      const IReferenceExplorerModel::ReferenceType &reference_type);
 
   //! Used to start window dragging
   void OnTitleFrameMousePress(QMouseEvent *event);
@@ -90,14 +89,14 @@ class QuickReferenceExplorer final : public QWidget {
   void CancelRunningRequest();
 
   //! Generate a new window name for the given entity name
-  static QString
-  GenerateWindowName(const QString &entity_name,
-                     IReferenceExplorerModel::ExpansionMode expansion_mode);
+  static QString GenerateWindowName(
+      const QString &entity_name,
+      const IReferenceExplorerModel::ReferenceType &reference_type);
 
   //! Generate a new window name for the given entity id
-  static QString
-  GenerateWindowName(const RawEntityId &entity_id,
-                     IReferenceExplorerModel::ExpansionMode expansion_mode);
+  static QString GenerateWindowName(
+      const RawEntityId &entity_id,
+      const IReferenceExplorerModel::ReferenceType &reference_type);
 
   //! Update the widget icons to match the active theme
   void UpdateIcons();

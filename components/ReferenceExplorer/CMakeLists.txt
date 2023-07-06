@@ -13,26 +13,11 @@ add_library("mx_referenceexplorer"
   include/multiplier/ui/IReferenceExplorerModel.h
   src/IReferenceExplorerModel.cpp
   
-  src/INodeGenerator.h
-  src/INodeGenerator.cpp
-
   src/ReferenceExplorerModel.h
   src/ReferenceExplorerModel.cpp
 
   src/ReferenceExplorerItemDelegate.h
   src/ReferenceExplorerItemDelegate.cpp
-
-  src/CallHierarchyChildGenerator.h
-  src/CallHierarchyChildGenerator.cpp
-  
-  src/CallHierarchyRootGenerator.h
-  src/CallHierarchyRootGenerator.cpp
-  
-  src/TaintedChildGenerator.h
-  src/TaintedChildGenerator.cpp
-  
-  src/TaintedRootGenerator.h
-  src/TaintedRootGenerator.cpp
 
   src/ReferenceExplorerTreeView.h
   src/ReferenceExplorerTreeView.cpp

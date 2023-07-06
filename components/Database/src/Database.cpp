@@ -11,6 +11,7 @@
 #include <requests/GetEntityInformation.h>
 #include <requests/GetEntityList.h>
 #include <requests/GetRelatedEntities.h>
+#include <requests/GetEntityReferences.h>
 
 #include <QThreadPool>
 #include <QtConcurrent>
@@ -86,6 +87,16 @@ QFuture<bool> Database::QueryEntities(QueryEntitiesReceiver &receiver,
                                       const QueryEntitiesMode &query_mode) {
   return QtConcurrent::run(QThreadPool::globalInstance(), GetEntityList,
                            d->index, &receiver, string, query_mode);
+}
+
+QFuture<bool> Database::QueryEntityReferences(
+    QueryEntityReferencesReceiver &receiver, const RawEntityId &entity_id,
+    const ReferenceType &reference_type, const bool &include_redeclarations,
+    const bool &emit_root_node, const std::size_t &depth) {
+  return QtConcurrent::run(QThreadPool::globalInstance(), GetEntityReferences,
+                           d->index, d->file_location_cache, &receiver,
+                           entity_id, reference_type, include_redeclarations,
+                           emit_root_node, depth);
 }
 
 Database::Database(const Index &index,

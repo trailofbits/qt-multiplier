@@ -389,8 +389,8 @@ void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
 }
 
 void MainWindow::OpenReferenceExplorer(
-    RawEntityId entity_id,
-    IReferenceExplorerModel::ExpansionMode expansion_mode) {
+    const RawEntityId &entity_id,
+    const IReferenceExplorerModel::ReferenceType &reference_type) {
 
   QPoint dialog_pos;
   if (d->quick_ref_explorer != nullptr) {
@@ -404,9 +404,9 @@ void MainWindow::OpenReferenceExplorer(
   CloseAllPopups();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
-      d->index, d->file_location_cache, entity_id, expansion_mode,
+      d->index, d->file_location_cache, entity_id,
       d->enable_quick_ref_explorer_code_preview, *d->global_highlighter,
-      *d->macro_explorer, this);
+      *d->macro_explorer, reference_type, this);
 
   connect(d->quick_ref_explorer.get(),
           &QuickReferenceExplorer::SaveReferenceExplorer, this,
@@ -440,11 +440,10 @@ void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
   }
 
   OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
-                        IReferenceExplorerModel::CallHierarchyMode);
+                        IReferenceExplorerModel::ReferenceType::Callers);
 }
 
 void MainWindow::OpenTokenTaintExplorer(const QModelIndex &index) {
-
   QVariant related_stmt_id_var =
       index.data(ICodeModel::EntityIdOfStmtContainingTokenRole);
 
@@ -453,8 +452,9 @@ void MainWindow::OpenTokenTaintExplorer(const QModelIndex &index) {
   // as well. But if there is a single associated declaration then it is fine
   // with it usually.
   if (related_stmt_id_var.isValid()) {
+
     OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_stmt_id_var),
-                          IReferenceExplorerModel::TaintMode);
+                          IReferenceExplorerModel::ReferenceType::Taint);
     return;
   }
 
@@ -463,7 +463,7 @@ void MainWindow::OpenTokenTaintExplorer(const QModelIndex &index) {
 
   if (related_entity_id_var.isValid()) {
     OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
-                          IReferenceExplorerModel::TaintMode);
+                          IReferenceExplorerModel::ReferenceType::Taint);
     return;
   }
 
@@ -786,16 +786,17 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       return;
     }
 
-    // Like in IDA Pro, pressing X while the cursor is on an entity shows us
-    // its cross-references.
     if (keyboard_button.key == Qt::Key_X) {
-      OpenTokenReferenceExplorer(index);
+      // Like in IDA Pro, pressing X while the cursor is on an entity shows us
+      // its cross-references.
 
-    } else if (keyboard_button.key == Qt::Key_P) {
-      OpenCodePreview(index);
+      OpenTokenReferenceExplorer(index);
 
     } else if (keyboard_button.key == Qt::Key_T) {
       OpenTokenTaintExplorer(index);
+
+    } else if (keyboard_button.key == Qt::Key_P) {
+      OpenCodePreview(index);
 
     } else if (keyboard_button.key == Qt::Key_I) {
       d->info_explorer_dock->show();

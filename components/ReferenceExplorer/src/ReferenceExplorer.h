@@ -37,8 +37,8 @@ class ReferenceExplorer final : public IReferenceExplorer {
   ReferenceExplorer(IReferenceExplorerModel *model, QWidget *parent,
                     IGlobalHighlighter *global_highlighter);
 
-  //! Initializes the internalwidgets
-  void InitializeWidgets();
+  //! Initializes the internal widgets
+  void InitializeWidgets(IReferenceExplorerModel *model);
 
   //! Installs the given model
   void InstallModel(IReferenceExplorerModel *model,
@@ -46,9 +46,6 @@ class ReferenceExplorer final : public IReferenceExplorer {
 
   //! Called when copying the details of a reference explorer item
   void CopyRefExplorerItemDetails(const QModelIndex &index);
-
-  //! Called when attempt to delete a reference explorer item
-  void RemoveRefExplorerItem(const QModelIndex &index);
 
   //! Called when attempt to expand a reference explorer item
   void ExpandRefExplorerItem(const QModelIndex &index);
@@ -94,14 +91,8 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Called when the FilterSettingsWidget options are changed
   void OnFilterParametersChange();
 
-  //! Called when the user disables the custom root item from the warning widget
-  void OnDisableCustomRootLinkClicked();
-
   //! Called when the "open" item button has been pressed
   void OnActivateTreeViewItem();
-
-  //! Called when the "close" item button has been pressed
-  void OnCloseTreeViewItem();
 
   //! Called when the "expand" item button has been pressed
   void OnExpandTreeViewItem();
@@ -109,6 +100,12 @@ class ReferenceExplorer final : public IReferenceExplorer {
   //! Called by the theme manager
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);
+
+  //! Called when a new model request is started
+  void OnModelRequestStarted();
+
+  //! Called when the model request has finished
+  void OnModelRequestFinished();
 
   friend class IReferenceExplorer;
 };

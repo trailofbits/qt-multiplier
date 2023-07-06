@@ -35,7 +35,6 @@ namespace {
 struct ContextMenu final {
   QMenu *menu{nullptr};
   QAction *copy_details_action{nullptr};
-  QAction *set_root_action{nullptr};
 };
 
 struct TreeviewItemButtons final {
@@ -43,7 +42,6 @@ struct TreeviewItemButtons final {
 
   // Keep up to date with UpdateTreeViewItemButtons
   QPushButton *open{nullptr};
-  QPushButton *close{nullptr};
   QPushButton *expand{nullptr};
 };
 
@@ -55,8 +53,8 @@ struct ReferenceExplorer::PrivateData final {
   QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
-  QWidget *alternative_root_warning{nullptr};
   ContextMenu context_menu;
+  QWidget *status_widget{nullptr};
 
   TreeviewItemButtons treeview_item_buttons;
 };
@@ -77,14 +75,14 @@ ReferenceExplorer::ReferenceExplorer(IReferenceExplorerModel *model,
     : IReferenceExplorer(parent),
       d(new PrivateData) {
 
-  InitializeWidgets();
+  InitializeWidgets(model);
   InstallModel(model, global_highlighter);
 
   // Synchronize the search widget and its addon
   d->search_widget->Deactivate();
 }
 
-void ReferenceExplorer::InitializeWidgets() {
+void ReferenceExplorer::InitializeWidgets(IReferenceExplorerModel *model) {
   // Initialize the tree view
   d->tree_view = new QTreeView(this);
 
@@ -142,12 +140,6 @@ void ReferenceExplorer::InitializeWidgets() {
   connect(d->treeview_item_buttons.open, &QPushButton::pressed, this,
           &ReferenceExplorer::OnActivateTreeViewItem);
 
-  d->treeview_item_buttons.close = new QPushButton(QIcon(), "", this);
-  d->treeview_item_buttons.close->setToolTip(tr("Close"));
-
-  connect(d->treeview_item_buttons.close, &QPushButton::pressed, this,
-          &ReferenceExplorer::OnCloseTreeViewItem);
-
   d->treeview_item_buttons.expand = new QPushButton(QIcon(), "", this);
   d->treeview_item_buttons.expand->setToolTip(tr("Expand"));
 
@@ -172,27 +164,29 @@ void ReferenceExplorer::InitializeWidgets() {
   connect(d->search_widget, &ISearchWidget::Deactivated,
           d->filter_settings_widget, &FilterSettingsWidget::Deactivate);
 
-  // Create the alternative root item warning
-  auto root_warning_label = new QLabel();
-  root_warning_label->setTextFormat(Qt::RichText);
-  root_warning_label->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
-  root_warning_label->setText(tr(
-      "A custom root has been set. <a href=\"#set_default_root\">Click here to disable it</a>"));
+  // Create the status widget
+  d->status_widget = new QWidget(this);
+  d->status_widget->setVisible(false);
 
-  auto warning_font = font();
-  warning_font.setItalic(true);
-  root_warning_label->setFont(warning_font);
+  auto status_widget_layout = new QHBoxLayout();
+  status_widget_layout->setContentsMargins(0, 0, 0, 0);
 
-  connect(root_warning_label, &QLabel::linkActivated, this,
-          &ReferenceExplorer::OnDisableCustomRootLinkClicked);
+  status_widget_layout->addWidget(new QLabel(tr("Updating..."), this));
+  status_widget_layout->addStretch();
 
-  auto root_warning_layout = new QHBoxLayout();
-  root_warning_layout->setContentsMargins(0, 0, 0, 0);
-  root_warning_layout->addWidget(root_warning_label);
-  root_warning_layout->addStretch();
+  auto cancel_button = new QPushButton(tr("Cancel"), this);
+  status_widget_layout->addWidget(cancel_button);
 
-  d->alternative_root_warning = new QWidget(this);
-  d->alternative_root_warning->setLayout(root_warning_layout);
+  connect(cancel_button, &QPushButton::pressed, model,
+          &IReferenceExplorerModel::CancelRunningRequest);
+
+  connect(model, &IReferenceExplorerModel::RequestStarted, this,
+          &ReferenceExplorer::OnModelRequestStarted);
+
+  connect(model, &IReferenceExplorerModel::RequestFinished, this,
+          &ReferenceExplorer::OnModelRequestFinished);
+
+  d->status_widget->setLayout(status_widget_layout);
 
   // Setup the main layout
   setContentsMargins(0, 0, 0, 0);
@@ -202,17 +196,14 @@ void ReferenceExplorer::InitializeWidgets() {
   layout->addWidget(d->tree_view);
   layout->addWidget(d->filter_settings_widget);
   layout->addWidget(d->search_widget);
-  layout->addWidget(d->alternative_root_warning);
+  layout->addWidget(d->status_widget);
   setLayout(layout);
 
   // Setup che custom context menu
   d->context_menu.menu = new QMenu(tr("Reference browser menu"));
   d->context_menu.copy_details_action = new QAction(tr("Copy details"));
-  d->context_menu.set_root_action = new QAction(tr("Set as root"));
 
   d->context_menu.menu->addAction(d->context_menu.copy_details_action);
-  d->context_menu.menu->addSeparator();
-  d->context_menu.menu->addAction(d->context_menu.set_root_action);
 
   connect(d->context_menu.menu, &QMenu::triggered, this,
           &ReferenceExplorer::OnContextMenuActionTriggered);
@@ -235,6 +226,7 @@ void ReferenceExplorer::InstallModel(IReferenceExplorerModel *model,
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(source_model);
+  d->model_proxy->setDynamicSortFilter(true);
 
   d->tree_view->setModel(d->model_proxy);
 
@@ -268,12 +260,9 @@ void ReferenceExplorer::CopyRefExplorerItemDetails(const QModelIndex &index) {
   clipboard.setText(tooltip);
 }
 
-void ReferenceExplorer::RemoveRefExplorerItem(const QModelIndex &index) {
-  d->model->RemoveEntity(d->model_proxy->mapToSource(index));
-}
-
 void ReferenceExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
-  d->model->ExpandEntity(d->model_proxy->mapToSource(index));
+  auto &model = *static_cast<ReferenceExplorerModel *>(d->model);
+  model.ExpandEntity(d->model_proxy->mapToSource(index));
 }
 
 bool ReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
@@ -325,7 +314,6 @@ bool ReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {
 void ReferenceExplorer::UpdateTreeViewItemButtons() {
   // Keep up to date with TreeviewItemButtons
   std::vector<QPushButton *> button_list{d->treeview_item_buttons.open,
-                                         d->treeview_item_buttons.close,
                                          d->treeview_item_buttons.expand};
 
   // Always show the buttons, but disable the ones that are not
@@ -357,12 +345,8 @@ void ReferenceExplorer::UpdateTreeViewItemButtons() {
   }
 
   // Enable the expansion button if we haven't yet expanded the node.
-  auto expansion_status_var =
-      index.data(IReferenceExplorerModel::ExpansionStatusRole);
-
-  if (expansion_status_var.isValid() && !expansion_status_var.toBool()) {
-    d->treeview_item_buttons.expand->setEnabled(true);
-  }
+  // TODO(alessandro): Fix the button visibility
+  d->treeview_item_buttons.expand->setEnabled(true);
 
   // Update the button positions
   auto rect = d->tree_view->visualRect(index);
@@ -402,9 +386,6 @@ void ReferenceExplorer::UpdateTreeViewItemButtons() {
 }
 
 void ReferenceExplorer::UpdateIcons() {
-  d->treeview_item_buttons.close->setIcon(
-      GetIcon(":/ReferenceExplorer/close_ref_item"));
-
   QIcon open_item_icon;
   open_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/activate_ref_item"),
                            QIcon::Normal, QIcon::On);
@@ -427,9 +408,6 @@ void ReferenceExplorer::UpdateIcons() {
 }
 
 void ReferenceExplorer::OnModelReset() {
-  auto display_root_warning = d->model->HasAlternativeRoot();
-  d->alternative_root_warning->setVisible(display_root_warning);
-
   ExpandAllNodes();
 
   d->treeview_item_buttons.opt_hovered_index = std::nullopt;
@@ -494,9 +472,6 @@ void ReferenceExplorer::OnContextMenuActionTriggered(QAction *action) {
 
   if (action == d->context_menu.copy_details_action) {
     CopyRefExplorerItemDetails(index);
-
-  } else if (action == d->context_menu.set_root_action) {
-    d->model->SetRoot(index);
   }
 }
 
@@ -546,10 +521,6 @@ void ReferenceExplorer::OnFilterParametersChange() {
       d->filter_settings_widget->FilterByEntityID());
 }
 
-void ReferenceExplorer::OnDisableCustomRootLinkClicked() {
-  d->model->SetDefaultRoot();
-}
-
 void ReferenceExplorer::OnActivateTreeViewItem() {
   if (!d->treeview_item_buttons.opt_hovered_index.has_value()) {
     return;
@@ -557,15 +528,6 @@ void ReferenceExplorer::OnActivateTreeViewItem() {
 
   const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
   emit ItemActivated(index);
-}
-
-void ReferenceExplorer::OnCloseTreeViewItem() {
-  if (!d->treeview_item_buttons.opt_hovered_index.has_value()) {
-    return;
-  }
-
-  const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
-  RemoveRefExplorerItem(index);
 }
 
 void ReferenceExplorer::OnExpandTreeViewItem() {
@@ -579,6 +541,16 @@ void ReferenceExplorer::OnExpandTreeViewItem() {
 
 void ReferenceExplorer::OnThemeChange(const QPalette &, const CodeViewTheme &) {
   UpdateIcons();
+}
+
+void ReferenceExplorer::OnModelRequestStarted() {
+  d->status_widget->setVisible(true);
+  d->model_proxy->setDynamicSortFilter(false);
+}
+
+void ReferenceExplorer::OnModelRequestFinished() {
+  d->status_widget->setVisible(false);
+  d->model_proxy->setDynamicSortFilter(true);
 }
 
 }  // namespace mx::gui

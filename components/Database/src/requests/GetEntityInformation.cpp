@@ -44,7 +44,7 @@ namespace {
 
 const std::size_t kBatchSize{512};
 
-std::size_t GetBatchSize(EntityInformation &info) {
+std::size_t GetBatchSize(const EntityInformation &info) {
   return info.declarations.size() + info.definitions.size() +
          info.macros_used.size() + info.callees.size() + info.callers.size() +
          info.pointers.size() + info.address_ofs.size() +

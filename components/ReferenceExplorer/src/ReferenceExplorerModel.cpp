@@ -7,28 +7,25 @@
 */
 
 #include "ReferenceExplorerModel.h"
-#include "INodeGenerator.h"
 
 #include <multiplier/ui/Assert.h>
-#include <multiplier/ui/Util.h>
 
-#include <multiplier/File.h>
-#include <multiplier/Index.h>
-#include <multiplier/AST.h>
-
-#include <QApplication>
-#include <QByteArray>
-#include <QIODevice>
-#include <QPalette>
-#include <QString>
-#include <QThreadPool>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QTimer>
 #include <QColor>
+#include <QApplication>
+#include <QPalette>
 
-#include <filesystem>
+#include <iostream>
 
 namespace mx::gui {
 
 namespace {
+
+const int kFirstUpdateInterval{500};
+const int kImportInterval{1500};
+const std::size_t kQueryDepth{2};
 
 static TokenCategory FromDeclCategory(DeclCategory cat) {
   switch (cat) {
@@ -66,14 +63,9 @@ struct ReferenceExplorerModel::PrivateData final {
   PrivateData(const mx::Index &index_,
               const mx::FileLocationCache &file_location_cache_)
       : index(index_),
-        file_location_cache(file_location_cache_) {
+        file_location_cache(file_location_cache_) {}
 
-    for (auto [path, id] : index.file_paths()) {
-      file_path_map.emplace(id.Pack(),
-                            QString::fromStdString(path.generic_string()));
-    }
-  }
-
+  //! The multiplier database
   mx::Index index;
 
   //! Caches file/line/column mappings for open files.
@@ -82,31 +74,63 @@ struct ReferenceExplorerModel::PrivateData final {
   //! The path map from mx::Index, keyed by id
   std::unordered_map<RawEntityId, QString> file_path_map;
 
-  //! Node tree for this model.
-  NodeTree node_tree;
+  //! Database object used to request the nodes
+  IDatabase::Ptr database;
+
+  //! Database request future
+  QFuture<bool> request_status_future;
+
+  //! Database future watcher
+  QFutureWatcher<bool> future_watcher;
+
+  //! A list of QueryEntityReferencesResult objects that needs to be imported
+  DataBatch data_batch_queue;
+
+  //! A mutex protecting data_batch_queue
+  std::mutex data_batch_queue_mutex;
+
+  //! A timer used to import data from the data batch queue
+  QTimer import_timer;
+
+  //! The insert point for the active request
+  QModelIndex insert_point;
+
+  //! ID mapping info used by the active reques
+  std::unordered_map<std::uint64_t, Context::NodeID> node_id_mapping;
+
+  //! Reference type
+  IDatabase::ReferenceType reference_type;
+
+  //! Model data
+  Context context;
 };
 
-//! Adds a new entity object under the given parent
-void ReferenceExplorerModel::AppendEntityById(RawEntityId entity_id,
-                                              ExpansionMode expansion_mode,
-                                              const QModelIndex &parent) {
+ReferenceExplorerModel::Context::NodeID
+ReferenceExplorerModel::GenerateNodeID(Context &context) {
+  return ++context.node_id_generator;
+}
 
-  INodeGenerator *generator = INodeGenerator::CreateRootGenerator(
-      d->index, d->file_location_cache, entity_id, parent, expansion_mode);
+void ReferenceExplorerModel::ResetContext(Context &context) {
+  context = {};
+}
 
-  if (!generator) {
-    return;
-  }
+void ReferenceExplorerModel::SetEntity(const RawEntityId &entity_id,
+                                       const ReferenceType &reference_type) {
+  CancelRunningRequest();
 
-  generator->setAutoDelete(true);
+  d->reference_type = reference_type == ReferenceType::Callers
+                          ? IDatabase::ReferenceType::Callers
+                          : IDatabase::ReferenceType::Taint;
 
-  connect(generator, &INodeGenerator::NodesAvailable, this,
-          &ReferenceExplorerModel::InsertNodes);
+  static const bool kShouldIncludeRedeclarations{true};
+  static const bool kGenerateRootNode{true};
 
-  connect(generator, &INodeGenerator::Finished, this,
-          &ReferenceExplorerModel::InsertNodes);
+  StartRequest(QModelIndex(), entity_id, d->reference_type,
+               kShouldIncludeRedeclarations, kGenerateRootNode, kQueryDepth);
 
-  QThreadPool::globalInstance()->start(generator);
+  emit beginResetModel();
+  ResetContext(d->context);
+  emit endResetModel();
 }
 
 void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
@@ -114,146 +138,25 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
     return;
   }
 
-  auto node_id = static_cast<std::uint64_t>(index.internalId());
-  auto node_it = d->node_tree.node_map.find(node_id);
-  if (node_it == d->node_tree.node_map.end()) {
+  CancelRunningRequest();
+
+  auto entity_id_var = index.data(EntityIdRole);
+  if (!entity_id_var.isValid()) {
     return;
   }
 
-  auto &node = node_it->second;
-  if (node.expanded) {
-    return;
-  }
+  auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
 
-  node.expanded = true;
+  static const bool kShouldIncludeRedeclarations{false};
+  static const bool kGenerateRootNode{false};
 
-  INodeGenerator *generator = INodeGenerator::CreateChildGenerator(
-      d->index, d->file_location_cache, node_it->second.entity_id, index,
-      node.expansion_mode);
-
-  generator->setAutoDelete(true);
-
-  connect(generator, &INodeGenerator::NodesAvailable, this,
-          &ReferenceExplorerModel::InsertNodes);
-
-  connect(generator, &INodeGenerator::Finished, this,
-          &ReferenceExplorerModel::InsertNodes);
-
-  QThreadPool::globalInstance()->start(generator);
+  StartRequest(index, entity_id, d->reference_type,
+               kShouldIncludeRedeclarations, kGenerateRootNode, kQueryDepth);
 }
 
-void ReferenceExplorerModel::RemoveEntity(const QModelIndex &index) {
-  if (!index.isValid()) {
-    return;
-  }
-
-  std::uint64_t node_id = static_cast<std::uint64_t>(index.internalId());
-  auto &node_map = d->node_tree.node_map;
-  auto node_it = node_map.find(node_id);
-  if (node_it == node_map.end()) {
-    return;
-  }
-
-  Assert(node_id == node_it->second.node_id, "Out-of-sync node ids.");
-
-  std::uint64_t parent_node_id = node_it->second.parent_node_id;
-
-  auto parent_it = node_map.find(parent_node_id);
-
-  // Check if we're removing the alternate root.
-  if (node_id == d->node_tree.curr_root_node_id) {
-    Assert(d->node_tree.curr_root_node_id != d->node_tree.root_node_id,
-           "Can't remove the true root node.");
-    d->node_tree.curr_root_node_id = d->node_tree.root_node_id;
-  }
-
-  QModelIndex parent_index = QModelIndex();
-  int parent_offset = 0;
-  if (parent_it == node_map.end()) {
-    Assert(false, "Missing parent node, or removing true root node");
-
-    // We're removing something inside of our parent.
-  } else {
-    Assert(parent_node_id == parent_it->second.node_id, "Out-of-sync node ids");
-
-    auto found = false;
-    for (auto sibling_id : parent_it->second.child_node_id_list) {
-      if (sibling_id == node_id) {
-        found = true;
-        break;
-      }
-      ++parent_offset;
-    }
-    if (!found) {
-      Assert(false, "Didn't find node to be deleted in parent's child list.");
-    }
-
-    if (parent_node_id != d->node_tree.curr_root_node_id) {
-      parent_index = createIndex(parent_offset, 0, parent_node_id);
-    }
-  }
-
-  emit beginResetModel();
-
-  std::vector<std::uint64_t> wl;
-  wl.push_back(node_id);
-
-  // Recursively delete the child nodes.
-  while (!wl.empty()) {
-    std::uint64_t next_node_id = wl.back();
-    Assert(next_node_id != parent_node_id, "Tree is actually a graph.");
-    wl.pop_back();
-
-    node_it = node_map.find(next_node_id);
-    if (node_it == node_map.end()) {
-      continue;
-    }
-
-    for (std::uint64_t child_node_id : node_it->second.child_node_id_list) {
-      wl.push_back(child_node_id);
-    }
-
-    node_map.erase(node_it);
-  }
-
-  // Remove the node in its parent's list of child ids.
-  if (parent_it != node_map.end()) {
-    auto it = std::remove(parent_it->second.child_node_id_list.begin(),
-                          parent_it->second.child_node_id_list.end(), node_id);
-    parent_it->second.child_node_id_list.erase(
-        it, parent_it->second.child_node_id_list.end());
-  }
-
-  emit endResetModel();
+ReferenceExplorerModel::~ReferenceExplorerModel() {
+  CancelRunningRequest();
 }
-
-bool ReferenceExplorerModel::HasAlternativeRoot() const {
-  return d->node_tree.root_node_id != d->node_tree.curr_root_node_id;
-}
-
-void ReferenceExplorerModel::SetRoot(const QModelIndex &index) {
-  std::uint64_t root_node_id = d->node_tree.root_node_id;
-  if (index.isValid()) {
-    auto node_id_var =
-        index.data(ReferenceExplorerModel::InternalIdentifierRole);
-
-    if (node_id_var.isValid()) {
-      root_node_id = node_id_var.toULongLong();
-    }
-  }
-
-  emit beginResetModel();
-
-  d->node_tree.curr_root_node_id = root_node_id;
-
-  emit endResetModel();
-}
-
-void ReferenceExplorerModel::SetDefaultRoot() {
-  SetRoot(QModelIndex());
-}
-
-ReferenceExplorerModel::~ReferenceExplorerModel() {}
 
 QModelIndex ReferenceExplorerModel::index(int row, int column,
                                           const QModelIndex &parent) const {
@@ -261,17 +164,17 @@ QModelIndex ReferenceExplorerModel::index(int row, int column,
     return QModelIndex();
   }
 
-  std::uint64_t parent_node_id{d->node_tree.curr_root_node_id};
+  std::uint64_t parent_node_id{};
   if (parent.isValid()) {
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
 
-  auto parent_node_it = d->node_tree.node_map.find(parent_node_id);
-  if (parent_node_it == d->node_tree.node_map.end()) {
+  auto parent_node_it = d->context.tree.find(parent_node_id);
+  if (parent_node_it == d->context.tree.end()) {
     return QModelIndex();
   }
 
-  const Node &parent_node = parent_node_it->second;
+  const auto &parent_node = parent_node_it->second;
 
   auto unsigned_row = static_cast<std::size_t>(row);
   if (unsigned_row >= parent_node.child_node_id_list.size()) {
@@ -279,7 +182,7 @@ QModelIndex ReferenceExplorerModel::index(int row, int column,
   }
 
   auto child_node_id = parent_node.child_node_id_list[unsigned_row];
-  if (d->node_tree.node_map.count(child_node_id) == 0) {
+  if (d->context.tree.count(child_node_id) == 0) {
     return QModelIndex();
   }
 
@@ -293,8 +196,8 @@ QModelIndex ReferenceExplorerModel::parent(const QModelIndex &child) const {
 
   auto child_node_id = static_cast<std::uint64_t>(child.internalId());
 
-  auto child_node_it = d->node_tree.node_map.find(child_node_id);
-  if (child_node_it == d->node_tree.node_map.end()) {
+  auto child_node_it = d->context.tree.find(child_node_id);
+  if (child_node_it == d->context.tree.end()) {
     return QModelIndex();
   }
 
@@ -303,8 +206,8 @@ QModelIndex ReferenceExplorerModel::parent(const QModelIndex &child) const {
     return QModelIndex();
   }
 
-  auto parent_node_it = d->node_tree.node_map.find(child_node.parent_node_id);
-  if (parent_node_it == d->node_tree.node_map.end()) {
+  auto parent_node_it = d->context.tree.find(child_node.parent_node_id);
+  if (parent_node_it == d->context.tree.end()) {
     return QModelIndex();
   }
 
@@ -312,8 +215,8 @@ QModelIndex ReferenceExplorerModel::parent(const QModelIndex &child) const {
 
   auto grandparent_node_id = parent_node.parent_node_id;
 
-  auto grandparent_node_it = d->node_tree.node_map.find(grandparent_node_id);
-  if (grandparent_node_it == d->node_tree.node_map.end()) {
+  auto grandparent_node_it = d->context.tree.find(grandparent_node_id);
+  if (grandparent_node_it == d->context.tree.end()) {
     return QModelIndex();
   }
 
@@ -338,13 +241,13 @@ int ReferenceExplorerModel::rowCount(const QModelIndex &parent) const {
     return 0;
   }
 
-  std::uint64_t parent_node_id{d->node_tree.curr_root_node_id};
+  std::uint64_t parent_node_id{};
   if (parent.isValid()) {
     parent_node_id = static_cast<std::uint64_t>(parent.internalId());
   }
 
-  auto parent_node_it = d->node_tree.node_map.find(parent_node_id);
-  if (parent_node_it == d->node_tree.node_map.end()) {
+  auto parent_node_it = d->context.tree.find(parent_node_id);
+  if (parent_node_it == d->context.tree.end()) {
     return 0;
   }
 
@@ -353,10 +256,6 @@ int ReferenceExplorerModel::rowCount(const QModelIndex &parent) const {
 }
 
 int ReferenceExplorerModel::columnCount(const QModelIndex &) const {
-  if (d->node_tree.node_map.empty()) {
-    return 0;
-  }
-
   return 3;
 }
 
@@ -367,8 +266,8 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
   }
 
   auto node_id = static_cast<std::uint64_t>(index.internalId());
-  auto node_it = d->node_tree.node_map.find(node_id);
-  if (node_it == d->node_tree.node_map.end()) {
+  auto node_it = d->context.tree.find(node_id);
+  if (node_it == d->context.tree.end()) {
     return QVariant();
   }
 
@@ -391,16 +290,16 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     auto column_number = index.column();
 
     if (column_number == 0) {
-      if (node.opt_name.has_value()) {
-        value = node.opt_name.value();
+      if (node.data.opt_name.has_value()) {
+        value = node.data.opt_name.value();
 
       } else {
-        value = tr("Unnamed: ") + QString::number(node.entity_id);
+        value = tr("Unnamed: ") + QString::number(node.data.entity_id);
       }
 
     } else if (column_number == 1) {
-      if (node.opt_location.has_value()) {
-        const auto &location = node.opt_location.value();
+      if (node.data.opt_location.has_value()) {
+        const auto &location = node.data.opt_location.value();
 
         std::filesystem::path file_path{location.path.toStdString()};
         auto file_name = QString::fromStdString(file_path.filename());
@@ -411,33 +310,34 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
       }
 
     } else if (column_number == 2) {
-      if (node.opt_breadcrumbs.has_value()) {
-        const auto &breadcrumbs = node.opt_breadcrumbs.value();
+      if (node.data.opt_breadcrumbs.has_value()) {
+        const auto &breadcrumbs = node.data.opt_breadcrumbs.value();
         value.setValue(breadcrumbs);
       }
     }
 
   } else if (role == Qt::ToolTipRole) {
-    auto opt_decl_category = GetTokenCategory(d->index, node.entity_id);
+    auto opt_decl_category = GetTokenCategory(d->index, node.data.entity_id);
     auto buffer =
         tr("Category: ") + GetTokenCategoryName(opt_decl_category) + "\n";
 
-    buffer += tr("Entity ID: ") + QString::number(node.entity_id) + "\n";
+    buffer += tr("Entity ID: ") + QString::number(node.data.entity_id) + "\n";
 
     if (std::optional<FragmentId> frag_id =
-            FragmentId::from(node.referenced_entity_id)) {
+            FragmentId::from(node.data.referenced_entity_id)) {
 
       buffer += tr("Fragment ID: ") +
                 QString::number(EntityId(frag_id.value()).Pack());
     }
 
-    if (node.opt_location.has_value()) {
+    if (node.data.opt_location.has_value()) {
       buffer += "\n";
-      buffer += tr("File ID: ") + QString::number(node.opt_location->file_id);
+      buffer +=
+          tr("File ID: ") + QString::number(node.data.opt_location->file_id);
     }
 
-    if (node.opt_location.has_value()) {
-      const auto &location = node.opt_location.value();
+    if (node.data.opt_location.has_value()) {
+      const auto &location = node.data.opt_location.value();
 
       buffer += "\n";
       buffer += tr("Path: ") + location.path;
@@ -446,65 +346,50 @@ QVariant ReferenceExplorerModel::data(const QModelIndex &index,
     value = std::move(buffer);
 
   } else if (role == IReferenceExplorerModel::EntityIdRole) {
-    value = static_cast<quint64>(node.entity_id);
+    value = static_cast<quint64>(node.data.entity_id);
 
   } else if (role == IReferenceExplorerModel::ReferencedEntityIdRole) {
-    value = static_cast<quint64>(node.referenced_entity_id);
+    value = static_cast<quint64>(node.data.referenced_entity_id);
 
   } else if (role == IReferenceExplorerModel::FragmentIdRole) {
     if (std::optional<FragmentId> frag_id =
-            FragmentId::from(node.referenced_entity_id)) {
+            FragmentId::from(node.data.referenced_entity_id)) {
       value.setValue(EntityId(frag_id.value()).Pack());
     }
 
   } else if (role == IReferenceExplorerModel::FileIdRole) {
-    if (node.opt_location.has_value()) {
-      value.setValue(node.opt_location->file_id);
+    if (node.data.opt_location.has_value()) {
+      value.setValue(node.data.opt_location->file_id);
     }
 
   } else if (role == IReferenceExplorerModel::LineNumberRole) {
-    if (node.opt_location.has_value() && 0u < node.opt_location->line) {
-      value.setValue(node.opt_location->line);
+    if (node.data.opt_location.has_value() &&
+        0u < node.data.opt_location->line) {
+      value.setValue(node.data.opt_location->line);
     }
 
   } else if (role == IReferenceExplorerModel::ColumnNumberRole) {
-    if (node.opt_location.has_value() && 0u < node.opt_location->column) {
-      value.setValue(node.opt_location->column);
+    if (node.data.opt_location.has_value() &&
+        0u < node.data.opt_location->column) {
+      value.setValue(node.data.opt_location->column);
     }
 
   } else if (role == IReferenceExplorerModel::TokenCategoryRole) {
     value.setValue(TokenCategory::FUNCTION);
 
   } else if (role == IReferenceExplorerModel::LocationRole) {
-    if (node.opt_location.has_value()) {
-      value.setValue(node.opt_location.value());
+    if (node.data.opt_location.has_value()) {
+      value.setValue(node.data.opt_location.value());
     }
 
   } else if (role == ReferenceExplorerModel::InternalIdentifierRole) {
     value.setValue(node_id);
 
-  } else if (role == IReferenceExplorerModel::ExpansionModeRole) {
-    value.setValue(node.expansion_mode);
-
-  } else if (role == IReferenceExplorerModel::ExpansionStatusRole) {
-    value.setValue(node.expanded);
-
   } else if (role == ReferenceExplorerModel::IconLabelRole) {
-    auto opt_decl_category = GetTokenCategory(d->index, node.entity_id);
+    auto opt_decl_category = GetTokenCategory(d->index, node.data.entity_id);
 
     auto label = GetTokenCategoryIconLabel(opt_decl_category);
     value.setValue(label);
-
-  } else if (role == ReferenceExplorerModel::ExpansionModeColor) {
-    switch (node.expansion_mode) {
-      case IReferenceExplorerModel::ExpansionMode::CallHierarchyMode:
-        value.setValue(QColor(0x50, 0x00, 0x00));
-        break;
-
-      case IReferenceExplorerModel::ExpansionMode::TaintMode:
-        value.setValue(QColor(0x00, 0x00, 0x50));
-        break;
-    }
   }
 
   return value;
@@ -529,109 +414,25 @@ QVariant ReferenceExplorerModel::headerData(int section,
   }
 }
 
-void ReferenceExplorerModel::InsertNodes(QVector<Node> nodes, int row,
-                                         const QModelIndex &drop_target) {
-
-  // Figure out the drop target. This is the internal node id of the parent
-  // node that will contain our dropped nodes.
-  std::uint64_t drop_target_node_id = d->node_tree.curr_root_node_id;
-  if (drop_target.isValid()) {
-    auto drop_target_var =
-        drop_target.data(ReferenceExplorerModel::InternalIdentifierRole);
-    Assert(drop_target_var.isValid(), "Invalid InternalIdentifierRole value");
-    drop_target_node_id = qvariant_cast<std::uint64_t>(drop_target_var);
-  }
-
-  if (!d->node_tree.node_map.contains(drop_target_node_id)) {
-    return;
-  }
-
-  // Figure out where to drop the item in within the `drop_target_node_id`.
-  int begin_row{};
-  if (row != -1) {
-    begin_row = row;
-  } else if (drop_target.isValid()) {
-    begin_row = drop_target.row();
-  } else {
-    begin_row = rowCount(QModelIndex());
-  }
-
-  // Link the new `root_nodes_dropped` into the parent node.
-  Node &parent_node = d->node_tree.node_map[drop_target_node_id];
-  Assert(parent_node.node_id == drop_target_node_id, "Invalid drop target");
-
-  if (static_cast<size_t>(begin_row) > parent_node.child_node_id_list.size()) {
-    return;
-  }
-
-  std::vector<std::uint64_t> root_nodes_dropped;
-
-  // Create an old-to-new node ID mapping.
-  std::unordered_map<std::uint64_t, std::uint64_t> id_mapping;
-  for (Node &node : nodes) {
-    const std::uint64_t old_id = node.node_id;
-    Assert(old_id != 0u, "Invalid node id");
-    node.AssignUniqueId();  // NOTE(pag): Replaces `Node::node_id`.
-    Assert(node.node_id != 0u, "Invlaid unique node id");
-    auto [it, added] = id_mapping.emplace(old_id, node.node_id);
-    Assert(added, "Repeat node id found");
-  }
-
-  // Remap a node id as well as its parent node id. If the parent node id isn't
-  // contained in our current tree, then this must be a node from the root of
-  // what we were dragging. Rewrite the node's parent id to be the drop target
-  // id.
-  for (Node &node : nodes) {
-    std::uint64_t parent_node_id = node.parent_node_id;
-    auto parent_it = id_mapping.find(parent_node_id);
-    if (parent_it == id_mapping.end()) {
-      root_nodes_dropped.push_back(node.node_id);
-      node.parent_node_id = drop_target_node_id;
-    } else {
-      node.parent_node_id = parent_it->second;
-    }
-  }
-
-  // The `expanded` property of this node has changed, so tell the view
-  // about it. This will disable the expand button (regardless of whether
-  // we did get new nodes or not).
-  emit dataChanged(drop_target, drop_target);
-
-  // We did nothing, or we did nothing visible.
-  auto num_dropped_nodes = static_cast<int>(root_nodes_dropped.size());
-  if (!num_dropped_nodes) {
-    return;
-  }
-
-  auto end_row = begin_row + static_cast<int>(root_nodes_dropped.size()) - 1;
-  emit beginInsertRows(drop_target, begin_row, end_row);
-
-  // Add the nodes into our tree.
-  for (Node &node : nodes) {
-    const std::uint64_t node_id = node.node_id;
-
-    // Remap the child node ids.
-    for (std::uint64_t &child_node_id : node.child_node_id_list) {
-      child_node_id = id_mapping[child_node_id];
-      Assert(child_node_id != 0u, "Missing child node");
-    }
-
-    auto [it, added] = d->node_tree.node_map.emplace(node_id, std::move(node));
-    Assert(added, "Repeat node id found");
-  }
-
-  parent_node.child_node_id_list.insert(
-      parent_node.child_node_id_list.begin() + static_cast<unsigned>(begin_row),
-      root_nodes_dropped.begin(), root_nodes_dropped.end());
-
-  emit endInsertRows();
-}
-
 ReferenceExplorerModel::ReferenceExplorerModel(
     const Index &index, const FileLocationCache &file_location_cache,
     QObject *parent)
     : IReferenceExplorerModel(parent),
-      d(new PrivateData(index, file_location_cache)) {}
+      d(new PrivateData(index, file_location_cache)) {
+
+  d->database = IDatabase::Create(index, file_location_cache);
+
+  for (auto [path, id] : d->index.file_paths()) {
+    d->file_path_map.emplace(id.Pack(),
+                             QString::fromStdString(path.generic_string()));
+  }
+
+  connect(&d->future_watcher, &QFutureWatcher<QFuture<bool>>::finished, this,
+          &ReferenceExplorerModel::FutureResultStateChanged);
+
+  connect(&d->import_timer, &QTimer::timeout, this,
+          &ReferenceExplorerModel::ProcessDataBatchQueue);
+}
 
 TokenCategory ReferenceExplorerModel::GetTokenCategory(const Index &index,
                                                        RawEntityId entity_id) {
@@ -714,6 +515,73 @@ ReferenceExplorerModel::GetTokenCategoryIconLabel(TokenCategory tok_category) {
   return label_map_it->second;
 }
 
+void ReferenceExplorerModel::ImportReferences(
+    IDatabase::QueryEntityReferencesResult result) {
+
+  bool reset_model{false};
+
+  if (d->context.tree.empty()) {
+    d->context.tree.insert({0, Context::Node{}});
+    reset_model = true;
+  }
+
+  auto insert_point_node_id = d->insert_point.internalId();
+  auto orig_insert_point_node = d->context.tree[insert_point_node_id];
+  if (!orig_insert_point_node.child_node_id_list.empty()) {
+    reset_model = true;
+  }
+
+  for (auto &database_node : result.node_list) {
+    Assert(
+        d->node_id_mapping.count(database_node.mapping_info.parent_node_id) > 0,
+        "Unknown node id");
+
+    auto parent_node_id =
+        d->node_id_mapping[database_node.mapping_info.parent_node_id];
+
+    auto &parent_node = d->context.tree[parent_node_id];
+
+    if (parent_node.entity_id_node_id_map.count(database_node.entity_id) > 0) {
+      auto node_id = parent_node.entity_id_node_id_map[database_node.entity_id];
+      d->node_id_mapping.insert({database_node.mapping_info.node_id, node_id});
+      continue;
+    }
+
+    auto node_id = GenerateNodeID(d->context);
+    parent_node.entity_id_node_id_map.insert(
+        {database_node.entity_id, node_id});
+
+    parent_node.child_node_id_list.push_back(node_id);
+
+    Context::Node node;
+    node.data = std::move(database_node);
+    node.node_id = node_id;
+    node.parent_node_id = parent_node_id;
+
+    d->node_id_mapping.insert(
+        {database_node.mapping_info.node_id, node.node_id});
+
+    d->context.tree.insert({node_id, std::move(node)});
+  }
+
+  if (reset_model) {
+    emit beginResetModel();
+    emit endResetModel();
+
+  } else {
+    const auto &current_insert_point_node =
+        d->context.tree[insert_point_node_id];
+
+    auto first_row =
+        static_cast<int>(current_insert_point_node.child_node_id_list.size() -
+                         orig_insert_point_node.child_node_id_list.size());
+    auto last_row =
+        static_cast<int>(orig_insert_point_node.child_node_id_list.size() - 1);
+
+    emit beginInsertRows(d->insert_point, first_row, last_row);
+  }
+}
+
 const QString &
 ReferenceExplorerModel::GetTokenCategoryName(TokenCategory tok_category) {
 
@@ -756,5 +624,107 @@ ReferenceExplorerModel::GetTokenCategoryName(TokenCategory tok_category) {
 
   return label_map_it->second;
 }
+
+void ReferenceExplorerModel::StartRequest(
+    const QModelIndex &insert_point, const RawEntityId &entity_id,
+    const IDatabase::ReferenceType &reference_type,
+    const bool &include_redeclarations, const bool &emit_root_node,
+    const std::size_t &depth) {
+
+  d->insert_point = insert_point;
+
+  d->node_id_mapping.clear();
+  d->node_id_mapping.insert({0, d->insert_point.internalId()});
+
+  d->request_status_future = d->database->QueryEntityReferences(
+      *this, entity_id, reference_type, include_redeclarations, emit_root_node,
+      depth);
+
+  d->future_watcher.setFuture(d->request_status_future);
+  d->import_timer.start(kFirstUpdateInterval);
+
+  emit RequestStarted();
+}
+
+void ReferenceExplorerModel::OnDataBatch(DataBatch data_batch) {
+  std::lock_guard<std::mutex> lock(d->data_batch_queue_mutex);
+
+  d->data_batch_queue.insert(d->data_batch_queue.end(),
+                             std::make_move_iterator(data_batch.begin()),
+                             std::make_move_iterator(data_batch.end()));
+}
+
+void ReferenceExplorerModel::CancelRunningRequest() {
+  auto is_importing = d->import_timer.isActive();
+  auto is_querying = d->request_status_future.isRunning();
+
+  d->import_timer.stop();
+  d->data_batch_queue.clear();
+
+  if (d->request_status_future.isRunning()) {
+    d->request_status_future.cancel();
+    d->request_status_future.waitForFinished();
+    d->request_status_future = {};
+  }
+
+  if (is_importing || is_querying) {
+    emit RequestFinished();
+  }
+}
+
+void ReferenceExplorerModel::ProcessDataBatchQueue() {
+  DataBatch data_batch_queue;
+
+  {
+    std::lock_guard<std::mutex> lock(d->data_batch_queue_mutex);
+
+    data_batch_queue = std::move(d->data_batch_queue);
+    d->data_batch_queue.clear();
+  }
+
+  // Merge all the updates together so we don't have to emit
+  // many expensive beginInsertRows/endInsertRows. The slowness
+  // is made worse by the proxy models that we are using
+  // (QSortFilterProxyModel + IGlobalHighlighter), so make
+  // sure that the view disables dynamic sorting while the
+  // request is running!
+  IDatabase::QueryEntityReferencesResult result;
+  for (auto &queue_entry : data_batch_queue) {
+    result.node_list.insert(
+        result.node_list.end(),
+        std::make_move_iterator(queue_entry.node_list.begin()),
+        std::make_move_iterator(queue_entry.node_list.end()));
+  }
+
+  ImportReferences(std::move(result));
+
+  if (!d->request_status_future.isRunning() && d->data_batch_queue.empty()) {
+    d->import_timer.stop();
+    emit RequestFinished();
+
+  } else {
+    // Restart the timer, so that the import procedure will fire again
+    // in kImportInterval msecs from the end of the previous batch
+    d->import_timer.start(kImportInterval);
+  }
+}
+
+void ReferenceExplorerModel::FutureResultStateChanged() {
+  if (d->request_status_future.isCanceled()) {
+    emit beginResetModel();
+    emit endResetModel();
+
+    return;
+  }
+
+  auto request_status = d->request_status_future.takeResult();
+  if (!request_status) {
+    emit beginResetModel();
+    emit endResetModel();
+
+    return;
+  }
+}
+
 
 }  // namespace mx::gui

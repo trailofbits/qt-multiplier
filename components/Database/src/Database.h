@@ -47,6 +47,12 @@ class Database final : public IDatabase {
   QueryEntities(QueryEntitiesReceiver &receiver, const QString &string,
                 const QueryEntitiesMode &query_mode) override;
 
+  //! \copybrief IDatabase::QueryEntityReferences
+  virtual QFuture<bool> QueryEntityReferences(
+      QueryEntityReferencesReceiver &receiver, const RawEntityId &entity_id,
+      const ReferenceType &reference_type, const bool &include_redeclarations,
+      const bool &emit_root_node, const std::size_t &depth) override;
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;

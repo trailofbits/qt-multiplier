@@ -9,39 +9,22 @@
 #pragma once
 
 #include <multiplier/Types.h>
+#include <multiplier/Index.h>
 
 #include <QAbstractItemModel>
 #include <QString>
 
-namespace mx {
-class FileLocationCache;
-class Index;
-namespace gui {
+namespace mx::gui {
 
 //! A model for the reference explorer widget
 class IReferenceExplorerModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
-  //! Expansion modes.
-  enum ExpansionMode {
-    //! Expand showing the call hierarchy.
-    CallHierarchyMode,
-
-    //! Expand showing the taint.
-    TaintMode,
-  };
-
   //! Additional item data roles for this model
   enum ItemDataRole {
     //! Returns a Location object
     LocationRole = Qt::UserRole + 1,
-
-    //! Returns the default expansion mode for this node's children.
-    ExpansionModeRole,
-
-    //! Returns true if the node has already been expanded
-    ExpansionStatusRole,
 
     //! Returns the entity id as a RawEntityId value
     EntityIdRole,
@@ -65,25 +48,20 @@ class IReferenceExplorerModel : public QAbstractItemModel {
     TokenCategoryRole,
   };
 
+  //! Reference type
+  enum class ReferenceType {
+    Callers,
+    Taint,
+  };
+
   //! Factory method
   static IReferenceExplorerModel *
   Create(const Index &index, const FileLocationCache &file_location_cache,
          QObject *parent = nullptr);
 
-  //! Expands the specified entity
-  virtual void ExpandEntity(const QModelIndex &index) = 0;
-
-  //! Removes the specified entity and all of its children.
-  virtual void RemoveEntity(const QModelIndex &index) = 0;
-
-  //! Returns true if an alternative root is being used
-  virtual bool HasAlternativeRoot() const = 0;
-
-  //! Sets the given item as the new root
-  virtual void SetRoot(const QModelIndex &index) = 0;
-
-  //! Restores the default root item
-  virtual void SetDefaultRoot() = 0;
+  //! Resets the model, setting the given entity as root
+  virtual void SetEntity(const RawEntityId &entity_id,
+                         const ReferenceType &reference_type) = 0;
 
   //! Constructor
   IReferenceExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}
@@ -92,11 +70,8 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   virtual ~IReferenceExplorerModel() override = default;
 
  public slots:
-
-  //! Adds a new entity object under the given parent
-  virtual void AppendEntityById(RawEntityId entity_id,
-                                ExpansionMode import_mode,
-                                const QModelIndex &parent) = 0;
+  //! Cancels any running request
+  virtual void CancelRunningRequest() = 0;
 
  private:
   //! Disabled copy constructor
@@ -104,9 +79,13 @@ class IReferenceExplorerModel : public QAbstractItemModel {
 
   //! Disabled copy assignment operator
   IReferenceExplorerModel &operator=(const IReferenceExplorerModel &) = delete;
+
+ signals:
+  //! Emitted when a new request is started
+  void RequestStarted();
+
+  //! Emitted when a request has finished
+  void RequestFinished();
 };
 
-}  // namespace gui
-}  // namespace mx
-
-Q_DECLARE_METATYPE(mx::gui::IReferenceExplorerModel::ExpansionMode);
+}  // namespace mx::gui
