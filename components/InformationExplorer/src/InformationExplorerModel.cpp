@@ -80,6 +80,8 @@ void CreatePropertyHelper(
   path.pop_front();
 
   if (path.isEmpty()) {
+    generated_node_id_path = std::move(current_node_id_path);
+
     for (const auto &child_id : current_node.child_id_list) {
       auto &child_node = context.node_map[child_id];
 
@@ -100,7 +102,6 @@ void CreatePropertyHelper(
     context.node_map.insert({child_id, std::move(property_node)});
 
     current_node_id_path.push_back(child_id);
-    generated_node_id_path = std::move(current_node_id_path);
 
     return;
   }
