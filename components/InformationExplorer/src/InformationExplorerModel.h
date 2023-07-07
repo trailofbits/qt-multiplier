@@ -8,6 +8,9 @@
 
 #pragma once
 
+#include <QObject>
+#include <QString>
+
 #include <multiplier/ui/IInformationExplorerModel.h>
 #include <multiplier/ui/IDatabase.h>
 
@@ -59,10 +62,10 @@ class InformationExplorerModel final
   virtual void RequestEntityInformation(const RawEntityId &entity_id) override;
 
   //! \copybrief IInformationExplorerModel::GetCurrentEntityID
-  virtual std::optional<RawEntityId> GetCurrentEntityID() const override;
+  virtual RawEntityId GetCurrentEntityID(void) const override;
 
   //! Destructor
-  virtual ~InformationExplorerModel() override;
+  virtual ~InformationExplorerModel(void) override;
 
   //! Creates a new Qt model index
   virtual QModelIndex index(int row, int column,
@@ -100,63 +103,10 @@ class InformationExplorerModel final
   //! Receives data batches from the IDatabase class
   virtual void OnDataBatch(DataBatch data_batch) override;
 
- public:
-  //! Model data
-  struct Context final {
-    //! A node id, matching the QModelIndex::internalId type
-    using NodeID = quintptr;
-
-    //! A list of node IDs
-    using NodeIDList = std::vector<NodeID>;
-
-    //! A node representing either a section or a property
-    struct Node final {
-      //! The property value
-      QString display_role;
-
-      //! Additional data roles
-      std::unordered_map<int, QVariant> value_map;
-
-      //! Parent node id
-      NodeID parent_node_id{};
-
-      //! Child nodes
-      NodeIDList child_id_list;
-    };
-
-    //! Node id generator, starting from the last top-level node ID
-    NodeID node_id_generator{};
-
-    //! The name of the active entity
-    QString entity_name;
-
-    //! All the nodes in the model
-    std::unordered_map<NodeID, Node> node_map;
-  };
-
-  //! A path in the form of Node IDs
-  using NodeIDPath = std::vector<InformationExplorerModel::Context::NodeID>;
-
-  //! A list of NodeIDPath objects. Used to emit row insertions
-  using NodeIDPathList = std::vector<NodeIDPath>;
-
-  //! Creates a new property in the node map
-  static void
-  CreateProperty(Context &context, NodeIDPath &node_id_path,
-                 const QStringList &path,
-                 const std::unordered_map<int, QVariant> &value_map = {});
-
-  //! Generates a unique node ID
-  static quintptr GenerateNodeID(Context &context);
-
-  //! Resets the context structure
-  static void ResetContext(Context &context);
+  void ClearTree(void);
 
   //! Imports the given entity information data
-  static void
-  ImportEntityInformation(Context &context,
-                          NodeIDPathList &generated_node_id_path_list,
-                          const EntityInformation &entity_information);
+  void ImportEntityInformation(EntityInformation &entity_information);
 
  private slots:
   //! Processes all the batches in the queue at fixed interval
