@@ -11,6 +11,7 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/Assert.h>
 
+#include <QDebug>
 #include <QFutureWatcher>
 #include <QMap>
 #include <QString>
@@ -44,8 +45,20 @@ static QString GetName(const QVariant &display_role) {
   return QString::fromUtf8(data.data(), static_cast<qsizetype>(data.size()));
 }
 
-QString GetFileName(const std::optional<EntityLocation> &opt_location,
-                    bool path_only) {
+static TokenRange GetTokenRange(const QVariant &display) {
+  if (display.canConvert<TokenRange>()) {
+    return qvariant_cast<TokenRange>(display);
+
+  } else if (display.canConvert<Token>()) {
+    return qvariant_cast<Token>(display);
+
+  } else {
+    return TokenRange();
+  }
+}
+
+static QString GetFileName(const std::optional<EntityLocation> &opt_location,
+                           bool path_only) {
 
   if (!opt_location.has_value()) {
     return QString();
@@ -68,11 +81,46 @@ QString GetFileName(const std::optional<EntityLocation> &opt_location,
   return QString();
 }
 
+static QString GetFileName(
+    const std::optional<InformationExplorerModel::RawLocation> &opt_location,
+    bool path_only) {
+
+  if (!opt_location.has_value()) {
+    return QString();
+  }
+
+  if (path_only) {
+    return opt_location->path;
+  }
+
+  return QString("%1:%2:%3")
+      .arg(opt_location->path)
+      .arg(opt_location->line_number)
+      .arg(opt_location->column_number);
+}
+
+static std::optional<InformationExplorerModel::RawLocation> ConvertLocation(
+    const std::optional<EntityLocation> &opt_location) {
+  if (!opt_location) {
+    return std::nullopt;
+  }
+
+  InformationExplorerModel::RawLocation location;
+  location.column_number = opt_location->column;
+  location.line_number = opt_location->line;
+  for (std::filesystem::path path : opt_location->file.paths()) {
+    location.path = QString::fromStdString(path.generic_string());
+    return location;
+  }
+
+  return std::nullopt;
+}
+
 struct Node;
 
 struct EntityData {
   VariantEntity entity;
-  std::optional<EntityLocation> location;
+  std::optional<InformationExplorerModel::RawLocation> location;
 };
 
 struct LocationData {
@@ -108,7 +156,8 @@ struct Node {
 
   //! What gets displayed for this node. This could be a QString, a Token, or
   //! a TokenRange.
-  QVariant display;
+  QString display;
+  TokenRange token_range;
 
   //! The data of this node.
   std::variant<std::monostate, RootData, CategoryData, LocationData, EntityData> data;
@@ -243,6 +292,10 @@ InformationExplorerModel::~InformationExplorerModel(void) {
 QModelIndex InformationExplorerModel::index(
     int row, int column, const QModelIndex &parent) const {
 
+  if (!hasIndex(row, column, parent)) {
+    return QModelIndex();
+  }
+
   if (column != 0) {
     return QModelIndex();
   }
@@ -252,23 +305,28 @@ QModelIndex InformationExplorerModel::index(
     node = reinterpret_cast<Node *>(parent.internalPointer());
   }
 
-  if (0 > row || row >= node->child_count) {
+  if (!node || 0 > row || row >= node->child_count) {
     return QModelIndex();
   }
 
   auto index = static_cast<size_t>(row);
+  Node *child_node = nullptr;
 
   if (RootData *rd = std::get_if<RootData>(&(node->data))) {
-    return createIndex(row, column, rd->children[index]);
+    child_node = rd->children.at(index);
 
   } else if (CategoryData *cd = std::get_if<CategoryData>(&(node->data))) {
-    return createIndex(row, column, cd->ordered_children[index]);
+    child_node = cd->ordered_children.at(index);
 
   } else if (LocationData *ld = std::get_if<LocationData>(&(node->data))) {
-    return createIndex(row, column, ld->children[index]);
+    child_node = ld->children.at(index);
   }
 
-  return QModelIndex();
+  if (!child_node) {
+    return QModelIndex();
+  }
+
+  return createIndex(row, column, child_node);
 }
 
 QModelIndex InformationExplorerModel::parent(const QModelIndex &child) const {
@@ -277,7 +335,7 @@ QModelIndex InformationExplorerModel::parent(const QModelIndex &child) const {
   }
 
   Node *node = reinterpret_cast<Node *>(child.internalPointer());
-  if (!node->parent) {
+  if (!node || !node->parent || node->parent == d->root) {
     return QModelIndex();
   }
 
@@ -290,6 +348,10 @@ int InformationExplorerModel::rowCount(const QModelIndex &parent) const {
     node = reinterpret_cast<Node *>(parent.internalPointer());
   }
 
+  if (!node) {
+    return 0;
+  }
+
   return node->child_count;
 }
 
@@ -299,16 +361,44 @@ int InformationExplorerModel::columnCount(const QModelIndex &) const {
 
 QVariant InformationExplorerModel::data(const QModelIndex &index,
                                         int role) const {
+  QVariant ret;
   if (!index.isValid()) {
-    return QVariant();
+    return ret;
   }
 
   Node *node = reinterpret_cast<Node *>(index.internalPointer());
-  if (role == Qt::DisplayRole) {
-    return node->display;
+  if (!node) {
+    return ret;
   }
 
-  return QVariant();
+  if (role == Qt::DisplayRole) {
+    ret.setValue(node->display);
+
+  } else if (role == LocationRole) {
+    if (EntityData *ed = std::get_if<EntityData>(&(node->data))) {
+      if (ed->location.has_value()) {
+        ret.setValue(GetFileName(ed->location.value(), false));
+      }
+    }
+
+  } else if (role == EntityIdRole) {
+    if (EntityData *ed = std::get_if<EntityData>(&(node->data))) {
+      ret.setValue(EntityId(ed->entity).Pack());
+    }
+
+  } else if (role == ForceTextPaintRole) {
+    ret.setValue(!node->token_range);
+
+  } else if (role == TokenRangeRole) {
+    if (node->token_range) {
+      ret.setValue(node->token_range);
+    }
+
+  } else if (role == AutoExpandRole) {
+    ret.setValue(!std::holds_alternative<LocationData>(node->data));
+  }
+
+  return ret;
 }
 
 void InformationExplorerModel::FutureResultStateChanged(void) {
@@ -421,16 +511,16 @@ found_category:
   if (!key) {
     EntityData ed;
     ed.entity = std::move(ei.entity_role);
-    ed.location = std::move(ei.location);
-
+    ed.location = ConvertLocation(ei.location);
     key = &(d->nodes.emplace_back());
     key->version = d->version;
     key->parent = category;
     key->row = static_cast<int>(category_data->ordered_children.size());
     key->data = std::move(ed);
-    key->display = std::move(ei.display_role);
-    category_data->ordered_children.push_back(category);
-    category->child_count++;
+    key->display = GetName(ei.display_role);
+    key->token_range = GetTokenRange(ei.display_role);
+    category_data->ordered_children.push_back(key);
+    category_data->keyed_children[display_role] = key;
     d->OnNewNode(*this, key);
 
   // We've found a second thing that looks the same as another thing. We have
@@ -460,7 +550,6 @@ found_category:
     d->OnNodeChanged(*this, key);
 
     std::get<LocationData>(sub_category->data).children.push_back(key);
-    sub_category->child_count++;
     d->OnNewNode(*this, key);
 
     goto add_to_sub_category;
@@ -480,7 +569,7 @@ found_category:
 
     EntityData ed;
     ed.entity = std::move(ei.entity_role);
-    ed.location = std::move(ei.location);
+    ed.location = ConvertLocation(ei.location);
 
     key = &(d->nodes.emplace_back());
     key->version = d->version;
@@ -490,7 +579,6 @@ found_category:
     key->display = std::move(key_loc);
 
     std::get<LocationData>(sub_category->data).children.push_back(key);
-    sub_category->child_count++;
     d->OnNewNode(*this, key);
   }
 }
@@ -521,9 +609,11 @@ void InformationExplorerModel::ProcessDataBatchQueue() {
     }
   }
 
+//  emit beginResetModel();
   // Exposes the changes.
   for (const Change &change : d->change_list) {
-    QModelIndex parent_index = createIndex(change.parent->row, 0, change.parent);
+    QModelIndex parent_index =
+        createIndex(change.parent->row, 0, change.parent);
     emit beginInsertRows(
         parent_index, change.parent->child_count,
         change.parent->child_count + change.num_children_added - 1);
@@ -533,6 +623,7 @@ void InformationExplorerModel::ProcessDataBatchQueue() {
 
   d->change_list.clear();
   d->changes.clear();
+//  emit endResetModel();
 }
 
 }  // namespace mx::gui

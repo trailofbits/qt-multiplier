@@ -46,10 +46,7 @@ class InformationExplorerModel final
     ForceTextPaintRole = Qt::UserRole + 100,
 
     //! Returns a boolean that tells the view whether to auto-expand
-    AutoExpandRole,
-
-    //! Returns a RawLocation structure
-    RawLocationRole,
+    AutoExpandRole
   };
 
   //! \copybrief IInformationExplorerModel::GetIndex

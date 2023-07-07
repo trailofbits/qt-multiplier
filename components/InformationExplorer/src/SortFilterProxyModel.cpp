@@ -22,52 +22,30 @@ void SortFilterProxyModel::setSourceModel(QAbstractItemModel *source_model) {
   Assert(sourceModel() == nullptr,
          "The source model was already set. Changing it is not supported");
 
-  connect(source_model, &QAbstractItemModel::dataChanged, this,
-          &SortFilterProxyModel::OnDataChange);
-
   QSortFilterProxyModel::setSourceModel(source_model);
+
+  connect(source_model, &QAbstractItemModel::rowsAboutToBeInserted,
+          this, &SortFilterProxyModel::OnBeginInsertRows);
+
+  connect(source_model, &QAbstractItemModel::dataChanged,
+          this, &SortFilterProxyModel::OnDataChanged);
 }
 
 bool SortFilterProxyModel::lessThan(const QModelIndex &source_left,
                                     const QModelIndex &source_right) const {
-
-  auto lhs_var = source_left.data(sortRole());
-  auto rhs_var = source_right.data(sortRole());
-  if (!lhs_var.isValid() || !rhs_var.isValid()) {
-    return QSortFilterProxyModel::lessThan(source_left, source_right);
-  }
-
-  if (!lhs_var.canConvert<InformationExplorerModel::RawLocation>() ||
-      !rhs_var.canConvert<InformationExplorerModel::RawLocation>()) {
-
-    return QSortFilterProxyModel::lessThan(source_left, source_right);
-  }
-
-  const auto &lhs =
-      qvariant_cast<InformationExplorerModel::RawLocation>(lhs_var);
-
-  const auto &rhs =
-      qvariant_cast<InformationExplorerModel::RawLocation>(rhs_var);
-
-  if (lhs.path != rhs.path) {
-    return lhs.path < rhs.path;
-  }
-
-  if (lhs.line_number != rhs.line_number) {
-    return lhs.line_number < rhs.line_number;
-  }
-
-  return lhs.column_number < rhs.column_number;
+  return source_left.row() < source_right.row();
 }
 
-void SortFilterProxyModel::OnDataChange(const QModelIndex &top_left,
-                                        const QModelIndex &bottom_right,
-                                        const QList<int> &roles) {
+void SortFilterProxyModel::OnBeginInsertRows(
+    const QModelIndex &parent, int begin_row, int end_row) {
 
-  auto mapped_top_left{mapFromSource(top_left)};
-  auto mapped_bottom_right{mapFromSource(bottom_right)};
+  emit beginInsertRows(mapFromSource(parent), begin_row, end_row);
+}
 
-  emit dataChanged(mapped_top_left, mapped_bottom_right, roles);
+void SortFilterProxyModel::OnDataChanged(const QModelIndex &top_left,
+                                         const QModelIndex &bottom_right,
+                                         const QList<int> &roles) {
+  emit dataChanged(mapFromSource(top_left), mapFromSource(bottom_right), roles);
 }
 
 }  // namespace mx::gui
