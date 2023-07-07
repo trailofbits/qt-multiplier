@@ -52,7 +52,7 @@ class IInformationExplorerModel : public QAbstractItemModel {
   virtual void RequestEntityInformation(const RawEntityId &entity_id) = 0;
 
   //! Returns the currenty entity, if any
-  virtual std::optional<RawEntityId> GetCurrentEntityID() const = 0;
+  virtual RawEntityId GetCurrentEntityID() const = 0;
 
   //! Disabled copy constructor
   IInformationExplorerModel(const IInformationExplorerModel &) = delete;

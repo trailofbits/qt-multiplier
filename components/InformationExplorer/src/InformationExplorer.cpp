@@ -131,12 +131,10 @@ void InformationExplorer::OnModelReset() {
   d->tree_view->expandRecursively(QModelIndex());
   d->tree_view->resizeColumnToContents(0);
 
-  auto opt_current_entity_id = d->model->GetCurrentEntityID();
-  if (!opt_current_entity_id.has_value()) {
+  auto current_entity_id = d->model->GetCurrentEntityID();
+  if (current_entity_id == kInvalidEntityId) {
     return;
   }
-
-  const auto &current_entity_id = opt_current_entity_id.value();
 
   if (d->enable_history_updates) {
     d->history_widget->CommitCurrentLocationToHistory();
