@@ -43,7 +43,7 @@ class InformationExplorer final : public IInformationExplorer {
   void OnModelReset();
 
   //! Called when new rows are inserted
-  void OnRowsInserted();
+  void OnRowsInserted(const QModelIndex &parent, int first, int last);
 
   //! Called when the data in the model changes
   void OnHighlightModelDataChange(const QModelIndex &top_left,
@@ -61,6 +61,8 @@ class InformationExplorer final : public IInformationExplorer {
   //! Called when the history widget is interacted with
   void OnHistoryNavigationEntitySelected(RawEntityId original_id,
                                          RawEntityId canonical_id);
+
+  void ExpandAllNodes(const QModelIndex &parent);
 
   friend class IInformationExplorer;
 };

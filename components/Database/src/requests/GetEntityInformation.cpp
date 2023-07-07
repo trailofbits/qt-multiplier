@@ -755,16 +755,50 @@ GetFileInformation(QPromise<bool> &result_promise,
     if (auto inc = IncludeLikeMacroDirective::from(ref.as_macro())) {
       if (auto file = File::containing(inc.value())) {
         TokenRange tokens = inc->use_tokens();
-        EntityInformation &sel = batch.emplace_back();
-        sel.category = QObject::tr("Included by");
-        sel.location = GetLocation(result_promise, tokens, file_location_cache);
-        sel.entity_role = inc.value();
+        std::optional<EntityLocation> loc =
+            GetLocation(result_promise, tokens, file_location_cache);
 
-        for (std::filesystem::path path : file->paths()) {
-          sel.display_role.setValue(
-              QString::fromStdString(path.generic_string()));
+        if (!loc.has_value()) {
+          continue;
+        }
+
+        SimpleToken path;
+        path.category = TokenCategory::FILE_NAME;
+        path.kind = TokenKind::HEADER_NAME;
+        path.related_entity = file.value();
+
+        for (std::filesystem::path file_path : file->paths()) {
+          path.data = file_path.generic_string();
           break;
         }
+
+        SimpleToken colon;
+        colon.category = TokenCategory::PUNCTUATION;
+        colon.kind = TokenKind::COLON;
+        colon.data = ":";
+
+        SimpleToken line;
+        line.category = TokenCategory::LINE_NUMBER;
+        line.kind = TokenKind::NUMERIC_CONSTANT;
+        line.data = std::to_string(loc->line);
+
+        SimpleToken col;
+        col.category = TokenCategory::LINE_NUMBER;
+        col.kind = TokenKind::NUMERIC_CONSTANT;
+        col.data = std::to_string(loc->column);
+
+        std::vector<CustomToken> toks;
+        toks.emplace_back(std::move(path));
+        toks.emplace_back(colon);
+        toks.emplace_back(std::move(line));
+        toks.emplace_back(std::move(colon));
+        toks.emplace_back(std::move(col));
+
+        EntityInformation &sel = batch.emplace_back();
+        sel.category = QObject::tr("Included by");
+        sel.location = std::move(loc);
+        sel.entity_role = inc.value();
+        sel.display_role.setValue(TokenRange::create(std::move(toks)));
 
         SendBatch(receiver, batch);
       }

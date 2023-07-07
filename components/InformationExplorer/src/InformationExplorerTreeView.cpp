@@ -58,7 +58,6 @@ void InformationExplorerTreeView::InstallItemDelegate() {
 
 void InformationExplorerTreeView::OnThemeChange(const QPalette &,
                                                 const CodeViewTheme &) {
-
   InstallItemDelegate();
   update();
 }
