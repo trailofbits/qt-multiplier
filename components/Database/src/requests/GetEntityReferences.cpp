@@ -379,7 +379,6 @@ void GetEntityReferences(QPromise<bool> &result_promise, const Index &index,
   if (reference_type == IDatabase::ReferenceType::Callers) {
     GetEntityCallReferences(result_promise, file_location_cache, receiver,
                             std::move(result), entity_queue, depth);
-
   }
 }
 
