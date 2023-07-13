@@ -8,17 +8,22 @@
 
 #pragma once
 
+#include "Types.h"
+
 #include <multiplier/ui/IReferenceExplorerModel.h>
+#include <multiplier/ui/IDatabase.h>
 
 #include <multiplier/Entities/DeclCategory.h>
 #include <multiplier/Entities/TokenCategory.h>
 
-#include "Types.h"
+#include <unordered_map>
 
 namespace mx::gui {
 
 //! Implements the IReferenceExplorerModel interface
-class ReferenceExplorerModel final : public IReferenceExplorerModel {
+class ReferenceExplorerModel final
+    : public IReferenceExplorerModel,
+      public IDatabase::QueryEntityReferencesReceiver {
   Q_OBJECT
 
  public:
@@ -29,25 +34,50 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
 
     //! Returns the icon label
     IconLabelRole,
-
-    //! Returns the color to associate with the expansion mode of this item.
-    ExpansionModeColor,
   };
 
-  //! \copybrief IReferenceExplorerModel::ExpandEntity
-  virtual void ExpandEntity(const QModelIndex &index) override;
+  //! Model data
+  struct Context final {
+    //! Node ID
+    using NodeID = std::uint64_t;
 
-  //! \copybrief IReferenceExplorerModel::RemoveEntity
-  virtual void RemoveEntity(const QModelIndex &index) override;
+    //! A single tree node
+    struct Node final {
+      //! The ID for this node
+      NodeID node_id;
 
-  //! \copybrief IReferenceExplorerModel::HasAlternativeRoot
-  virtual bool HasAlternativeRoot() const override;
+      //! Parent node ID
+      NodeID parent_node_id;
 
-  //! \copybrief IReferenceExplorerModel::SetRoot
-  virtual void SetRoot(const QModelIndex &index) override;
+      //! Child nodes
+      std::vector<NodeID> child_node_id_list;
 
-  //! \copybrief IReferenceExplorerModel::SetDefaultRoot
-  virtual void SetDefaultRoot() override;
+      //! List of entity IDs we have within the child nodes
+      std::unordered_map<RawEntityId, NodeID> entity_id_node_id_map;
+
+      //! Node data
+      IDatabase::QueryEntityReferencesResult::Node data;
+    };
+
+    //! Node ID generator
+    NodeID node_id_generator{};
+
+    //! The node tree used by the model
+    std::unordered_map<NodeID, Node> tree;
+  };
+
+  //! Generates a new Node ID
+  static Context::NodeID GenerateNodeID(Context &context);
+
+  //! Resets the whole context
+  static void ResetContext(Context &context);
+
+  //! \copybrief IReferenceExplorerModel::SetEntity
+  virtual void SetEntity(const RawEntityId &entity_id,
+                         const ReferenceType &reference_type) override;
+
+  //! Expands the given entity
+  virtual void ExpandEntity(const QModelIndex &index);
 
   //! Destructor
   virtual ~ReferenceExplorerModel() override;
@@ -74,15 +104,6 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
   virtual QVariant headerData(int section, Qt::Orientation orientation,
                               int role) const override;
 
- public slots:
-  //! \copybrief IReferenceExplorerModel::AppendEntityById
-  virtual void AppendEntityById(RawEntityId entity_id,
-                                ExpansionMode expansion_mode,
-                                const QModelIndex &parent) override;
-
- private slots:
-  void InsertNodes(QVector<Node> node, int row, const QModelIndex &parent);
-
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
@@ -101,6 +122,30 @@ class ReferenceExplorerModel final : public IReferenceExplorerModel {
 
   //! Returns the decl category name used to build the tooltip
   static const QString &GetTokenCategoryName(TokenCategory tok_category);
+
+  //! Imports the given QueryEntityReferencesResult object into the model
+  void ImportReferences(IDatabase::QueryEntityReferencesResult result);
+
+  //! Starts a new data request
+  void StartRequest(const QModelIndex &insert_point,
+                    const RawEntityId &entity_id,
+                    const IDatabase::ReferenceType &reference_type,
+                    const bool &include_redeclarations,
+                    const bool &emit_root_node, const std::size_t &depth);
+
+  //! A callback used to receive batched data
+  virtual void OnDataBatch(DataBatch data_batch) override;
+
+ public slots:
+  //! \copybrief IReferenceExplorerModel::CancelRunningRequest
+  virtual void CancelRunningRequest() override;
+
+ private slots:
+  //! Processes the entire data batch queue
+  void ProcessDataBatchQueue();
+
+  //! Called whenever the database request future changes status
+  void FutureResultStateChanged();
 
   friend class IReferenceExplorerModel;
 };

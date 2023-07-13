@@ -80,14 +80,11 @@ std::optional<Location> Location::Create(const FileLocationCache &file_cache,
 
 Node Node::Create(const FileLocationCache &file_cache,
                   const VariantEntity &entity,
-                  const VariantEntity &referenced_entity,
-                  IReferenceExplorerModel::ExpansionMode import_mode,
-                  const bool &expanded,
+                  const VariantEntity &referenced_entity, const bool &expanded,
                   const std::optional<QString> opt_breadcrumbs) {
 
   Node node;
   node.node_id = gNextNodeId.fetchAndAddOrdered(1);
-  node.expansion_mode = import_mode;
   node.entity_id = IdOfEntity(entity);
   node.expanded = expanded;
   node.opt_breadcrumbs = opt_breadcrumbs;
@@ -135,7 +132,6 @@ const Node *NodeTree::CurrentRootNode(void) const {
 QDataStream &operator<<(QDataStream &stream, const Node &node) {
   stream << static_cast<quint64>(node.node_id);
   stream << static_cast<quint64>(node.parent_node_id);
-  stream << node.expansion_mode;
   stream << static_cast<quint64>(node.entity_id);
   stream << static_cast<quint64>(node.referenced_entity_id);
   stream << node.expanded;
@@ -183,8 +179,6 @@ QDataStream &operator>>(QDataStream &stream, Node &node) {
 
   stream >> uint64_value;
   node.parent_node_id = static_cast<std::uint64_t>(uint64_value);
-
-  stream >> node.expansion_mode;
 
   stream >> uint64_value;
   node.entity_id = static_cast<RawEntityId>(uint64_value);

@@ -24,7 +24,6 @@ class PreviewableReferenceExplorer final : public QWidget {
   PreviewableReferenceExplorer(const Index &index,
                                const FileLocationCache &file_location_cache,
                                IReferenceExplorerModel *model,
-                               const IReferenceExplorer::Mode &mode,
                                const bool &show_code_preview,
                                IGlobalHighlighter &highlighter,
                                IMacroExplorer &macro_explorer,
@@ -51,7 +50,6 @@ class PreviewableReferenceExplorer final : public QWidget {
   void InitializeWidgets(mx::Index index,
                          mx::FileLocationCache file_location_cache,
                          IReferenceExplorerModel *model,
-                         const IReferenceExplorer::Mode &mode,
                          const bool &show_code_preview,
                          IGlobalHighlighter &highlighter,
                          IMacroExplorer &macro_explorer);

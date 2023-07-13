@@ -48,7 +48,7 @@ class IBatchedDataTypeReceiver {
   //! A single batch of data of type `DataType`
   using DataBatch = std::deque<DataType>;
 
-  //! A slot used to receive batched data
+  //! A callback used to receive batched data
   virtual void OnDataBatch(DataBatch data_batch) = 0;
 };
 
@@ -155,6 +155,74 @@ class IDatabase {
   virtual QFuture<bool> QueryEntities(QueryEntitiesReceiver &receiver,
                                       const QString &string,
                                       const QueryEntitiesMode &query_mode) = 0;
+
+  //! Results for QueryEntityReferences
+  struct QueryEntityReferencesResult final {
+    //! A single entity node
+    struct Node final {
+      //! Entity location information
+      struct Location final {
+        //! File entity id
+        RawEntityId file_id{kInvalidEntityId};
+
+        //! File path
+        QString path;
+
+        //! An optional line number
+        unsigned line{0};
+
+        //! An optional column number
+        unsigned column{0};
+      };
+
+      //! Tree information, only used at import time
+      struct MappingInformation final {
+        //! Parent node (0 for root)
+        std::uint64_t parent_node_id{};
+
+        //! Node ID
+        std::uint64_t node_id{};
+      };
+
+      //! Multiplier's entity id
+      RawEntityId entity_id{kInvalidEntityId};
+
+      //! Multiplier's referenced entity id
+      RawEntityId referenced_entity_id{kInvalidEntityId};
+
+      //! An optional name for this entity
+      std::optional<QString> opt_name;
+
+      //! Optional file location information (path + line + column)
+      std::optional<Location> opt_location;
+
+      //! Optional breadcrumbs string
+      std::optional<QString> opt_breadcrumbs;
+
+      //! Mapping information, only useful at import time
+      MappingInformation mapping_info;
+    };
+
+    //! A list of nodes
+    std::vector<Node> node_list;
+  };
+
+  //! A data batch receiver for QueryEntityReferencesResult objects
+  using QueryEntityReferencesReceiver =
+      IBatchedDataTypeReceiver<QueryEntityReferencesResult>;
+
+  //! Query mode for QueryEntityReferences
+  enum class ReferenceType {
+    Taint,
+    Callers,
+  };
+
+  //! Queries the references for the given entity
+  //! \return True in case of success, or false otherwise
+  virtual QFuture<bool> QueryEntityReferences(
+      QueryEntityReferencesReceiver &receiver, const RawEntityId &entity_id,
+      const ReferenceType &reference_type, const bool &include_redeclarations,
+      const bool &emit_root_node, const std::size_t &depth) = 0;
 
   //! Disabled copy constructor
   IDatabase(const IDatabase &) = delete;

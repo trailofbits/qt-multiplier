@@ -87,8 +87,6 @@ struct MainWindow::PrivateData final {
   QShortcut *close_active_ref_explorer_tab_shortcut{nullptr};
   QShortcut *close_active_code_tab_shortcut{nullptr};
 
-  IReferenceExplorer::Mode ref_explorer_mode{
-      IReferenceExplorer::Mode::TextView};
   bool enable_quick_ref_explorer_code_preview{false};
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
@@ -391,8 +389,8 @@ void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
 }
 
 void MainWindow::OpenReferenceExplorer(
-    RawEntityId entity_id,
-    IReferenceExplorerModel::ExpansionMode expansion_mode) {
+    const RawEntityId &entity_id,
+    const IReferenceExplorerModel::ReferenceType &reference_type) {
 
   QPoint dialog_pos;
   if (d->quick_ref_explorer != nullptr) {
@@ -406,9 +404,9 @@ void MainWindow::OpenReferenceExplorer(
   CloseAllPopups();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
-      d->index, d->file_location_cache, entity_id, expansion_mode,
-      d->ref_explorer_mode, d->enable_quick_ref_explorer_code_preview,
-      *d->global_highlighter, *d->macro_explorer, this);
+      d->index, d->file_location_cache, entity_id,
+      d->enable_quick_ref_explorer_code_preview, *d->global_highlighter,
+      *d->macro_explorer, reference_type, this);
 
   connect(d->quick_ref_explorer.get(),
           &QuickReferenceExplorer::SaveReferenceExplorer, this,
@@ -442,11 +440,10 @@ void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
   }
 
   OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
-                        IReferenceExplorerModel::CallHierarchyMode);
+                        IReferenceExplorerModel::ReferenceType::Callers);
 }
 
 void MainWindow::OpenTokenTaintExplorer(const QModelIndex &index) {
-
   QVariant related_stmt_id_var =
       index.data(ICodeModel::EntityIdOfStmtContainingTokenRole);
 
@@ -455,8 +452,9 @@ void MainWindow::OpenTokenTaintExplorer(const QModelIndex &index) {
   // as well. But if there is a single associated declaration then it is fine
   // with it usually.
   if (related_stmt_id_var.isValid()) {
+
     OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_stmt_id_var),
-                          IReferenceExplorerModel::TaintMode);
+                          IReferenceExplorerModel::ReferenceType::Taint);
     return;
   }
 
@@ -465,7 +463,7 @@ void MainWindow::OpenTokenTaintExplorer(const QModelIndex &index) {
 
   if (related_entity_id_var.isValid()) {
     OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
-                          IReferenceExplorerModel::TaintMode);
+                          IReferenceExplorerModel::ReferenceType::Taint);
     return;
   }
 
@@ -549,39 +547,6 @@ void MainWindow::CloseAllPopups() {
 void MainWindow::CreateRefExplorerMenuOptions() {
   auto main_menu = new QMenu(tr("Reference Explorer"));
   d->view_menu->addMenu(main_menu);
-
-  auto mode_menu = new QMenu(tr("Mode"));
-  main_menu->addMenu(mode_menu);
-
-  connect(mode_menu, &QMenu::triggered, this,
-          &MainWindow::OnRefExplorerModeSelected);
-
-  auto mode_action_group = new QActionGroup(this);
-
-  for (const auto &mode :
-       {IReferenceExplorer::Mode::TextView, IReferenceExplorer::Mode::TreeView,
-        IReferenceExplorer::Mode::Split}) {
-
-    QString label;
-    switch (mode) {
-      case IReferenceExplorer::Mode::TextView: label = tr("Text view"); break;
-
-      case IReferenceExplorer::Mode::TreeView: label = tr("Tree view"); break;
-
-      case IReferenceExplorer::Mode::Split: label = tr("Split"); break;
-    }
-
-    auto mode_action = new QAction(label);
-    mode_action_group->addAction(mode_action);
-
-    mode_action->setData(static_cast<int>(mode));
-    mode_action->setCheckable(true);
-    if (mode == d->ref_explorer_mode) {
-      mode_action->setChecked(true);
-    }
-
-    mode_menu->addAction(mode_action);
-  }
 
   auto code_preview_action = new QAction(tr("Enable code preview"));
   code_preview_action->setCheckable(true);
@@ -821,16 +786,17 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       return;
     }
 
-    // Like in IDA Pro, pressing X while the cursor is on an entity shows us
-    // its cross-references.
     if (keyboard_button.key == Qt::Key_X) {
-      OpenTokenReferenceExplorer(index);
+      // Like in IDA Pro, pressing X while the cursor is on an entity shows us
+      // its cross-references.
 
-    } else if (keyboard_button.key == Qt::Key_P) {
-      OpenCodePreview(index);
+      OpenTokenReferenceExplorer(index);
 
     } else if (keyboard_button.key == Qt::Key_T) {
       OpenTokenTaintExplorer(index);
+
+    } else if (keyboard_button.key == Qt::Key_P) {
+      OpenCodePreview(index);
 
     } else if (keyboard_button.key == Qt::Key_I) {
       d->info_explorer_dock->show();
@@ -1049,14 +1015,6 @@ void MainWindow::OnCloseActiveRefExplorerTab() {
   OnReferenceExplorerTabBarClose(current_index);
 
   d->ref_explorer_tab_widget->setFocus();
-}
-
-void MainWindow::OnRefExplorerModeSelected(QAction *action) {
-  auto ref_explorer_int_mode = action->data().toInt();
-  d->ref_explorer_mode =
-      static_cast<IReferenceExplorer::Mode>(ref_explorer_int_mode);
-
-  action->setChecked(true);
 }
 
 void MainWindow::OnSetDarkTheme() {

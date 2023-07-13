@@ -20,17 +20,9 @@ class IReferenceExplorer : public QWidget {
   Q_OBJECT
 
  public:
-  //! Determines how the tree view/text view is split
-  enum class Mode {
-    TreeView,
-    TextView,
-    Split,
-  };
-
   //! Factory method
   static IReferenceExplorer *
-  Create(IReferenceExplorerModel *model, const Mode &mode,
-         QWidget *parent = nullptr,
+  Create(IReferenceExplorerModel *model, QWidget *parent = nullptr,
          IGlobalHighlighter *global_highlighter = nullptr);
 
   //! Constructor
