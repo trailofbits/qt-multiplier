@@ -31,13 +31,13 @@ struct PreviewableReferenceExplorer::PrivateData final {
 
 PreviewableReferenceExplorer::PreviewableReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
-    IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
-    const bool &show_code_preview, IGlobalHighlighter &highlighter,
-    IMacroExplorer &macro_explorer, QWidget *parent)
+    IReferenceExplorerModel *model, const bool &show_code_preview,
+    IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
+    QWidget *parent)
     : QWidget(parent),
       d(new PrivateData()) {
 
-  InitializeWidgets(index, file_location_cache, model, mode, show_code_preview,
+  InitializeWidgets(index, file_location_cache, model, show_code_preview,
                     highlighter, macro_explorer);
 }
 
@@ -49,12 +49,10 @@ IReferenceExplorerModel *PreviewableReferenceExplorer::Model() {
 
 void PreviewableReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
-    IReferenceExplorerModel *model, const IReferenceExplorer::Mode &mode,
-    const bool &show_code_preview, IGlobalHighlighter &highlighter,
-    IMacroExplorer &macro_explorer) {
+    IReferenceExplorerModel *model, const bool &show_code_preview,
+    IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer) {
 
-  d->reference_explorer =
-      IReferenceExplorer::Create(model, mode, this, &highlighter);
+  d->reference_explorer = IReferenceExplorer::Create(model, this, &highlighter);
 
   connect(
       d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,

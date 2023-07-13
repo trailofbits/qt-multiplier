@@ -46,9 +46,6 @@ QDataStream &operator>>(QDataStream &stream, Location &self);
 
 //! A single node in the model
 struct Node final {
-  //! How this node was imported
-  IReferenceExplorerModel::ExpansionMode expansion_mode{};
-
   //! True if this node has already been expanded
   bool expanded{false};
 
@@ -57,9 +54,7 @@ struct Node final {
   // NOTE(pag): This is a blocking operation.
   static Node
   Create(const FileLocationCache &file_cache, const VariantEntity &entity,
-         const VariantEntity &referenced_entity,
-         IReferenceExplorerModel::ExpansionMode import_mode,
-         const bool &expanded,
+         const VariantEntity &referenced_entity, const bool &expanded,
          const std::optional<QString> opt_breadcrumbs = std::nullopt);
 
   // Initialize this node with a specific parent id node.

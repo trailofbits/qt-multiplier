@@ -27,7 +27,7 @@ int GetMarginSize(const QFontMetrics &font_metrics) {
 }
 
 int GetIconSize(const QFontMetrics &font_metrics) {
-  return static_cast<int>(font_metrics.height() * 1.2);
+  return static_cast<int>(font_metrics.height() * 1.5);
 }
 
 }  // namespace
@@ -79,10 +79,6 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
   }
 
   QColor icon_bg = option.palette.base().color().darker();
-  auto icon_bg_var = index.data(ReferenceExplorerModel::ExpansionModeColor);
-  if (icon_bg_var.isValid()) {
-    icon_bg = qvariant_cast<QColor>(icon_bg_var);
-  }
 
   QFontMetrics font_metrics(option.font);
   auto margin{GetMarginSize(font_metrics)};
@@ -143,9 +139,17 @@ void ReferenceExplorerItemDelegate::DrawIcon(QPainter &painter, const int &size,
   painter.setPen(pen_color);
   painter.drawRect(0, 0, size, size);
 
+  auto text_font = painter.font();
+  text_font.setPointSize(static_cast<int>(text_font.pointSize() * 0.8));
+
   pen_color = pen_color.lighter(50);
   painter.setPen(QColor(255, 255, 255));
+
+  auto original_font = painter.font();
+  painter.setFont(text_font);
   painter.drawText(QRect(0, 0, size, size), Qt::AlignCenter, text);
+
+  painter.setFont(original_font);
 }
 
 bool ReferenceExplorerItemDelegate::editorEvent(QEvent *, QAbstractItemModel *,
