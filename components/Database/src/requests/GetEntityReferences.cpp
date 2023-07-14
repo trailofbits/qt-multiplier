@@ -380,8 +380,6 @@ void GetEntityReferences(QPromise<bool> &result_promise, const Index &index,
     GetEntityCallReferences(result_promise, file_location_cache, receiver,
                             std::move(result), entity_queue, depth);
 
-  } else if (reference_type == IDatabase::ReferenceType::Taint) {
-    Assert(false, "Tainting is not yet supported");
   }
 }
 

@@ -118,9 +118,11 @@ void ReferenceExplorerModel::SetEntity(const RawEntityId &entity_id,
                                        const ReferenceType &reference_type) {
   CancelRunningRequest();
 
-  d->reference_type = reference_type == ReferenceType::Callers
-                          ? IDatabase::ReferenceType::Callers
-                          : IDatabase::ReferenceType::Taint;
+  if (reference_type == ReferenceType::Callers) {
+    d->reference_type = IDatabase::ReferenceType::Callers;
+  } else {
+    return;
+  }
 
   static const bool kShouldIncludeRedeclarations{true};
   static const bool kGenerateRootNode{true};
