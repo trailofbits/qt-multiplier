@@ -316,9 +316,6 @@ QString QuickReferenceExplorer::GenerateWindowName(
   QString reference_type_name;
   if (reference_type == IReferenceExplorerModel::ReferenceType::Callers) {
     reference_type_name = tr("Call hierarchy of ");
-
-  } else if (reference_type == IReferenceExplorerModel::ReferenceType::Taint) {
-    reference_type_name = tr("Taint of ");
   }
 
   return reference_type_name + quoted_entity_name;

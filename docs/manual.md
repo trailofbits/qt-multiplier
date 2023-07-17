@@ -70,33 +70,4 @@ In the top right corner, the following three buttons are visible:
 * Save to new tab: Always created a new docked tab a the bottom containing all the references on screen.
 * Close
 
-### Text view
-
-The text view looks like this:
-
-```
-1  | x validate ubpf_vm.c:796:1
-2  |   x ubpf_load ubpf_vm.c:158:10 [+]
-3  | x validate ubpf_vm.c:32:1
-```
-
-The symbol on the left identifies the node type:
-
- `x`: Call hierarchy node
- `t`: Tainting node
-
-The `[+]` comments means that it may be possible to further expand an item and populate additional child nodes.
-
-#### Key bindings for the text view
-
-* `B` toggles breadcrumbs
-* `+` (or `Shift + =`) expands an item. `Cmd + LClick` on the `[+]` comment has the same effect.
-* `-` deletes a reference from the view
-* `Return`, `Cmd + LClick` with the cursor on a token opens the selected reference in the main window
-
-If you are on another platform, substitute the `Cmd` key with `Ctrl`.
-
-### Graphical view
-
-It works in the same way as the text representation, with the controls shown as buttons hovering on top of the active row.
 

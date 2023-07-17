@@ -51,7 +51,6 @@ class IReferenceExplorerModel : public QAbstractItemModel {
   //! Reference type
   enum class ReferenceType {
     Callers,
-    Taint,
   };
 
   //! Factory method

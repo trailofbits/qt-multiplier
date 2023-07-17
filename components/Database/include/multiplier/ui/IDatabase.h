@@ -213,7 +213,6 @@ class IDatabase {
 
   //! Query mode for QueryEntityReferences
   enum class ReferenceType {
-    Taint,
     Callers,
   };
 

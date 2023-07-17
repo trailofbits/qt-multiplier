@@ -59,10 +59,7 @@ class ICodeModel : public QAbstractItemModel {
     //! code previews, we hide the related entity ID, and return the token ID
     //! instead. But internal to the `CodeView`, we like to be able to access
     //! the real related entity ID so that we can highlight other uses.
-    RealRelatedEntityIdRole,
-
-    //! The raw form of the `StmtId` for the statement containing this token.
-    EntityIdOfStmtContainingTokenRole,
+    RealRelatedEntityIdRole
   };
 
   //! Factory function
