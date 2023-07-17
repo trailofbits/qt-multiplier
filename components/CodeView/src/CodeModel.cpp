@@ -234,12 +234,6 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
           value.setValue(eid);
         }
         break;
-
-      // TODO(pag): Consider removing this role. It would be better to have the
-      //            taint browser go and ask the database for the statement
-      //            containing an token id, or just a general entity id.
-      case ICodeModel::EntityIdOfStmtContainingTokenRole:
-        break;
     }
   }
 
