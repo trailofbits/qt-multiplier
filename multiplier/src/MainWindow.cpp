@@ -464,34 +464,6 @@ void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
                         IReferenceExplorerModel::ReferenceType::Callers);
 }
 
-void MainWindow::OpenTokenTaintExplorer(const QModelIndex &index) {
-  QVariant related_stmt_id_var =
-      index.data(ICodeModel::EntityIdOfStmtContainingTokenRole);
-
-  // If we clicked on a statement, then if it's a decl statement, it could be
-  // of the form `int a = 1, b = 2;` and the taint tracker doesn't handle that
-  // as well. But if there is a single associated declaration then it is fine
-  // with it usually.
-  if (related_stmt_id_var.isValid()) {
-
-    OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_stmt_id_var),
-                          IReferenceExplorerModel::ReferenceType::Taint);
-    return;
-  }
-
-  QVariant related_entity_id_var =
-      index.data(ICodeModel::RealRelatedEntityIdRole);
-
-  if (related_entity_id_var.isValid()) {
-    OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
-                          IReferenceExplorerModel::ReferenceType::Taint);
-    return;
-  }
-
-  CloseAllPopups();
->>>>>>> a65508f (ReferenceExplorer: Add streaming support (#290))
-}
-
 void MainWindow::OpenTokenEntityInfo(const QModelIndex &index) {
 
   QVariant related_entity_id_var =
