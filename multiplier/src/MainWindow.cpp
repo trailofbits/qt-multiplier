@@ -875,6 +875,8 @@ void MainWindow::OnToggleWordWrap(bool checked) {
 
 void MainWindow::SaveReferenceExplorer(
     PreviewableReferenceExplorer *reference_explorer) {
+  d->quick_ref_explorer.release();
+
   auto new_tab_index = d->ref_explorer_tab_widget->count();
 
   reference_explorer->setParent(this);
