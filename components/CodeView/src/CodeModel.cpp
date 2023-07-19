@@ -14,6 +14,8 @@
 #include <QFutureWatcher>
 
 #include <unordered_set>
+#include <iostream>
+#include <set>
 
 namespace mx::gui {
 
@@ -35,19 +37,18 @@ struct CodeModel::PrivateData final {
   const IndexedTokenRangeData::Column *last_column_cache{nullptr};
   IndexedTokenRangeData tokens;
 
-  const IndexedTokenRangeData::Line *LinePointerCast(
-      const QModelIndex &index);
+  const IndexedTokenRangeData::Line *LinePointerCast(const QModelIndex &index);
 
-  const IndexedTokenRangeData::Column *ColumnPointerCast(
-      const QModelIndex &index);
+  const IndexedTokenRangeData::Column *
+  ColumnPointerCast(const QModelIndex &index);
 
   IDatabase::Ptr database;
   QFuture<IDatabase::IndexedTokenRangeDataResult> future_result;
   QFutureWatcher<IDatabase::IndexedTokenRangeDataResult> future_watcher;
 };
 
-const IndexedTokenRangeData::Line *CodeModel::PrivateData::LinePointerCast(
-    const QModelIndex &model_index) {
+const IndexedTokenRangeData::Line *
+CodeModel::PrivateData::LinePointerCast(const QModelIndex &model_index) {
   const void *ptr = model_index.constInternalPointer();
   if (last_line_cache == ptr) {
     return last_line_cache;
@@ -65,8 +66,8 @@ const IndexedTokenRangeData::Line *CodeModel::PrivateData::LinePointerCast(
   return nullptr;
 }
 
-const IndexedTokenRangeData::Column *CodeModel::PrivateData::ColumnPointerCast(
-    const QModelIndex &model_index) {
+const IndexedTokenRangeData::Column *
+CodeModel::PrivateData::ColumnPointerCast(const QModelIndex &model_index) {
   const void *ptr = model_index.constInternalPointer();
   if (ptr == last_column_cache) {
     return last_column_cache;
@@ -165,7 +166,7 @@ QModelIndex CodeModel::parent(const QModelIndex &child) const {
     auto row_index = static_cast<unsigned>(child.row());
     return createIndex(child.row(), 0, &(d->tokens.lines[row_index]));
 
-  // Otherwise it's a line, or its the root, so give us back the root.
+    // Otherwise it's a line, or its the root, so give us back the root.
   } else {
     return QModelIndex();
   }
@@ -211,16 +212,12 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
       }
     }
 
-  // We're dealing with a column of data. Specifically, a token, or a fragment
-  // of a token.
+    // We're dealing with a column of data. Specifically, a token, or a fragment
+    // of a token.
   } else if (auto col = d->ColumnPointerCast(index)) {
     switch (role) {
-      case Qt::DisplayRole:
-        value.setValue(col->data);
-        break;
-      case ICodeModel::TokenCategoryRole:
-        value.setValue(col->category);
-        break;
+      case Qt::DisplayRole: value.setValue(col->data); break;
+      case ICodeModel::TokenCategoryRole: value.setValue(col->category); break;
       case ICodeModel::TokenIdRole:
         value.setValue(d->tokens.tokens[col->token_index].id().Pack());
         break;
@@ -229,7 +226,8 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
         break;
       case ICodeModel::RelatedEntityIdRole:
       case ICodeModel::RealRelatedEntityIdRole:
-        if (auto eid = d->tokens.tokens[col->token_index].related_entity_id().Pack();
+        if (auto eid =
+                d->tokens.tokens[col->token_index].related_entity_id().Pack();
             eid != kInvalidEntityId) {
           value.setValue(eid);
         }
@@ -276,21 +274,156 @@ void CodeModel::FutureResultStateChanged() {
     return;
   }
 
-  // Check if anything actually changed.
   IndexedTokenRangeData new_tokens = future_result.TakeValue();
-  if (new_tokens.requested_id == d->tokens.requested_id &&
-      new_tokens.response_id == d->tokens.response_id &&
-      new_tokens.tokens == d->tokens.tokens)  {
+  if (new_tokens.requested_id != d->tokens.requested_id ||
+      new_tokens.response_id != d->tokens.response_id) {
+
+    emit beginResetModel();
+    d->last_line_cache = nullptr;
+    d->last_column_cache = nullptr;
+    d->tokens = std::move(new_tokens);
+    d->model_state = ModelState::Ready;
+    emit endResetModel();
+
+    return;
+  }
+
+  if (new_tokens.tokens == d->tokens.tokens) {
     d->model_state = ModelState::Ready;
     return;
   }
 
-  emit beginResetModel();
+  auto old_tokens = std::move(d->tokens);
+  d->tokens = std::move(new_tokens);
+
   d->last_line_cache = nullptr;
   d->last_column_cache = nullptr;
-  d->tokens = std::move(new_tokens);
   d->model_state = ModelState::Ready;
-  emit endResetModel();
+
+  //
+  // Compare the token ranges, and make a list of all the
+  // token indexes that have changed
+  //
+
+  const auto &old_token_range = old_tokens.tokens;
+  std::size_t old_token_index{};
+
+  const auto &new_token_range = d->tokens.tokens;
+  std::size_t new_token_index{};
+
+  std::vector<std::size_t> removed_token_index_list;
+  std::vector<std::size_t> added_token_index_list;
+
+  for (;;) {
+    if (old_token_index >= new_token_range.size()) {
+      // We lost some tokens at the end of the document
+      for (auto i = old_token_index; i < old_token_range.size(); ++i) {
+        removed_token_index_list.push_back(i);
+      }
+
+      break;
+
+    } else if (new_token_index >= new_token_range.size()) {
+      // We have new tokens at the end of the document
+      for (auto i = new_token_index; i < new_token_range.size(); ++i) {
+        added_token_index_list.push_back(i);
+      }
+
+      break;
+    }
+
+    const auto &old_token = old_token_range[old_token_index];
+    const auto &new_token = new_token_range[new_token_index];
+
+    if (old_token.id() == new_token.id()) {
+      ++old_token_index;
+      ++new_token_index;
+      continue;
+    }
+
+    // There is a difference here; attempt to realign the new token
+    // range
+    std::optional<std::size_t> opt_next_new_token_index;
+
+    for (std::size_t i{new_token_index}; i < new_token_range.size(); ++i) {
+      const auto &next_new_token = new_token_range[i];
+      if (old_token.id() == next_new_token.id()) {
+        opt_next_new_token_index = i;
+        break;
+      }
+    }
+
+    // Realign the token ranges
+    if (opt_next_new_token_index.has_value()) {
+      const auto &next_new_token_range_offset =
+          opt_next_new_token_index.value();
+
+      for (std::size_t i{new_token_index}; i < next_new_token_range_offset;
+           ++i) {
+        added_token_index_list.push_back(i);
+      }
+
+      ++old_token_index;
+      new_token_index = next_new_token_range_offset + 1;
+
+      continue;
+    }
+
+    // We could not realign the token ranges. Mark the current item as
+    // removed and then try again
+    removed_token_index_list.push_back(old_token_index);
+    added_token_index_list.push_back(new_token_index);
+
+    ++old_token_index;
+    ++new_token_index;
+  }
+
+  // Next, we have to convert the token indexes we have generated
+  // to lines
+  auto L_createLineIndex = [](const IndexedTokenRangeData &tokens)
+      -> std::unordered_map<std::size_t, std::size_t> {
+    std::unordered_map<std::size_t, std::size_t> line_index;
+
+    const auto &line_list = tokens.lines;
+    for (std::size_t i{}; i < line_list.size(); ++i) {
+      const auto &current_line = line_list[i];
+
+      for (const auto &column : current_line.columns) {
+        auto token_index = static_cast<std::size_t>(column.token_index);
+        line_index.insert({token_index, i});
+      }
+    }
+
+    return line_index;
+  };
+
+  auto old_line_index = L_createLineIndex(old_tokens);
+
+  std::set<std::size_t> removed_line_list;
+  for (const auto &token_index : removed_token_index_list) {
+    removed_line_list.insert(old_line_index[token_index]);
+  }
+
+  auto new_line_index = L_createLineIndex(d->tokens);
+
+  std::set<std::size_t> added_line_list;
+  for (const auto &token_index : added_token_index_list) {
+    added_line_list.insert(new_line_index[token_index]);
+  }
+
+  for (const auto &removed_line : removed_line_list) {
+    auto row_number{static_cast<int>(removed_line)};
+
+    emit beginRemoveRows(QModelIndex(), row_number, row_number);
+    emit endInsertRows();
+  }
+
+  for (const auto &added_line : added_line_list) {
+    auto row_number{static_cast<int>(added_line)};
+
+    emit beginInsertRows(QModelIndex(), row_number, row_number);
+    emit endInsertRows();
+  }
 }
 
 void CodeModel::OnExpandMacros(const TokenTreeVisitor *visitor) {

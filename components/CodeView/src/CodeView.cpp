@@ -85,6 +85,8 @@ struct CodeView::PrivateData final {
 
   std::optional<unsigned> deferred_scroll_to_line;
   QList<QTextEdit::ExtraSelection> extra_selection_list;
+
+  QTimer update_timer;
 };
 
 void CodeView::SetTheme(const CodeViewTheme &theme) {
@@ -209,6 +211,9 @@ CodeView::CodeView(QAbstractItemModel *model, QWidget *parent)
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
           &CodeView::OnThemeChange);
+
+  connect(&d->update_timer, &QTimer::timeout, this,
+          &CodeView::ResetModelAndKeepCursor);
 }
 
 bool CodeView::eventFilter(QObject *obj, QEvent *event) {
@@ -290,6 +295,12 @@ void CodeView::InstallModel(QAbstractItemModel *model) {
 
   connect(d->model, &QAbstractItemModel::modelReset, this,
           &CodeView::OnModelReset);
+
+  connect(d->model, &QAbstractItemModel::rowsInserted, this,
+          &CodeView::OnRowsInserted);
+
+  connect(d->model, &QAbstractItemModel::rowsRemoved, this,
+          &CodeView::OnRowsRemoved);
 
   connect(d->model, &QAbstractItemModel::dataChanged, this,
           &CodeView::OnDataChange);
@@ -863,6 +874,14 @@ void CodeView::HighlightTokensForRelatedEntityID(
   }
 }
 
+void CodeView::OnRowsRemoved(const QModelIndex &, int, int) {
+  StartDelayedUpdate();
+}
+
+void CodeView::OnRowsInserted(const QModelIndex &, int, int) {
+  StartDelayedUpdate();
+}
+
 void CodeView::OnDataChange(const QModelIndex &, const QModelIndex &,
                             const QList<int> &roles) {
 
@@ -929,6 +948,76 @@ void CodeView::OnModelReset() {
   }
 
   emit DocumentChanged();
+}
+
+void CodeView::ResetModelAndKeepCursor() {
+  d->update_timer.stop();
+
+  std::optional<unsigned int> opt_active_line_number;
+
+  {
+    auto text_cursor = d->text_edit->textCursor();
+    auto text_block = text_cursor.block();
+
+    opt_active_line_number =
+        GetLineNumberFromBlockNumber(d->token_map, text_block.blockNumber());
+  }
+
+  std::optional<unsigned int> opt_last_visible_line_number;
+
+  {
+    QPoint bottom_margin(1, d->text_edit->viewport()->height() - 1);
+    auto text_block = d->text_edit->cursorForPosition(bottom_margin);
+    opt_last_visible_line_number =
+        GetLineNumberFromBlockNumber(d->token_map, text_block.blockNumber());
+  }
+
+  OnModelReset();
+
+  if (!opt_active_line_number.has_value()) {
+    return;
+  }
+
+  const auto &document = *d->text_edit->document();
+
+  if (opt_last_visible_line_number.has_value()) {
+    auto last_visible_line_number = opt_last_visible_line_number.value();
+
+    auto opt_last_visible_block_number =
+        GetBlockNumberFromLineNumber(d->token_map, last_visible_line_number);
+    if (opt_last_visible_block_number.has_value()) {
+      const auto &last_visible_block_number =
+          opt_last_visible_block_number.value();
+
+      auto last_visible_text_block = document.findBlockByNumber(
+          static_cast<int>(last_visible_block_number));
+      if (last_visible_text_block.isValid()) {
+        auto text_cursor = d->text_edit->textCursor();
+        text_cursor.setPosition(last_visible_text_block.position());
+        d->text_edit->setTextCursor(text_cursor);
+      }
+    }
+  }
+
+  auto active_line_number = opt_active_line_number.value();
+
+  auto opt_active_block_number =
+      GetBlockNumberFromLineNumber(d->token_map, active_line_number);
+  if (!opt_active_block_number.has_value()) {
+    return;
+  }
+
+  const auto &active_block_number = opt_active_block_number.value();
+
+  auto active_text_block =
+      document.findBlockByNumber(static_cast<int>(active_block_number));
+  if (!active_text_block.isValid()) {
+    return;
+  }
+
+  auto text_cursor = d->text_edit->textCursor();
+  text_cursor.setPosition(active_text_block.position());
+  d->text_edit->setTextCursor(text_cursor);
 }
 
 void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
@@ -1044,6 +1133,10 @@ void CodeView::SetZoomDelta(const qreal &font_point_size_delta) {
   }
 
   SetZoom(font_point_size);
+}
+
+void CodeView::StartDelayedUpdate() {
+  d->update_timer.start(100);
 }
 
 void CodeView::OnCursorMoved(void) {

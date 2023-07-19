@@ -117,6 +117,9 @@ class CodeView final : public ICodeView {
   //! Sets the given text zoom delta
   void SetZoomDelta(const qreal &font_point_size_delta);
 
+  //! Starts a delayed update to respont to a row insert/delete event
+  void StartDelayedUpdate();
+
  public:
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
@@ -191,12 +194,21 @@ class CodeView final : public ICodeView {
   //! Connect the cursor changed event. This will also trigger a cursor event.
   void ConnectCursorChangeEvent(void);
 
+  //! One or multiple rows are being removed
+  void OnRowsRemoved(const QModelIndex &parent, int first, int last);
+
+  //! One or multiple rows are being inserted
+  void OnRowsInserted(const QModelIndex &parent, int first, int last);
+
   //! Generates new extra selections for highlight changes, or a reset otherwise
   void OnDataChange(const QModelIndex &top_left,
                     const QModelIndex &bottom_right, const QList<int> &roles);
 
   //! This slot regenerates the code view contents using CreateTextDocument
   void OnModelReset(void);
+
+  //! Wraps OnModelReset, saving and restoring the text cursor
+  void ResetModelAndKeepCursor();
 
   //! Repaints the line numbers on the gutter
   void OnGutterPaintEvent(QPaintEvent *event);
