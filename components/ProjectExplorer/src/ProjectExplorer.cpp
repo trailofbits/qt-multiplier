@@ -343,6 +343,8 @@ void ProjectExplorer::OnModelReset() {
 
   auto display_root_warning = d->model->HasAlternativeRoot();
   d->alternative_root_warning->setVisible(display_root_warning);
+
+  d->tree_view->expandRecursively(QModelIndex(), 1);
 }
 
 void ProjectExplorer::OnDisableCustomRootLinkClicked() {
