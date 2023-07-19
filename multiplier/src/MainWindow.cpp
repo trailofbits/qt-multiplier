@@ -68,6 +68,19 @@ struct ToolBar final {
   HistoryWidget *back_forward{nullptr};
 };
 
+std::optional<QRect> GetRestoredPopupPlacement(const QWidget *widget) {
+  if (widget == nullptr) {
+    return std::nullopt;
+  }
+
+  auto widget_rect = widget->rect().translated(widget->pos());
+  if (!widget_rect.contains(QCursor::pos())) {
+    return std::nullopt;
+  }
+
+  return widget_rect;
+}
+
 }  // namespace
 
 struct MainWindow::PrivateData final {
@@ -463,6 +476,9 @@ void MainWindow::ExpandMacro(const QModelIndex &index) {
 }
 
 void MainWindow::OpenCodePreview(const QModelIndex &index) {
+  auto opt_popup_placement =
+      GetRestoredPopupPlacement(d->quick_code_view.get());
+
   CloseAllPopups();
 
   QVariant related_entity_id_var =
@@ -481,14 +497,24 @@ void MainWindow::OpenCodePreview(const QModelIndex &index) {
   connect(d->quick_code_view.get(), &QuickCodeView::TokenTriggered, this,
           &MainWindow::OnTokenTriggered);
 
-  auto dialog_pos = QCursor::pos();
-  d->quick_code_view->move(dialog_pos.x() - 20, dialog_pos.y() - 20);
+  if (opt_popup_placement.has_value()) {
+    const auto &popup_placement = opt_popup_placement.value();
 
-  auto margin = fontMetrics().height();
-  auto max_width = margin + (width() / 3);
-  auto max_height = margin + (height() / 4);
+    d->quick_code_view->move(popup_placement.x(), popup_placement.y());
+    d->quick_code_view->resize(popup_placement.width(),
+                               popup_placement.height());
 
-  d->quick_code_view->resize(max_width, max_height);
+  } else {
+    auto cursor_pos{QCursor::pos()};
+    d->quick_code_view->move(cursor_pos.x() - 20, cursor_pos.y() - 20);
+
+    auto margin = fontMetrics().height();
+    auto max_width = margin + (width() / 3);
+    auto max_height = margin + (height() / 4);
+
+    d->quick_code_view->resize(max_width, max_height);
+  }
+
   d->quick_code_view->show();
 }
 
