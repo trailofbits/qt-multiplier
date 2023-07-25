@@ -220,7 +220,6 @@ jobs:
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DCMAKE_MAKE_PROGRAM=$(which make) \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_MANIFEST_MODE=OFF \
             -DVAST_ENABLE_GAP_SUBMODULE=FALSE \
             -DVAST_WARNINGS_AS_ERRORS=FALSE \
             -S libraries/vendored/vast \
