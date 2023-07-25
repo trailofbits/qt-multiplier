@@ -405,15 +405,7 @@ void MainWindow::OpenReferenceExplorer(
     const RawEntityId &entity_id,
     const IReferenceExplorerModel::ReferenceType &reference_type) {
 
-  QPoint dialog_pos;
-  if (d->quick_ref_explorer != nullptr) {
-    dialog_pos = d->quick_ref_explorer->pos();
-
-  } else {
-    auto cursor_pos{QCursor::pos()};
-    dialog_pos = {cursor_pos.x() - 20, cursor_pos.y() - 20};
-  }
-
+  auto opt_popup_placement = GetPopupPlacement();
   CloseAllPopups();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
@@ -428,17 +420,24 @@ void MainWindow::OpenReferenceExplorer(
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
 
-  d->quick_ref_explorer->move(dialog_pos.x(), dialog_pos.y());
+  if (opt_popup_placement.has_value()) {
+    const auto &popup_placement = opt_popup_placement.value();
 
-  auto margin = fontMetrics().height();
-  auto max_width = margin + (width() / 3);
-  auto max_height = margin + (height() / 3);
+    d->quick_ref_explorer->move(popup_placement.x(), popup_placement.y());
+    d->quick_ref_explorer->resize(popup_placement.width(),
+                                  popup_placement.height());
 
-  auto size_hint = d->quick_ref_explorer->sizeHint();
-  auto width = std::min(max_width, size_hint.width());
-  auto height = std::min(max_height, size_hint.height());
+  } else {
+    auto cursor_pos{QCursor::pos()};
+    d->quick_ref_explorer->move(cursor_pos.x() - 20, cursor_pos.y() - 20);
 
-  d->quick_ref_explorer->resize(width, height);
+    auto margin = fontMetrics().height();
+    auto max_width = margin + (width() / 3);
+    auto max_height = margin + (height() / 4);
+
+    d->quick_ref_explorer->resize(max_width, max_height);
+  }
+
   d->quick_ref_explorer->show();
 }
 
@@ -475,10 +474,20 @@ void MainWindow::ExpandMacro(const QModelIndex &index) {
   }
 }
 
-void MainWindow::OpenCodePreview(const QModelIndex &index) {
+std::optional<QRect> MainWindow::GetPopupPlacement() {
   auto opt_popup_placement =
       GetRestoredPopupPlacement(d->quick_code_view.get());
 
+  if (!opt_popup_placement.has_value()) {
+    opt_popup_placement =
+        GetRestoredPopupPlacement(d->quick_ref_explorer.get());
+  }
+
+  return opt_popup_placement;
+}
+
+void MainWindow::OpenCodePreview(const QModelIndex &index) {
+  auto opt_popup_placement = GetPopupPlacement();
   CloseAllPopups();
 
   QVariant related_entity_id_var =
