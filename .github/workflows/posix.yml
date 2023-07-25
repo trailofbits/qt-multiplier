@@ -176,6 +176,7 @@ jobs:
             -DPASTA_BOOTSTRAP_TYPES=OFF \
             -DPASTA_ENABLE_INSTALL=ON \
             -DPASTA_ENABLE_TESTING=OFF \
+            -DPASTA_ENABLE_PY_BINDINGS=OFF \
             -S libraries/vendored/pasta \
             -B build_vendored/pasta
 

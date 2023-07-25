@@ -46,7 +46,7 @@ namespace {
 
 using DataBatch = IDatabase::RequestEntityInformationReceiver::DataBatch;
 
-const std::size_t kBatchSize{512};
+const std::size_t kBatchSize{256};
 
 void SendBatch(IDatabase::RequestEntityInformationReceiver &receiver,
                DataBatch &batch, bool force = false) {
