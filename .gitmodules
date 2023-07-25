@@ -16,3 +16,7 @@
 [submodule "libraries/phantomstyle/src"]
 	path = libraries/phantomstyle/src
 	url = https://github.com/randrew/phantomstyle
+[submodule "libraries/vendored/vast"]
+	path = libraries/vendored/vast
+	url = https://github.com/trailofbits/vast.git
+	branch = vspell-future

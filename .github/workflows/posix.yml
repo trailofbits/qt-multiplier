@@ -209,6 +209,28 @@ jobs:
             -j ${{ steps.job_count.outputs.VALUE }} \
             --target install
 
+      - name: Build VAST
+        run: |
+          cmake \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
+            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DVCPKG_ROOT="${VCPKG_ROOT}" \
+            -DVCPKG_MANIFEST_MODE=OFF \
+            -DCMAKE_C_COMPILER=$(which clang) \
+            -DCMAKE_CXX_COMPILER=$(which clang++) \
+            -DCMAKE_MAKE_PROGRAM=$(which make) \
+            -DVAST_ENABLE_GAP_SUBMODULE=FALSE \
+            -DVAST_WARNINGS_AS_ERRORS=FALSE \
+            -S libraries/vendored/vast \
+            -B build_vendored/vast
+
+          cmake \
+            --build build_vendored/vast \
+            -j ${{ steps.job_count.outputs.VALUE }} \
+            --target install
+
       - name: Build multiplier
         run: |
           cmake \
