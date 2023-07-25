@@ -22,7 +22,7 @@ class GlobalHighlighter final : public IGlobalHighlighter {
   virtual ~GlobalHighlighter() override;
 
   //! \copybrief IGlobalHighlighter::CreateModelProxy
-  virtual QAbstractItemModel *
+  virtual QAbstractProxyModel *
   CreateModelProxy(QAbstractItemModel *source_model,
                    int entity_id_data_role) override;
 
