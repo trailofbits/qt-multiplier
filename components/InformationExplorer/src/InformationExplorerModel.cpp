@@ -612,8 +612,10 @@ void InformationExplorerModel::ProcessDataBatchQueue() {
 //  emit beginResetModel();
   // Exposes the changes.
   for (const Change &change : d->change_list) {
-    QModelIndex parent_index =
-        createIndex(change.parent->row, 0, change.parent);
+    QModelIndex parent_index;
+    if (change.parent != d->root) {
+      parent_index = createIndex(change.parent->row, 0, change.parent);
+    }
     emit beginInsertRows(
         parent_index, change.parent->child_count,
         change.parent->child_count + change.num_children_added - 1);

@@ -81,11 +81,11 @@ void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model) {
   d->tree_view->header()->setStretchLastSection(true);
   layout->addWidget(d->tree_view);
 
-//  d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
-//  connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
-//          &InformationExplorer::OnSearchParametersChange);
-//
-//  layout->addWidget(d->search_widget);
+  d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
+  connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
+          &InformationExplorer::OnSearchParametersChange);
+
+  layout->addWidget(d->search_widget);
 
   setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
@@ -102,10 +102,10 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model,
         d->top_model, IInformationExplorerModel::EntityIdRole);
   }
 
-//  d->model_proxy = new SortFilterProxyModel(this);
-//  d->model_proxy->setRecursiveFilteringEnabled(true);
-//  d->model_proxy->setSourceModel(d->top_model);
-//  d->top_model = d->model_proxy;
+  d->model_proxy = new SortFilterProxyModel(this);
+  d->model_proxy->setRecursiveFilteringEnabled(true);
+  d->model_proxy->setSourceModel(d->top_model);
+  d->top_model = d->model_proxy;
 
   d->tree_view->setModel(d->top_model);
 
