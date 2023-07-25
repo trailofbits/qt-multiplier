@@ -192,11 +192,11 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DVCPKG_ROOT="${VCPKG_ROOT}" \
-            -DVCPKG_MANIFEST_MODE=OFF \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DCMAKE_MAKE_PROGRAM=$(which make) \
+            -DVCPKG_ROOT="${VCPKG_ROOT}" \
+            -DVCPKG_MANIFEST_MODE=OFF \
             -DGAP_WARNINGS_AS_ERRORS=OFF \
             -DGAP_ENABLE_TESTING=OFF \
             -DGAP_ENABLE_EXAMPLES=OFF \
@@ -216,11 +216,11 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DVCPKG_ROOT="${VCPKG_ROOT}" \
-            -DVCPKG_MANIFEST_MODE=OFF \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DCMAKE_MAKE_PROGRAM=$(which make) \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_MANIFEST_MODE=OFF \
             -DVAST_ENABLE_GAP_SUBMODULE=FALSE \
             -DVAST_WARNINGS_AS_ERRORS=FALSE \
             -S libraries/vendored/vast \
@@ -239,14 +239,14 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
+            -DCMAKE_MAKE_PROGRAM=$(which make) \
+            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DMX_ENABLE_BOOTSTRAP=OFF \
             -DMX_ENABLE_WEGGLI=ON \
             -DMX_ENABLE_RE2=ON \
-            -DMX_ENABLE_VAST=OFF \
             -DMX_ENABLE_INSTALL=ON \
             -S libraries/vendored/multiplier \
             -B build_vendored/multiplier
@@ -263,10 +263,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
+            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DMXQT_ENABLE_TESTS=true \
             -DCMAKE_PREFIX_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -S . \
