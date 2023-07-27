@@ -93,11 +93,10 @@ jobs:
 
       - name: Install cxx-common
         run: |
-          # Note the ubuntu link has been changed since v4.0.0
           if [[ "$OSTYPE" == "darwin"* ]]; then
             folder_name="vcpkg_macos-12_llvm-16-pasta_xcode-14.2_amd64"
           else
-            folder_name="vcpkg_ubuntu-v2-22.04_llvm-16-pasta_amd64"
+            folder_name="vcpkg_ubuntu-22.04_llvm-16_amd64"
           fi
 
           archive_name="${folder_name}.tar.xz"
@@ -216,12 +215,13 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DCMAKE_C_COMPILER=$(which clang) \
-            -DCMAKE_CXX_COMPILER=$(which clang++) \
-            -DCMAKE_MAKE_PROGRAM=$(which make) \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DVAST_ENABLE_GAP_SUBMODULE=FALSE \
             -DVAST_WARNINGS_AS_ERRORS=FALSE \
+            -DVAST_INSTALL=ON \
+            -DENABLE_TESTING=OFF \
             -S libraries/vendored/vast \
             -B build_vendored/vast
 

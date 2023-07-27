@@ -9,6 +9,7 @@
 if(MXQT_ENABLE_INSTALL AND MXQT_GENERATE_LIBRARY_MANIFEST)
   set(library_list
     "gap"
+    "vast"
     "multiplier"
     "pasta"
     "weggli-native"
