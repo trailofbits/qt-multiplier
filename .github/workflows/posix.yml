@@ -93,11 +93,10 @@ jobs:
 
       - name: Install cxx-common
         run: |
-          # Note the ubuntu link has been changed since v4.0.0
           if [[ "$OSTYPE" == "darwin"* ]]; then
             folder_name="vcpkg_macos-12_llvm-16-pasta_xcode-14.2_amd64"
           else
-            folder_name="vcpkg_ubuntu-v2-22.04_llvm-16-pasta_amd64"
+            folder_name="vcpkg_ubuntu-22.04_llvm-16_amd64"
           fi
 
           archive_name="${folder_name}.tar.xz"
@@ -176,6 +175,7 @@ jobs:
             -DPASTA_BOOTSTRAP_TYPES=OFF \
             -DPASTA_ENABLE_INSTALL=ON \
             -DPASTA_ENABLE_TESTING=OFF \
+            -DPASTA_ENABLE_PY_BINDINGS=OFF \
             -S libraries/vendored/pasta \
             -B build_vendored/pasta
 
@@ -191,11 +191,11 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DVCPKG_ROOT="${VCPKG_ROOT}" \
-            -DVCPKG_MANIFEST_MODE=OFF \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DCMAKE_MAKE_PROGRAM=$(which make) \
+            -DVCPKG_ROOT="${VCPKG_ROOT}" \
+            -DVCPKG_MANIFEST_MODE=OFF \
             -DGAP_WARNINGS_AS_ERRORS=OFF \
             -DGAP_ENABLE_TESTING=OFF \
             -DGAP_ENABLE_EXAMPLES=OFF \
@@ -208,7 +208,7 @@ jobs:
             -j ${{ steps.job_count.outputs.VALUE }} \
             --target install
 
-      - name: Build multiplier
+      - name: Build VAST
         run: |
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -218,12 +218,34 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVAST_ENABLE_GAP_SUBMODULE=FALSE \
+            -DVAST_WARNINGS_AS_ERRORS=FALSE \
+            -DVAST_INSTALL=ON \
+            -DENABLE_TESTING=OFF \
+            -S libraries/vendored/vast \
+            -B build_vendored/vast
+
+          cmake \
+            --build build_vendored/vast \
+            -j ${{ steps.job_count.outputs.VALUE }} \
+            --target install
+
+      - name: Build multiplier
+        run: |
+          cmake \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
+            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
+            -DCMAKE_MAKE_PROGRAM=$(which make) \
+            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DMX_ENABLE_BOOTSTRAP=OFF \
             -DMX_ENABLE_WEGGLI=ON \
             -DMX_ENABLE_RE2=ON \
-            -DMX_ENABLE_VAST=OFF \
             -DMX_ENABLE_INSTALL=ON \
             -S libraries/vendored/multiplier \
             -B build_vendored/multiplier
@@ -240,10 +262,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
+            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
             -DMXQT_ENABLE_TESTS=true \
             -DCMAKE_PREFIX_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
             -S . \

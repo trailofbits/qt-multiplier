@@ -48,7 +48,7 @@ GlobalHighlighter::~GlobalHighlighter() {
   CancelRequest();
 }
 
-QAbstractItemModel *
+QAbstractProxyModel *
 GlobalHighlighter::CreateModelProxy(QAbstractItemModel *source_model,
                                     int entity_id_data_role) {
 

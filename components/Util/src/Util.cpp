@@ -492,8 +492,8 @@ static bool AddLeadingWhitespace(TokenKind tk) {
 //    case TokenKind::COMMA:
     case TokenKind::LESS_LESS_LESS:
     case TokenKind::GREATER_GREATER_GREATER:
-    case TokenKind::L_BRACE_TOKEN:
-    case TokenKind::R_BRACE_TOKEN:
+    case TokenKind::L_BRACE:
+    case TokenKind::R_BRACE:
       return true;
     default:
       return IsKeyword(tk);
@@ -504,8 +504,8 @@ static bool IsFirst(TokenKind tk) {
   switch (tk) {
     case TokenKind::L_PARENTHESIS:
     case TokenKind::L_SQUARE:
-    case TokenKind::L_BRACE_TOKEN:
-    case TokenKind::R_BRACE_TOKEN:
+    case TokenKind::L_BRACE:
+    case TokenKind::R_BRACE:
     case TokenKind::SEMI:
     case TokenKind::COMMA:
       return true;
@@ -557,7 +557,7 @@ static bool AddTrailingWhitespace(TokenKind tk) {
     case TokenKind::COMMA:
     case TokenKind::LESS_LESS_LESS:
     case TokenKind::GREATER_GREATER_GREATER:
-    case TokenKind::R_BRACE_TOKEN:
+    case TokenKind::R_BRACE:
       return true;
     default:
       return IsKeyword(tk);
@@ -668,6 +668,7 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
       [](const File &) -> VariantEntity { return NotAnEntity{}; },
       [](const Type &) -> VariantEntity { return NotAnEntity{}; },
       [](const TemplateArgument &) -> VariantEntity { return NotAnEntity{}; },
+      [](const Compilation &) -> VariantEntity { return NotAnEntity{}; },
       [](const NotAnEntity &) -> VariantEntity { return NotAnEntity{}; }};
   return std::visit<VariantEntity>(VariantEntityVisitor, ent);
 }
@@ -696,6 +697,7 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
       },
       [](const Fragment &entity) { return File::containing(entity); },
       [](const File &entity) { return entity; },
+      [](const Compilation &entity) -> std::optional<File> { return entity.main_source_file(); },
       [](auto) -> std::optional<File> { return std::nullopt; }};
   return std::visit<std::optional<File>>(VariantEntityVisitor, ent);
 }

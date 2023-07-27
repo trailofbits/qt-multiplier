@@ -58,7 +58,3 @@ target_include_directories("mx_informationexplorer" SYSTEM INTERFACE
 )
 
 enable_qt_properties("mx_informationexplorer")
-
-if(MXQT_ENABLE_TESTS)
-  add_subdirectory("tests")
-endif()

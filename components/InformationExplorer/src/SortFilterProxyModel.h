@@ -8,6 +8,9 @@
 
 #pragma once
 
+#include <QList>
+#include <QModelIndex>
+#include <QObject>
 #include <QSortFilterProxyModel>
 
 namespace mx::gui {
@@ -32,9 +35,14 @@ class SortFilterProxyModel final : public QSortFilterProxyModel {
                 const QModelIndex &source_right) const override;
 
  private slots:
-  //! Forwards the dataChanged signal
-  void OnDataChange(const QModelIndex &top_left,
-                    const QModelIndex &bottom_right, const QList<int> &roles);
+  void OnBeginInsertRows(const QModelIndex &, int, int);
+  void OnDataChanged(const QModelIndex &, const QModelIndex &,
+                     const QList<int> &);
+
+ signals:
+  void beginInsertRows(const QModelIndex &, int, int);
+  void dataChanged(const QModelIndex &, const QModelIndex &,
+                   const QList<int> &roles);
 };
 
 }  // namespace mx::gui

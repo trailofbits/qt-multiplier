@@ -13,6 +13,7 @@
 #include <multiplier/Entity.h>
 // clang-format on
 
+#include <multiplier/Compilation.h>
 #include <multiplier/Entities/Attr.h>
 #include <multiplier/Entities/CXXBaseSpecifier.h>
 #include <multiplier/Entities/DefineMacroDirective.h>

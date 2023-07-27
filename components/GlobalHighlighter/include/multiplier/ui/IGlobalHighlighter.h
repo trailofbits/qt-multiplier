@@ -11,7 +11,7 @@
 #include <multiplier/Index.h>
 
 #include <QWidget>
-#include <QAbstractItemModel>
+#include <QAbstractProxyModel>
 
 namespace mx::gui {
 
@@ -26,8 +26,8 @@ class IGlobalHighlighter : public QWidget {
                                     QWidget *parent = nullptr);
 
   //! Creates a new proxy model controlled by the highlighter
-  virtual QAbstractItemModel *CreateModelProxy(QAbstractItemModel *source_model,
-                                               int entity_id_data_role) = 0;
+  virtual QAbstractProxyModel *CreateModelProxy(QAbstractItemModel *source_model,
+                                                int entity_id_data_role) = 0;
 
   //! Constructor
   IGlobalHighlighter(QWidget *parent) : QWidget(parent) {}

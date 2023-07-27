@@ -25,10 +25,11 @@ namespace {
 
 const std::size_t kMaxHistorySize{30};
 
-}
+}  // namespace
 
 struct InformationExplorer::PrivateData final {
   IInformationExplorerModel *model{nullptr};
+  QAbstractItemModel *top_model{nullptr};
   InformationExplorerTreeView *tree_view{nullptr};
 
   SortFilterProxyModel *model_proxy{nullptr};
@@ -94,30 +95,27 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model,
                                        IGlobalHighlighter *global_highlighter) {
 
   d->model = model;
+  d->top_model = model;
 
-  QAbstractItemModel *source_model{d->model};
   if (global_highlighter != nullptr) {
-    source_model = global_highlighter->CreateModelProxy(
-        source_model, IInformationExplorerModel::EntityIdRole);
+    d->top_model = global_highlighter->CreateModelProxy(
+        d->top_model, IInformationExplorerModel::EntityIdRole);
   }
 
   d->model_proxy = new SortFilterProxyModel(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
-  d->model_proxy->setSourceModel(source_model);
+  d->model_proxy->setSourceModel(d->top_model);
+  d->top_model = d->model_proxy;
 
-  d->model_proxy->setSortRole(InformationExplorerModel::RawLocationRole);
-  d->model_proxy->sort(0);
-  d->model_proxy->setDynamicSortFilter(true);
+  d->tree_view->setModel(d->top_model);
 
-  d->tree_view->setModel(d->model_proxy);
-
-  connect(d->model_proxy, &QAbstractItemModel::dataChanged, this,
+  connect(d->top_model, &QAbstractItemModel::dataChanged, this,
           &InformationExplorer::OnHighlightModelDataChange);
 
-  connect(d->model_proxy, &QAbstractItemModel::modelReset, this,
+  connect(d->top_model, &QAbstractItemModel::modelReset, this,
           &InformationExplorer::OnModelReset);
 
-  connect(d->model_proxy, &QAbstractItemModel::rowsInserted, this,
+  connect(d->top_model, &QAbstractItemModel::rowsInserted, this,
           &InformationExplorer::OnRowsInserted);
 
   auto tree_selection_model = d->tree_view->selectionModel();
@@ -128,15 +126,12 @@ void InformationExplorer::InstallModel(IInformationExplorerModel *model,
 }
 
 void InformationExplorer::OnModelReset() {
-  d->tree_view->expandRecursively(QModelIndex());
-  d->tree_view->resizeColumnToContents(0);
+  ExpandAllNodes(QModelIndex());
 
-  auto opt_current_entity_id = d->model->GetCurrentEntityID();
-  if (!opt_current_entity_id.has_value()) {
+  auto current_entity_id = d->model->GetCurrentEntityID();
+  if (current_entity_id == kInvalidEntityId) {
     return;
   }
-
-  const auto &current_entity_id = opt_current_entity_id.value();
 
   if (d->enable_history_updates) {
     d->history_widget->CommitCurrentLocationToHistory();
@@ -147,9 +142,8 @@ void InformationExplorer::OnModelReset() {
   d->history_widget->SetCurrentLocation(current_entity_id);
 }
 
-void InformationExplorer::OnRowsInserted() {
-  d->tree_view->expandRecursively(QModelIndex());
-  d->tree_view->resizeColumnToContents(0);
+void InformationExplorer::OnRowsInserted(const QModelIndex &parent, int, int) {
+  ExpandAllNodes(parent);
 }
 
 void InformationExplorer::OnHighlightModelDataChange(const QModelIndex &,
@@ -199,6 +193,32 @@ void InformationExplorer::OnHistoryNavigationEntitySelected(
 
   d->enable_history_updates = false;
   d->model->RequestEntityInformation(original_id);
+}
+
+void InformationExplorer::ExpandAllNodes(const QModelIndex &parent) {
+  std::vector<QModelIndex> next_queue;
+  next_queue.emplace_back(parent);
+
+  while (!next_queue.empty()) {
+    auto queue = std::move(next_queue);
+    next_queue.clear();
+
+    for (const auto &index : queue) {
+      if (!ShouldAutoExpand(index)) {
+        continue;
+      }
+
+      d->tree_view->expand(index);
+
+      auto row_count = d->top_model->rowCount(index);
+      for (int row{}; row < row_count; ++row) {
+        auto child_index = d->top_model->index(row, 0, index);
+        next_queue.push_back(child_index);
+      }
+    }
+  }
+
+  d->tree_view->resizeColumnToContents(0);
 }
 
 }  // namespace mx::gui

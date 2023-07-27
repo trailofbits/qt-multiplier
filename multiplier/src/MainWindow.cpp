@@ -405,6 +405,15 @@ void MainWindow::OpenReferenceExplorer(
     const RawEntityId &entity_id,
     const IReferenceExplorerModel::ReferenceType &reference_type) {
 
+  QPoint dialog_pos;
+  if (d->quick_ref_explorer != nullptr) {
+    dialog_pos = d->quick_ref_explorer->pos();
+
+  } else {
+    auto cursor_pos{QCursor::pos()};
+    dialog_pos = {cursor_pos.x() - 20, cursor_pos.y() - 20};
+  }
+
   auto opt_popup_placement = GetPopupPlacement();
   CloseAllPopups();
 

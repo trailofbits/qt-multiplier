@@ -11,6 +11,7 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/Assert.h>
 
+#include <multiplier/Compilation.h>
 #include <multiplier/Entities/Token.h>
 #include <multiplier/Entities/TokenKind.h>
 
@@ -186,7 +187,8 @@ void EnumerateEntityReferences(
     MX_FOR_EACH_ENTITY_CATEGORY(REFERENCES_TO_CATEGORY, REFERENCES_TO_CATEGORY,
                                 REFERENCES_TO_CATEGORY,
                                 MX_IGNORE_ENTITY_CATEGORY,
-                                REFERENCES_TO_CATEGORY, REFERENCES_TO_CATEGORY)
+                                REFERENCES_TO_CATEGORY, REFERENCES_TO_CATEGORY,
+                                MX_IGNORE_ENTITY_CATEGORY)
 
   } else {
     return;
@@ -379,7 +381,6 @@ void GetEntityReferences(QPromise<bool> &result_promise, const Index &index,
   if (reference_type == IDatabase::ReferenceType::Callers) {
     GetEntityCallReferences(result_promise, file_location_cache, receiver,
                             std::move(result), entity_queue, depth);
-
   }
 }
 
