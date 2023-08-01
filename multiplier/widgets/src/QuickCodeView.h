@@ -25,10 +25,8 @@ class QuickCodeView final : public QWidget {
   //! Constructor
   QuickCodeView(const Index &index,
                 const FileLocationCache &file_location_cache,
-                RawEntityId entity_id,
-                IGlobalHighlighter &highlighter,
-                IMacroExplorer &macro_explorer,
-                QWidget *parent = nullptr);
+                RawEntityId entity_id, IGlobalHighlighter &highlighter,
+                IMacroExplorer &macro_explorer, QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickCodeView() override;
@@ -52,6 +50,9 @@ class QuickCodeView final : public QWidget {
   //! Used to handle window movements
   virtual bool eventFilter(QObject *obj, QEvent *event) override;
 
+  //! Used to update the size grip position
+  virtual void resizeEvent(QResizeEvent *event) override;
+
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
@@ -59,8 +60,7 @@ class QuickCodeView final : public QWidget {
   //! Initializes the internal widgets
   void InitializeWidgets(const Index &index,
                          const FileLocationCache &file_location_cache,
-                         RawEntityId entity_id,
-                         IGlobalHighlighter &highlighter,
+                         RawEntityId entity_id, IGlobalHighlighter &highlighter,
                          IMacroExplorer &macro_explorer);
 
   //! Updates the widget icons to match the active theme
