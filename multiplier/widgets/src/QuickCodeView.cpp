@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QPushButton>
 #include <QFutureWatcher>
+#include <QSizeGrip>
 
 #include <optional>
 
@@ -31,6 +32,7 @@ struct QuickCodeView::PrivateData final {
 
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
+  QSizeGrip *size_grip{nullptr};
 
   IDatabase::Ptr database;
 
@@ -102,6 +104,15 @@ bool QuickCodeView::eventFilter(QObject *, QEvent *event) {
   return false;
 }
 
+void QuickCodeView::resizeEvent(QResizeEvent *event) {
+  QPoint size_grip_pos(width() - d->size_grip->width(),
+                       height() - d->size_grip->height());
+
+  d->size_grip->move(size_grip_pos);
+
+  QWidget::resizeEvent(event);
+}
+
 void QuickCodeView::InitializeWidgets(
     const Index &index, const FileLocationCache &file_location_cache,
     RawEntityId entity_id, IGlobalHighlighter &highlighter,
@@ -119,8 +130,8 @@ void QuickCodeView::InitializeWidgets(
   // Code model
   //
 
-  ICodeModel *main_model = macro_explorer.CreateCodeModel(
-      file_location_cache, index, this);
+  ICodeModel *main_model =
+      macro_explorer.CreateCodeModel(file_location_cache, index, this);
   d->model = new CodePreviewModelAdapter(main_model, this);
 
   QAbstractItemModel *model_proxy = highlighter.CreateModelProxy(
@@ -182,6 +193,11 @@ void QuickCodeView::InitializeWidgets(
   main_layout->addWidget(title_frame);
   main_layout->addLayout(contents_layout);
 
+  // It is important that we do not add this to the layout, because
+  // we change its position manually on resize
+  d->size_grip = new QSizeGrip(this);
+  d->size_grip->resize(12, 12);
+
   setLayout(main_layout);
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
@@ -238,8 +254,8 @@ void QuickCodeView::OnEntityRequestFutureStatusChanged() {
 
   // Set the name.
   if (std::optional<QString> opt_entity_name = NameOfEntityAsString(ent)) {
-    d->window_title->setText(
-        tr("Preview for") + " `" + opt_entity_name.value() + "`");
+    d->window_title->setText(tr("Preview for") + " `" +
+                             opt_entity_name.value() + "`");
   }
 
   // Set the contents.
