@@ -122,6 +122,19 @@ class MainWindow final : public QMainWindow {
 
   //! Called when toggling the code preview setting of the ref explorer
   void OnRefExplorerCodePreviewToggled(const bool &checked);
+
+  //! Called by theme manager
+  void OnThemeChange(const QPalette &, const CodeViewTheme &);
+
+  //! Updates the icons according to the current theme
+  void UpdateIcons();
+
+  //! Called when the browser mode action is interacted with
+  void OnBrowserModeToggled();
+
+ signals:
+  //! Emitted when the browse mode is toggled
+  void BrowserModeToggled(const bool &enabled);
 };
 
 }  // namespace mx::gui

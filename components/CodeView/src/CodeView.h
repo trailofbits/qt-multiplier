@@ -55,6 +55,9 @@ class CodeView final : public ICodeView {
   //! Scrolls the view to the specified entity id
   virtual bool ScrollToLineNumber(unsigned line) override;
 
+  //! \copybrief ICodeView::SetBrowserMode
+  virtual void SetBrowserMode(const bool &enabled) override;
+
  protected:
   //! Constructor
   CodeView(QAbstractItemModel *model, QWidget *parent);
@@ -82,7 +85,7 @@ class CodeView final : public ICodeView {
   void OnHoverTimerTimeout();
 
   //! Utility function used to handle mouse press events
-  void OnTextEditViewportMouseButtonPress(QMouseEvent *event);
+  bool OnTextEditViewportMouseButtonPress(QMouseEvent *event);
 
   //! Utility function used to handle key press events
   void OnTextEditViewportKeyboardButtonPress(QKeyEvent *event);

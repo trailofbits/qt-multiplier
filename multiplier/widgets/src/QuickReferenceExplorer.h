@@ -114,6 +114,10 @@ class QuickReferenceExplorer final : public QWidget {
   //! Called by the theme manager
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);
+
+ public slots:
+  //! Enables or disables the browser mode of the inner code view
+  void SetBrowserMode(const bool &enabled);
 };
 
 }  // namespace mx::gui

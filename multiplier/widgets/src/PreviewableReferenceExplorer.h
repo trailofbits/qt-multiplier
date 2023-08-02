@@ -70,6 +70,10 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Used to do the first time initialization of the code preview
   void OnRowsInserted();
 
+ public slots:
+  //! Enables or disables the browser mode of the inner code view
+  void SetBrowserMode(const bool &enabled);
+
  signals:
   //! The forwarded IReferenceExplorer::SelectedItemChanged signal
   void SelectedItemChanged(const QModelIndex &index);

@@ -103,6 +103,10 @@ class ICodeView : public QWidget {
   //! Disable copy assignment
   ICodeView &operator=(const ICodeView &) = delete;
 
+ public slots:
+  //! Enables or disables browser mode
+  virtual void SetBrowserMode(const bool &enabled) = 0;
+
  signals:
   //! This signal is emitted when a token action is performed
   void TokenTriggered(const TokenAction &token_action,

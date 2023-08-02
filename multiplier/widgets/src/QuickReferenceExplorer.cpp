@@ -341,4 +341,8 @@ void QuickReferenceExplorer::OnThemeChange(const QPalette &,
   UpdateIcons();
 }
 
+void QuickReferenceExplorer::SetBrowserMode(const bool &enabled) {
+  d->reference_explorer->SetBrowserMode(enabled);
+}
+
 }  // namespace mx::gui
