@@ -37,6 +37,7 @@ struct QuickCodeView::PrivateData final {
   IDatabase::Ptr database;
 
   ICodeModel *model{nullptr};
+  ICodeView *code_view{nullptr};
 
   QFuture<VariantEntity> entity_future;
   QFutureWatcher<VariantEntity> entity_future_watcher;
@@ -174,15 +175,15 @@ void QuickCodeView::InitializeWidgets(
   // Contents
   //
 
-  ICodeView *view = ICodeView::Create(model_proxy, this);
-  view->SetWordWrapping(true);
+  d->code_view = ICodeView::Create(model_proxy, this);
+  d->code_view->SetWordWrapping(true);
 
-  connect(view, &ICodeView::TokenTriggered, this,
+  connect(d->code_view, &ICodeView::TokenTriggered, this,
           &QuickCodeView::OnTokenTriggered);
 
   auto contents_layout = new QVBoxLayout();
   contents_layout->setContentsMargins(0, 0, 0, 0);
-  contents_layout->addWidget(view);
+  contents_layout->addWidget(d->code_view);
 
   //
   // Main layout
@@ -279,6 +280,10 @@ void QuickCodeView::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 
 void QuickCodeView::OnThemeChange(const QPalette &, const CodeViewTheme &) {
   UpdateIcons();
+}
+
+void QuickCodeView::SetBrowserMode(const bool &enabled) {
+  d->code_view->SetBrowserMode(enabled);
 }
 
 }  // namespace mx::gui

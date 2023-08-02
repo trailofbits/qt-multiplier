@@ -90,6 +90,10 @@ class QuickCodeView final : public QWidget {
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);
 
+ public slots:
+  //! Enables or disables the browser mode of the inner code view
+  void SetBrowserMode(const bool &enabled);
+
  signals:
   //! \brief This signal will only fire for TokenAction::Type::Keyboard events
   //! The reason it is limited to a single event type is that the popup

@@ -59,6 +59,7 @@ struct CodeView::PrivateData final {
   int last_press_position{-1};
   int last_block{-1};
 
+  bool browser_mode{true};
   QPlainTextEditMod *text_edit{nullptr};
   QWidget *gutter{nullptr};
 
@@ -199,6 +200,10 @@ bool CodeView::ScrollToLineNumber(unsigned line) {
   }
 }
 
+void CodeView::SetBrowserMode(const bool &enabled) {
+  d->browser_mode = enabled;
+}
+
 CodeView::CodeView(QAbstractItemModel *model, QWidget *parent)
     : ICodeView(parent),
       d(new PrivateData) {
@@ -237,10 +242,11 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
         OnTextEditViewportMouseMoveEvent(dynamic_cast<QMouseEvent *>(event));
       }
       break;
+    case QEvent::MouseButtonDblClick: return true;
     case QEvent::MouseButtonPress:
       if (obj == d->text_edit->viewport()) {
         auto mouse_event = dynamic_cast<QMouseEvent *>(event);
-        OnTextEditViewportMouseButtonPress(mouse_event);
+        return OnTextEditViewportMouseButtonPress(mouse_event);
       }
       break;
     case QEvent::MouseButtonRelease:
@@ -315,10 +321,12 @@ void CodeView::InitializeWidgets() {
   // Code viewer
   d->text_edit = new QPlainTextEditMod();
   d->text_edit->setReadOnly(true);
+  d->text_edit->setAcceptDrops(false);
   d->text_edit->setContextMenuPolicy(Qt::NoContextMenu);
   d->text_edit->setTextInteractionFlags(Qt::TextSelectableByMouse |
                                         Qt::TextSelectableByKeyboard);
   d->text_edit->installEventFilter(this);
+  d->text_edit->setMouseTracking(true);
   d->text_edit->viewport()->installEventFilter(this);
   d->text_edit->viewport()->setMouseTracking(true);
 
@@ -416,9 +424,21 @@ CodeView::GetModelIndexFromMousePosition(const QPoint &pos) {
 }
 
 void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
+  const auto L_updateMouseCursor = [&](const bool &interactive) {
+    if (interactive) {
+      d->text_edit->viewport()->setCursor(Qt::PointingHandCursor);
+
+    } else {
+      d->text_edit->viewport()->setCursor(d->browser_mode ? Qt::ArrowCursor
+                                                          : Qt::IBeamCursor);
+    }
+  };
+
   auto opt_model_index = GetModelIndexFromMousePosition(event->pos());
   if (!opt_model_index.has_value()) {
     d->opt_prev_hovered_model_index = std::nullopt;
+
+    L_updateMouseCursor(false);
     return;
   }
 
@@ -426,10 +446,13 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
 
   auto token_id_var = model_index.data(ICodeModel::TokenIdRole);
   if (!token_id_var.isValid()) {
+    L_updateMouseCursor(false);
     return;
   }
 
   auto token_id = qvariant_cast<RawEntityId>(token_id_var);
+  L_updateMouseCursor(d->browser_mode ||
+                      event->modifiers() == Qt::ControlModifier);
 
   if (d->opt_prev_hovered_model_index.has_value()) {
     const auto &prev_hovered_model_index =
@@ -485,30 +508,77 @@ void CodeView::OnHoverTimerTimeout() {
   emit TokenTriggered({TokenAction::Type::Hover, std::nullopt}, model_index);
 }
 
-void CodeView::OnTextEditViewportMouseButtonPress(QMouseEvent *event) {
+bool CodeView::OnTextEditViewportMouseButtonPress(QMouseEvent *event) {
   QTextCursor cursor = d->text_edit->cursorForPosition(event->pos());
-  d->last_press_version = d->version;
-  d->last_press_position = cursor.position();
-  d->last_block = cursor.block().blockNumber();
-
   auto opt_model_index = GetQModelIndexFromTextCursor(d->token_map, cursor);
-  if (!opt_model_index.has_value()) {
-    return;
-  }
 
-  const QModelIndex &model_index = opt_model_index.value();
+  if (event->button() == Qt::LeftButton) {
+    enum class InteractionType {
+      None,
+      TextCursor,
+      TokenAction,
+    };
 
-  if (event->button() == Qt::LeftButton &&
-      event->modifiers() == Qt::ControlModifier) {
-    HandleNewCursor(cursor);
-    emit TokenTriggered({TokenAction::Type::Primary, std::nullopt},
-                        model_index);
+    auto interaction_type{InteractionType::None};
+    if (d->browser_mode) {
+      if (event->modifiers() == Qt::ControlModifier) {
+        interaction_type = InteractionType::TextCursor;
+
+      } else if (event->modifiers() == Qt::NoModifier) {
+        interaction_type = InteractionType::TokenAction;
+      }
+
+    } else {
+      if (event->modifiers() == Qt::ControlModifier) {
+        interaction_type = InteractionType::TokenAction;
+
+      } else if (event->modifiers() == Qt::NoModifier) {
+        interaction_type = InteractionType::TextCursor;
+      }
+    }
+
+    if (interaction_type == InteractionType::None) {
+      return true;
+    }
+
+    switch (interaction_type) {
+      case InteractionType::None: return true;
+
+      case InteractionType::TextCursor: {
+        d->last_press_version = d->version;
+        d->last_press_position = cursor.position();
+        d->last_block = cursor.block().blockNumber();
+
+        HandleNewCursor(cursor);
+        return false;
+      }
+
+      case InteractionType::TokenAction: {
+        if (opt_model_index.has_value()) {
+          auto model_index = opt_model_index.value();
+          emit TokenTriggered({TokenAction::Type::Primary, std::nullopt},
+                              model_index);
+        }
+
+        return true;
+      }
+    }
 
   } else if (event->button() == Qt::RightButton &&
              event->modifiers() == Qt::NoModifier) {
-    HandleNewCursor(cursor);
+
+    if (!opt_model_index.has_value()) {
+      return true;
+    }
+
+    auto model_index = opt_model_index.value();
     emit TokenTriggered({TokenAction::Type::Secondary, std::nullopt},
                         model_index);
+
+    return true;
+
+  } else {
+    return true;
   }
 }
 

@@ -146,4 +146,8 @@ void PreviewableReferenceExplorer::OnRowsInserted() {
   UpdateCodePreview(first_item_index);
 }
 
+void PreviewableReferenceExplorer::SetBrowserMode(const bool &enabled) {
+  d->code_view->SetBrowserMode(enabled);
+}
+
 }  // namespace mx::gui

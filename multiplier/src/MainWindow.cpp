@@ -22,6 +22,7 @@
 #include <multiplier/ui/IMacroExplorer.h>
 #include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/IThemeManager.h>
+#include <multiplier/ui/Icons.h>
 
 #include <multiplier/Entities/StmtKind.h>
 
@@ -66,6 +67,7 @@ struct CodeViewContextMenu final {
 
 struct ToolBar final {
   HistoryWidget *back_forward{nullptr};
+  QAction *browser_mode{nullptr};
 };
 
 std::optional<QRect> GetRestoredPopupPlacement(const QWidget *widget) {
@@ -129,6 +131,9 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
 
   InitializeWidgets();
   InitializeToolBar();
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &MainWindow::OnThemeChange);
 
   resize(1280, 800);
 }
@@ -199,7 +204,15 @@ void MainWindow::InitializeToolBar() {
 
   toolbar->addWidget(d->toolbar.back_forward);
 
+  d->toolbar.browser_mode = new QAction(tr("Browser mode"), this);
+  d->toolbar.browser_mode->setCheckable(true);
+  d->toolbar.browser_mode->setChecked(true);
+  connect(d->toolbar.browser_mode, &QAction::toggled, this,
+          &MainWindow::OnBrowserModeToggled);
+  toolbar->addAction(d->toolbar.browser_mode);
+
   addToolBar(toolbar);
+  UpdateIcons();
 }
 
 void MainWindow::CreateProjectExplorerDock() {
@@ -422,12 +435,17 @@ void MainWindow::OpenReferenceExplorer(
       d->enable_quick_ref_explorer_code_preview, *d->global_highlighter,
       *d->macro_explorer, reference_type, this);
 
+  d->quick_ref_explorer->SetBrowserMode(d->toolbar.browser_mode->isChecked());
+
   connect(d->quick_ref_explorer.get(),
           &QuickReferenceExplorer::SaveReferenceExplorer, this,
           &MainWindow::SaveReferenceExplorer);
 
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
+
+  connect(this, &MainWindow::BrowserModeToggled, d->quick_ref_explorer.get(),
+          &QuickReferenceExplorer::SetBrowserMode);
 
   if (opt_popup_placement.has_value()) {
     const auto &popup_placement = opt_popup_placement.value();
@@ -512,8 +530,13 @@ void MainWindow::OpenCodePreview(const QModelIndex &index) {
       d->index, d->file_location_cache, related_entity_id,
       *d->global_highlighter, *d->macro_explorer, this);
 
+  d->quick_code_view->SetBrowserMode(d->toolbar.browser_mode->isChecked());
+
   connect(d->quick_code_view.get(), &QuickCodeView::TokenTriggered, this,
           &MainWindow::OnTokenTriggered);
+
+  connect(this, &MainWindow::BrowserModeToggled, d->quick_code_view.get(),
+          &QuickCodeView::SetBrowserMode);
 
   if (opt_popup_placement.has_value()) {
     const auto &popup_placement = opt_popup_placement.value();
@@ -585,6 +608,9 @@ MainWindow::CreateNewCodeView(RawEntityId file_entity_id, QString tab_name,
       code_model, kHighlightEntityIdRole);
 
   ICodeView *code_view = ICodeView::Create(proxy_model);
+  code_view->SetBrowserMode(d->toolbar.browser_mode->isChecked());
+  connect(this, &MainWindow::BrowserModeToggled, code_view,
+          &ICodeView::SetBrowserMode);
 
   code_model->SetEntity(file_entity_id);
 
@@ -925,12 +951,16 @@ void MainWindow::SaveReferenceExplorer(
 
   reference_explorer->setParent(this);
   reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
+  reference_explorer->SetBrowserMode(d->toolbar.browser_mode->isChecked());
 
   connect(reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
 
   connect(reference_explorer, &PreviewableReferenceExplorer::TokenTriggered,
           this, &MainWindow::OnTokenTriggered);
+
+  connect(this, &MainWindow::BrowserModeToggled, reference_explorer,
+          &PreviewableReferenceExplorer::SetBrowserMode);
 
   d->ref_explorer_tab_widget->addTab(reference_explorer,
                                      reference_explorer->windowTitle());
@@ -1043,6 +1073,24 @@ void MainWindow::OnSetLightTheme() {
 
 void MainWindow::OnRefExplorerCodePreviewToggled(const bool &checked) {
   d->enable_quick_ref_explorer_code_preview = checked;
+}
+
+void MainWindow::OnThemeChange(const QPalette &, const CodeViewTheme &) {
+  UpdateIcons();
+}
+
+void MainWindow::UpdateIcons() {
+  auto is_checked = d->toolbar.browser_mode->isChecked();
+  auto browser_mode_icon =
+      GetIcon(":/Icons/ToolBar/BrowserMode",
+              is_checked ? IconStyle::Highlighted : IconStyle::None);
+
+  d->toolbar.browser_mode->setIcon(browser_mode_icon);
+}
+
+void MainWindow::OnBrowserModeToggled() {
+  UpdateIcons();
+  emit BrowserModeToggled(d->toolbar.browser_mode->isChecked());
 }
 
 }  // namespace mx::gui
