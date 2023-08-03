@@ -41,6 +41,8 @@
 #include <QColorDialog>
 #include <QActionGroup>
 
+#include <iostream>
+
 namespace mx::gui {
 
 namespace {
@@ -123,8 +125,15 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
   setWindowTitle("Multiplier");
   setWindowIcon(QIcon(":/Icons/Multiplier"));
 
-  auto database_path = QFileDialog::getOpenFileName(
-      this, tr("Select a Multiplier database"), QDir::homePath());
+  QString database_path;
+  const auto &arg_list = qApp->arguments();
+  if (arg_list.size() == 2) {
+    database_path = arg_list[1];
+
+  } else {
+    database_path = QFileDialog::getOpenFileName(
+        this, tr("Select a Multiplier database"), QDir::homePath());
+  }
 
   d->index = mx::Index::in_memory_cache(
       mx::Index::from_database(database_path.toStdString()));
