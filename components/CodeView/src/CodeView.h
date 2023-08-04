@@ -22,6 +22,7 @@
 #include <functional>
 #include <optional>
 #include <vector>
+#include <unordered_set>
 
 namespace mx::gui {
 
@@ -120,39 +121,25 @@ class CodeView final : public ICodeView {
   //! Sets the given text zoom delta
   void SetZoomDelta(const qreal &font_point_size_delta);
 
-  //! Starts a delayed update to respont to a row insert/delete event
-  void StartDelayedUpdate();
+  //! Starts/restarts a delayed DocumentChanged signal
+  void StartDelayedDocumentUpdateSignal();
 
  public:
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
-
-    //! A single token map entry
-    struct Entry final {
+    struct TokenEntry final {
       int cursor_start{};
       int cursor_end{};
-      QModelIndex model_index;
     };
 
-    //! The key is unique and derived from a QModelIndex
-    std::unordered_map<std::uint64_t, Entry> data;
+    struct BlockEntry final {
+      std::vector<TokenEntry> token_entry_list;
+      std::size_t line_number{};
+    };
 
-    //! This maps a block number to a list of unique token identifiers
-    std::unordered_map<int, std::vector<std::uint64_t>>
-        block_number_to_unique_token_id_list;
-
-    //! This maps a line number to a block number
-    std::unordered_map<unsigned, int> line_number_to_block_number;
-
-    //! This maps a block number to a line number
-    std::unordered_map<int, unsigned> block_number_to_line_number;
-
-    //! This maps related entity ids to a list of unique token identifiers
-    std::unordered_map<RawEntityId, std::vector<std::uint64_t>>
-        related_entity_id_to_unique_token_id_list;
-
-    //! The highest line number that we have encountered
-    unsigned highest_line_number{};
+    std::vector<BlockEntry> block_entry_list;
+    std::unordered_map<std::size_t, std::size_t> line_num_to_block_num_map;
+    std::size_t highest_line_number{};
   };
 
   //! Creates a unique token identifier from the given code model index
@@ -160,15 +147,18 @@ class CodeView final : public ICodeView {
 
   //! Returns the line number for the specified block number
   static std::optional<std::size_t>
-  GetLineNumberFromBlockNumber(const TokenMap &token_map, int block_number);
+  GetLineNumberFromBlockNumber(const TokenMap &token_map,
+                               const int &block_number);
 
   //! Returns the block number for the specified line number
   static std::optional<std::size_t>
-  GetBlockNumberFromLineNumber(const TokenMap &token_map, unsigned line_number);
+  GetBlockNumberFromLineNumber(const TokenMap &token_map,
+                               const std::size_t &line_number);
 
   //! Returns a code model index from the specified text cursor
   static std::optional<QModelIndex>
-  GetQModelIndexFromTextCursor(const TokenMap &token_map,
+  GetQModelIndexFromTextCursor(const QAbstractItemModel &model,
+                               const TokenMap &token_map,
                                const QTextCursor &cursor);
 
   //! Used with CreateTextDocument to display graphical progress
@@ -180,6 +170,20 @@ class CodeView final : public ICodeView {
                      const CodeViewTheme &theme,
                      const std::optional<CreateTextDocumentProgressCallback>
                          &opt_progress_callback = std::nullopt);
+
+  //!
+  static void CreateTextDocumentLine(TokenMap &token_map,
+                                     QTextDocument &document,
+                                     const CodeViewTheme &theme,
+                                     const QModelIndex &row_index);
+
+  //!
+  static void EraseTextDocumentLine(TokenMap &token_map,
+                                    QTextDocument &document,
+                                    const int &block_number);
+
+  //!
+  static void UpdateTokenDataLineNumbers(TokenMap &token_map);
 
   //! Initializes the given text_format object according to the code view theme
   static void ConfigureTextFormatFromTheme(QTextCharFormat &text_format,
@@ -210,8 +214,8 @@ class CodeView final : public ICodeView {
   //! This slot regenerates the code view contents using CreateTextDocument
   void OnModelReset(void);
 
-  //! Wraps OnModelReset, saving and restoring the text cursor
-  void ResetModelAndKeepCursor();
+  //! Used to emit the DocumentChanged signal after a model edit (insertion/removal of rows)
+  void DocumentChangedTimedSignal();
 
   //! Repaints the line numbers on the gutter
   void OnGutterPaintEvent(QPaintEvent *event);

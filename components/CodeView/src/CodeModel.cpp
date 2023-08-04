@@ -14,8 +14,9 @@
 #include <QFutureWatcher>
 
 #include <unordered_set>
-#include <iostream>
 #include <set>
+#include <sstream>
+#include <fstream>
 
 namespace mx::gui {
 
@@ -296,6 +297,32 @@ void CodeModel::FutureResultStateChanged() {
   auto old_tokens = std::move(d->tokens);
   d->tokens = std::move(new_tokens);
 
+  // DEBUG
+  {
+    auto L_tokenRangeToString =
+        [](const TokenRange &token_range) -> std::string {
+      std::stringstream buffer;
+
+      for (const auto &token : token_range) {
+        buffer << token.data();
+      }
+
+      return buffer.str();
+    };
+
+    auto L_dumpTokenRangeToFile = [&](const std::string &path,
+                                      const TokenRange &token_range) {
+      auto buffer = L_tokenRangeToString(token_range);
+      std::fstream output_file(path.c_str(), std::ios::out);
+      output_file << buffer;
+    };
+
+    L_dumpTokenRangeToFile("/Users/alessandro/model_before.txt",
+                           old_tokens.tokens);
+    L_dumpTokenRangeToFile("/Users/alessandro/model_after.txt",
+                           d->tokens.tokens);
+  }
+
   d->last_line_cache = nullptr;
   d->last_column_cache = nullptr;
   d->model_state = ModelState::Ready;
@@ -399,29 +426,101 @@ void CodeModel::FutureResultStateChanged() {
 
   auto old_line_index = L_createLineIndex(old_tokens);
 
-  std::set<std::size_t> removed_line_list;
+  std::vector<std::size_t> removed_line_list;
   for (const auto &token_index : removed_token_index_list) {
-    removed_line_list.insert(old_line_index[token_index]);
+    // TODO: Possibly a bug? Skip empty tokens because they are
+    // reported on line 0, causing a duplication of the first line
+    const auto &token_data = old_tokens.tokens[token_index].data();
+    if (token_data.empty()) {
+      continue;
+    }
+
+    removed_line_list.push_back(old_line_index[token_index]);
   }
 
   auto new_line_index = L_createLineIndex(d->tokens);
 
-  std::set<std::size_t> added_line_list;
+  std::vector<std::size_t> added_line_list;
   for (const auto &token_index : added_token_index_list) {
-    added_line_list.insert(new_line_index[token_index]);
+    // TODO: Possibly a bug? Skip empty tokens because they are
+    // reported on line 0, causing a duplication of the first line
+    const auto &token_data = d->tokens.tokens[token_index].data();
+    if (token_data.empty()) {
+      continue;
+    }
+
+    added_line_list.push_back(new_line_index[token_index]);
   }
 
-  for (const auto &removed_line : removed_line_list) {
-    auto row_number{static_cast<int>(removed_line)};
+  // Now convert the line numbers to ranges
+  using Range = std::pair<std::size_t, std::size_t>;
+  using RangeList = std::vector<Range>;
 
-    emit beginRemoveRows(QModelIndex(), row_number, row_number);
-    emit endInsertRows();
+  auto L_convertToRanges = [](std::vector<std::size_t> line_list) -> RangeList {
+    std::sort(line_list.begin(), line_list.end());
+
+    auto it = std::unique(line_list.begin(), line_list.end());
+    line_list.erase(it, line_list.end());
+
+    auto line_list_it = line_list.begin();
+    std::optional<Range> opt_range;
+
+    std::vector<std::pair<std::size_t, std::size_t>> range_list;
+
+    while (line_list_it != line_list.end()) {
+      const auto &line = *line_list_it;
+
+      if (opt_range.has_value()) {
+        auto &range = opt_range.value();
+
+        if (range.second + 1 == line) {
+          ++range.second;
+          ++line_list_it;
+          continue;
+
+        } else {
+          range_list.push_back(std::move(range));
+          opt_range = std::nullopt;
+          continue;
+        }
+      }
+
+      opt_range = std::make_pair(line, line);
+      ++line_list_it;
+    }
+
+    if (opt_range.has_value()) {
+      auto &range = opt_range.value();
+      range_list.push_back(std::move(range));
+    }
+
+    return range_list;
+  };
+
+  // Send the row removals in reverse order so we don't have to rebase
+  // the ranges
+  auto removed_line_range_list = L_convertToRanges(removed_line_list);
+  std::sort(removed_line_range_list.begin(), removed_line_range_list.end(),
+            [](const Range &lhs, const Range &rhs) -> bool {
+              return lhs.first > rhs.first;
+            });
+
+  auto added_line_range_list = L_convertToRanges(added_line_list);
+
+  for (const auto &removed_line_range : removed_line_range_list) {
+    auto first_line = static_cast<int>(removed_line_range.first);
+    auto last_line = static_cast<int>(removed_line_range.second);
+
+    emit beginRemoveRows(QModelIndex(), first_line, last_line);
+    emit endRemoveRows();
   }
 
-  for (const auto &added_line : added_line_list) {
-    auto row_number{static_cast<int>(added_line)};
+  // Finally, send the row insertions
+  for (const auto &added_line_range : added_line_range_list) {
+    auto first_line = static_cast<int>(added_line_range.first);
+    auto last_line = static_cast<int>(added_line_range.second);
 
-    emit beginInsertRows(QModelIndex(), row_number, row_number);
+    emit beginInsertRows(QModelIndex(), first_line, last_line);
     emit endInsertRows();
   }
 }
@@ -447,6 +546,7 @@ void CodeModel::OnExpandMacros(const TokenTreeVisitor *visitor) {
   d->model_state = ModelState::UpdateInProgress;
   d->future_result = d->database->RequestExpandedTokenRangeData(
       d->tokens.requested_id, tt.value(), d->macro_expansion_config);
+
   d->future_watcher.setFuture(d->future_result);
 }
 
