@@ -17,6 +17,7 @@
 #include <set>
 #include <sstream>
 #include <fstream>
+#include <iostream>
 
 namespace mx::gui {
 
@@ -297,32 +298,6 @@ void CodeModel::FutureResultStateChanged() {
   auto old_tokens = std::move(d->tokens);
   d->tokens = std::move(new_tokens);
 
-  // DEBUG
-  {
-    auto L_tokenRangeToString =
-        [](const TokenRange &token_range) -> std::string {
-      std::stringstream buffer;
-
-      for (const auto &token : token_range) {
-        buffer << token.data();
-      }
-
-      return buffer.str();
-    };
-
-    auto L_dumpTokenRangeToFile = [&](const std::string &path,
-                                      const TokenRange &token_range) {
-      auto buffer = L_tokenRangeToString(token_range);
-      std::fstream output_file(path.c_str(), std::ios::out);
-      output_file << buffer;
-    };
-
-    L_dumpTokenRangeToFile("/Users/alessandro/model_before.txt",
-                           old_tokens.tokens);
-    L_dumpTokenRangeToFile("/Users/alessandro/model_after.txt",
-                           d->tokens.tokens);
-  }
-
   d->last_line_cache = nullptr;
   d->last_column_cache = nullptr;
   d->model_state = ModelState::Ready;
@@ -447,6 +422,13 @@ void CodeModel::FutureResultStateChanged() {
     const auto &token_data = d->tokens.tokens[token_index].data();
     if (token_data.empty()) {
       continue;
+    }
+
+    auto line_number = new_line_index[token_index];
+    if (line_number == 0) {
+      std::cerr
+          << __FILE__ << "@" << __LINE__
+          << ": Found a post-expansion difference at line 0. This is likely a bug\n";
     }
 
     added_line_list.push_back(new_line_index[token_index]);
