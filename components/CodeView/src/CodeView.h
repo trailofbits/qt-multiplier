@@ -127,18 +127,41 @@ class CodeView final : public ICodeView {
  public:
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
+    //! Represents a single token in the code view
     struct TokenEntry final {
+      //! Cursor position of the first character, block-relative
       int cursor_start{};
+
+      //! Cursor position of the last character, block-relative
       int cursor_end{};
+
+      //! Entity ID
+      RawEntityId entity_id{kInvalidEntityId};
+
+      //! Related entity ID
+      RawEntityId related_entity_id{kInvalidEntityId};
     };
 
+    //! A block entry represents a single line in the QTextDocument object
     struct BlockEntry final {
+      //! The list of token entries in this block
       std::vector<TokenEntry> token_entry_list;
+
+      //! The line number, as reported by multiplier
       std::size_t line_number{};
     };
 
+    //! A list of all the blocks in the document
     std::vector<BlockEntry> block_entry_list;
+
+    //! Maps a line number to a block number
     std::unordered_map<std::size_t, std::size_t> line_num_to_block_num_map;
+
+    //! Maps an entity to its related entities
+    std::unordered_map<RawEntityId, std::vector<RawEntityId>>
+        related_entity_to_entity_list;
+
+    //! Highest line number encountered, used to determine the gutter size
     std::size_t highest_line_number{};
   };
 
@@ -171,18 +194,18 @@ class CodeView final : public ICodeView {
                      const std::optional<CreateTextDocumentProgressCallback>
                          &opt_progress_callback = std::nullopt);
 
-  //!
+  //! Creates a new block associated with the given model index
   static void CreateTextDocumentLine(TokenMap &token_map,
                                      QTextDocument &document,
                                      const CodeViewTheme &theme,
                                      const QModelIndex &row_index);
 
-  //!
+  //! Removes the specified block number from the document
   static void EraseTextDocumentLine(TokenMap &token_map,
                                     QTextDocument &document,
                                     const int &block_number);
 
-  //!
+  //! Updates the line number mappings and the highest line number
   static void UpdateTokenDataLineNumbers(TokenMap &token_map);
 
   //! Initializes the given text_format object according to the code view theme

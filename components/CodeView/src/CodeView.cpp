@@ -604,8 +604,10 @@ void CodeView::OnTextEditViewportKeyboardButtonPress(QKeyEvent *event) {
       (event->modifiers() & Qt::ControlModifier) != 0;
 
   const QModelIndex &model_index = opt_model_index.value();
+
   std::cout << "Attempting to perform action on token '"
             << model_index.data().toString().toStdString() << "'\n";
+
   emit TokenTriggered({TokenAction::Type::Keyboard, keyboard_button},
                       model_index);
 }
@@ -638,9 +640,10 @@ void CodeView::UpdateGutterWidth() {
 }
 
 void CodeView::UpdateBaseExtraSelections() {
-  /*QList<QTextEdit::ExtraSelection> extra_selection_list;
+  QList<QTextEdit::ExtraSelection> extra_selection_list;
 
   auto row_count = d->model->rowCount();
+  const auto &document = *d->text_edit->document();
 
   for (int row{}; row < row_count; ++row) {
     auto line_index = d->model->index(row, 0);
@@ -671,24 +674,29 @@ void CodeView::UpdateBaseExtraSelections() {
       selection.format.setBackground(background_color);
       selection.format.setForeground(foreground_color);
 
-      auto unique_token_id = GetUniqueTokenIdentifier(token_index);
-      const auto &token_entry = d->token_map.data[unique_token_id];
+      const auto &block_entry =
+          d->token_map.block_entry_list[static_cast<std::size_t>(row)];
 
-      selection.cursor = d->text_edit->textCursor();
-      selection.cursor.setPosition(token_entry.cursor_start,
-                                   QTextCursor::MoveMode::MoveAnchor);
+      const auto &token_entry =
+          block_entry.token_entry_list[static_cast<std::size_t>(column)];
 
-      selection.cursor.setPosition(token_entry.cursor_end,
-                                   QTextCursor::MoveMode::KeepAnchor);
+      auto text_block = document.findBlockByNumber(row);
+
+      selection.cursor = QTextCursor(text_block);
+      selection.cursor.setPosition(
+          text_block.position() + token_entry.cursor_start,
+          QTextCursor::MoveMode::MoveAnchor);
+
+      selection.cursor.setPosition(
+          text_block.position() + token_entry.cursor_end,
+          QTextCursor::MoveMode::KeepAnchor);
 
       extra_selection_list.append(std::move(selection));
     }
   }
 
   d->extra_selection_list = std::move(extra_selection_list);
-  d->text_edit->setExtraSelections(d->extra_selection_list);*/
-
-  //TODO(alessandro)
+  d->text_edit->setExtraSelections(d->extra_selection_list);
 }
 
 std::uint64_t CodeView::GetUniqueTokenIdentifier(const QModelIndex &index) {
@@ -704,12 +712,17 @@ CodeView::GetLineNumberFromBlockNumber(const TokenMap &token_map,
 
   auto block_entry_list_it =
       std::next(token_map.block_entry_list.begin(), block_number);
+
   if (block_entry_list_it >= token_map.block_entry_list.end()) {
     return std::nullopt;
   }
 
   const auto &block_entry = *block_entry_list_it;
-  return block_entry.line_number;
+  if (block_entry.line_number != 0) {
+    return block_entry.line_number;
+  }
+
+  return std::nullopt;
 }
 
 std::optional<std::size_t>
@@ -811,6 +824,25 @@ void CodeView::CreateTextDocumentLine(CodeView::TokenMap &token_map,
     }
 
     TokenMap::TokenEntry token_entry;
+
+    if (auto related_entity_id_var =
+            token_index.data(ICodeModel::RealRelatedEntityIdRole);
+        related_entity_id_var.isValid()) {
+
+      auto entity_id_var = token_index.data(ICodeModel::TokenIdRole);
+      Assert(entity_id_var.isValid(), "Invalid entity id");
+
+      token_entry.entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+      token_entry.related_entity_id =
+          qvariant_cast<RawEntityId>(related_entity_id_var);
+
+      auto &related_entity_id_list =
+          token_map
+              .related_entity_to_entity_list[token_entry.related_entity_id];
+
+      related_entity_id_list.push_back(token_entry.entity_id);
+    }
+
     token_entry.cursor_start = text_cursor.position() - block_position;
     token_entry.cursor_end =
         token_entry.cursor_start + static_cast<int>(display_role.size());
@@ -841,6 +873,7 @@ void CodeView::CreateTextDocumentLine(CodeView::TokenMap &token_map,
 void CodeView::EraseTextDocumentLine(CodeView::TokenMap &token_map,
                                      QTextDocument &document,
                                      const int &block_number) {
+
   // Delete the block from the text document
   auto block_to_delete = document.findBlockByLineNumber(block_number);
   Assert(block_to_delete.isValid(), "Invalid block number");
@@ -857,6 +890,20 @@ void CodeView::EraseTextDocumentLine(CodeView::TokenMap &token_map,
 
   Assert(block_entry_list_it < token_map.block_entry_list.end(),
          "Invalid block number");
+
+  const auto &block_entry = *block_entry_list_it;
+  for (const auto &token_entry : block_entry.token_entry_list) {
+    auto &related_entity_id_list =
+        token_map.related_entity_to_entity_list[token_entry.related_entity_id];
+
+    auto related_entity_id_list_it =
+        std::find(related_entity_id_list.begin(), related_entity_id_list.end(),
+                  token_entry.entity_id);
+
+    if (related_entity_id_list_it != related_entity_id_list.end()) {
+      related_entity_id_list.erase(related_entity_id_list_it);
+    }
+  }
 
   token_map.block_entry_list.erase(block_entry_list_it);
 }
@@ -938,6 +985,7 @@ void CodeView::ConfigureTextFormatFromTheme(
   auto token_category = static_cast<TokenCategory>(token_category_uint);
   text_format.setBackground(theme.BackgroundColor(token_category));
   text_format.setForeground(theme.ForegroundColor(token_category));
+
   CodeViewTheme::Style text_style = theme.TextStyle(token_category);
   text_format.setFontItalic(text_style.italic);
   text_format.setFontWeight(text_style.bold ? QFont::DemiBold : QFont::Normal);
@@ -994,8 +1042,10 @@ void CodeView::OnRowsRemoved(const QModelIndex &parent, int first, int last) {
 
   auto &document = *d->text_edit->document();
 
+  // Once we delete a line, everything after it just moves up. Delete
+  // the same line multiple times, if needed
   for (auto block_number{first}; block_number <= last; ++block_number) {
-    EraseTextDocumentLine(d->token_map, document, block_number);
+    EraseTextDocumentLine(d->token_map, document, first);
   }
 
   UpdateTokenDataLineNumbers(d->token_map);
@@ -1108,7 +1158,6 @@ void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
   while (block.isValid() && top <= event->rect().bottom()) {
     if (block.isVisible() && bottom >= event->rect().top()) {
       auto block_number = block.blockNumber();
-
       auto opt_line_number =
           GetLineNumberFromBlockNumber(d->token_map, block_number);
 
