@@ -127,6 +127,15 @@ class CodeView final : public ICodeView {
  public:
   //! Contains all the tokens that we have imported from the model
   struct TokenMap final {
+    //! A cursor range. This could be relative or absolute
+    struct CursorRange final {
+      //! Start position of this range
+      int start;
+
+      //! End position of this range
+      int end;
+    };
+
     //! Represents a single token in the code view
     struct TokenEntry final {
       //! Cursor position of the first character, block-relative
@@ -160,6 +169,9 @@ class CodeView final : public ICodeView {
     //! Maps an entity to its related entities
     std::unordered_map<RawEntityId, std::vector<RawEntityId>>
         related_entity_to_entity_list;
+
+    //! Maps an entity to a line and column
+    std::unordered_map<RawEntityId, CursorRange> entity_cursor_range_map;
 
     //! Highest line number encountered, used to determine the gutter size
     std::size_t highest_line_number{};
@@ -207,6 +219,10 @@ class CodeView final : public ICodeView {
 
   //! Updates the line number mappings and the highest line number
   static void UpdateTokenDataLineNumbers(TokenMap &token_map);
+
+  //! Updates the entity->cursor position map used by the token highlighter
+  static void UpdateTokenMappings(TokenMap &token_map,
+                                  const QTextDocument &document);
 
   //! Initializes the given text_format object according to the code view theme
   static void ConfigureTextFormatFromTheme(QTextCharFormat &text_format,

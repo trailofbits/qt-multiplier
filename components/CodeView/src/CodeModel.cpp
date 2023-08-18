@@ -399,40 +399,48 @@ void CodeModel::FutureResultStateChanged() {
     return line_index;
   };
 
-  auto old_line_index = L_createLineIndex(old_tokens);
+  auto L_gatherLineNumbers =
+      [&L_createLineIndex](
+          const IndexedTokenRangeData &indexed_token_range_data,
+          const std::vector<std::size_t> &token_range_index_list)
+      -> std::vector<std::size_t> {
+    auto token_to_line_map = L_createLineIndex(indexed_token_range_data);
 
-  std::vector<std::size_t> removed_line_list;
-  for (const auto &token_index : removed_token_index_list) {
-    // TODO: Possibly a bug? Skip empty tokens because they are
-    // reported on line 0, causing a duplication of the first line
-    const auto &token_data = old_tokens.tokens[token_index].data();
-    if (token_data.empty()) {
-      continue;
+    std::vector<std::size_t> line_list;
+
+    for (const auto &token_index : token_range_index_list) {
+      auto line_number = token_to_line_map[token_index];
+
+      const auto &token_data =
+          indexed_token_range_data.tokens[token_index].data();
+      if (token_data.empty() || line_number == 0) {
+        // This needs further debugging. We are getting empty tokens in the
+        // `TokenRange tokens` field of the IndexedTokenRangeData struct we
+        // have received.
+        //
+        // Additionally, we may be getting newlines injected into the
+        // tokens, which breaks the 1:1 line mapping we are currently
+        // expecting here in the model and in the code view.
+        //
+        // Since the code view stores data per-line with block-relative
+        // cursor positions, this would break the mapping.
+        std::cerr
+            << __FILE__ << "@" << __LINE__
+            << ": Found a post-expansion difference at line 0. This is likely a bug\n";
+
+        continue;
+      }
+
+      line_list.push_back(line_number);
     }
 
-    removed_line_list.push_back(old_line_index[token_index]);
-  }
+    return line_list;
+  };
 
-  auto new_line_index = L_createLineIndex(d->tokens);
+  auto removed_line_list =
+      L_gatherLineNumbers(old_tokens, removed_token_index_list);
 
-  std::vector<std::size_t> added_line_list;
-  for (const auto &token_index : added_token_index_list) {
-    // TODO: Possibly a bug? Skip empty tokens because they are
-    // reported on line 0, causing a duplication of the first line
-    const auto &token_data = d->tokens.tokens[token_index].data();
-    if (token_data.empty()) {
-      continue;
-    }
-
-    auto line_number = new_line_index[token_index];
-    if (line_number == 0) {
-      std::cerr
-          << __FILE__ << "@" << __LINE__
-          << ": Found a post-expansion difference at line 0. This is likely a bug\n";
-    }
-
-    added_line_list.push_back(new_line_index[token_index]);
-  }
+  auto added_line_list = L_gatherLineNumbers(d->tokens, added_token_index_list);
 
   // Now convert the line numbers to ranges
   using Range = std::pair<std::size_t, std::size_t>;

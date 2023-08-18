@@ -605,7 +605,15 @@ void CodeView::OnTextEditViewportKeyboardButtonPress(QKeyEvent *event) {
 
   const QModelIndex &model_index = opt_model_index.value();
 
-  std::cout << "Attempting to perform action on token '"
+  // Keep some debug data for now. If the token is different than the
+  // one that was shown on screen, then there is a mismatch between
+  // the TokenMap::block_entry_list entries and the blocks in the
+  // QTextDocument.
+  //
+  // This could happen if the IndexedTokenRangeDataResult structure
+  // returned by IDatabase injects columns that contain newlines
+  // inside IndexedTokenRangeDataResult::Line::columns
+  std::cerr << __FILE__ << "@" << __LINE__ << " Keyboard action on '"
             << model_index.data().toString().toStdString() << "'\n";
 
   emit TokenTriggered({TokenAction::Type::Keyboard, keyboard_button},
@@ -922,6 +930,29 @@ void CodeView::UpdateTokenDataLineNumbers(TokenMap &token_map) {
   }
 }
 
+void CodeView::UpdateTokenMappings(TokenMap &token_map,
+                                   const QTextDocument &document) {
+  auto max_block_number{token_map.block_entry_list.size()};
+
+  for (std::size_t block_number{0}; block_number < max_block_number;
+       ++block_number) {
+
+    const auto &block =
+        document.findBlockByLineNumber(static_cast<int>(block_number));
+    auto block_position = block.position();
+
+    const auto &block_entry = token_map.block_entry_list[block_number];
+    for (const auto &token_entry : block_entry.token_entry_list) {
+      TokenMap::CursorRange cursor_range;
+      cursor_range.start = block_position + token_entry.cursor_start;
+      cursor_range.end = block_position + token_entry.cursor_end;
+
+      token_map.entity_cursor_range_map.insert(
+          {token_entry.entity_id, std::move(cursor_range)});
+    }
+  }
+}
+
 QTextDocument *CodeView::CreateTextDocument(
     CodeView::TokenMap &token_map, const QAbstractItemModel &model,
     const CodeViewTheme &theme,
@@ -966,6 +997,8 @@ QTextDocument *CodeView::CreateTextDocument(
   }
 
   UpdateTokenDataLineNumbers(token_map);
+  UpdateTokenMappings(token_map, *document);
+
   return document;
 }
 
@@ -999,13 +1032,7 @@ void CodeView::HighlightTokensForRelatedEntityID(
     QList<QTextEdit::ExtraSelection> &selection_list,
     const CodeViewTheme &theme) {
 
-  static_cast<void>(token_map);
-  static_cast<void>(text_cursor);
-  static_cast<void>(model_index);
-  static_cast<void>(selection_list);
-  static_cast<void>(theme);
-
-  /*QVariant related_entity_id_var =
+  QVariant related_entity_id_var =
       model_index.data(ICodeModel::RealRelatedEntityIdRole);
 
   if (!related_entity_id_var.isValid()) {
@@ -1013,28 +1040,40 @@ void CodeView::HighlightTokensForRelatedEntityID(
   }
 
   auto related_entity_id = qvariant_cast<std::uint64_t>(related_entity_id_var);
+  auto related_entity_to_entity_list_it =
+      token_map.related_entity_to_entity_list.find(related_entity_id);
 
-  auto unique_token_id_list =
-      token_map.related_entity_id_to_unique_token_id_list.at(related_entity_id);
+  if (related_entity_to_entity_list_it ==
+      token_map.related_entity_to_entity_list.end()) {
+    return;
+  }
+
+  const auto &related_entity_list = related_entity_to_entity_list_it->second;
 
   QTextEdit::ExtraSelection selection;
-  for (auto unique_token_id : unique_token_id_list) {
-    const auto &token_map_entry = token_map.data.at(unique_token_id);
+
+  for (const auto &related_entity : related_entity_list) {
+    auto entity_cursor_range_map_it =
+        token_map.entity_cursor_range_map.find(related_entity);
+
+    if (entity_cursor_range_map_it == token_map.entity_cursor_range_map.end()) {
+      continue;
+    }
+
+    const auto &absolute_cursor_range = entity_cursor_range_map_it->second;
 
     selection = {};
     selection.format.setBackground(theme.highlighted_entity_background_color);
 
     selection.cursor = text_cursor;
-
-    selection.cursor.setPosition(token_map_entry.cursor_start,
+    selection.cursor.setPosition(absolute_cursor_range.start,
                                  QTextCursor::MoveMode::MoveAnchor);
 
-    selection.cursor.setPosition(token_map_entry.cursor_end,
+    selection.cursor.setPosition(absolute_cursor_range.end,
                                  QTextCursor::MoveMode::KeepAnchor);
 
     selection_list.append(std::move(selection));
-  }*/
-  // TODO(alessandro)
+  }
 }
 
 void CodeView::OnRowsRemoved(const QModelIndex &parent, int first, int last) {
@@ -1049,6 +1088,7 @@ void CodeView::OnRowsRemoved(const QModelIndex &parent, int first, int last) {
   }
 
   UpdateTokenDataLineNumbers(d->token_map);
+  UpdateTokenMappings(d->token_map, document);
   StartDelayedDocumentUpdateSignal();
 }
 
@@ -1063,6 +1103,7 @@ void CodeView::OnRowsInserted(const QModelIndex &parent, int first, int last) {
   }
 
   UpdateTokenDataLineNumbers(d->token_map);
+  UpdateTokenMappings(d->token_map, document);
   StartDelayedDocumentUpdateSignal();
 }
 
