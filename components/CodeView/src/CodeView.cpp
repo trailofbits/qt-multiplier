@@ -853,11 +853,13 @@ void CodeView::CreateTextDocumentLine(CodeView::TokenMap &token_map,
       token_entry.related_entity_id =
           qvariant_cast<RawEntityId>(related_entity_id_var);
 
-      auto &related_entity_id_list =
-          token_map
-              .related_entity_to_entity_list[token_entry.related_entity_id];
+      if (token_entry.related_entity_id != kInvalidEntityId) {
+        auto &related_entity_id_list =
+            token_map
+                .related_entity_to_entity_list[token_entry.related_entity_id];
 
-      related_entity_id_list.push_back(token_entry.entity_id);
+        related_entity_id_list.push_back(token_entry.entity_id);
+      }
     }
 
     token_entry.cursor_start = text_cursor.position() - block_position;
@@ -910,8 +912,19 @@ void CodeView::EraseTextDocumentLine(CodeView::TokenMap &token_map,
 
   const auto &block_entry = *block_entry_list_it;
   for (const auto &token_entry : block_entry.token_entry_list) {
-    auto &related_entity_id_list =
-        token_map.related_entity_to_entity_list[token_entry.related_entity_id];
+    if (token_entry.related_entity_id == kInvalidEntityId) {
+      continue;
+    }
+
+    auto related_entity_to_entity_list_it =
+        token_map.related_entity_to_entity_list.find(
+            token_entry.related_entity_id);
+
+    Assert(related_entity_to_entity_list_it !=
+               token_map.related_entity_to_entity_list.end(),
+           "Invalid related entity id");
+
+    auto &related_entity_id_list = related_entity_to_entity_list_it->second;
 
     auto related_entity_id_list_it =
         std::find(related_entity_id_list.begin(), related_entity_id_list.end(),
@@ -919,6 +932,11 @@ void CodeView::EraseTextDocumentLine(CodeView::TokenMap &token_map,
 
     if (related_entity_id_list_it != related_entity_id_list.end()) {
       related_entity_id_list.erase(related_entity_id_list_it);
+    }
+
+    if (related_entity_id_list.empty()) {
+      token_map.related_entity_to_entity_list.erase(
+          related_entity_to_entity_list_it);
     }
   }
 
@@ -1263,6 +1281,7 @@ void CodeView::HandleNewCursor(const QTextCursor &cursor) {
 
   if (opt_model_index.has_value()) {
     const auto &model_index = opt_model_index.value();
+
     HighlightTokensForRelatedEntityID(d->token_map, cursor, model_index,
                                       extra_selections, d->theme);
 
