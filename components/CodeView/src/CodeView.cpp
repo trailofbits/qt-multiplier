@@ -452,8 +452,17 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
   }
 
   auto token_id = qvariant_cast<RawEntityId>(token_id_var);
-  L_updateMouseCursor(d->browser_mode ||
-                      event->modifiers() == Qt::ControlModifier);
+
+  auto related_token_id_var = model_index.data(ICodeModel::RelatedEntityIdRole);
+  auto has_related_entity_id{related_token_id_var.isValid() &&
+                             qvariant_cast<RawEntityId>(related_token_id_var) !=
+                                 kInvalidEntityId};
+
+  auto is_interactive =
+      has_related_entity_id &&
+      (d->browser_mode || event->modifiers() == Qt::ControlModifier);
+
+  L_updateMouseCursor(is_interactive);
 
   if (d->opt_prev_hovered_model_index.has_value()) {
     const auto &prev_hovered_model_index =
