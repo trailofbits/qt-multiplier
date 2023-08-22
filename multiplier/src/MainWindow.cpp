@@ -198,7 +198,7 @@ void MainWindow::InitializeWidgets() {
 }
 
 void MainWindow::InitializeToolBar() {
-  QSize icon_size(16, 16);
+  QSize icon_size(32, 32);
 
   d->toolbar.back_forward = new HistoryWidget(d->index, d->file_location_cache,
                                               kMaxHistorySize, this, true);
