@@ -20,3 +20,6 @@
 	path = libraries/vendored/vast
 	url = https://github.com/trailofbits/vast.git
 	branch = vspell-future
+[submodule "libraries/xxhash/src"]
+	path = libraries/xxhash/src
+	url = https://github.com/Cyan4973/xxHash

@@ -7,10 +7,15 @@
 #pragma once
 
 #include <multiplier/Entities/TokenCategory.h>
+
 #include <multiplier/Types.h>
+
 #include <optional>
 #include <vector>
+
 #include <QString>
+
+#include <xxhash.h>
 
 namespace mx::gui {
 
@@ -53,6 +58,8 @@ class IndexedTokenRangeData final {
   };
 
   struct Line {
+    //! A hash of both the line contents and entity IDs. Used for diffing
+    XXH64_hash_t hash{};
 
     //! Offset of the first QChar of this line.
     unsigned offset{0u};

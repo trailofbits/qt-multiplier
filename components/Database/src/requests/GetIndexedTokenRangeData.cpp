@@ -165,6 +165,37 @@ static bool IsTopLevelToken(const Token &tok) {
   return true;
 }
 
+static void GenerateLineHashes(IndexedTokenRangeData &res) {
+  auto xxhash_state = XXH64_createState();
+  Assert(xxhash_state != nullptr, "Failed to initialize the xxHash state");
+
+  for (IndexedTokenRangeData::Line &line : res.lines) {
+    static const XXH64_hash_t kXxhashSeed{0};
+    auto succeeded = XXH64_reset(xxhash_state, kXxhashSeed) != XXH_ERROR;
+    Assert(succeeded, "Failed to reset the xxHash state");
+
+    for (const auto &column : line.columns) {
+      const auto &token = res.tokens[column.token_index];
+
+      auto token_id = token.id();
+      succeeded =
+          XXH64_update(xxhash_state, &token_id, sizeof(token_id)) != XXH_ERROR;
+
+      Assert(succeeded, "Failed to update the xxHash state");
+
+      const auto &token_str = column.data;
+      succeeded = XXH64_update(xxhash_state, token_str.data(),
+                               token_str.size()) != XXH_ERROR;
+
+      Assert(succeeded, "Failed to update the xxHash state");
+
+      line.hash = XXH64_digest(xxhash_state);
+    }
+  }
+
+  XXH64_freeState(xxhash_state);
+}
+
 // Fixup the line numbers from the visible tokens.
 static void FixupLineNumbers(const FileLocationCache &file_location_cache,
                              IndexedTokenRangeData &res) {
@@ -201,6 +232,13 @@ static void FixupLineNumbers(const FileLocationCache &file_location_cache,
   }
 }
 
+static void PostProcessLineObjects(const FileLocationCache &file_location_cache,
+                                   IndexedTokenRangeData &res) {
+  FixupLineNumbers(file_location_cache, res);
+  GenerateLineHashes(res);
+}
+
+
 }  // namespace
 
 void GetExpandedTokenRangeData(
@@ -236,7 +274,7 @@ void GetExpandedTokenRangeData(
     res.lines.pop_back();
   }
 
-  FixupLineNumbers(file_location_cache, res);
+  PostProcessLineObjects(file_location_cache, res);
 
   result_promise.addResult(std::move(res));
 }

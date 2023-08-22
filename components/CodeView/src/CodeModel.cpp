@@ -302,145 +302,85 @@ void CodeModel::FutureResultStateChanged() {
   d->last_column_cache = nullptr;
   d->model_state = ModelState::Ready;
 
-  //
-  // Compare the token ranges, and make a list of all the
-  // token indexes that have changed
-  //
+  // Compare the old lines with the new lines to determine what
+  // has changed
+  std::vector<std::size_t> removed_line_list;
+  const auto &old_line_list = old_tokens.lines;
+  std::size_t old_line_index{};
 
-  const auto &old_token_range = old_tokens.tokens;
-  std::size_t old_token_index{};
-
-  const auto &new_token_range = d->tokens.tokens;
-  std::size_t new_token_index{};
-
-  std::vector<std::size_t> removed_token_index_list;
-  std::vector<std::size_t> added_token_index_list;
+  std::vector<std::size_t> added_line_list;
+  const auto &new_line_list = d->tokens.lines;
+  std::size_t new_line_index{};
 
   for (;;) {
-    if (old_token_index >= new_token_range.size()) {
-      // We lost some tokens at the end of the document
-      for (auto i = old_token_index; i < old_token_range.size(); ++i) {
-        removed_token_index_list.push_back(i);
+    // Make sure we can access both the old and new lines at the
+    // current indexes
+    if (old_line_index >= new_line_list.size()) {
+      // We lost some lines at the end of the document
+      for (auto i{old_line_index}; i < old_line_list.size(); ++i) {
+        removed_line_list.push_back(i);
       }
 
       break;
 
-    } else if (new_token_index >= new_token_range.size()) {
-      // We have new tokens at the end of the document
-      for (auto i = new_token_index; i < new_token_range.size(); ++i) {
-        added_token_index_list.push_back(i);
+    } else if (new_line_index >= old_line_list.size()) {
+      // We have brand new lines at the end of the document
+      for (auto i{new_line_index}; i < new_line_list.size(); ++i) {
+        added_line_list.push_back(i);
       }
 
       break;
     }
 
-    const auto &old_token = old_token_range[old_token_index];
-    const auto &new_token = new_token_range[new_token_index];
+    // Compare the current lines
+    const auto &old_line = old_line_list[old_line_index];
+    const auto &new_line = new_line_list[new_line_index];
 
-    if (old_token.id() == new_token.id()) {
-      ++old_token_index;
-      ++new_token_index;
+    if (old_line.hash == new_line.hash) {
+      ++old_line_index;
+      ++new_line_index;
+
       continue;
     }
 
-    // There is a difference here; attempt to realign the new token
-    // range
-    std::optional<std::size_t> opt_next_new_token_index;
+    // The current lines are different; look for the missing data
+    // in the new line list
+    std::optional<std::size_t> opt_next_new_line_index{std::nullopt};
 
-    for (std::size_t i{new_token_index}; i < new_token_range.size(); ++i) {
-      const auto &next_new_token = new_token_range[i];
-      if (old_token.id() == next_new_token.id()) {
-        opt_next_new_token_index = i;
+    for (auto i{new_line_index}; i < new_line_list.size(); ++i) {
+      const auto &next_new_line = new_line_list[i];
+
+      if (old_line.hash == next_new_line.hash) {
+        opt_next_new_line_index = i;
         break;
       }
     }
 
-    // Realign the token ranges
-    if (opt_next_new_token_index.has_value()) {
-      const auto &next_new_token_range_offset =
-          opt_next_new_token_index.value();
+    // Check whether we have found a matching new line we can realign to
+    if (opt_next_new_line_index.has_value()) {
+      // We have found the missing line further in the new line list.
+      // Mark everything between the old line and the new line as
+      // added
+      const auto &next_new_line_index = opt_next_new_line_index.value();
 
-      for (std::size_t i{new_token_index}; i < next_new_token_range_offset;
-           ++i) {
-        added_token_index_list.push_back(i);
+      for (auto i{new_line_index}; i < next_new_line_index; ++i) {
+        added_line_list.push_back(i);
       }
 
-      ++old_token_index;
-      new_token_index = next_new_token_range_offset + 1;
+      ++old_line_index;
+      new_line_index = next_new_line_index + 1;
 
       continue;
     }
 
-    // We could not realign the token ranges. Mark the current item as
-    // removed and then try again
-    removed_token_index_list.push_back(old_token_index);
-    added_token_index_list.push_back(new_token_index);
+    // We could not find a way to realign the streams. Mark the old line as
+    // removed and the new line as added
+    added_line_list.push_back(new_line_index);
+    removed_line_list.push_back(old_line_index);
 
-    ++old_token_index;
-    ++new_token_index;
+    ++old_line_index;
+    ++new_line_index;
   }
-
-  // Next, we have to convert the token indexes we have generated
-  // to lines
-  auto L_createLineIndex = [](const IndexedTokenRangeData &tokens)
-      -> std::unordered_map<std::size_t, std::size_t> {
-    std::unordered_map<std::size_t, std::size_t> line_index;
-
-    const auto &line_list = tokens.lines;
-    for (std::size_t i{}; i < line_list.size(); ++i) {
-      const auto &current_line = line_list[i];
-
-      for (const auto &column : current_line.columns) {
-        auto token_index = static_cast<std::size_t>(column.token_index);
-        line_index.insert({token_index, i});
-      }
-    }
-
-    return line_index;
-  };
-
-  auto L_gatherLineNumbers =
-      [&L_createLineIndex](
-          const IndexedTokenRangeData &indexed_token_range_data,
-          const std::vector<std::size_t> &token_range_index_list)
-      -> std::vector<std::size_t> {
-    auto token_to_line_map = L_createLineIndex(indexed_token_range_data);
-
-    std::vector<std::size_t> line_list;
-
-    for (const auto &token_index : token_range_index_list) {
-      auto line_number = token_to_line_map[token_index];
-
-      const auto &token_data =
-          indexed_token_range_data.tokens[token_index].data();
-      if (token_data.empty() || line_number == 0) {
-        // This needs further debugging. We are getting empty tokens in the
-        // `TokenRange tokens` field of the IndexedTokenRangeData struct we
-        // have received.
-        //
-        // Additionally, we may be getting newlines injected into the
-        // tokens, which breaks the 1:1 line mapping we are currently
-        // expecting here in the model and in the code view.
-        //
-        // Since the code view stores data per-line with block-relative
-        // cursor positions, this would break the mapping.
-        std::cerr
-            << __FILE__ << "@" << __LINE__
-            << ": Found a post-expansion difference at line 0. This is likely a bug\n";
-
-        continue;
-      }
-
-      line_list.push_back(line_number);
-    }
-
-    return line_list;
-  };
-
-  auto removed_line_list =
-      L_gatherLineNumbers(old_tokens, removed_token_index_list);
-
-  auto added_line_list = L_gatherLineNumbers(d->tokens, added_token_index_list);
 
   // Now convert the line numbers to ranges
   using Range = std::pair<std::size_t, std::size_t>;

@@ -1,3 +1,2 @@
 Vectors and icons by
- * <a href="https://github.com/la-moore/scarlab-icons" target="_blank">Scarlab</a> in MIT License
  * <a href="https://github.com/siemens/ix-icons" target="_blank">ix-icons</a> in MIT License

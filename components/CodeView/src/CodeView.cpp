@@ -470,8 +470,8 @@ void CodeView::OnTextEditViewportMouseMoveEvent(QMouseEvent *event) {
 
     auto prev_token_id_var =
         prev_hovered_model_index.data(ICodeModel::TokenIdRole);
-    auto prev_token_id = qvariant_cast<RawEntityId>(prev_token_id_var);
 
+    auto prev_token_id = qvariant_cast<RawEntityId>(prev_token_id_var);
     if (prev_token_id == token_id) {
       return;
     }
@@ -616,12 +616,8 @@ void CodeView::OnTextEditViewportKeyboardButtonPress(QKeyEvent *event) {
 
   // Keep some debug data for now. If the token is different than the
   // one that was shown on screen, then there is a mismatch between
-  // the TokenMap::block_entry_list entries and the blocks in the
+  // the TokenMap::block_entry_list entries and the test blocks in the
   // QTextDocument.
-  //
-  // This could happen if the IndexedTokenRangeDataResult structure
-  // returned by IDatabase injects columns that contain newlines
-  // inside IndexedTokenRangeDataResult::Line::columns
   std::cerr << __FILE__ << "@" << __LINE__ << " Keyboard action on '"
             << model_index.data().toString().toStdString() << "'\n";
 
@@ -840,24 +836,30 @@ void CodeView::CreateTextDocumentLine(CodeView::TokenMap &token_map,
       }
     }
 
+    auto entity_id_var = token_index.data(ICodeModel::TokenIdRole);
+    Assert(entity_id_var.isValid(), "Invalid entity id");
+
     TokenMap::TokenEntry token_entry;
+    token_entry.entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+
+    Assert(!display_role.contains("\n") && !display_role.contains("\r"),
+           "The DisplayRole for entity " +
+               std::to_string(token_entry.entity_id) + "contains newlines");
 
     if (auto related_entity_id_var =
             token_index.data(ICodeModel::RealRelatedEntityIdRole);
         related_entity_id_var.isValid()) {
 
-      auto entity_id_var = token_index.data(ICodeModel::TokenIdRole);
-      Assert(entity_id_var.isValid(), "Invalid entity id");
-
-      token_entry.entity_id = qvariant_cast<RawEntityId>(entity_id_var);
       token_entry.related_entity_id =
           qvariant_cast<RawEntityId>(related_entity_id_var);
 
-      auto &related_entity_id_list =
-          token_map
-              .related_entity_to_entity_list[token_entry.related_entity_id];
+      if (token_entry.related_entity_id != kInvalidEntityId) {
+        auto &related_entity_id_list =
+            token_map
+                .related_entity_to_entity_list[token_entry.related_entity_id];
 
-      related_entity_id_list.push_back(token_entry.entity_id);
+        related_entity_id_list.push_back(token_entry.entity_id);
+      }
     }
 
     token_entry.cursor_start = text_cursor.position() - block_position;
@@ -910,8 +912,19 @@ void CodeView::EraseTextDocumentLine(CodeView::TokenMap &token_map,
 
   const auto &block_entry = *block_entry_list_it;
   for (const auto &token_entry : block_entry.token_entry_list) {
-    auto &related_entity_id_list =
-        token_map.related_entity_to_entity_list[token_entry.related_entity_id];
+    if (token_entry.related_entity_id == kInvalidEntityId) {
+      continue;
+    }
+
+    auto related_entity_to_entity_list_it =
+        token_map.related_entity_to_entity_list.find(
+            token_entry.related_entity_id);
+
+    Assert(related_entity_to_entity_list_it !=
+               token_map.related_entity_to_entity_list.end(),
+           "Invalid related entity id");
+
+    auto &related_entity_id_list = related_entity_to_entity_list_it->second;
 
     auto related_entity_id_list_it =
         std::find(related_entity_id_list.begin(), related_entity_id_list.end(),
@@ -919,6 +932,11 @@ void CodeView::EraseTextDocumentLine(CodeView::TokenMap &token_map,
 
     if (related_entity_id_list_it != related_entity_id_list.end()) {
       related_entity_id_list.erase(related_entity_id_list_it);
+    }
+
+    if (related_entity_id_list.empty()) {
+      token_map.related_entity_to_entity_list.erase(
+          related_entity_to_entity_list_it);
     }
   }
 
@@ -941,6 +959,8 @@ void CodeView::UpdateTokenDataLineNumbers(TokenMap &token_map) {
 
 void CodeView::UpdateTokenMappings(TokenMap &token_map,
                                    const QTextDocument &document) {
+  token_map.entity_cursor_range_map.clear();
+
   auto max_block_number{token_map.block_entry_list.size()};
 
   for (std::size_t block_number{0}; block_number < max_block_number;
@@ -948,6 +968,7 @@ void CodeView::UpdateTokenMappings(TokenMap &token_map,
 
     const auto &block =
         document.findBlockByLineNumber(static_cast<int>(block_number));
+
     auto block_position = block.position();
 
     const auto &block_entry = token_map.block_entry_list[block_number];
@@ -955,6 +976,11 @@ void CodeView::UpdateTokenMappings(TokenMap &token_map,
       TokenMap::CursorRange cursor_range;
       cursor_range.start = block_position + token_entry.cursor_start;
       cursor_range.end = block_position + token_entry.cursor_end;
+
+      QTextCursor text_cursor(block);
+
+      text_cursor.setPosition(cursor_range.start, QTextCursor::MoveAnchor);
+      text_cursor.setPosition(cursor_range.end, QTextCursor::KeepAnchor);
 
       token_map.entity_cursor_range_map.insert(
           {token_entry.entity_id, std::move(cursor_range)});
@@ -1255,6 +1281,7 @@ void CodeView::HandleNewCursor(const QTextCursor &cursor) {
 
   if (opt_model_index.has_value()) {
     const auto &model_index = opt_model_index.value();
+
     HighlightTokensForRelatedEntityID(d->token_map, cursor, model_index,
                                       extra_selections, d->theme);
 
