@@ -817,9 +817,19 @@ void CodeView::CreateTextDocumentLine(CodeView::TokenMap &token_map,
   QVariant line_number_var;
 
   auto block_position{text_cursor.position()};
+  bool contains_macro_expansion{false};
 
   for (int column_number{0}; column_number < column_count; ++column_number) {
     auto token_index = model.index(0, column_number, row_index);
+
+    if (!contains_macro_expansion) {
+      auto is_macro_expansion_var =
+          token_index.data(ICodeModel::IsMacroExpansionRole);
+
+      if (is_macro_expansion_var.isValid()) {
+        contains_macro_expansion = qvariant_cast<bool>(is_macro_expansion_var);
+      }
+    }
 
     QString display_role;
     if (auto display_role_var = token_index.data(Qt::DisplayRole);
@@ -873,6 +883,8 @@ void CodeView::CreateTextDocumentLine(CodeView::TokenMap &token_map,
 
     text_cursor.insertText(display_role, text_format);
   }
+
+  block_entry.contains_macro_expansion = contains_macro_expansion;
 
   text_cursor.insertText("\n");
   text_cursor.endEditBlock();
@@ -1219,9 +1231,6 @@ void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
   QPainter painter(d->gutter);
   painter.fillRect(event->rect(), d->theme.default_gutter_background);
 
-  painter.setPen(d->theme.ForegroundColor(TokenCategory::LINE_NUMBER));
-  painter.setFont(font());
-
   QTextBlock block = d->text_edit->firstVisibleBlock();
   int top = qRound(d->text_edit->blockBoundingGeometry(block)
                        .translated(d->text_edit->contentOffset())
@@ -1231,13 +1240,34 @@ void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
 
   auto right_line_num_margin = d->gutter->width() - (d->gutter->width() / 3);
 
+  auto original_font{painter.font()};
+  auto gutter_font{painter.font()};
+
   while (block.isValid() && top <= event->rect().bottom()) {
     if (block.isVisible() && bottom >= event->rect().top()) {
       auto block_number = block.blockNumber();
+
       auto opt_line_number =
           GetLineNumberFromBlockNumber(d->token_map, block_number);
 
       if (opt_line_number.has_value()) {
+        auto block_entry_it =
+            std::next(d->token_map.block_entry_list.begin(), block_number);
+
+        Assert(
+            block_entry_it != d->token_map.block_entry_list.end(),
+            "Block number mismatch between the view and the block entry list");
+
+        const auto &block_entry = *block_entry_it;
+        gutter_font.setBold(block_entry.contains_macro_expansion);
+        painter.setFont(gutter_font);
+
+        if (block_entry.contains_macro_expansion) {
+          painter.setPen(d->theme.ForegroundColor(TokenCategory::MACRO_NAME));
+        } else {
+          painter.setPen(d->theme.ForegroundColor(TokenCategory::LINE_NUMBER));
+        }
+
         auto line_number = opt_line_number.value();
         painter.drawText(0, top, right_line_num_margin, fontMetrics().height(),
                          Qt::AlignRight, QString::number(line_number));
@@ -1248,6 +1278,8 @@ void CodeView::OnGutterPaintEvent(QPaintEvent *event) {
     top = bottom;
     bottom = top + qRound(d->text_edit->blockBoundingRect(block).height());
   }
+
+  painter.setFont(original_font);
 }
 
 void CodeView::OnTextEditUpdateRequest(const QRect &rect, int dy) {

@@ -153,6 +153,9 @@ class CodeView final : public ICodeView {
 
     //! A block entry represents a single line in the QTextDocument object
     struct BlockEntry final {
+      //! True if this block entry contains macro expansion tokens
+      bool contains_macro_expansion{false};
+
       //! The list of token entries in this block
       std::vector<TokenEntry> token_entry_list;
 
