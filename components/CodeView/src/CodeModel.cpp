@@ -234,6 +234,16 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
           value.setValue(eid);
         }
         break;
+
+      case ICodeModel::IsMacroExpansionRole:
+        const auto &token = d->tokens.tokens[col->token_index];
+        const auto &variant = EntityId(token.derived_token().id()).Unpack();
+
+        auto is_macro_expansion =
+            std::holds_alternative<mx::MacroTokenId>(variant);
+
+        value.setValue(is_macro_expansion);
+        break;
     }
   }
 
