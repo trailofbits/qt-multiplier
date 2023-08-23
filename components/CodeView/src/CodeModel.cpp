@@ -315,18 +315,25 @@ void CodeModel::FutureResultStateChanged() {
   for (;;) {
     // Make sure we can access both the old and new lines at the
     // current indexes
-    if (old_line_index >= new_line_list.size()) {
-      // We lost some lines at the end of the document
-      for (auto i{old_line_index}; i < old_line_list.size(); ++i) {
-        removed_line_list.push_back(i);
-      }
+    bool has_next_old_line = old_line_index < old_line_list.size();
+    bool has_next_new_line = new_line_index < new_line_list.size();
 
+    if (!has_next_old_line && !has_next_new_line) {
       break;
+    }
 
-    } else if (new_line_index >= old_line_list.size()) {
-      // We have brand new lines at the end of the document
-      for (auto i{new_line_index}; i < new_line_list.size(); ++i) {
-        added_line_list.push_back(i);
+    if (has_next_old_line != has_next_new_line) {
+      const auto &line_list =
+          !has_next_old_line ? new_line_list : old_line_list;
+
+      const auto &line_index =
+          !has_next_old_line ? new_line_index : old_line_index;
+
+      auto &dest_line_list =
+          !has_next_old_line ? added_line_list : removed_line_list;
+
+      for (auto i{line_index}; i < line_list.size(); ++i) {
+        dest_line_list.push_back(i);
       }
 
       break;

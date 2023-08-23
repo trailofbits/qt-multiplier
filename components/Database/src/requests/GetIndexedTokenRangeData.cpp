@@ -169,9 +169,15 @@ static void GenerateLineHashes(IndexedTokenRangeData &res) {
   auto xxhash_state = XXH64_createState();
   Assert(xxhash_state != nullptr, "Failed to initialize the xxHash state");
 
+  auto column_count{res.lines.size()};
+  auto succeeded = XXH64_update(xxhash_state, &column_count,
+                                sizeof(column_count)) != XXH_ERROR;
+
+  Assert(succeeded, "Failed to update the xxHash state");
+
   for (IndexedTokenRangeData::Line &line : res.lines) {
     static const XXH64_hash_t kXxhashSeed{0};
-    auto succeeded = XXH64_reset(xxhash_state, kXxhashSeed) != XXH_ERROR;
+    succeeded = XXH64_reset(xxhash_state, kXxhashSeed) != XXH_ERROR;
     Assert(succeeded, "Failed to reset the xxHash state");
 
     for (const auto &column : line.columns) {
