@@ -8,7 +8,7 @@
 
 if(PLATFORM_LINUX OR PLATFORM_MACOS)
   find_program(ccache_executable "ccache")
-  if(NOT ccache_executable STREQUAL "ccache_executable-NOFOUND")
+  if(ccache_executable)
     message(STATUS "Multiplier: Enabling ccache support (${ccache_executable})")
 
     set(CMAKE_CXX_COMPILER_LAUNCHER "${ccache_executable}" CACHE FILEPATH "ccache")
