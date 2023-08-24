@@ -195,6 +195,7 @@ void MainWindow::InitializeWidgets() {
   d->project_explorer_dock->raise();
 
   setDocumentMode(false);
+  mx::gui::IThemeManager::Get().SendGlobalUpdate();
 }
 
 void MainWindow::InitializeToolBar() {
