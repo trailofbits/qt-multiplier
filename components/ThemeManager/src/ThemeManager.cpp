@@ -48,6 +48,10 @@ const CodeViewTheme &ThemeManager::GetCodeViewTheme() const {
   return d->code_view_theme;
 }
 
+void ThemeManager::SendGlobalUpdate() const {
+  emit ThemeChanged(d->palette, d->code_view_theme);
+}
+
 bool ThemeManager::isDarkTheme() const {
   return d->is_dark_theme;
 }

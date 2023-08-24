@@ -36,6 +36,9 @@ class IThemeManager : public QObject {
   //! Returns the active CodeViewTheme
   virtual const CodeViewTheme &GetCodeViewTheme() const = 0;
 
+  //! Sends a ThemeChanged update to all connected components
+  virtual void SendGlobalUpdate() const = 0;
+
   //! Returns true if the active theme is dark
   virtual bool isDarkTheme() const = 0;
 
@@ -54,7 +57,7 @@ class IThemeManager : public QObject {
  signals:
   //! Emitted when the selected item has changed
   void ThemeChanged(const QPalette &palette,
-                    const CodeViewTheme &code_view_theme);
+                    const CodeViewTheme &code_view_theme) const;
 };
 
 }  // namespace mx::gui

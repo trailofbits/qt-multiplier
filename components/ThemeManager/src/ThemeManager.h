@@ -28,6 +28,9 @@ class ThemeManager final : public IThemeManager {
   //! \copybrief IThemeManager::GetCodeViewTheme
   virtual const CodeViewTheme &GetCodeViewTheme() const override;
 
+  //! \copybrief IThemeManager::SendGlobalUpdate
+  virtual void SendGlobalUpdate() const override;
+
   //! \copybrief IThemeManager::isDarkTheme
   virtual bool isDarkTheme() const override;
 
