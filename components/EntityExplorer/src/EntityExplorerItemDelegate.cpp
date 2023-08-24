@@ -74,15 +74,35 @@ void EntityExplorerItemDelegate::paint(QPainter *painter,
     return;
   }
 
-  auto background_var = index.data(Qt::BackgroundRole);
-  auto background_color = background_var.value<QColor>();
+  auto code_view_theme = d.Configuration().theme;
 
-  if (background_color.isValid()) {
-    this->QStyledItemDelegate::paint(painter, option, index);
-    return;
+  QColor background_color;
+  if ((option.state & QStyle::State_Selected) != 0) {
+    background_color = code_view_theme.selected_line_background_color;
+
+  } else {
+    if (auto background_var = index.data(Qt::BackgroundRole);
+        background_var.isValid()) {
+      background_color = background_var.value<QColor>();
+
+    } else {
+      background_color = code_view_theme.default_background_color;
+    }
   }
 
+  painter->fillRect(option.rect, QBrush(background_color));
   d.Paint(painter, option, qvariant_cast<Token>(val));
+
+  // The highlight color used by the theme is barely visible, force better
+  // highlighting using the standard highlight color to draw a frame
+  // around the item
+  if ((option.state & QStyle::State_Selected) != 0) {
+    auto original_pen = painter->pen();
+    painter->setPen(QPen(option.palette.highlight().color()));
+
+    painter->drawRect(option.rect.adjusted(0, 0, -1, -1));
+    painter->setPen(original_pen);
+  }
 }
 
 QSize EntityExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
