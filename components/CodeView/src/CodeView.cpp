@@ -812,9 +812,12 @@ void CodeView::CreateTextDocumentLine(CodeView::TokenMap &token_map,
   auto column_count = model.columnCount(row_index);
 
   TokenMap::BlockEntry block_entry;
-
   QTextCharFormat text_format;
-  QVariant line_number_var;
+
+  if (auto line_number_var = row_index.data(ICodeModel::LineNumberRole);
+      line_number_var.isValid()) {
+    block_entry.line_number = qvariant_cast<std::size_t>(line_number_var);
+  }
 
   auto block_position{text_cursor.position()};
   bool contains_macro_expansion{false};
@@ -837,13 +840,6 @@ void CodeView::CreateTextDocumentLine(CodeView::TokenMap &token_map,
       display_role = display_role_var.toString();
     } else {
       continue;
-    }
-
-    if (!line_number_var.isValid()) {
-      line_number_var = row_index.data(ICodeModel::LineNumberRole);
-      if (line_number_var.isValid()) {
-        block_entry.line_number = qvariant_cast<std::size_t>(line_number_var);
-      }
     }
 
     auto entity_id_var = token_index.data(ICodeModel::TokenIdRole);
