@@ -29,10 +29,12 @@ class InformationExplorer final : public IInformationExplorer {
 
   //! Constructor
   InformationExplorer(IInformationExplorerModel *model, QWidget *parent,
-                      IGlobalHighlighter *global_highlighter);
+                      IGlobalHighlighter *global_highlighter,
+                      const bool &enable_history);
 
   //! Initializes the internal widgets
-  void InitializeWidgets(IInformationExplorerModel *model);
+  void InitializeWidgets(IInformationExplorerModel *model,
+                         const bool &enable_history);
 
   //! Installs the specified model
   void InstallModel(IInformationExplorerModel *model,

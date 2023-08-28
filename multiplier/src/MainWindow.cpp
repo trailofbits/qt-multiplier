@@ -10,6 +10,7 @@
 #include "SimpleTextInputDialog.h"
 #include "QuickCodeView.h"
 #include "MxTabWidget.h"
+#include "DockableInformationExplorer.h"
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/HistoryWidget.h>
@@ -108,10 +109,10 @@ struct MainWindow::PrivateData final {
 
   QDockWidget *project_explorer_dock{nullptr};
   QDockWidget *entity_explorer_dock{nullptr};
-  QDockWidget *info_explorer_dock{nullptr};
   QDockWidget *macro_explorer_dock{nullptr};
   QDockWidget *highlight_explorer_dock{nullptr};
-  IInformationExplorerModel *info_explorer_model{nullptr};
+
+  DockableInformationExplorer *info_explorer_dock{nullptr};
 
   IGlobalHighlighter *global_highlighter{nullptr};
 
@@ -257,18 +258,8 @@ void MainWindow::CreateEntityExplorerDock() {
 }
 
 void MainWindow::CreateInfoExplorerDock() {
-  d->info_explorer_model =
-      IInformationExplorerModel::Create(d->index, d->file_location_cache, this);
-
-  auto info_explorer = IInformationExplorer::Create(
-      d->info_explorer_model, this, d->global_highlighter);
-
-  connect(info_explorer, &IInformationExplorer::SelectedItemChanged, this,
-          &MainWindow::OnInformationExplorerSelectionChange);
-
-  d->info_explorer_dock = new QDockWidget(tr("Information Explorer"), this);
-  d->info_explorer_dock->setWidget(info_explorer);
-  d->info_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+  d->info_explorer_dock = DockableInformationExplorer::Create(
+      d->index, d->file_location_cache, d->global_highlighter, true, this);
 
   d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
   addDockWidget(Qt::LeftDockWidgetArea, d->info_explorer_dock);
@@ -490,7 +481,8 @@ void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
                         IReferenceExplorerModel::ReferenceType::Callers);
 }
 
-void MainWindow::OpenTokenEntityInfo(const QModelIndex &index) {
+void MainWindow::OpenTokenEntityInfo(const QModelIndex &index,
+                                     const bool &new_window) {
 
   QVariant related_entity_id_var =
       index.data(ICodeModel::RealRelatedEntityIdRole);
@@ -499,7 +491,21 @@ void MainWindow::OpenTokenEntityInfo(const QModelIndex &index) {
     return;
   }
 
-  OpenEntityInfo(qvariant_cast<RawEntityId>(related_entity_id_var));
+  auto entity_id = qvariant_cast<RawEntityId>(related_entity_id_var);
+
+  if (new_window) {
+    auto info_explorer_dock = DockableInformationExplorer::Create(
+        d->index, d->file_location_cache, d->global_highlighter, false, this);
+
+    info_explorer_dock->DisplayEntity(entity_id);
+    info_explorer_dock->setAttribute(Qt::WA_DeleteOnClose);
+    info_explorer_dock->show();
+
+    addDockWidget(Qt::RightDockWidgetArea, info_explorer_dock);
+
+  } else {
+    OpenEntityInfo(entity_id);
+  }
 }
 
 void MainWindow::ExpandMacro(const QModelIndex &index) {
@@ -707,7 +713,8 @@ void MainWindow::OpenEntityRelatedToToken(const QModelIndex &index) {
 }
 
 void MainWindow::OpenEntityInfo(RawEntityId entity_id) {
-  d->info_explorer_model->RequestEntityInformation(entity_id);
+  d->info_explorer_dock->show();
+  d->info_explorer_dock->DisplayEntity(entity_id);
 }
 
 void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
@@ -833,7 +840,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
     // Ideally we should find a Qt-friendly method that the framework handles
     // well natively
     const auto &keyboard_button = token_action.opt_keyboard_button.value();
-    if (keyboard_button.shift_modifier || keyboard_button.control_modifier) {
+    if (keyboard_button.control_modifier) {
       return;
     }
 
@@ -847,8 +854,8 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       OpenCodePreview(index);
 
     } else if (keyboard_button.key == Qt::Key_I) {
-      d->info_explorer_dock->show();
-      OpenTokenEntityInfo(index);
+      const auto &as_new_window{keyboard_button.shift_modifier};
+      OpenTokenEntityInfo(index, as_new_window);
 
     } else if (keyboard_button.key == Qt::Key_E) {
       ExpandMacro(index);

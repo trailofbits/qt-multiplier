@@ -605,6 +605,10 @@ void CodeView::OnTextEditViewportKeyboardButtonPress(QKeyEvent *event) {
 
   TokenAction::KeyboardButton keyboard_button;
   keyboard_button.key = event->key();
+  if (keyboard_button.key == Qt::Key_Shift ||
+      keyboard_button.key == Qt::Key_Control) {
+    return;
+  }
 
   keyboard_button.shift_modifier =
       (event->modifiers() & Qt::ShiftModifier) != 0;

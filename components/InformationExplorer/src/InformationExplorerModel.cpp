@@ -99,8 +99,8 @@ static QString GetFileName(
       .arg(opt_location->column_number);
 }
 
-static std::optional<InformationExplorerModel::RawLocation> ConvertLocation(
-    const std::optional<EntityLocation> &opt_location) {
+static std::optional<InformationExplorerModel::RawLocation>
+ConvertLocation(const std::optional<EntityLocation> &opt_location) {
   if (!opt_location) {
     return std::nullopt;
   }
@@ -160,7 +160,8 @@ struct Node {
   TokenRange token_range;
 
   //! The data of this node.
-  std::variant<std::monostate, RootData, CategoryData, LocationData, EntityData> data;
+  std::variant<std::monostate, RootData, CategoryData, LocationData, EntityData>
+      data;
 };
 
 struct Change {
@@ -176,10 +177,14 @@ struct InformationExplorerModel::PrivateData final {
 
   RawEntityId next_active_entity_id{kInvalidEntityId};
   RawEntityId active_entity_id{kInvalidEntityId};
+  std::optional<QString> opt_active_entity_name;
 
   IDatabase::Ptr database;
-  QFuture<bool> request_status_future;
-  QFutureWatcher<bool> future_watcher;
+  QFuture<bool> info_request_status_future;
+  QFutureWatcher<bool> info_future_watcher;
+
+  QFuture<Token> name_request_future;
+  QFutureWatcher<Token> name_future_watcher;
 
   // The QFuture that goes and loads entity information can sometimes send
   // *a lot* of data, so it sends it in batches, via invoking `OnDataBatch`.
@@ -273,24 +278,33 @@ void InformationExplorerModel::RequestEntityInformation(
   emit endResetModel();
 
   d->active_entity_id = kInvalidEntityId;
+  d->opt_active_entity_name = std::nullopt;
   d->next_active_entity_id = entity_id;
-  d->request_status_future =
+  d->info_request_status_future =
       d->database->RequestEntityInformation(*this, entity_id);
 
-  d->future_watcher.setFuture(d->request_status_future);
+  d->info_future_watcher.setFuture(d->info_request_status_future);
   d->import_timer.start(250);
+
+  d->name_request_future = d->database->RequestEntityName(entity_id);
+
+  d->name_future_watcher.setFuture(d->name_request_future);
 }
 
 RawEntityId InformationExplorerModel::GetCurrentEntityID(void) const {
   return d->active_entity_id;
 }
 
+std::optional<QString> InformationExplorerModel::GetCurrentEntityName() const {
+  return d->opt_active_entity_name;
+}
+
 InformationExplorerModel::~InformationExplorerModel(void) {
   CancelRunningRequest();
 }
 
-QModelIndex InformationExplorerModel::index(
-    int row, int column, const QModelIndex &parent) const {
+QModelIndex InformationExplorerModel::index(int row, int column,
+                                            const QModelIndex &parent) const {
 
   if (!hasIndex(row, column, parent)) {
     return QModelIndex();
@@ -401,15 +415,15 @@ QVariant InformationExplorerModel::data(const QModelIndex &index,
   return ret;
 }
 
-void InformationExplorerModel::FutureResultStateChanged(void) {
-  if (d->request_status_future.isCanceled()) {
+void InformationExplorerModel::InfoFutureResultStateChanged(void) {
+  if (d->info_request_status_future.isCanceled()) {
     emit beginResetModel();
     ClearTree();
     emit endResetModel();
     return;
   }
 
-  auto request_status = d->request_status_future.takeResult();
+  auto request_status = d->info_request_status_future.takeResult();
   if (!request_status) {
     emit beginResetModel();
     ClearTree();
@@ -419,6 +433,24 @@ void InformationExplorerModel::FutureResultStateChanged(void) {
 
   // We got something.
   d->active_entity_id = d->next_active_entity_id;
+  d->opt_active_entity_name = tr("CIAO CIAO");  // TODO xxxxxx
+}
+
+void InformationExplorerModel::NameFutureResultStateChanged(void) {
+  if (d->info_request_status_future.isCanceled() ||
+      d->name_request_future.isCanceled()) {
+    return;
+  }
+
+  emit beginResetModel();
+
+  auto entity_name_as_token = d->name_request_future.takeResult();
+  auto entity_name_as_string_view = entity_name_as_token.data();
+  d->opt_active_entity_name = QString::fromUtf8(
+      entity_name_as_string_view.data(),
+      static_cast<qsizetype>(entity_name_as_string_view.size()));
+
+  emit endResetModel();
 }
 
 InformationExplorerModel::InformationExplorerModel(
@@ -431,8 +463,11 @@ InformationExplorerModel::InformationExplorerModel(
   d->index = index;
   d->file_location_cache = file_location_cache;
 
-  connect(&d->future_watcher, &QFutureWatcher<QFuture<bool>>::finished, this,
-          &InformationExplorerModel::FutureResultStateChanged);
+  connect(&d->info_future_watcher, &QFutureWatcher<QFuture<bool>>::finished,
+          this, &InformationExplorerModel::InfoFutureResultStateChanged);
+
+  connect(&d->name_future_watcher, &QFutureWatcher<QFuture<bool>>::finished,
+          this, &InformationExplorerModel::NameFutureResultStateChanged);
 
   connect(&d->import_timer, &QTimer::timeout, this,
           &InformationExplorerModel::ProcessDataBatchQueue);
@@ -443,10 +478,16 @@ InformationExplorerModel::InformationExplorerModel(
 void InformationExplorerModel::CancelRunningRequest() {
   d->import_timer.stop();
 
-  if (d->request_status_future.isRunning()) {
-    d->request_status_future.cancel();
-    d->request_status_future.waitForFinished();
-    d->request_status_future = {};
+  if (d->info_request_status_future.isRunning()) {
+    d->info_request_status_future.cancel();
+    d->info_request_status_future.waitForFinished();
+    d->info_request_status_future = {};
+  }
+
+  if (d->name_request_future.isRunning()) {
+    d->name_request_future.cancel();
+    d->name_request_future.waitForFinished();
+    d->name_request_future = {};
   }
 }
 
@@ -456,12 +497,11 @@ void InformationExplorerModel::OnDataBatch(DataBatch data_batch) {
   d->data_batch_queue.push_back(std::move(data_batch));
 }
 
-void InformationExplorerModel::ImportEntityInformation(
-    EntityInformation &ei) {
+void InformationExplorerModel::ImportEntityInformation(EntityInformation &ei) {
 
   QString display_role = GetName(ei.display_role);
   if (display_role.isEmpty()) {
-    display_role = GetFileName(ei.location, true  /* path_only */);
+    display_role = GetFileName(ei.location, true /* path_only */);
     if (display_role.isEmpty()) {
       return;
     }
@@ -523,9 +563,9 @@ found_category:
     category_data->keyed_children[display_role] = key;
     d->OnNewNode(*this, key);
 
-  // We've found a second thing that looks the same as another thing. We have
-  // to change that other thing from being a leaf node to being a node that
-  // has children.
+    // We've found a second thing that looks the same as another thing. We have
+    // to change that other thing from being a leaf node to being a node that
+    // has children.
   } else if (std::holds_alternative<EntityData>(key->data)) {
     sub_category = key;
 
@@ -537,7 +577,7 @@ found_category:
     key->data = std::move(sub_category->data);
 
     QString key_loc = GetFileName(std::get<EntityData>(key->data).location,
-                                  false  /* path_only */);
+                                  false /* path_only */);
     if (key_loc.isEmpty()) {
       key_loc = QString::number(
           EntityId(std::get<EntityData>(key->data).entity).Pack());
@@ -554,15 +594,15 @@ found_category:
 
     goto add_to_sub_category;
 
-  // We've found a third, fourth, etc. thing that looks the same as something
-  // else.
+    // We've found a third, fourth, etc. thing that looks the same as something
+    // else.
   } else {
     sub_category = key;
 
   add_to_sub_category:
 
     // Add in the new data.
-    QString key_loc = GetFileName(ei.location, false  /* path_only */);
+    QString key_loc = GetFileName(ei.location, false /* path_only */);
     if (key_loc.isEmpty()) {
       key_loc = QString::number(EntityId(ei.entity_role).Pack());
     }
@@ -586,7 +626,7 @@ found_category:
 void InformationExplorerModel::ProcessDataBatchQueue() {
   ++d->version;
 
-  if (!d->request_status_future.isRunning()) {
+  if (!d->info_request_status_future.isRunning()) {
     d->import_timer.stop();
   }
 
@@ -609,7 +649,7 @@ void InformationExplorerModel::ProcessDataBatchQueue() {
     }
   }
 
-//  emit beginResetModel();
+  //  emit beginResetModel();
   // Exposes the changes.
   for (const Change &change : d->change_list) {
     QModelIndex parent_index;
@@ -625,7 +665,7 @@ void InformationExplorerModel::ProcessDataBatchQueue() {
 
   d->change_list.clear();
   d->changes.clear();
-//  emit endResetModel();
+  //  emit endResetModel();
 }
 
 }  // namespace mx::gui
