@@ -184,6 +184,9 @@ void ProjectExplorer::InstallModel(IFileTreeModel *model) {
   connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
           &ProjectExplorer::SelectionChanged);
 
+  connect(d->tree_view, &QTreeView::clicked, this,
+          &ProjectExplorer::OnFileTreeItemClicked);
+
   connect(d->model, &QAbstractItemModel::modelReset, this,
           &ProjectExplorer::OnModelReset);
 
@@ -212,7 +215,6 @@ void ProjectExplorer::ApplyExpandedNodeList(
   }
 }
 
-//! Try to open the file related to a specific model index.
 void ProjectExplorer::SelectionChanged(const QModelIndex &index,
                                        const QModelIndex &) {
   OnFileTreeItemClicked(index);
