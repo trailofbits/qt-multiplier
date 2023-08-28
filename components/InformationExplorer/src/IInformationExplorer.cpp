@@ -14,9 +14,11 @@ namespace mx::gui {
 
 IInformationExplorer *
 IInformationExplorer::Create(IInformationExplorerModel *model, QWidget *parent,
-                             IGlobalHighlighter *global_highlighter) {
+                             IGlobalHighlighter *global_highlighter,
+                             const bool &enable_history) {
 
-  return new InformationExplorer(model, parent, global_highlighter);
+  return new InformationExplorer(model, parent, global_highlighter,
+                                 enable_history);
 }
 
 }  // namespace mx::gui

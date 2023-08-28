@@ -43,32 +43,36 @@ InformationExplorer::~InformationExplorer() {}
 
 InformationExplorer::InformationExplorer(IInformationExplorerModel *model,
                                          QWidget *parent,
-                                         IGlobalHighlighter *global_highlighter)
+                                         IGlobalHighlighter *global_highlighter,
+                                         const bool &enable_history)
     : IInformationExplorer(parent),
       d(new PrivateData) {
 
-  InitializeWidgets(model);
+  InitializeWidgets(model, enable_history);
   InstallModel(model, global_highlighter);
 }
 
-void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model) {
+void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model,
+                                            const bool &enable_history) {
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
 
-  auto toolbar = new QToolBar(this);
-  layout->addWidget(toolbar);
+  if (enable_history) {
+    auto toolbar = new QToolBar(this);
+    layout->addWidget(toolbar);
 
-  d->history_widget =
-      new HistoryWidget(model->GetIndex(), model->GetFileLocationCache(),
-                        kMaxHistorySize, this, false);
+    d->history_widget =
+        new HistoryWidget(model->GetIndex(), model->GetFileLocationCache(),
+                          kMaxHistorySize, this, false);
 
-  toolbar->addWidget(d->history_widget);
-  toolbar->setIconSize(QSize(16, 16));
+    toolbar->addWidget(d->history_widget);
+    toolbar->setIconSize(QSize(16, 16));
 
-  d->history_widget->SetIconSize(toolbar->iconSize());
+    d->history_widget->SetIconSize(toolbar->iconSize());
 
-  connect(d->history_widget, &HistoryWidget::GoToEntity, this,
-          &InformationExplorer::OnHistoryNavigationEntitySelected);
+    connect(d->history_widget, &HistoryWidget::GoToEntity, this,
+            &InformationExplorer::OnHistoryNavigationEntitySelected);
+  }
 
   d->tree_view = new InformationExplorerTreeView(this);
   d->tree_view->setHeaderHidden(true);
@@ -133,13 +137,15 @@ void InformationExplorer::OnModelReset() {
     return;
   }
 
-  if (d->enable_history_updates) {
-    d->history_widget->CommitCurrentLocationToHistory();
-  } else {
-    d->enable_history_updates = true;
-  }
+  if (d->history_widget != nullptr) {
+    if (d->enable_history_updates) {
+      d->history_widget->CommitCurrentLocationToHistory();
+    } else {
+      d->enable_history_updates = true;
+    }
 
-  d->history_widget->SetCurrentLocation(current_entity_id);
+    d->history_widget->SetCurrentLocation(current_entity_id);
+  }
 }
 
 void InformationExplorer::OnRowsInserted(const QModelIndex &parent, int, int) {

@@ -61,6 +61,9 @@ class InformationExplorerModel final
   //! \copybrief IInformationExplorerModel::GetCurrentEntityID
   virtual RawEntityId GetCurrentEntityID(void) const override;
 
+  //! \copybrief IInformationExplorerModel::GetCurrentEntityName
+  virtual std::optional<QString> GetCurrentEntityName() const override;
+
   //! Destructor
   virtual ~InformationExplorerModel(void) override;
 
@@ -83,8 +86,11 @@ class InformationExplorerModel final
   virtual QVariant data(const QModelIndex &index, int role) const override;
 
  private slots:
-  //! Called whenever the database request future changes status
-  void FutureResultStateChanged();
+  //! Called whenever the info database request future changes status
+  void InfoFutureResultStateChanged();
+
+  //! Called whenever the name database request future changes status
+  void NameFutureResultStateChanged();
 
  private:
   struct PrivateData;

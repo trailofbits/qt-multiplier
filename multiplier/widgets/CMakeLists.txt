@@ -24,6 +24,9 @@ add_library("mx_widgets" STATIC
 
   src/MxTabWidget.h
   src/MxTabWidget.cpp
+
+  src/DockableInformationExplorer.h
+  src/DockableInformationExplorer.cpp
 )
 
 target_include_directories("mx_widgets" SYSTEM INTERFACE
@@ -40,6 +43,7 @@ target_link_libraries("mx_widgets"
     "mx_codeview"
     "mx_referenceexplorer"
     "mx_globalhighlighter"
+    "mx_informationexplorer"
 )
 
 enable_qt_properties("mx_widgets")

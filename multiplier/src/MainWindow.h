@@ -47,7 +47,7 @@ class MainWindow final : public QMainWindow {
   void OpenEntityInfo(RawEntityId entity_id);
   void OpenTokenContextMenu(const QModelIndex &index);
   void OpenTokenReferenceExplorer(const QModelIndex &index);
-  void OpenTokenEntityInfo(const QModelIndex &index);
+  void OpenTokenEntityInfo(const QModelIndex &index, const bool &new_window);
   void ExpandMacro(const QModelIndex &index);
   void OpenReferenceExplorer(
       const RawEntityId &entity_id,

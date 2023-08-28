@@ -12,6 +12,8 @@
 
 #include <QAbstractItemModel>
 
+#include <optional>
+
 namespace mx::gui {
 
 //! A tree model that displays entity information
@@ -53,6 +55,9 @@ class IInformationExplorerModel : public QAbstractItemModel {
 
   //! Returns the currenty entity, if any
   virtual RawEntityId GetCurrentEntityID() const = 0;
+
+  //! Returns the name for the current entity
+  virtual std::optional<QString> GetCurrentEntityName() const = 0;
 
   //! Disabled copy constructor
   IInformationExplorerModel(const IInformationExplorerModel &) = delete;

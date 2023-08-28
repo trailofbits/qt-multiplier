@@ -23,7 +23,8 @@ class IInformationExplorer : public QWidget {
   //! Factory function
   static IInformationExplorer *
   Create(IInformationExplorerModel *model, QWidget *parent = nullptr,
-         IGlobalHighlighter *global_highlighter = nullptr);
+         IGlobalHighlighter *global_highlighter = nullptr,
+         const bool &enable_history = true);
 
   //! Constructor
   IInformationExplorer(QWidget *parent) : QWidget(parent) {}
