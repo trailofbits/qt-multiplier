@@ -41,8 +41,6 @@
 #include <QColorDialog>
 #include <QActionGroup>
 
-#include <iostream>
-
 namespace mx::gui {
 
 namespace {
