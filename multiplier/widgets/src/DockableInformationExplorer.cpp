@@ -29,6 +29,13 @@ DockableInformationExplorer *DockableInformationExplorer::Create(
   obj->setAllowedAreas(Qt::AllDockWidgetAreas);
   obj->setWindowTitle(tr("Information Explorer"));
 
+  // This widget can be created way after the main window initialization.
+  // If that is the case, we won't get the first theme change update. Manually
+  // force an update now
+  auto palette = IThemeManager::Get().GetPalette();
+  auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
+  obj->OnThemeChange(palette, code_view_theme);
+
   return obj;
 }
 
@@ -50,10 +57,11 @@ DockableInformationExplorer::DockableInformationExplorer(
   d->info_explorer = IInformationExplorer::Create(
       d->model, this, global_highlighter, enable_history);
 
-  d->info_explorer->show();
-
   connect(d->info_explorer, &IInformationExplorer::SelectedItemChanged, this,
           &DockableInformationExplorer::SelectedItemChanged);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &DockableInformationExplorer::OnThemeChange);
 }
 
 void DockableInformationExplorer::DisplayEntity(const RawEntityId &entity_id) {
@@ -78,6 +86,18 @@ void DockableInformationExplorer::OnModelReset() {
   }
 
   setWindowTitle(window_title);
+}
+
+void DockableInformationExplorer::OnThemeChange(
+    const QPalette &palette, const CodeViewTheme &code_view_theme) {
+  // Do not spawn popups from this widget without restoring the
+  // real application palette first!
+  auto custom_palette = palette;
+  custom_palette.setBrush(QPalette::Base,
+                          QBrush(code_view_theme.default_background_color));
+
+  setPalette(custom_palette);
+  update();
 }
 
 }  // namespace mx::gui
