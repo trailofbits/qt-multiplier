@@ -9,6 +9,7 @@
 #pragma once
 
 #include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <multiplier/Index.h>
 
@@ -57,6 +58,10 @@ class DockableInformationExplorer final : public QDockWidget {
  private slots:
   //! Used to update the window title
   void OnModelReset();
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
  signals:
   //! Forwards the internal InformationExplorer::SelectedItemChanged signal
