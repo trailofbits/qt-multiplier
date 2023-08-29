@@ -81,6 +81,10 @@ class EntityExplorerModel final : public IEntityExplorerModel,
   //! Sort the rows.
   void SortRows(void);
 
+ private slots:
+  //! Processes the queued data batches
+  void ProcessDataBatchQueue();
+
   friend class IEntityExplorerModel;
 };
 
