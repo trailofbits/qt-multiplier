@@ -9,10 +9,14 @@
 #include "EntityExplorerModel.h"
 
 #include <QFutureWatcher>
+#include <QTimer>
 
 namespace mx::gui {
 
 namespace {
+
+const int kInitialUpdateTimer{500};
+const int kUpdateTimer{1000};
 
 struct EntityQueryResultCmp final {
   bool operator()(const IDatabase::EntityQueryResult *lhs,
@@ -74,6 +78,11 @@ struct EntityExplorerModel::PrivateData final {
   std::optional<QRegularExpression> opt_regex;
 
   std::vector<const IDatabase::EntityQueryResult *> row_list;
+
+  std::vector<IDatabase::QueryEntitiesReceiver::DataBatch> data_batch_queue;
+  std::mutex data_batch_mutex;
+
+  QTimer update_timer;
 };
 
 EntityExplorerModel::~EntityExplorerModel() {
@@ -177,6 +186,8 @@ void EntityExplorerModel::Search(const QString &name,
 
   d->future_watcher.setFuture(d->request_status_future);
 
+  d->update_timer.start(kInitialUpdateTimer);
+
   emit SearchStarted();
 }
 
@@ -187,6 +198,8 @@ void EntityExplorerModel::CancelSearch() {
 
     d->request_status_future = {};
   }
+
+  d->update_timer.stop();
 
   emit beginResetModel();
 
@@ -209,43 +222,16 @@ EntityExplorerModel::EntityExplorerModel(
 
   connect(&d->future_watcher, &QFutureWatcher<QFuture<bool>>::finished, this,
           &EntityExplorerModel::SearchFinished);
+
+  connect(&d->update_timer, &QTimer::timeout, this,
+          &EntityExplorerModel::ProcessDataBatchQueue);
 }
 
 void EntityExplorerModel::OnDataBatch(
     IDatabase::QueryEntitiesReceiver::DataBatch data_batch) {
 
-  emit beginResetModel();
-
-  TokenCategorySet token_category_set;
-  if (d->opt_token_category_set.has_value()) {
-    token_category_set = d->opt_token_category_set.value();
-  }
-
-  // If our sorting method is reverse, then put the entities back in their
-  // original order, so that when we call `SortRows` we get a properly
-  // maintained stable sort.
-  if (d->sorting_method == SortingMethod::Descending) {
-    std::reverse(d->row_list.begin(), d->row_list.end());
-  }
-
-  for (auto &data_batch_entity : data_batch) {
-    const IDatabase::EntityQueryResult &entity =
-        d->results.emplace_back(std::move(data_batch_entity));
-
-    if (!EntityIncludedInTokenCategorySet(entity, d->opt_token_category_set)) {
-      continue;
-    }
-
-    if (!RegexMatchesEntityName(entity, d->opt_regex)) {
-      continue;
-    }
-
-    d->row_list.push_back(&entity);
-  }
-
-  SortRows();
-
-  emit endResetModel();
+  std::lock_guard<std::mutex> lock(d->data_batch_mutex);
+  d->data_batch_queue.push_back(std::move(data_batch));
 }
 
 void EntityExplorerModel::GenerateRows(void) {
@@ -273,6 +259,59 @@ void EntityExplorerModel::SortRows(void) {
 
   if (d->sorting_method == SortingMethod::Descending) {
     std::reverse(d->row_list.begin(), d->row_list.end());
+  }
+}
+
+void EntityExplorerModel::ProcessDataBatchQueue() {
+  std::vector<IDatabase::QueryEntitiesReceiver::DataBatch> data_batch_queue;
+
+  {
+    std::lock_guard<std::mutex> lock(d->data_batch_mutex);
+    data_batch_queue = std::move(d->data_batch_queue);
+
+    d->data_batch_queue.clear();
+  }
+
+  for (auto &data_batch : data_batch_queue) {
+    TokenCategorySet token_category_set;
+    if (d->opt_token_category_set.has_value()) {
+      token_category_set = d->opt_token_category_set.value();
+    }
+
+    // If our sorting method is reverse, then put the entities back in their
+    // original order, so that when we call `SortRows` we get a properly
+    // maintained stable sort.
+    if (d->sorting_method == SortingMethod::Descending) {
+      std::reverse(d->row_list.begin(), d->row_list.end());
+    }
+
+    for (auto &data_batch_entity : data_batch) {
+      const IDatabase::EntityQueryResult &entity =
+          d->results.emplace_back(std::move(data_batch_entity));
+
+      if (!EntityIncludedInTokenCategorySet(entity,
+                                            d->opt_token_category_set)) {
+        continue;
+      }
+
+      if (!RegexMatchesEntityName(entity, d->opt_regex)) {
+        continue;
+      }
+
+      d->row_list.push_back(&entity);
+    }
+  }
+
+  SortRows();
+
+  emit beginResetModel();
+  emit endResetModel();
+
+  if (d->request_status_future.isRunning()) {
+    d->update_timer.start(kUpdateTimer);
+
+  } else {
+    d->update_timer.stop();
   }
 }
 
