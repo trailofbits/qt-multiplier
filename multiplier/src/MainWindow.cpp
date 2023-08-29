@@ -261,6 +261,10 @@ void MainWindow::CreateInfoExplorerDock() {
   d->info_explorer_dock = DockableInformationExplorer::Create(
       d->index, d->file_location_cache, d->global_highlighter, true, this);
 
+  connect(d->info_explorer_dock,
+          &DockableInformationExplorer::SelectedItemChanged, this,
+          &MainWindow::OnInformationExplorerSelectionChange);
+
   d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
   addDockWidget(Qt::LeftDockWidgetArea, d->info_explorer_dock);
 }
@@ -496,6 +500,10 @@ void MainWindow::OpenTokenEntityInfo(const QModelIndex &index,
   if (new_window) {
     auto info_explorer_dock = DockableInformationExplorer::Create(
         d->index, d->file_location_cache, d->global_highlighter, false, this);
+
+    connect(info_explorer_dock,
+            &DockableInformationExplorer::SelectedItemChanged, this,
+            &MainWindow::OnInformationExplorerSelectionChange);
 
     info_explorer_dock->DisplayEntity(entity_id);
     info_explorer_dock->setAttribute(Qt::WA_DeleteOnClose);
