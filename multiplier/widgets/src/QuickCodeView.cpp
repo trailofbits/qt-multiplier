@@ -5,7 +5,6 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "QuickCodeView.h"
-#include "CodePreviewModelAdapter.h"
 
 #include <multiplier/ui/IDatabase.h>
 #include <multiplier/ui/Icons.h>
@@ -131,9 +130,8 @@ void QuickCodeView::InitializeWidgets(
   // Code model
   //
 
-  ICodeModel *main_model =
-      macro_explorer.CreateCodeModel(file_location_cache, index, this);
-  d->model = new CodePreviewModelAdapter(main_model, this);
+  d->model =
+      macro_explorer.CreateCodeModel(file_location_cache, index, true, this);
 
   QAbstractItemModel *model_proxy = highlighter.CreateModelProxy(
       d->model, ICodeModel::RealRelatedEntityIdRole);

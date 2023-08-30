@@ -46,9 +46,10 @@ class IMacroExplorer : public QWidget {
   //! Create an `ICodeModel` connected with the `IMacroExplorer`, so that the
   //! `ICodeModel` can notify registered code views to expand macros and
   //! re-render.
-  virtual ICodeModel *CreateCodeModel(
-      const FileLocationCache &file_location_cache,
-      const Index &index, QObject *parent = nullptr) = 0;
+  virtual ICodeModel *
+  CreateCodeModel(const FileLocationCache &file_location_cache,
+                  const Index &index, const bool &remap_related_entity_id_role,
+                  QObject *parent = nullptr) = 0;
 
  public slots:
   virtual void AddMacro(RawEntityId macro_id, RawEntityId token_id) = 0;

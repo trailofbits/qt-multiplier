@@ -624,7 +624,7 @@ MainWindow::CreateNewCodeView(RawEntityId file_entity_id, QString tab_name,
                               const std::optional<QString> &opt_file_path) {
 
   ICodeModel *code_model = d->macro_explorer->CreateCodeModel(
-      d->file_location_cache, d->index, this);
+      d->file_location_cache, d->index, false, this);
 
   QAbstractItemModel *proxy_model = d->global_highlighter->CreateModelProxy(
       code_model, kHighlightEntityIdRole);

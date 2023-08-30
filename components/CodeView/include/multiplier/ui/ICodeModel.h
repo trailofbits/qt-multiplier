@@ -66,8 +66,9 @@ class ICodeModel : public QAbstractItemModel {
   };
 
   //! Factory function
-  static ICodeModel *Create(const FileLocationCache &file_location_cache,
-                            const Index &index, QObject *parent = nullptr);
+  static ICodeModel *
+  Create(const FileLocationCache &file_location_cache, const Index &index,
+         const bool &remap_related_entity_id_role, QObject *parent = nullptr);
 
   static std::optional<std::pair<RawEntityId, RawEntityId>>
   MacroExpansionPoint(const QModelIndex &index);
