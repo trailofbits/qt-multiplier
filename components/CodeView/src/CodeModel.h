@@ -51,7 +51,7 @@ class CodeModel final : public ICodeModel {
  protected:
   //! Constructor
   CodeModel(const FileLocationCache &file_location_cache, const Index &index,
-            QObject *parent);
+            const bool &remap_related_entity_id_role, QObject *parent);
 
  private:
   struct PrivateData;

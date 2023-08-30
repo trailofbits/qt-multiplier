@@ -5,7 +5,6 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "PreviewableReferenceExplorer.h"
-#include "CodePreviewModelAdapter.h"
 
 #include <multiplier/Index.h>
 #include <multiplier/ui/ICodeView.h>
@@ -64,8 +63,8 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   connect(model, &QAbstractItemModel::rowsInserted, this,
           &PreviewableReferenceExplorer::OnRowsInserted);
 
-  d->code_model = new CodePreviewModelAdapter(
-      macro_explorer.CreateCodeModel(file_location_cache, index), this);
+  d->code_model =
+      macro_explorer.CreateCodeModel(file_location_cache, index, true);
 
   auto model_proxy = highlighter.CreateModelProxy(
       d->code_model, ICodeModel::RealRelatedEntityIdRole);

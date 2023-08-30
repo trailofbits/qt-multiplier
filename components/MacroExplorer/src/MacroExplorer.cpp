@@ -67,19 +67,20 @@ struct MacroExplorer::PrivateData final : public TokenTreeVisitor {
 };
 
 ICodeModel *MacroExplorer::CreateCodeModel(
-    const FileLocationCache &file_location_cache,
-    const Index &index, QObject *parent) {
-  ICodeModel *model = ICodeModel::Create(file_location_cache, index, parent);
+    const FileLocationCache &file_location_cache, const Index &index,
+    const bool &remap_related_entity_id_role, QObject *parent) {
+  ICodeModel *model = ICodeModel::Create(file_location_cache, index,
+                                         remap_related_entity_id_role, parent);
   model->OnExpandMacros(d.get());
-  connect(this, &MacroExplorer::ExpandMacros,
-          model, &ICodeModel::OnExpandMacros);
+  connect(this, &MacroExplorer::ExpandMacros, model,
+          &ICodeModel::OnExpandMacros);
   return model;
 }
 
 namespace {
 
-static std::optional<QString> GetLocation(
-    Token tok, const FileLocationCache &loc_cache) {
+static std::optional<QString> GetLocation(Token tok,
+                                          const FileLocationCache &loc_cache) {
   Token file_tok = TokenRange(tok).file_tokens().front();
   if (!file_tok) {
     return std::nullopt;
@@ -122,10 +123,9 @@ void MacroExplorer::AlwaysExpandMacro(const DefineMacroDirective &def) {
 
   MacroExplorerItem *item = new MacroExplorerItem(
       eid, true,
-      QString::fromUtf8(
-          def_name.data(), static_cast<qsizetype>(def_name.size())),
-      GetLocation(def.name(), d->file_location_cache),
-      this);
+      QString::fromUtf8(def_name.data(),
+                        static_cast<qsizetype>(def_name.size())),
+      GetLocation(def.name(), d->file_location_cache), this);
 
   d->items.emplace(eid, item);
   d->ordered_items.push_back(item);
@@ -157,10 +157,9 @@ void MacroExplorer::ExpandSpecificMacro(const DefineMacroDirective &def,
 
   auto item = new MacroExplorerItem(
       eid, false,
-      QString::fromUtf8(
-          def_name.data(), static_cast<qsizetype>(def_name.size())),
-      loc_name,
-      this);
+      QString::fromUtf8(def_name.data(),
+                        static_cast<qsizetype>(def_name.size())),
+      loc_name, this);
 
   d->items.emplace(eid, item);
   d->ordered_items.push_back(item);
@@ -182,10 +181,9 @@ void MacroExplorer::ExpandSpecificSubstitution(const Token &use_tok,
   std::string_view def_name = use_tok.data();
   auto item = new MacroExplorerItem(
       eid, false,
-      QString::fromUtf8(
-          def_name.data(), static_cast<qsizetype>(def_name.size())),
-      GetLocation(use_tok, d->file_location_cache),
-      this);
+      QString::fromUtf8(def_name.data(),
+                        static_cast<qsizetype>(def_name.size())),
+      GetLocation(use_tok, d->file_location_cache), this);
 
   d->items.emplace(eid, item);
   d->ordered_items.push_back(item);
@@ -205,8 +203,8 @@ void MacroExplorer::RemoveMacro(RawEntityId macro_id) {
 
   MacroExplorerItem *item = it->second;
   d->items.erase(it);
-  auto rit = std::remove(d->ordered_items.begin(), d->ordered_items.end(),
-                         item);
+  auto rit =
+      std::remove(d->ordered_items.begin(), d->ordered_items.end(), item);
   d->ordered_items.erase(rit, d->ordered_items.end());
 
   UpdateList();
@@ -223,7 +221,7 @@ void MacroExplorer::UpdateList(void) {
     if (QWidget *widget = child->widget()) {
       widget->setParent(nullptr);
     }
-    delete child;   // delete the layout item
+    delete child;  // delete the layout item
   }
 
   for (auto item : d->ordered_items) {
@@ -268,9 +266,9 @@ void MacroExplorer::AddMacro(RawEntityId macro_id, RawEntityId token_id) {
 
 MacroExplorer::~MacroExplorer(void) {}
 
-MacroExplorer::MacroExplorer(
-    const Index &index, const FileLocationCache &file_location_cache,
-    QWidget *parent)
+MacroExplorer::MacroExplorer(const Index &index,
+                             const FileLocationCache &file_location_cache,
+                             QWidget *parent)
     : IMacroExplorer(parent),
       d(new PrivateData(index, file_location_cache)) {
 

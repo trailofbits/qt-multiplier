@@ -17,8 +17,11 @@
 namespace mx::gui {
 
 ICodeModel *ICodeModel::Create(const FileLocationCache &file_location_cache,
-                               const Index &index, QObject *parent) {
-  return new CodeModel(file_location_cache, index, parent);
+                               const Index &index,
+                               const bool &remap_related_entity_id_role,
+                               QObject *parent) {
+  return new CodeModel(file_location_cache, index, remap_related_entity_id_role,
+                       parent);
 }
 
 std::optional<std::pair<RawEntityId, RawEntityId>>

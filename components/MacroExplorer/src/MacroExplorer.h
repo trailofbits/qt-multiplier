@@ -31,9 +31,10 @@ class MacroExplorer final : public IMacroExplorer {
   virtual ~MacroExplorer(void);
 
   //! \copybrief IMacroExplorer::CreateCodeModel
-  virtual ICodeModel *CreateCodeModel(
-      const FileLocationCache &file_location_cache,
-      const Index &index, QObject *parent) override;
+  virtual ICodeModel *
+  CreateCodeModel(const FileLocationCache &file_location_cache,
+                  const Index &index, const bool &remap_related_entity_id_role,
+                  QObject *parent) override;
 
  public slots:
   //! \copybrief IMacroExplorer::AddMacro
@@ -48,8 +49,7 @@ class MacroExplorer final : public IMacroExplorer {
 
   //! Constructor
   MacroExplorer(const Index &index,
-                const FileLocationCache &file_location_cache,
-                QWidget *parent);
+                const FileLocationCache &file_location_cache, QWidget *parent);
 
   void AlwaysExpandMacro(const DefineMacroDirective &);
   void ExpandSpecificMacro(const DefineMacroDirective &,

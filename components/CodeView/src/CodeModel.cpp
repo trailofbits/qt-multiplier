@@ -47,6 +47,8 @@ struct CodeModel::PrivateData final {
   IDatabase::Ptr database;
   QFuture<IDatabase::IndexedTokenRangeDataResult> future_result;
   QFutureWatcher<IDatabase::IndexedTokenRangeDataResult> future_watcher;
+
+  bool remap_related_entity_id_role{false};
 };
 
 const IndexedTokenRangeData::Line *
@@ -191,8 +193,12 @@ int CodeModel::columnCount(const QModelIndex &parent) const {
 }
 
 QVariant CodeModel::data(const QModelIndex &index, int role) const {
-
   QVariant value;
+
+  if (d->remap_related_entity_id_role) {
+    role = (role == ICodeModel::RelatedEntityIdRole) ? ICodeModel::TokenIdRole
+                                                     : role;
+  }
 
   // We're dealing with the root node.
   if (!index.isValid()) {
@@ -251,10 +257,12 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
 }
 
 CodeModel::CodeModel(const FileLocationCache &file_location_cache,
-                     const Index &index, QObject *parent)
+                     const Index &index,
+                     const bool &remap_related_entity_id_role, QObject *parent)
     : ICodeModel(parent),
       d(new PrivateData(file_location_cache, index)) {
 
+  d->remap_related_entity_id_role = remap_related_entity_id_role;
   d->database = IDatabase::Create(index, file_location_cache);
 
   connect(&d->future_watcher,
