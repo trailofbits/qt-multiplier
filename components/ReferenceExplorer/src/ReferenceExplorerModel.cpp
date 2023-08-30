@@ -65,6 +65,18 @@ struct ReferenceExplorerModel::PrivateData final {
       : index(index_),
         file_location_cache(file_location_cache_) {}
 
+  //! Describes the index where new data is appended to
+  struct InsertPoint final {
+    //! Internal node id
+    std::uint64_t id{};
+
+    //! The original row number
+    int row{};
+
+    //! The original column number
+    int column{};
+  };
+
   //! The multiplier database
   mx::Index index;
 
@@ -93,9 +105,9 @@ struct ReferenceExplorerModel::PrivateData final {
   QTimer import_timer;
 
   //! The insert point for the active request
-  QModelIndex insert_point;
+  InsertPoint insert_point;
 
-  //! ID mapping info used by the active reques
+  //! ID mapping info used by the active requests
   std::unordered_map<std::uint64_t, Context::NodeID> node_id_mapping;
 
   //! Reference type
@@ -521,14 +533,12 @@ void ReferenceExplorerModel::ImportReferences(
     IDatabase::QueryEntityReferencesResult result) {
 
   bool reset_model{false};
-
   if (d->context.tree.empty()) {
     d->context.tree.insert({0, Context::Node{}});
     reset_model = true;
   }
 
-  auto insert_point_node_id = d->insert_point.internalId();
-  auto orig_insert_point_node = d->context.tree[insert_point_node_id];
+  auto orig_insert_point_node = d->context.tree[d->insert_point.id];
   if (!orig_insert_point_node.child_node_id_list.empty()) {
     reset_model = true;
   }
@@ -571,16 +581,26 @@ void ReferenceExplorerModel::ImportReferences(
     emit endResetModel();
 
   } else {
-    const auto &current_insert_point_node =
-        d->context.tree[insert_point_node_id];
+    const auto &current_insert_point_node = d->context.tree[d->insert_point.id];
 
-    auto first_row =
+    auto row_count =
         static_cast<int>(current_insert_point_node.child_node_id_list.size() -
                          orig_insert_point_node.child_node_id_list.size());
-    auto last_row =
-        static_cast<int>(orig_insert_point_node.child_node_id_list.size() - 1);
 
-    emit beginInsertRows(d->insert_point, first_row, last_row);
+    if (row_count == 0) {
+      return;
+    }
+
+    auto first_row =
+        static_cast<int>(orig_insert_point_node.child_node_id_list.size());
+
+    auto last_row = first_row + row_count - 1;
+
+    auto insert_point_index = createIndex(
+        d->insert_point.row, d->insert_point.column, d->insert_point.id);
+
+    emit beginInsertRows(insert_point_index, first_row, last_row);
+    emit endInsertRows();
   }
 }
 
@@ -633,10 +653,12 @@ void ReferenceExplorerModel::StartRequest(
     const bool &include_redeclarations, const bool &emit_root_node,
     const std::size_t &depth) {
 
-  d->insert_point = insert_point;
+  d->insert_point.row = insert_point.row();
+  d->insert_point.column = insert_point.column();
+  d->insert_point.id = insert_point.internalId();
 
   d->node_id_mapping.clear();
-  d->node_id_mapping.insert({0, d->insert_point.internalId()});
+  d->node_id_mapping.insert({0, d->insert_point.id});
 
   d->request_status_future = d->database->QueryEntityReferences(
       *this, entity_id, reference_type, include_redeclarations, emit_root_node,
