@@ -32,7 +32,7 @@ clone_or_update_qtsdk() {
   ( cd "qt5" && git fetch --tags )
   ( cd "qt5" && git reset --hard && git clean -ffdx )
   ( cd "qt5" && git reset "${QTSDK_VERSION}" ) || panic "Failed to update the Qt SDK repository"
-  ( cd "qt5" && perl init-repository -f --module-subset=default,-qtwebengine ) || panic "Failed to initialize the git submodules"
+  ( cd "qt5" && perl init-repository -f --module-subset=qtbase,qt5compat,-qtwebengine ) || panic "Failed to initialize the git submodules"
 }
 
 panic() {
