@@ -201,6 +201,11 @@ void EntityExplorerModel::CancelSearch() {
 
   d->update_timer.stop();
 
+  {
+    std::lock_guard<std::mutex> lock(d->data_batch_mutex);
+    d->data_batch_queue.clear();
+  }
+
   emit beginResetModel();
 
   d->results.clear();
