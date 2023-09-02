@@ -25,7 +25,7 @@ namespace {
 
 const int kFirstUpdateInterval{500};
 const int kImportInterval{1500};
-const std::size_t kQueryDepth{2};
+const std::size_t kQueryDepth{1};
 
 static TokenCategory FromDeclCategory(DeclCategory cat) {
   switch (cat) {
@@ -147,7 +147,8 @@ void ReferenceExplorerModel::SetEntity(const RawEntityId &entity_id,
   emit endResetModel();
 }
 
-void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
+void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index,
+                                          unsigned depth) {
   if (!index.isValid()) {
     return;
   }
@@ -165,7 +166,7 @@ void ReferenceExplorerModel::ExpandEntity(const QModelIndex &index) {
   static const bool kGenerateRootNode{false};
 
   StartRequest(index, entity_id, d->reference_type,
-               kShouldIncludeRedeclarations, kGenerateRootNode, kQueryDepth);
+               kShouldIncludeRedeclarations, kGenerateRootNode, depth);
 }
 
 ReferenceExplorerModel::~ReferenceExplorerModel() {
@@ -611,28 +612,28 @@ ReferenceExplorerModel::GetTokenCategoryName(TokenCategory tok_category) {
 
   // clang-format off
   static const std::unordered_map<TokenCategory, QString> kLabelMap{
-    { TokenCategory::UNKNOWN, kInvalidCategory },
-    { TokenCategory::LOCAL_VARIABLE, tr("Local Variable") },
-    { TokenCategory::GLOBAL_VARIABLE, tr("Global Variable") },
-    { TokenCategory::PARAMETER_VARIABLE, tr("Parameter Variable") },
-    { TokenCategory::FUNCTION, tr("Function") },
-    { TokenCategory::INSTANCE_METHOD, tr("Instance Method") },
-    { TokenCategory::INSTANCE_MEMBER, tr("Instance Member") },
-    { TokenCategory::CLASS_METHOD, tr("Class Method") },
-    { TokenCategory::CLASS_MEMBER, tr("Class Member") },
-    { TokenCategory::THIS, tr("This") },
-    { TokenCategory::CLASS, tr("Class") },
-    { TokenCategory::STRUCT, tr("Structure") },
-    { TokenCategory::UNION, tr("Union") },
-    { TokenCategory::CONCEPT, tr("Concept") },
-    { TokenCategory::INTERFACE, tr("Interface") },
-    { TokenCategory::ENUM, tr("Enumeration") },
-    { TokenCategory::ENUMERATOR, tr("Enumerator") },
-    { TokenCategory::NAMESPACE, tr("Namespace") },
-    { TokenCategory::TYPE_ALIAS, tr("Type Alias") },
-    { TokenCategory::TEMPLATE_PARAMETER_TYPE, tr("Template Type Parameter") },
-    { TokenCategory::TEMPLATE_PARAMETER_VALUE, tr("Template Value Parameter") },
-    { TokenCategory::LABEL, tr("Label") },
+    {TokenCategory::UNKNOWN, kInvalidCategory },
+    {TokenCategory::LOCAL_VARIABLE, tr("Local Variable") },
+    {TokenCategory::GLOBAL_VARIABLE, tr("Global Variable") },
+    {TokenCategory::PARAMETER_VARIABLE, tr("Parameter Variable") },
+    {TokenCategory::FUNCTION, tr("Function") },
+    {TokenCategory::INSTANCE_METHOD, tr("Instance Method") },
+    {TokenCategory::INSTANCE_MEMBER, tr("Instance Member") },
+    {TokenCategory::CLASS_METHOD, tr("Class Method") },
+    {TokenCategory::CLASS_MEMBER, tr("Class Member") },
+    {TokenCategory::THIS, tr("This") },
+    {TokenCategory::CLASS, tr("Class") },
+    {TokenCategory::STRUCT, tr("Structure") },
+    {TokenCategory::UNION, tr("Union") },
+    {TokenCategory::CONCEPT, tr("Concept") },
+    {TokenCategory::INTERFACE, tr("Interface") },
+    {TokenCategory::ENUM, tr("Enumeration") },
+    {TokenCategory::ENUMERATOR, tr("Enumerator") },
+    {TokenCategory::NAMESPACE, tr("Namespace") },
+    {TokenCategory::TYPE_ALIAS, tr("Type Alias") },
+    {TokenCategory::TEMPLATE_PARAMETER_TYPE, tr("Template Type Parameter") },
+    {TokenCategory::TEMPLATE_PARAMETER_VALUE, tr("Template Value Parameter") },
+    {TokenCategory::LABEL, tr("Label") },
     {TokenCategory::MACRO_DIRECTIVE_NAME, "Macro Directive"},
     {TokenCategory::MACRO_NAME, "Macro"},
     {TokenCategory::MACRO_PARAMETER_NAME, "Macro Parameter"},

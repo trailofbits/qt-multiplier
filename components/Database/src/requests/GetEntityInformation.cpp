@@ -40,6 +40,8 @@
 #include <multiplier/Entities/WhileStmt.h>
 
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 namespace mx::gui {
 namespace {
@@ -678,12 +680,58 @@ FillEnumInformation(QPromise<bool> &result_promise,
   }
 }
 
+static void FillTypeDeclInformation(DataBatch &batch, TypeDecl entity) {
+  if (auto type = entity.type_for_declaration()) {
+    if (auto size = type->size_in_bits()) {
+      EntityInformation &sel = batch.emplace_back();
+      sel.category = "Size";
+      if (!(size.value() % 8u)) {
+        sel.display_role = QObject::tr("Size %1 (bytes)").arg(size.value() / 8u);
+      } else {
+        sel.display_role = QObject::tr("Size %1 (bits)").arg(size.value());
+      }
+    }
+
+    if (auto align = type->alignment()) {
+      EntityInformation &sel = batch.emplace_back();
+      sel.category = "Size";
+      if (!(align.value() % 8u)) {
+        sel.display_role = QObject::tr("Alignment %1 (bytes)").arg(align.value() / 8u);
+      } else {
+        sel.display_role = QObject::tr("Alignment %1 (bits)").arg(align.value());
+      }
+    }
+  }
+}
+
 //! Fill `info` with information about the variable `var`.
 static void
 FillRecordInformation(QPromise<bool> &result_promise,
                       IDatabase::RequestEntityInformationReceiver &receiver,
                       const FileLocationCache &file_location_cache,
                       DataBatch &batch, RecordDecl entity) {
+
+  uint64_t max_offset = 0u;
+  uint64_t all_offset = 0u;
+  for (const mx::Decl &decl : entity.declarations_in_context()) {
+    if (result_promise.isCanceled()) {
+      return;
+    }
+
+    if (auto fd = mx::FieldDecl::from(decl)) {
+      if (auto offset = fd->offset_in_bits()) {
+        all_offset |= offset.value();
+        max_offset = std::max(max_offset, offset.value());
+      }
+    }
+  }
+
+  auto has_bits = all_offset % 8u;
+  auto num_bytes = max_offset / 8u;
+  int num_digits = 0;
+  for (num_bytes += 9; num_bytes; num_bytes /= 10u) {
+    ++num_digits;
+  }
 
   // Find the local variables.
   for (const mx::Decl &decl : entity.declarations_in_context()) {
@@ -709,10 +757,41 @@ FillRecordInformation(QPromise<bool> &result_promise,
     } else if (auto fd = mx::FieldDecl::from(decl)) {
       EntityInformation &sel = batch.emplace_back();
       sel.category = QObject::tr("Members");
-      sel.display_role.setValue(fd->token());
       sel.entity_role = fd.value();
       sel.location =
           GetLocation(result_promise, fd->tokens(), file_location_cache);
+
+      // Make the field have `NNN.N` offsets as bit and byte offsets.
+      if (auto offset = fd->offset_in_bits()) {
+
+        std::stringstream ss;
+        ss << std::setw(num_digits) << std::setfill(' ')
+           << (offset.value() / 8u);
+
+        if (has_bits) {
+          ss << '.' << (offset.value() % 8u);
+        }
+
+        std::vector<CustomToken> toks;
+
+        SimpleToken tok;
+        tok.category = TokenCategory::LITERAL;
+        tok.kind = TokenKind::NUMERIC_CONSTANT;
+        tok.data = ss.str();
+        toks.emplace_back(std::move(tok));
+
+        tok.category = TokenCategory::WHITESPACE;
+        tok.kind = TokenKind::WHITESPACE;
+        tok.data = " ";
+        toks.emplace_back(std::move(tok));
+
+        toks.emplace_back(fd->token());
+
+        sel.display_role.setValue(TokenRange::create(std::move(toks)));
+
+      } else {
+        sel.display_role.setValue(fd->token());
+      }
     }
 
     SendBatch(receiver, batch);
@@ -948,6 +1027,8 @@ GetDeclInformation(QPromise<bool> &result_promise,
   DataBatch batch;
   EntityInformationScopedSender info_auto_sender{batch, receiver};
 
+  entity = entity.canonical_declaration();
+
   // Fill all redeclarations.
   for (NamedDecl redecl : entity.redeclarations()) {
     if (result_promise.isCanceled()) {
@@ -971,6 +1052,10 @@ GetDeclInformation(QPromise<bool> &result_promise,
     // Collect all macros used by all redeclarations.
     FillUsedMacros(result_promise, receiver, file_location_cache, batch,
                    redecl.tokens());
+  }
+
+  if (auto type = TypeDecl::from(entity)) {
+    FillTypeDeclInformation(batch, std::move(type.value()));
   }
 
   // If this is a function, then look at who it calls, and who calls it.
