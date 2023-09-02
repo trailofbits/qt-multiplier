@@ -642,6 +642,8 @@ void InformationExplorerModel::ProcessDataBatchQueue() {
     return;
   }
 
+  auto reset_model{d->nodes.size() == 1};
+
   // Imports the changes.
   for (DataBatch &data_batch : data_batch_queue) {
     for (EntityInformation &entity_information : data_batch) {
@@ -649,23 +651,36 @@ void InformationExplorerModel::ProcessDataBatchQueue() {
     }
   }
 
-  //  emit beginResetModel();
+  if (reset_model) {
+    emit beginResetModel();
+  }
+
   // Exposes the changes.
   for (const Change &change : d->change_list) {
     QModelIndex parent_index;
     if (change.parent != d->root) {
       parent_index = createIndex(change.parent->row, 0, change.parent);
     }
-    emit beginInsertRows(
-        parent_index, change.parent->child_count,
-        change.parent->child_count + change.num_children_added - 1);
+
+    if (!reset_model) {
+      emit beginInsertRows(
+          parent_index, change.parent->child_count,
+          change.parent->child_count + change.num_children_added - 1);
+    }
+
     change.parent->child_count += change.num_children_added;
-    emit endInsertRows();
+
+    if (!reset_model) {
+      emit endInsertRows();
+    }
   }
 
   d->change_list.clear();
   d->changes.clear();
-  //  emit endResetModel();
+
+  if (reset_model) {
+    emit endResetModel();
+  }
 }
 
 }  // namespace mx::gui
