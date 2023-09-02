@@ -68,6 +68,15 @@ void EntityExplorerItemDelegate::paint(QPainter *painter,
     return;
   }
 
+  // This item may have been highlighted by the global highlighter. If that
+  // is the case, then do not apply any style and just forward this to
+  // the base QStyledItemDelegate class
+  if (auto background_var = index.data(Qt::BackgroundRole);
+      background_var.isValid()) {
+    QStyledItemDelegate::paint(painter, option, index);
+    return;
+  }
+
   QVariant val = index.data(IEntityExplorerModel::TokenRole);
   if (!val.isValid()) {
     this->QStyledItemDelegate::paint(painter, option, index);
@@ -79,15 +88,8 @@ void EntityExplorerItemDelegate::paint(QPainter *painter,
   QColor background_color;
   if ((option.state & QStyle::State_Selected) != 0) {
     background_color = code_view_theme.selected_line_background_color;
-
   } else {
-    if (auto background_var = index.data(Qt::BackgroundRole);
-        background_var.isValid()) {
-      background_color = background_var.value<QColor>();
-
-    } else {
-      background_color = code_view_theme.default_background_color;
-    }
+    background_color = code_view_theme.default_background_color;
   }
 
   painter->fillRect(option.rect, QBrush(background_color));
