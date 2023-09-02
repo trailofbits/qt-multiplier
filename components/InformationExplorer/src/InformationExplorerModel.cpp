@@ -286,8 +286,9 @@ void InformationExplorerModel::RequestEntityInformation(
   d->info_future_watcher.setFuture(d->info_request_status_future);
   d->import_timer.start(250);
 
+  d->opt_active_entity_name =
+      tr("Entity #") + QString::number(d->active_entity_id);
   d->name_request_future = d->database->RequestEntityName(entity_id);
-
   d->name_future_watcher.setFuture(d->name_request_future);
 }
 
@@ -433,7 +434,6 @@ void InformationExplorerModel::InfoFutureResultStateChanged(void) {
 
   // We got something.
   d->active_entity_id = d->next_active_entity_id;
-  d->opt_active_entity_name = tr("CIAO CIAO");  // TODO xxxxxx
 }
 
 void InformationExplorerModel::NameFutureResultStateChanged(void) {
