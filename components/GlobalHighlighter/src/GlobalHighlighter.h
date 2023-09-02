@@ -11,6 +11,7 @@
 #include "Types.h"
 
 #include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/IThemeManager.h>
 
 namespace mx::gui {
 
@@ -58,6 +59,10 @@ class GlobalHighlighter final : public IGlobalHighlighter {
  private slots:
   //! Called when the entity name resolution has finished
   void EntityListFutureStatusChanged();
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
  signals:
   //! Signals the proxy models that the highlight set has changed

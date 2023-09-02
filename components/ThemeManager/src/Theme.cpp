@@ -20,7 +20,7 @@ QPalette GetLightPalette() {
   palette.setColor(QPalette::Text, QColor::fromRgb(0xff2e3436));
   palette.setColor(QPalette::BrightText, QColor::fromRgb(0xff000000));
   palette.setColor(QPalette::ButtonText, QColor::fromRgb(0xff2e3436));
-  palette.setColor(QPalette::Base, QColor::fromRgb(0xffffffff));
+  palette.setColor(QPalette::Base, QColor::fromRgb(255, 255, 255));
   palette.setColor(QPalette::Window, QColor::fromRgb(0xfff6f5f4));
   palette.setColor(QPalette::Shadow, QColor::fromRgb(0xff000000));
   palette.setColor(QPalette::Highlight, QColor::fromRgb(0xff3584e4));
@@ -48,7 +48,7 @@ QPalette GetDarkPalette() {
   palette.setColor(QPalette::Text, QColor::fromRgb(0xffeeeeec));
   palette.setColor(QPalette::BrightText, QColor::fromRgb(0xffffffff));
   palette.setColor(QPalette::ButtonText, QColor::fromRgb(0xffeeeeec));
-  palette.setColor(QPalette::Base, QColor::fromRgb(0xff2d2d2d));
+  palette.setColor(QPalette::Base, QColor::fromRgb(0x1e, 0x1e, 0x1e).darker());
   palette.setColor(QPalette::Window, QColor::fromRgb(0xff353535));
   palette.setColor(QPalette::Shadow, QColor::fromRgb(0xff000000));
   palette.setColor(QPalette::Highlight, QColor::fromRgb(0xff15539e));

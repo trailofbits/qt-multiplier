@@ -117,6 +117,9 @@ GlobalHighlighter::GlobalHighlighter(
   layout->addWidget(d->scroll_area);
   setLayout(layout);
 
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &GlobalHighlighter::OnThemeChange);
+
   setEnabled(false);
 }
 
@@ -228,6 +231,15 @@ void GlobalHighlighter::EntityListFutureStatusChanged() {
 
   setEnabled(!d->entity_color_map.empty());
   emit EntityColorMapChanged(d->entity_color_map);
+}
+
+void GlobalHighlighter::OnThemeChange(const QPalette &palette,
+                                      const CodeViewTheme &) {
+
+  auto modified_palette = palette;
+  modified_palette.setColor(QPalette::Window, palette.base().color());
+
+  d->scroll_area->setPalette(modified_palette);
 }
 
 }  // namespace mx::gui
