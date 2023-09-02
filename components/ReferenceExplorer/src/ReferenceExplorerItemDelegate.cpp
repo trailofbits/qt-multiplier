@@ -78,8 +78,6 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
     icon_label = icon_label_var.toString();
   }
 
-  QColor icon_bg = option.palette.base().color().darker();
-
   QFontMetrics font_metrics(option.font);
   auto margin{GetMarginSize(font_metrics)};
   auto icon_size{GetIconSize(font_metrics)};
@@ -102,6 +100,7 @@ void ReferenceExplorerItemDelegate::paint(QPainter *painter,
 
   painter->translate(option.rect.x() + margin, option.rect.y() + margin);
 
+  static const QColor icon_bg{QColor::fromRgb(0x20, 0x20, 0x20)};
   DrawIcon(*painter, icon_size, icon_label, icon_bg);
 
   painter->translate(icon_size + (margin * 2), 0);
@@ -143,7 +142,7 @@ void ReferenceExplorerItemDelegate::DrawIcon(QPainter &painter, const int &size,
   text_font.setPointSize(static_cast<int>(text_font.pointSize() * 0.8));
 
   pen_color = pen_color.lighter(50);
-  painter.setPen(QColor(255, 255, 255));
+  painter.setPen(QColor(0xA0, 0xA0, 0xA0));
 
   auto original_font = painter.font();
   painter.setFont(text_font);

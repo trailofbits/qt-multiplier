@@ -56,15 +56,8 @@ void InformationExplorerTreeView::InstallItemDelegate() {
   setItemDelegate(new InformationExplorerItemDelegate());
 }
 
-void InformationExplorerTreeView::OnThemeChange(
-    const QPalette &palette, const CodeViewTheme &code_view_theme) {
-  // Do not spawn popups from this widget without restoring the
-  // real application palette first!
-  auto custom_palette = palette;
-  custom_palette.setBrush(QPalette::Base,
-                          QBrush(code_view_theme.default_background_color));
-  setPalette(custom_palette);
-
+void InformationExplorerTreeView::OnThemeChange(const QPalette &,
+                                                const CodeViewTheme &) {
   InstallItemDelegate();
   update();
 }
