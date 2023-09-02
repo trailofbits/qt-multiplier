@@ -39,11 +39,11 @@ QColor GetIconColor(const IconStyle &style) {
     case IconStyle::None: color = is_dark_theme ? Qt::white : Qt::black; break;
 
     case IconStyle::Highlighted:
-      color = is_dark_theme ? Qt::cyan : Qt::red;
+      color = is_dark_theme ? Qt::darkGray : Qt::red;
       break;
 
     case IconStyle::Disabled:
-      color = is_dark_theme ? Qt::gray : Qt::white;
+      color = is_dark_theme ? Qt::black : Qt::white;
       break;
   }
 
