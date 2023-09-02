@@ -38,6 +38,7 @@ struct CodeModel::PrivateData final {
   const IndexedTokenRangeData::Line *last_line_cache{nullptr};
   const IndexedTokenRangeData::Column *last_column_cache{nullptr};
   IndexedTokenRangeData tokens;
+  int num_lines{0};
 
   const IndexedTokenRangeData::Line *LinePointerCast(const QModelIndex &index);
 
@@ -59,9 +60,9 @@ CodeModel::PrivateData::LinePointerCast(const QModelIndex &model_index) {
   }
 
   auto line = reinterpret_cast<const IndexedTokenRangeData::Line *>(ptr);
-  if (auto num_lines = tokens.lines.size()) {
+  if (num_lines) {
     auto first = tokens.lines.data();
-    auto last = &(first[num_lines - 1u]);
+    auto last = &(first[num_lines - 1]);
     if (first <= line && line <= last) {
       last_line_cache = line;
       return line;
@@ -77,12 +78,11 @@ CodeModel::PrivateData::ColumnPointerCast(const QModelIndex &model_index) {
     return last_column_cache;
   }
 
-  unsigned row = static_cast<unsigned>(model_index.row());
-  auto num_lines = tokens.lines.size();
-  if (row >= num_lines) {  // Make unsafe :-P
+  if (model_index.row() >= num_lines) {  // Make unsafe :-P
     return nullptr;
   }
 
+  unsigned row = static_cast<unsigned>(model_index.row());
   const IndexedTokenRangeData::Line &line = tokens.lines[row];
   last_line_cache = &line;
 
@@ -178,7 +178,7 @@ QModelIndex CodeModel::parent(const QModelIndex &child) const {
 
 int CodeModel::rowCount(const QModelIndex &parent) const {
   if (!parent.isValid()) {  // Root item.
-    return static_cast<int>(d->tokens.lines.size());
+    return d->num_lines;
   } else {
     return 0;
   }
@@ -302,6 +302,7 @@ void CodeModel::FutureResultStateChanged() {
     d->last_line_cache = nullptr;
     d->last_column_cache = nullptr;
     d->tokens = std::move(new_tokens);
+    d->num_lines = static_cast<int>(d->tokens.lines.size());
     d->model_state = ModelState::Ready;
     emit endResetModel();
 
@@ -313,12 +314,7 @@ void CodeModel::FutureResultStateChanged() {
     return;
   }
 
-  auto old_tokens = std::move(d->tokens);
-  d->tokens = std::move(new_tokens);
-
-  d->last_line_cache = nullptr;
-  d->last_column_cache = nullptr;
-  d->model_state = ModelState::Ready;
+  auto &old_tokens = d->tokens;
 
   // Compare the old lines with the new lines to determine what
   // has changed
@@ -327,7 +323,7 @@ void CodeModel::FutureResultStateChanged() {
   std::size_t old_line_index{};
 
   std::vector<std::size_t> added_line_list;
-  const auto &new_line_list = d->tokens.lines;
+  const auto &new_line_list = new_tokens.lines;
   std::size_t new_line_index{};
 
   for (;;) {
@@ -462,11 +458,18 @@ void CodeModel::FutureResultStateChanged() {
 
   auto added_line_range_list = L_convertToRanges(added_line_list);
 
+  d->tokens = std::move(new_tokens);
+  d->last_line_cache = nullptr;
+  d->last_column_cache = nullptr;
+
   for (const auto &removed_line_range : removed_line_range_list) {
     auto first_line = static_cast<int>(removed_line_range.first);
     auto last_line = static_cast<int>(removed_line_range.second);
 
     emit beginRemoveRows(QModelIndex(), first_line, last_line);
+    d->last_line_cache = nullptr;
+    d->last_column_cache = nullptr;
+    d->num_lines -= (last_line - first_line + 1);
     emit endRemoveRows();
   }
 
@@ -476,8 +479,15 @@ void CodeModel::FutureResultStateChanged() {
     auto last_line = static_cast<int>(added_line_range.second);
 
     emit beginInsertRows(QModelIndex(), first_line, last_line);
+    d->last_line_cache = nullptr;
+    d->last_column_cache = nullptr;
+    d->num_lines += (last_line - first_line + 1);
     emit endInsertRows();
   }
+
+  d->last_line_cache = nullptr;
+  d->last_column_cache = nullptr;
+  d->model_state = ModelState::Ready;
 }
 
 void CodeModel::OnExpandMacros(const TokenTreeVisitor *visitor) {
