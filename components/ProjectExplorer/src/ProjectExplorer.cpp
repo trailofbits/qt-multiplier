@@ -164,6 +164,9 @@ void ProjectExplorer::InitializeWidgets() {
 
   connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
           &ProjectExplorer::OnOpenItemContextMenu);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &ProjectExplorer::OnThemeChange);
 }
 
 void ProjectExplorer::InstallModel(IFileTreeModel *model) {
@@ -360,6 +363,12 @@ void ProjectExplorer::OnStartSearching() {
 void ProjectExplorer::OnStopSearching() {
   ApplyExpandedNodeList(d->expanded_node_list);
   d->expanded_node_list.clear();
+}
+
+void ProjectExplorer::OnThemeChange(const QPalette &,
+                                    const CodeViewTheme &code_view_theme) {
+  QFont font(code_view_theme.font_name);
+  setFont(font);
 }
 
 }  // namespace mx::gui
