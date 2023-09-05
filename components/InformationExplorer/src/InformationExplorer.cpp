@@ -93,6 +93,9 @@ void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model,
 
   setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &InformationExplorer::OnThemeChange);
 }
 
 void InformationExplorer::InstallModel(IInformationExplorerModel *model,
@@ -225,6 +228,12 @@ void InformationExplorer::ExpandAllNodes(const QModelIndex &parent) {
   }
 
   d->tree_view->resizeColumnToContents(0);
+}
+
+void InformationExplorer::OnThemeChange(const QPalette &,
+                                        const CodeViewTheme &code_view_theme) {
+  QFont font{code_view_theme.font_name};
+  setFont(font);
 }
 
 }  // namespace mx::gui
