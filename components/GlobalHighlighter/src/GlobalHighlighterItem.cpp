@@ -137,9 +137,12 @@ void GlobalHighlighterItem::onDeleteButtonPress() {
   deleteLater();
 }
 
-void GlobalHighlighterItem::OnThemeChange(const QPalette &,
-                                          const CodeViewTheme &) {
+void GlobalHighlighterItem::OnThemeChange(
+    const QPalette &, const CodeViewTheme &code_view_theme) {
   UpdateIcons();
+
+  QFont font{code_view_theme.font_name};
+  setFont(font);
 }
 
 }  // namespace mx::gui
