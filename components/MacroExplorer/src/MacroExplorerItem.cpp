@@ -58,16 +58,16 @@ MacroExplorerItem::MacroExplorerItem(
 
   setLayout(layout);
 
-  connect(d->delete_button, &QPushButton::clicked,
-          this, &MacroExplorerItem::onDeleteButtonPress);
+  connect(d->delete_button, &QPushButton::clicked, this,
+          &MacroExplorerItem::onDeleteButtonPress);
 
   auto explorer = static_cast<MacroExplorer *>(parent);
 
-  connect(this, &MacroExplorerItem::Deleted,
-          explorer, &MacroExplorer::RemoveMacro);
+  connect(this, &MacroExplorerItem::Deleted, explorer,
+          &MacroExplorer::RemoveMacro);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged,
-          this, &MacroExplorerItem::OnThemeChange);
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &MacroExplorerItem::OnThemeChange);
 
   UpdateIcons();
 }
@@ -83,8 +83,12 @@ void MacroExplorerItem::onDeleteButtonPress() {
   deleteLater();
 }
 
-void MacroExplorerItem::OnThemeChange(const QPalette &, const CodeViewTheme &) {
+void MacroExplorerItem::OnThemeChange(const QPalette &,
+                                      const CodeViewTheme &code_view_theme) {
   UpdateIcons();
+
+  QFont font(code_view_theme.font_name);
+  setFont(font);
 }
 
 }  // namespace mx::gui
