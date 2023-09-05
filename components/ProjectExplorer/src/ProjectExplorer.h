@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/IProjectExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
+#include <multiplier/ui/IThemeManager.h>
 
 namespace mx::gui {
 
@@ -68,6 +69,10 @@ class ProjectExplorer final : public IProjectExplorer {
 
   //! Called right after search is disabled to restore the node expansion status
   void OnStopSearching();
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
   friend class IProjectExplorer;
 };
