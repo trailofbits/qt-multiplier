@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/IEntityExplorerModel.h>
+#include <multiplier/ui/TokenPainter.h>
 
 #include <multiplier/Token.h>
 
@@ -28,35 +29,52 @@
 
 namespace mx::gui {
 
+struct EntityExplorerItemDelegate::PrivateData final {
+  QFont font;
+  std::unique_ptr<TokenPainter> token_painter;
+};
+
 EntityExplorerItemDelegate::EntityExplorerItemDelegate(
     const CodeViewTheme &theme, QObject *parent)
     : QStyledItemDelegate(parent),
-      d(TokenPainterConfiguration(theme)) {}
+      d(new PrivateData) {
+  SetTheme(theme);
+}
 
 EntityExplorerItemDelegate::~EntityExplorerItemDelegate(void) {}
 
 void EntityExplorerItemDelegate::SetTheme(const CodeViewTheme &theme) {
-  TokenPainterConfiguration config = d.Configuration();
-  config.theme = theme;
-  d = TokenPainter(config);
+  d->font = QFont(theme.font_name);
+
+  TokenPainterConfiguration token_painter_config({});
+  if (d->token_painter != nullptr) {
+    token_painter_config = d->token_painter->Configuration();
+  }
+
+  token_painter_config.theme = theme;
+
+  d->token_painter = std::make_unique<TokenPainter>(token_painter_config);
 }
 
 void EntityExplorerItemDelegate::SetTabWidth(std::size_t width) {
-  TokenPainterConfiguration config = d.Configuration();
-  config.tab_width = width;
-  d = TokenPainter(config);
+  auto token_painter_config = d->token_painter->Configuration();
+  token_painter_config.tab_width = width;
+
+  d->token_painter = std::make_unique<TokenPainter>(token_painter_config);
 }
 
 void EntityExplorerItemDelegate::SetWhitespaceReplacement(QString data) {
-  TokenPainterConfiguration config = d.Configuration();
-  config.whitespace_replacement = data;
-  d = TokenPainter(config);
+  auto token_painter_config = d->token_painter->Configuration();
+  token_painter_config.whitespace_replacement = data;
+
+  d->token_painter = std::make_unique<TokenPainter>(token_painter_config);
 }
 
 void EntityExplorerItemDelegate::ClearWhitespaceReplacement(void) {
-  TokenPainterConfiguration config = d.Configuration();
-  config.whitespace_replacement.reset();
-  d = TokenPainter(config);
+  auto token_painter_config = d->token_painter->Configuration();
+  token_painter_config.whitespace_replacement.reset();
+
+  d->token_painter = std::make_unique<TokenPainter>(token_painter_config);
 }
 
 void EntityExplorerItemDelegate::paint(QPainter *painter,
@@ -83,7 +101,7 @@ void EntityExplorerItemDelegate::paint(QPainter *painter,
     return;
   }
 
-  auto code_view_theme = d.Configuration().theme;
+  auto code_view_theme = d->token_painter->Configuration().theme;
 
   QColor background_color;
   if ((option.state & QStyle::State_Selected) != 0) {
@@ -93,7 +111,7 @@ void EntityExplorerItemDelegate::paint(QPainter *painter,
   }
 
   painter->fillRect(option.rect, QBrush(background_color));
-  d.Paint(painter, option, qvariant_cast<Token>(val));
+  d->token_painter->Paint(painter, option, qvariant_cast<Token>(val));
 
   // The highlight color used by the theme is barely visible, force better
   // highlighting using the standard highlight color to draw a frame
@@ -118,7 +136,8 @@ QSize EntityExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
     return QStyledItemDelegate::sizeHint(option, index);
   }
 
-  QSize contents_size = d.SizeHint(option, qvariant_cast<Token>(val));
+  QSize contents_size =
+      d->token_painter->SizeHint(option, qvariant_cast<Token>(val));
 
   QStyleOptionViewItem opt(option);
   initStyleOption(&opt, index);
