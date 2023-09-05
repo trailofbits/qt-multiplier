@@ -234,12 +234,15 @@ void GlobalHighlighter::EntityListFutureStatusChanged() {
 }
 
 void GlobalHighlighter::OnThemeChange(const QPalette &palette,
-                                      const CodeViewTheme &) {
+                                      const CodeViewTheme &code_view_theme) {
 
   auto modified_palette = palette;
   modified_palette.setColor(QPalette::Window, palette.base().color());
 
   d->scroll_area->setPalette(modified_palette);
+
+  QFont font{code_view_theme.font_name};
+  setFont(font);
 }
 
 }  // namespace mx::gui

@@ -213,6 +213,12 @@ void MacroExplorer::RemoveMacro(RawEntityId macro_id) {
   emit ExpandMacros(d.get());
 }
 
+void MacroExplorer::OnThemeChange(const QPalette &,
+                                  const CodeViewTheme &code_view_theme) {
+  QFont font(code_view_theme.font_name);
+  setFont(font);
+}
+
 // NOTE(pag): `d->lock` is held in exclusive mode.
 void MacroExplorer::UpdateList(void) {
 
@@ -288,6 +294,9 @@ MacroExplorer::MacroExplorer(const Index &index,
   scroll_area->setWidget(widget);
   layout->addWidget(scroll_area);
   setLayout(layout);
+
+  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+          &MacroExplorer::OnThemeChange);
 }
 
 }  // namespace mx::gui

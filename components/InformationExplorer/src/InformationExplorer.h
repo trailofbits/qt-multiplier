@@ -10,6 +10,7 @@
 
 #include <multiplier/ui/IInformationExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
+#include <multiplier/ui/IThemeManager.h>
 
 #include <QWidget>
 
@@ -64,7 +65,11 @@ class InformationExplorer final : public IInformationExplorer {
   void OnHistoryNavigationEntitySelected(RawEntityId original_id,
                                          RawEntityId canonical_id);
 
+  //! Called on model resets to expand all nodes
   void ExpandAllNodes(const QModelIndex &parent);
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &, const CodeViewTheme &code_view_theme);
 
   friend class IInformationExplorer;
 };

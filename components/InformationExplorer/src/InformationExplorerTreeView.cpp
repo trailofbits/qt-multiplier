@@ -56,9 +56,13 @@ void InformationExplorerTreeView::InstallItemDelegate() {
   setItemDelegate(new InformationExplorerItemDelegate());
 }
 
-void InformationExplorerTreeView::OnThemeChange(const QPalette &,
-                                                const CodeViewTheme &) {
+void InformationExplorerTreeView::OnThemeChange(
+    const QPalette &, const CodeViewTheme &code_view_theme) {
   InstallItemDelegate();
+
+  QFont font(code_view_theme.font_name);
+  setFont(font);
+
   update();
 }
 
