@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <multiplier/ui/IThemeManager.h>
 #include <multiplier/ui/IMacroExplorer.h>
 
 namespace mx {
@@ -41,7 +42,12 @@ class MacroExplorer final : public IMacroExplorer {
   virtual void AddMacro(RawEntityId macro_id, RawEntityId token_id) override;
 
  private slots:
+  //! Unexpands the specified amcro
   void RemoveMacro(RawEntityId macro_id);
+
+  //! Called by the theme manager
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
 
  private:
   struct PrivateData;
