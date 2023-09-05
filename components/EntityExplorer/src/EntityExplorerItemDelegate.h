@@ -10,7 +10,6 @@
 
 #include <multiplier/ui/CodeViewTheme.h>
 
-#include <multiplier/ui/TokenPainter.h>
 #include <QPainter>
 #include <QStyleOptionViewItem>
 #include <QStyledItemDelegate>
@@ -51,7 +50,8 @@ class EntityExplorerItemDelegate final : public QStyledItemDelegate {
                          const QModelIndex &index) const override;
 
  private:
-  TokenPainter d;
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
 };
 
 }  // namespace mx::gui

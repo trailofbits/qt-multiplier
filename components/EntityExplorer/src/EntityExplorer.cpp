@@ -249,6 +249,9 @@ void EntityExplorer::OnCategoryChange(
 void EntityExplorer::OnThemeChange(const QPalette &,
                                    const CodeViewTheme &code_view_theme) {
   InstallItemDelegate(code_view_theme);
+
+  QFont font{code_view_theme.font_name};
+  setFont(font);
 }
 
 }  // namespace mx::gui
