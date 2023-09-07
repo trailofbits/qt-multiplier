@@ -58,14 +58,7 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
         continue;
       }
 
-      Fragment fragment = Fragment::containing(named_decl);
-      data_batch.push_back(IDatabase::EntityQueryResult{
-          named_decl.id().Pack(),
-          fragment,
-          File::containing(fragment),
-          std::move(name_token),
-          std::move(named_decl),
-      });
+      data_batch.push_back(std::move(name_token));
 
     } else if (std::holds_alternative<DefineMacroDirective>(named_entity)) {
       DefineMacroDirective &macro =
@@ -81,21 +74,42 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
       if (query_mode == IDatabase::QueryEntitiesMode::ExactMatch) {
         skip_entity = macro_name != std_string;
       } else {
-        skip_entity = macro_name.find(std_string) == 0;
+        skip_entity = macro_name.find(std_string) == std::string::npos;
       }
 
       if (skip_entity) {
         continue;
       }
 
-      Fragment fragment = Fragment::containing(macro);
-      data_batch.push_back(IDatabase::EntityQueryResult{
-          name_token.id().Pack(),
-          fragment,
-          File::containing(fragment),
-          std::move(name_token),
-          std::move(macro),
-      });
+      data_batch.emplace_back(std::move(name_token));
+    
+    } else if (std::holds_alternative<File>(named_entity)) {
+      File &file = std::get<File>(named_entity);
+      for (std::filesystem::path path : file.paths()) {
+        auto path_str = path.generic_string();
+        auto skip_entity{true};
+        if (query_mode == IDatabase::QueryEntitiesMode::ExactMatch) {
+          skip_entity = path_str != std_string;
+        } else {
+          skip_entity = path_str.find(std_string) == std::string::npos;
+        }
+
+        if (skip_entity) {
+          continue;
+        }
+
+        SimpleToken path_tok;
+        path_tok.category = TokenCategory::FILE_NAME;
+        path_tok.kind = TokenKind::HEADER_NAME;
+        path_tok.related_entity = file;
+        path_tok.data = std::move(path_str);
+
+        std::vector<CustomToken> toks;
+        toks.emplace_back(std::move(path_tok));
+
+        data_batch.emplace_back(TokenRange::create(std::move(toks)).front());
+        break;
+      }
     }
 
     if (data_batch.size() >= kBatchSize) {

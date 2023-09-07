@@ -18,20 +18,19 @@ namespace {
 const int kInitialUpdateTimer{500};
 const int kUpdateTimer{1000};
 
-struct EntityQueryResultCmp final {
-  bool operator()(const IDatabase::EntityQueryResult *lhs,
-                  const IDatabase::EntityQueryResult *rhs) const {
+struct TokenPtrCmp final {
+  bool operator()(const Token *lhs,
+                  const Token *rhs) const {
 
-    const auto &lhs_string_view = lhs->name_token.data();
-    const auto &rhs_string_view = rhs->name_token.data();
+    const auto &lhs_string_view = lhs->data();
+    const auto &rhs_string_view = rhs->data();
 
     return lhs_string_view < rhs_string_view;
   }
 };
 
 bool RegexMatchesEntityName(
-    const IDatabase::EntityQueryResult &entity,
-    const std::optional<QRegularExpression> &opt_regex) {
+    const Token &entity, const std::optional<QRegularExpression> &opt_regex) {
 
   if (!opt_regex.has_value()) {
     return true;
@@ -39,7 +38,7 @@ bool RegexMatchesEntityName(
 
   const auto &regex = opt_regex.value();
 
-  auto string_view = entity.name_token.data();
+  auto string_view = entity.data();
   auto string_view_size = static_cast<qsizetype>(string_view.size());
 
   auto entity_name = QString::fromUtf8(string_view.data(), string_view_size);
@@ -49,7 +48,7 @@ bool RegexMatchesEntityName(
 }
 
 bool EntityIncludedInTokenCategorySet(
-    const IDatabase::EntityQueryResult &entity,
+    const Token &entity,
     const std::optional<EntityExplorerModel::TokenCategorySet>
         &opt_token_category_set) {
 
@@ -58,7 +57,7 @@ bool EntityIncludedInTokenCategorySet(
   }
 
   const auto &token_category_set = opt_token_category_set.value();
-  return token_category_set.count(entity.name_token.category()) > 0;
+  return token_category_set.count(entity.category()) > 0;
 }
 
 }  // namespace
@@ -71,13 +70,13 @@ struct EntityExplorerModel::PrivateData final {
   QFuture<bool> request_status_future;
   QFutureWatcher<bool> future_watcher;
 
-  std::deque<IDatabase::EntityQueryResult> results;
+  std::deque<Token> results;
 
   std::optional<TokenCategorySet> opt_token_category_set{};
   SortingMethod sorting_method{SortingMethod::Ascending};
   std::optional<QRegularExpression> opt_regex;
 
-  std::vector<const IDatabase::EntityQueryResult *> row_list;
+  std::vector<const Token *> row_list;
 
   std::vector<IDatabase::QueryEntitiesReceiver::DataBatch> data_batch_queue;
   std::mutex data_batch_mutex;
@@ -136,21 +135,27 @@ QVariant EntityExplorerModel::data(const QModelIndex &index, int role) const {
     return value;
   }
 
-  const IDatabase::EntityQueryResult *row = d->row_list[row_index];
+  const Token *row = d->row_list[row_index];
   if (!row) {
     return value;  // Shouldn't happen.
   }
 
   if (role == Qt::DisplayRole) {
-    std::string_view name = row->name_token.data();
+    std::string_view name = row->data();
     qsizetype name_len = static_cast<qsizetype>(name.size());
     value.setValue(QString::fromUtf8(name.data(), name_len));
 
   } else if (role == EntityExplorerModel::TokenRole) {
-    value.setValue(row->name_token);
+    value.setValue(*row);
 
   } else if (role == EntityExplorerModel::TokenIdRole) {
-    value.setValue(static_cast<qulonglong>(row->entity_id));
+    if (auto tok_id = row->id().Pack(); tok_id != kInvalidEntityId) {
+      value.setValue(static_cast<qulonglong>(tok_id));
+
+    } else if (auto ent_id = row->related_entity_id().Pack();
+               ent_id != kInvalidEntityId) {
+      value.setValue(static_cast<qulonglong>(ent_id));
+    }
   }
 
   return value;
@@ -242,7 +247,7 @@ void EntityExplorerModel::OnDataBatch(
 void EntityExplorerModel::GenerateRows(void) {
   d->row_list.clear();
 
-  for (const IDatabase::EntityQueryResult &entity : d->results) {
+  for (const Token &entity : d->results) {
     if (!EntityIncludedInTokenCategorySet(entity, d->opt_token_category_set)) {
       continue;
     }
@@ -259,8 +264,7 @@ void EntityExplorerModel::SortRows(void) {
 
   // Use a stable sort to maintain order from Multiplier API, which orders by
   // entity IDs. This puts definitions before declarations.
-  std::stable_sort(d->row_list.begin(), d->row_list.end(),
-                   EntityQueryResultCmp{});
+  std::stable_sort(d->row_list.begin(), d->row_list.end(), TokenPtrCmp{});
 
   if (d->sorting_method == SortingMethod::Descending) {
     std::reverse(d->row_list.begin(), d->row_list.end());
@@ -291,7 +295,7 @@ void EntityExplorerModel::ProcessDataBatchQueue() {
     }
 
     for (auto &data_batch_entity : data_batch) {
-      const IDatabase::EntityQueryResult &entity =
+      const Token &entity =
           d->results.emplace_back(std::move(data_batch_entity));
 
       if (!EntityIncludedInTokenCategorySet(entity,
