@@ -31,6 +31,7 @@
 #include <QRegularExpression>
 #include <QShortcut>
 #include <QTimer>
+#include <QScrollBar>
 
 #include <unordered_set>
 #include <vector>
@@ -110,7 +111,36 @@ void CodeView::SetTheme(const CodeViewTheme &theme) {
   palette.setColor(QPalette::AlternateBase, d->theme.default_background_color);
   d->text_edit->setPalette(palette);
 
+  const auto L_saveScrollBarValue =
+      [](const QScrollBar *scrollbar) -> std::optional<int> {
+    if (scrollbar == nullptr || !scrollbar->isEnabled()) {
+      return std::nullopt;
+    }
+
+    return scrollbar->value();
+  };
+
+  const auto L_restoreScrollBarValue = [](QScrollBar *scrollbar,
+                                          const std::optional<int> &opt_value) {
+    if (scrollbar == nullptr || !scrollbar->isEnabled() ||
+        !opt_value.has_value()) {
+      return;
+    }
+
+    scrollbar->setValue(opt_value.value());
+  };
+
+  auto opt_vertical_scroll =
+      L_saveScrollBarValue(d->text_edit->verticalScrollBar());
+  auto opt_horizontal_scroll =
+      L_saveScrollBarValue(d->text_edit->horizontalScrollBar());
+
   OnModelReset();
+
+  L_restoreScrollBarValue(d->text_edit->verticalScrollBar(),
+                          opt_vertical_scroll);
+  L_restoreScrollBarValue(d->text_edit->horizontalScrollBar(),
+                          opt_horizontal_scroll);
 }
 
 void CodeView::SetTabWidth(std::size_t width) {
