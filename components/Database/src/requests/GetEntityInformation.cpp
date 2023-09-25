@@ -695,11 +695,7 @@ static void FillTypeDeclInformation(DataBatch &batch, TypeDecl entity) {
     if (auto align = type->alignment()) {
       EntityInformation &sel = batch.emplace_back();
       sel.category = "Size";
-      if (!(align.value() % 8u)) {
-        sel.display_role = QObject::tr("Alignment %1 (bytes)").arg(align.value() / 8u);
-      } else {
-        sel.display_role = QObject::tr("Alignment %1 (bits)").arg(align.value());
-      }
+      sel.display_role = QObject::tr("Alignment %1 (bytes)").arg(align.value());
     }
   }
 }
