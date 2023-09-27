@@ -42,6 +42,10 @@ target_sources("mx_referenceexplorer" INTERFACE
   Resources/Resources.qrc
 )
 
+if(MX_ENABLE_VAST)
+  set(mlir_dep "multiplier::mx-mlir")
+endif()
+
 target_link_libraries("mx_referenceexplorer"
   PRIVATE
     "qtmx_cxx_flags"
@@ -50,7 +54,7 @@ target_link_libraries("mx_referenceexplorer"
     "thirdparty_qt"
     "multiplier::mx-api"
     "multiplier::mx-analysis"
-    "multiplier::mx-mlir"
+    ${mlir_dep}
     "gap::gap"
     "mx_assert"
     "mx_searchwidget"

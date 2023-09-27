@@ -12,7 +12,6 @@ if(MXQT_ENABLE_INSTALL AND MXQT_GENERATE_LIBRARY_MANIFEST)
     "vast"
     "multiplier"
     "pasta"
-    "weggli-native"
   )
 
   find_package(Git REQUIRED)
