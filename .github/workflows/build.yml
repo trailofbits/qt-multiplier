@@ -26,6 +26,10 @@ concurrency:
 
 jobs:
   macos:
+    # Disable for now, we can no longer build the multiplier library
+    # like this
+    if: false
+
     strategy:
       matrix:
         build_type: [Release]
@@ -39,6 +43,10 @@ jobs:
       cxx_common_tag: v0.4.2
 
   linux:
+    # Disable for now, we can no longer build the multiplier library
+    # like this
+    if: false
+
     strategy:
       matrix:
         build_type: [Release]
