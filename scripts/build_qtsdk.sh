@@ -2,8 +2,39 @@
 
 QTSDK_REPOSITORY="https://code.qt.io/qt/qt5.git"
 QTSDK_VERSION="v6.4.2"
+BUILD_TYPE=Release
+RELEASE_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -gline-tables-only"
+DEBUG_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -O0 -g3"
+FLAGS="${RELEASE_FLAGS}"
+CONFIG_EXTRA=-release
 
 main() {
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+
+    case $key in
+    -h | --help)
+      Help
+      exit 0
+      ;;
+    --debug)
+      BUILD_TYPE=Debug
+      FLAGS="${DEBUG_FLAGS}"
+      CONFIG_EXTRA=
+      ;;
+    --release)
+      BUILD_TYPE=Release
+      FLAGS="${RELEASE_FLAGS}"
+      CONFIG_EXTRA=-release
+      ;;
+    *)
+      ADD_ARGS+=("$1")
+      ;;
+    esac
+    shift
+  done
+
+
   clone_or_update_qtsdk
   configure_build
   build_project
@@ -20,8 +51,29 @@ build_project() {
 
 configure_build() {
   mkdir -p "qt5-build"
-  ( cd "qt5-build" && ../qt5/configure -developer-build -opensource -nomake examples -nomake tests ) || panic "The configuration step has failed"
-  cmake -S "qt5" -B "qt5-build" -DWARNINGS_ARE_ERRORS=OFF
+  ( cd "qt5-build" && CC=`which clang` CXX=`which clang++` \
+                      ../qt5/configure \
+                      ${CONFIG_EXTRA} \
+                      -developer-build \
+                      -opensource \
+                      -nomake examples \
+                      -nomake tests \
+                      -qt-zlib \
+                      -qt-freetype \
+                      -qt-pcre \
+                      -qt-harfbuzz \
+                      -qt-libjpeg \
+                      -qt-libpng \
+                      -no-xcb \
+                      -no-gtk ) || panic "The configuration step has failed"
+  
+  CXXFLAGS="${FLAGS}" \
+  CCFLAGS="${FLAGS}" \
+  cmake \
+      "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" 
+      -DCMAKE_C_COMPILER=`which clang` \
+      -DCMAKE_CXX_COMPILER=`which clang++` \
+      -S "qt5" -B "qt5-build" -DWARNINGS_ARE_ERRORS=OFF
 }
 
 clone_or_update_qtsdk() {
@@ -46,5 +98,5 @@ panic() {
   exit 1
 }
 
-main $@
+main "$@"
 exit $?

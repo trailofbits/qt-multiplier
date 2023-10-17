@@ -262,7 +262,7 @@ void ReferenceExplorer::CopyRefExplorerItemDetails(const QModelIndex &index) {
 
 void ReferenceExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
   auto &model = *static_cast<ReferenceExplorerModel *>(d->model);
-  model.ExpandEntity(d->model_proxy->mapToSource(index));
+  model.ExpandEntity(d->model_proxy->mapToSource(index), 1u);
 }
 
 bool ReferenceExplorer::eventFilter(QObject *obj, QEvent *event) {

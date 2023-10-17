@@ -13,6 +13,7 @@
 #include <QString>
 
 #include <unordered_map>
+#include <iostream>
 
 #include <multiplier/Entities/Stmt.h>
 #include <multiplier/Entities/Token.h>
@@ -169,16 +170,17 @@ static void GenerateLineHashes(IndexedTokenRangeData &res) {
   auto xxhash_state = XXH64_createState();
   Assert(xxhash_state != nullptr, "Failed to initialize the xxHash state");
 
-  auto column_count{res.lines.size()};
-  auto succeeded = XXH64_update(xxhash_state, &column_count,
-                                sizeof(column_count)) != XXH_ERROR;
-
-  Assert(succeeded, "Failed to update the xxHash state");
-
   for (IndexedTokenRangeData::Line &line : res.lines) {
     static const XXH64_hash_t kXxhashSeed{0};
-    succeeded = XXH64_reset(xxhash_state, kXxhashSeed) != XXH_ERROR;
+
+    auto succeeded = XXH64_reset(xxhash_state, kXxhashSeed) != XXH_ERROR;
     Assert(succeeded, "Failed to reset the xxHash state");
+
+    auto line_count{res.lines.size()};
+    succeeded = XXH64_update(xxhash_state, &line_count, sizeof(line_count)) !=
+                XXH_ERROR;
+
+    Assert(succeeded, "Failed to update the xxHash state");
 
     for (const auto &column : line.columns) {
       const auto &token = res.tokens[column.token_index];
@@ -243,7 +245,6 @@ static void PostProcessLineObjects(const FileLocationCache &file_location_cache,
   FixupLineNumbers(file_location_cache, res);
   GenerateLineHashes(res);
 }
-
 
 }  // namespace
 

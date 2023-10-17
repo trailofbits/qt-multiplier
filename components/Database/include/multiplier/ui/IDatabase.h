@@ -123,26 +123,8 @@ class IDatabase {
   virtual QFuture<RelatedEntitiesResult>
   GetRelatedEntities(RawEntityId entity_id) = 0;
 
-  //! A single entity query result
-  struct EntityQueryResult final {
-    //! The entity id of this result
-    RawEntityId entity_id{};
-
-    //! The fragment containing this token
-    Fragment fragment;
-
-    //! The file containing this token
-    std::optional<File> opt_file;
-
-    //! The entity name
-    Token name_token;
-
-    //! The entity data
-    std::variant<NamedDecl, DefineMacroDirective> data;
-  };
-
   //! A data batch receiver for EntityQueryResult objects
-  using QueryEntitiesReceiver = IBatchedDataTypeReceiver<EntityQueryResult>;
+  using QueryEntitiesReceiver = IBatchedDataTypeReceiver<Token>;
 
   //! String matching mode for QueryEntities
   enum class QueryEntitiesMode {

@@ -1142,7 +1142,7 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode) {
         case StmtKind::UNARY_EXPR_OR_TYPE_TRAIT_EXPR: {
           auto &expr =
               reinterpret_cast<const UnaryExprOrTypeTraitExpr &>(cstmt.value());
-          crumbs.AddEnum(expr.expression_or_trait_kind());
+          crumbs.AddEnum(expr.keyword_kind());
           continue;
         }
 

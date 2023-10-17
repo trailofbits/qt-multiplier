@@ -77,7 +77,7 @@ class ReferenceExplorerModel final
                          const ReferenceType &reference_type) override;
 
   //! Expands the given entity
-  virtual void ExpandEntity(const QModelIndex &index);
+  virtual void ExpandEntity(const QModelIndex &index, unsigned depth);
 
   //! Destructor
   virtual ~ReferenceExplorerModel() override;

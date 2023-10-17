@@ -38,6 +38,10 @@ function(enable_appbundle_postbuild_steps target_name)
       "/usr/local/bin"
   )
 
+  if(MACDEPLOYQT_EXECUTABLE)
+    set(macdeployqt_path "${MACDEPLOYQT_EXECUTABLE}")
+  endif()
+
   if(NOT macdeployqt_path)
     message(FATAL_ERROR "qt-multiplier: Failed to locate the macdeployqt executable")
   endif()
