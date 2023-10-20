@@ -38,6 +38,8 @@ With the text cursor on a token:
 
  * `I`: Open in the primary `Information Browser`
  * `Shift+I`: Open in a new `Information Browser`
+ * `P` or hover on a token: Open a code preview widget
+ * `Shift+P`: Open in a new code preview widget
  * `X`: Show call hierarchy. See the `Reference Explorer` section
  * `T`: Show tainting. See the `Reference Explorer` section
 

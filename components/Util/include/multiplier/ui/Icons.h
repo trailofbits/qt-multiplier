@@ -6,6 +6,8 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
+#pragma once
+
 #include <QIcon>
 #include <QPixmap>
 

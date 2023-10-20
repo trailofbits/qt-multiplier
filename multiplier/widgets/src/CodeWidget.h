@@ -17,41 +17,25 @@
 
 namespace mx::gui {
 
-//! A top-most code view used for hover events
-class QuickCodeView final : public QWidget {
+//! A widget containing a code view and its model
+class CodeWidget final : public QWidget {
   Q_OBJECT
 
  public:
   //! Constructor
-  QuickCodeView(const Index &index,
-                const FileLocationCache &file_location_cache,
-                RawEntityId entity_id, IGlobalHighlighter &highlighter,
-                IMacroExplorer &macro_explorer, QWidget *parent = nullptr);
+  CodeWidget(const Index &index, const FileLocationCache &file_location_cache,
+             RawEntityId entity_id, IGlobalHighlighter &highlighter,
+             IMacroExplorer &macro_explorer, QWidget *parent = nullptr);
 
   //! Destructor
-  virtual ~QuickCodeView() override;
+  virtual ~CodeWidget() override;
 
   //! Disabled copy constructor
-  QuickCodeView(const QuickCodeView &) = delete;
+  CodeWidget(const CodeWidget &) = delete;
 
   //! Disabled copy assignment operator
-  QuickCodeView &operator=(const QuickCodeView &) = delete;
+  CodeWidget &operator=(const CodeWidget &) = delete;
 
- protected:
-  //! Closes the widget when the escape key is pressed
-  virtual void keyPressEvent(QKeyEvent *event) override;
-
-  //! Helps determine if the widget should be restored on focus
-  virtual void showEvent(QShowEvent *event) override;
-
-  //! Helps determine if the widget should be restored on focus
-  virtual void closeEvent(QCloseEvent *event) override;
-
-  //! Used to handle window movements
-  virtual bool eventFilter(QObject *obj, QEvent *event) override;
-
-  //! Used to update the size grip position
-  virtual void resizeEvent(QResizeEvent *event) override;
 
  private:
   struct PrivateData;
@@ -63,22 +47,7 @@ class QuickCodeView final : public QWidget {
                          RawEntityId entity_id, IGlobalHighlighter &highlighter,
                          IMacroExplorer &macro_explorer);
 
-  //! Updates the widget icons to match the active theme
-  void UpdateIcons();
-
-  //! Used to start window dragging
-  void OnTitleFrameMousePress(QMouseEvent *event);
-
-  //! Used to move the window by moving the title frame
-  void OnTitleFrameMouseMove(QMouseEvent *event);
-
-  //! Used to stop window dragging
-  void OnTitleFrameMouseRelease(QMouseEvent *event);
-
  private slots:
-  //! Restores the widget visibility when the application gains focus
-  void OnApplicationStateChange(Qt::ApplicationState state);
-
   //! Tells us when we probably have the entity available.
   void OnEntityRequestFutureStatusChanged();
 
@@ -86,9 +55,6 @@ class QuickCodeView final : public QWidget {
   void OnTokenTriggered(const ICodeView::TokenAction &token_action,
                         const QModelIndex &index);
 
-  //! Called by the theme manager
-  void OnThemeChange(const QPalette &palette,
-                     const CodeViewTheme &code_view_theme);
 
  public slots:
   //! Enables or disables the browser mode of the inner code view
