@@ -8,9 +8,11 @@
 #include "PreviewableReferenceExplorer.h"
 #include "QuickReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
-#include "QuickCodeView.h"
+#include "CodeWidget.h"
 #include "MxTabWidget.h"
-#include "DockableInformationExplorer.h"
+#include "InformationExplorerWidget.h"
+#include "PopupWidgetContainer.h"
+#include "DockWidgetContainer.h"
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/HistoryWidget.h>
@@ -41,10 +43,18 @@
 #include <QTreeView>
 #include <QColorDialog>
 #include <QActionGroup>
+#include <QTextEdit>
 
 namespace mx::gui {
 
 namespace {
+
+using DockableInformationExplorer =
+    DockWidgetContainer<InformationExplorerWidget>;
+
+using CodeWidgetPopup = PopupWidgetContainer<CodeWidget>;
+
+using DockableCodeWidget = DockWidgetContainer<CodeWidget>;
 
 const std::size_t kMaxHistorySize{30};
 
@@ -98,7 +108,7 @@ struct MainWindow::PrivateData final {
   std::unique_ptr<QuickReferenceExplorer> quick_ref_explorer;
 
   QAction *enable_code_preview_action{nullptr};
-  std::unique_ptr<QuickCodeView> quick_code_view;
+  std::unique_ptr<CodeWidgetPopup> code_widget_popup;
 
   QShortcut *close_active_ref_explorer_tab_shortcut{nullptr};
   QShortcut *close_active_code_tab_shortcut{nullptr};
@@ -258,11 +268,11 @@ void MainWindow::CreateEntityExplorerDock() {
 }
 
 void MainWindow::CreateInfoExplorerDock() {
-  d->info_explorer_dock = DockableInformationExplorer::Create(
+  d->info_explorer_dock = new DockableInformationExplorer(
       d->index, d->file_location_cache, d->global_highlighter, true, this);
 
-  connect(d->info_explorer_dock,
-          &DockableInformationExplorer::SelectedItemChanged, this,
+  connect(d->info_explorer_dock->GetWrappedWidget(),
+          &InformationExplorerWidget::SelectedItemChanged, this,
           &MainWindow::OnInformationExplorerSelectionChange);
 
   d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
@@ -498,16 +508,16 @@ void MainWindow::OpenTokenEntityInfo(const QModelIndex &index,
   auto entity_id = qvariant_cast<RawEntityId>(related_entity_id_var);
 
   if (new_window) {
-    auto info_explorer_dock = DockableInformationExplorer::Create(
+    auto info_explorer_dock = new DockableInformationExplorer(
         d->index, d->file_location_cache, d->global_highlighter, false, this);
 
-    connect(info_explorer_dock,
-            &DockableInformationExplorer::SelectedItemChanged, this,
+    connect(info_explorer_dock->GetWrappedWidget(),
+            &InformationExplorerWidget::SelectedItemChanged, this,
             &MainWindow::OnInformationExplorerSelectionChange);
 
-    info_explorer_dock->DisplayEntity(entity_id);
-    info_explorer_dock->setAttribute(Qt::WA_DeleteOnClose);
-    info_explorer_dock->show();
+    info_explorer_dock->GetWrappedWidget()->DisplayEntity(entity_id);
+    info_explorer_dock->GetWrappedWidget()->setAttribute(Qt::WA_DeleteOnClose);
+    info_explorer_dock->GetWrappedWidget()->show();
 
     addDockWidget(Qt::RightDockWidgetArea, info_explorer_dock);
 
@@ -525,7 +535,7 @@ void MainWindow::ExpandMacro(const QModelIndex &index) {
 
 std::optional<QRect> MainWindow::GetPopupPlacement() {
   auto opt_popup_placement =
-      GetRestoredPopupPlacement(d->quick_code_view.get());
+      GetRestoredPopupPlacement(d->code_widget_popup.get());
 
   if (!opt_popup_placement.has_value()) {
     opt_popup_placement =
@@ -535,10 +545,8 @@ std::optional<QRect> MainWindow::GetPopupPlacement() {
   return opt_popup_placement;
 }
 
-void MainWindow::OpenCodePreview(const QModelIndex &index) {
-  auto opt_popup_placement = GetPopupPlacement();
-  CloseAllPopups();
-
+void MainWindow::OpenCodePreview(const QModelIndex &index,
+                                 const bool &as_new_window) {
   QVariant related_entity_id_var =
       index.data(ICodeModel::RealRelatedEntityIdRole);
 
@@ -548,37 +556,56 @@ void MainWindow::OpenCodePreview(const QModelIndex &index) {
 
   auto related_entity_id = qvariant_cast<RawEntityId>(related_entity_id_var);
 
-  d->quick_code_view = std::make_unique<QuickCodeView>(
-      d->index, d->file_location_cache, related_entity_id,
-      *d->global_highlighter, *d->macro_explorer, this);
+  CodeWidget *code_widget{nullptr};
 
-  d->quick_code_view->SetBrowserMode(d->toolbar.browser_mode->isChecked());
+  if (!as_new_window) {
+    auto opt_popup_placement = GetPopupPlacement();
+    CloseAllPopups();
 
-  connect(d->quick_code_view.get(), &QuickCodeView::TokenTriggered, this,
-          &MainWindow::OnTokenTriggered);
+    d->code_widget_popup = std::make_unique<CodeWidgetPopup>(
+        d->index, d->file_location_cache, related_entity_id,
+        *d->global_highlighter, *d->macro_explorer, this);
 
-  connect(this, &MainWindow::BrowserModeToggled, d->quick_code_view.get(),
-          &QuickCodeView::SetBrowserMode);
+    if (opt_popup_placement.has_value()) {
+      const auto &popup_placement = opt_popup_placement.value();
 
-  if (opt_popup_placement.has_value()) {
-    const auto &popup_placement = opt_popup_placement.value();
+      d->code_widget_popup->move(popup_placement.x(), popup_placement.y());
+      d->code_widget_popup->resize(popup_placement.width(),
+                                   popup_placement.height());
 
-    d->quick_code_view->move(popup_placement.x(), popup_placement.y());
-    d->quick_code_view->resize(popup_placement.width(),
-                               popup_placement.height());
+    } else {
+      auto cursor_pos{QCursor::pos()};
+      d->code_widget_popup->move(cursor_pos.x() - 20, cursor_pos.y() - 20);
+
+      auto margin = fontMetrics().height();
+      auto max_width = margin + (width() / 3);
+      auto max_height = margin + (height() / 4);
+
+      d->code_widget_popup->resize(max_width, max_height);
+    }
+
+    d->code_widget_popup->show();
+
+    code_widget = d->code_widget_popup->GetWrappedWidget();
 
   } else {
-    auto cursor_pos{QCursor::pos()};
-    d->quick_code_view->move(cursor_pos.x() - 20, cursor_pos.y() - 20);
+    auto code_widget_dock = new DockableCodeWidget(
+        d->index, d->file_location_cache, related_entity_id,
+        *d->global_highlighter, *d->macro_explorer, this);
 
-    auto margin = fontMetrics().height();
-    auto max_width = margin + (width() / 3);
-    auto max_height = margin + (height() / 4);
+    code_widget_dock->setParent(this);
+    addDockWidget(Qt::RightDockWidgetArea, code_widget_dock);
 
-    d->quick_code_view->resize(max_width, max_height);
+    code_widget = code_widget_dock->GetWrappedWidget();
   }
 
-  d->quick_code_view->show();
+  code_widget->SetBrowserMode(d->toolbar.browser_mode->isChecked());
+
+  connect(code_widget, &CodeWidget::TokenTriggered, this,
+          &MainWindow::OnTokenTriggered);
+
+  connect(this, &MainWindow::BrowserModeToggled, code_widget,
+          &CodeWidget::SetBrowserMode);
 }
 
 void MainWindow::CloseQuickRefExplorerPopup() {
@@ -592,13 +619,13 @@ void MainWindow::CloseQuickRefExplorerPopup() {
 }
 
 void MainWindow::CloseCodePreviewPopup() {
-  if (d->quick_code_view == nullptr) {
+  if (d->code_widget_popup == nullptr) {
     return;
   }
 
-  d->quick_code_view->close();
-  d->quick_code_view->deleteLater();
-  d->quick_code_view.release();
+  d->code_widget_popup->close();
+  d->code_widget_popup->deleteLater();
+  d->code_widget_popup.release();
 }
 
 void MainWindow::CloseAllPopups() {
@@ -722,7 +749,7 @@ void MainWindow::OpenEntityRelatedToToken(const QModelIndex &index) {
 
 void MainWindow::OpenEntityInfo(RawEntityId entity_id) {
   d->info_explorer_dock->show();
-  d->info_explorer_dock->DisplayEntity(entity_id);
+  d->info_explorer_dock->GetWrappedWidget()->DisplayEntity(entity_id);
 }
 
 void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
@@ -838,7 +865,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
 
   } else if (token_action.type == ICodeView::TokenAction::Type::Hover) {
     if (d->enable_code_preview_action->isChecked()) {
-      OpenCodePreview(index);
+      OpenCodePreview(index, false /* as_new_window */);
     }
 
   } else if (token_action.type == ICodeView::TokenAction::Type::Keyboard) {
@@ -859,7 +886,8 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       OpenTokenReferenceExplorer(index);
 
     } else if (keyboard_button.key == Qt::Key_P) {
-      OpenCodePreview(index);
+      const auto &as_new_window{keyboard_button.shift_modifier};
+      OpenCodePreview(index, as_new_window);
 
     } else if (keyboard_button.key == Qt::Key_I) {
       const auto &as_new_window{keyboard_button.shift_modifier};

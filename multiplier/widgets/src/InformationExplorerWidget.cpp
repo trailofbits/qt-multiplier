@@ -6,69 +6,62 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "DockableInformationExplorer.h"
+#include "InformationExplorerWidget.h"
 
 #include <multiplier/ui/IInformationExplorer.h>
 
+#include <QVBoxLayout>
+
 namespace mx::gui {
 
-struct DockableInformationExplorer::PrivateData final {
+struct InformationExplorerWidget::PrivateData final {
   IInformationExplorerModel *model{nullptr};
   IInformationExplorer *info_explorer{nullptr};
 };
 
-DockableInformationExplorer *DockableInformationExplorer::Create(
-    Index index, FileLocationCache file_location_cache,
-    IGlobalHighlighter *global_highlighter, const bool &enable_history,
-    QWidget *parent) {
+InformationExplorerWidget::~InformationExplorerWidget() {}
 
-  auto obj = new DockableInformationExplorer(
-      index, file_location_cache, global_highlighter, enable_history, parent);
-
-  obj->setWidget(obj->d->info_explorer);
-  obj->setAllowedAreas(Qt::AllDockWidgetAreas);
-  obj->setWindowTitle(tr("Information Explorer"));
-
-  // This widget can be created way after the main window initialization.
-  // If that is the case, we won't get the first theme change update. Manually
-  // force an update now
-  auto palette = IThemeManager::Get().GetPalette();
-  auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
-  obj->OnThemeChange(palette, code_view_theme);
-
-  return obj;
-}
-
-DockableInformationExplorer::~DockableInformationExplorer() {}
-
-DockableInformationExplorer::DockableInformationExplorer(
+InformationExplorerWidget::InformationExplorerWidget(
     Index index, FileLocationCache file_location_cache,
     IGlobalHighlighter *global_highlighter, const bool &enable_history,
     QWidget *parent)
-    : QDockWidget(parent),
+    : QWidget(parent),
       d(new PrivateData) {
 
   d->model =
       IInformationExplorerModel::Create(index, file_location_cache, this);
 
   connect(d->model, &QAbstractItemModel::modelReset, this,
-          &DockableInformationExplorer::OnModelReset);
+          &InformationExplorerWidget::OnModelReset);
 
   d->info_explorer = IInformationExplorer::Create(
       d->model, this, global_highlighter, enable_history);
 
+  auto layout = new QVBoxLayout();
+  layout->setContentsMargins(0, 0, 0, 0);
+
+  layout->addWidget(d->info_explorer);
+  setLayout(layout);
+
   connect(d->info_explorer, &IInformationExplorer::SelectedItemChanged, this,
-          &DockableInformationExplorer::SelectedItemChanged);
+          &InformationExplorerWidget::SelectedItemChanged);
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
-          &DockableInformationExplorer::OnThemeChange);
+          &InformationExplorerWidget::OnThemeChange);
+
+  // This widget can be created way after the main window initialization.
+  // If that is the case, we won't get the first theme change update. Manually
+  // force an update now
+  auto palette = IThemeManager::Get().GetPalette();
+  auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
+  OnThemeChange(palette, code_view_theme);
 }
 
-void DockableInformationExplorer::DisplayEntity(const RawEntityId &entity_id) {
+void InformationExplorerWidget::DisplayEntity(const RawEntityId &entity_id) {
   d->model->RequestEntityInformation(entity_id);
 }
 
-void DockableInformationExplorer::OnModelReset() {
+void InformationExplorerWidget::OnModelReset() {
   QString window_title;
 
   auto opt_entity_name = d->model->GetCurrentEntityName();
@@ -88,8 +81,8 @@ void DockableInformationExplorer::OnModelReset() {
   setWindowTitle(window_title);
 }
 
-void DockableInformationExplorer::OnThemeChange(const QPalette &,
-                                                const CodeViewTheme &) {
+void InformationExplorerWidget::OnThemeChange(const QPalette &,
+                                              const CodeViewTheme &) {
   update();
 }
 

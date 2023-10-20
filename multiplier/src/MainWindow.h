@@ -53,7 +53,7 @@ class MainWindow final : public QMainWindow {
       const RawEntityId &entity_id,
       const IReferenceExplorerModel::ReferenceType &reference_type);
   std::optional<QRect> GetPopupPlacement();
-  void OpenCodePreview(const QModelIndex &index);
+  void OpenCodePreview(const QModelIndex &index, const bool &as_new_window);
   void CloseQuickRefExplorerPopup();
   void CloseCodePreviewPopup();
   void CloseAllPopups();

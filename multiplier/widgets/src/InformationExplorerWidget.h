@@ -19,37 +19,30 @@
 
 namespace mx::gui {
 
-//! A component that wraps an InformationExplorer inside a dock widget
-class DockableInformationExplorer final : public QDockWidget {
+//! A component that wraps an InformationExplorer widget with its model
+class InformationExplorerWidget final : public QWidget {
   Q_OBJECT
 
  public:
-  //! Factory function
-  static DockableInformationExplorer *
-  Create(Index index, FileLocationCache file_location_cache,
-         IGlobalHighlighter *global_highlighter,
-         const bool &enable_history = true, QWidget *parent = nullptr);
+  //! Constructor
+  InformationExplorerWidget(Index index, FileLocationCache file_location_cache,
+                            IGlobalHighlighter *global_highlighter,
+                            const bool &enable_history, QWidget *parent);
 
   //! Destructor
-  virtual ~DockableInformationExplorer() override;
+  virtual ~InformationExplorerWidget() override;
 
   //! Disabled copy constructor
-  DockableInformationExplorer(const DockableInformationExplorer &) = delete;
+  InformationExplorerWidget(const InformationExplorerWidget &) = delete;
 
   //! Disabled copy assignment operator
-  DockableInformationExplorer &
-  operator=(const DockableInformationExplorer &) = delete;
+  InformationExplorerWidget &
+  operator=(const InformationExplorerWidget &) = delete;
 
  private:
   //! Private widget data
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
-
-  //! Private constructor
-  DockableInformationExplorer(Index index,
-                              FileLocationCache file_location_cache,
-                              IGlobalHighlighter *global_highlighter,
-                              const bool &enable_history, QWidget *parent);
 
  public slots:
   //! Requests the internal model to display the specified entity
