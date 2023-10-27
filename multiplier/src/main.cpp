@@ -5,7 +5,7 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MainWindow.h"
-#include "meta_types.h"
+#include "MetaTypes.h"
 #include "Style.h"
 
 #include <multiplier/ui/FontDatabase.h>

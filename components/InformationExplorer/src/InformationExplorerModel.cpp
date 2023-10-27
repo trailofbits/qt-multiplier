@@ -183,8 +183,8 @@ struct InformationExplorerModel::PrivateData final {
   QFuture<bool> info_request_status_future;
   QFutureWatcher<bool> info_future_watcher;
 
-  QFuture<Token> name_request_future;
-  QFutureWatcher<Token> name_future_watcher;
+  QFuture<TokenRange> name_request_future;
+  QFutureWatcher<TokenRange> name_future_watcher;
 
   // The QFuture that goes and loads entity information can sometimes send
   // *a lot* of data, so it sends it in batches, via invoking `OnDataBatch`.

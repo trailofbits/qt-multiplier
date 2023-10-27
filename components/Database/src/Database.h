@@ -36,7 +36,7 @@ class Database final : public IDatabase {
                                 const TokenTreeVisitor *vis) override;
 
   //! \copybrief IDatabase::RequestEntityName
-  virtual QFuture<Token> RequestEntityName(RawEntityId fragment_id) override;
+  virtual QFuture<TokenRange> RequestEntityName(RawEntityId fragment_id) override;
 
   //! \copybrief IDatabase::GetRelatedEntities
   virtual QFuture<RelatedEntitiesResult>
@@ -46,12 +46,6 @@ class Database final : public IDatabase {
   virtual QFuture<bool>
   QueryEntities(QueryEntitiesReceiver &receiver, const QString &string,
                 const QueryEntitiesMode &query_mode) override;
-
-  //! \copybrief IDatabase::QueryEntityReferences
-  virtual QFuture<bool> QueryEntityReferences(
-      QueryEntityReferencesReceiver &receiver, const RawEntityId &entity_id,
-      const ReferenceType &reference_type, const bool &include_redeclarations,
-      const bool &emit_root_node, const std::size_t &depth) override;
 
  private:
   struct PrivateData;

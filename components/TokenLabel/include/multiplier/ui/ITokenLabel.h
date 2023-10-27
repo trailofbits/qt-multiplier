@@ -20,7 +20,7 @@ class ITokenLabel : public QWidget {
 
  public:
   //! Factory function
-  static ITokenLabel *Create(Token token, QWidget *parent = nullptr);
+  static ITokenLabel *Create(TokenRange token, QWidget *parent = nullptr);
 
   //! Constructor
   ITokenLabel(QWidget *parent) : QWidget(parent) {}

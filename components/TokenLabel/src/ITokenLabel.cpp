@@ -12,8 +12,8 @@
 
 namespace mx::gui {
 
-ITokenLabel *ITokenLabel::Create(Token token, QWidget *parent) {
-  return new TokenLabel(token, parent);
+ITokenLabel *ITokenLabel::Create(TokenRange tokens, QWidget *parent) {
+  return new TokenLabel(tokens, parent);
 }
 
 }  // namespace mx::gui

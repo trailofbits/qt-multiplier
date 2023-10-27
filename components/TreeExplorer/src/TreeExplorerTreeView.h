@@ -1,0 +1,27 @@
+/*
+  Copyright (c) 2022-present, Trail of Bits, Inc.
+  All rights reserved.
+
+  This source code is licensed in accordance with the terms specified in
+  the LICENSE file found in the root directory of this source tree.
+*/
+
+#pragma once
+
+#include <QTreeView>
+
+namespace mx::gui {
+
+class TreeExplorerTreeView final : public QTreeView {
+  Q_OBJECT
+
+ public:
+  TreeExplorerTreeView(QWidget *parent);
+  virtual ~TreeExplorerTreeView() override;
+
+ protected:
+  void drawRow(QPainter *painter, const QStyleOptionViewItem &option,
+               const QModelIndex &index) const override;
+};
+
+}  // namespace mx::gui

@@ -16,7 +16,7 @@
 
 namespace mx::gui {
 
-void GetEntityName(QPromise<Token> &entity_name_promise,
+void GetEntityName(QPromise<TokenRange> &entity_name_promise,
                    const Index &index, RawEntityId entity_id);
 
 }  // namespace mx::gui

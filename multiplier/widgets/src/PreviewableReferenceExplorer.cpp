@@ -7,7 +7,10 @@
 #include "PreviewableReferenceExplorer.h"
 
 #include <multiplier/Index.h>
-#include <multiplier/ui/ICodeView.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/IMacroExplorer.h>
+#include <multiplier/ui/ITreeExplorer.h>
+#include <multiplier/ui/ITreeExplorerModel.h>
 
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -22,15 +25,13 @@ struct PreviewableReferenceExplorer::PrivateData final {
   ICodeModel *code_model{nullptr};
   ICodeView *code_view{nullptr};
   std::optional<unsigned> opt_scroll_to_line;
-
-  IReferenceExplorer *reference_explorer{nullptr};
-
+  ITreeExplorer *reference_explorer{nullptr};
   QSplitter *splitter{nullptr};
 };
 
 PreviewableReferenceExplorer::PreviewableReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
-    IReferenceExplorerModel *model, const bool &show_code_preview,
+    ITreeExplorerModel *model, const bool &show_code_preview,
     IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
     QWidget *parent)
     : QWidget(parent),
@@ -42,22 +43,22 @@ PreviewableReferenceExplorer::PreviewableReferenceExplorer(
 
 PreviewableReferenceExplorer::~PreviewableReferenceExplorer() {}
 
-IReferenceExplorerModel *PreviewableReferenceExplorer::Model() {
+ITreeExplorerModel *PreviewableReferenceExplorer::Model() {
   return d->reference_explorer->Model();
 }
 
 void PreviewableReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
-    IReferenceExplorerModel *model, const bool &show_code_preview,
+    ITreeExplorerModel *model, const bool &show_code_preview,
     IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer) {
 
-  d->reference_explorer = IReferenceExplorer::Create(model, this, &highlighter);
+  d->reference_explorer = ITreeExplorer::Create(model, this, &highlighter);
 
   connect(
-      d->reference_explorer, &IReferenceExplorer::SelectedItemChanged, this,
+      d->reference_explorer, &ITreeExplorer::SelectedItemChanged, this,
       &PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged);
 
-  connect(d->reference_explorer, &IReferenceExplorer::ItemActivated, this,
+  connect(d->reference_explorer, &ITreeExplorer::ItemActivated, this,
           &PreviewableReferenceExplorer::ItemActivated);
 
   connect(model, &QAbstractItemModel::rowsInserted, this,
@@ -107,23 +108,21 @@ PreviewableReferenceExplorer::GetScheduledPostUpdateLineScrollCommand() {
 }
 
 void PreviewableReferenceExplorer::UpdateCodePreview(const QModelIndex &index) {
-  auto file_raw_entity_id_var =
-      index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
-
+  auto file_raw_entity_id_var = index.data(ITreeExplorerModel::EntityIdRole);
   if (!file_raw_entity_id_var.isValid()) {
     return;
   }
 
-  auto line_number_var = index.data(IReferenceExplorerModel::LineNumberRole);
-  if (!line_number_var.isValid()) {
-    return;
-  }
+  // auto line_number_var = index.data(ITreeExplorerModel::LineNumberRole);
+  // if (!line_number_var.isValid()) {
+  //   return;
+  // }
 
-  auto line_number = qvariant_cast<unsigned>(line_number_var);
+  // auto line_number = qvariant_cast<unsigned>(line_number_var);
 
   auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
   d->code_model->SetEntity(file_raw_entity_id);
-  d->code_view->ScrollToLineNumber(line_number);
+  // d->code_view->ScrollToLineNumber(line_number);
 }
 
 void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(
