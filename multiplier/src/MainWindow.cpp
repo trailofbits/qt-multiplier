@@ -5,6 +5,7 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MainWindow.h"
+#include "CallHierarchyGenerator.h"
 #include "PreviewableReferenceExplorer.h"
 #include "QuickReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
@@ -15,17 +16,17 @@
 #include "DockWidgetContainer.h"
 
 #include <multiplier/ui/Assert.h>
-#include <multiplier/ui/HistoryWidget.h>
-#include <multiplier/ui/IProjectExplorer.h>
-#include <multiplier/ui/IReferenceExplorer.h>
-#include <multiplier/ui/IEntityExplorer.h>
-#include <multiplier/ui/Util.h>
-#include <multiplier/ui/IInformationExplorer.h>
-#include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/IMacroExplorer.h>
 #include <multiplier/ui/CodeViewTheme.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/ui/HistoryWidget.h>
 #include <multiplier/ui/Icons.h>
+#include <multiplier/ui/IEntityExplorer.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/IInformationExplorer.h>
+#include <multiplier/ui/IMacroExplorer.h>
+#include <multiplier/ui/IProjectExplorer.h>
+#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/ui/ITreeExplorerModel.h>
+#include <multiplier/ui/Util.h>
 
 #include <multiplier/Entities/StmtKind.h>
 
@@ -68,7 +69,7 @@ static const auto kHighlightEntityIdRole = ICodeModel::RealRelatedEntityIdRole;
 
 struct CodeViewContextMenu final {
   QMenu *menu{nullptr};
-  QAction *show_ref_explorer_action{nullptr};
+  QAction *show_call_hierarchy{nullptr};
 
   QMenu *highlight_menu{nullptr};
   QAction *set_entity_highlight{nullptr};
@@ -363,11 +364,11 @@ void MainWindow::CreateCodeView() {
   connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
           &MainWindow::OnCodeViewContextMenuActionTriggered);
 
-  d->code_view_context_menu.show_ref_explorer_action =
-      new QAction(tr("Show Reference Explorer"));
+  d->code_view_context_menu.show_call_hierarchy =
+      new QAction(tr("Show Call Hierarchy"));
 
   d->code_view_context_menu.menu->addAction(
-      d->code_view_context_menu.show_ref_explorer_action);
+      d->code_view_context_menu.show_call_hierarchy);
 
   d->code_view_context_menu.highlight_menu = new QMenu(tr("Highlights"));
   d->code_view_context_menu.menu->addMenu(
@@ -409,7 +410,7 @@ void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
   action_data.setValue(index);
 
   std::vector<QAction *> action_list{
-      d->code_view_context_menu.show_ref_explorer_action,
+      d->code_view_context_menu.show_call_hierarchy,
       d->code_view_context_menu.set_entity_highlight,
       d->code_view_context_menu.remove_entity_highlight,
       d->code_view_context_menu.reset_entity_highlights};
@@ -421,15 +422,14 @@ void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
   QVariant related_entity_id_var = index.data(ICodeModel::RelatedEntityIdRole);
 
   // Only enable the references browser if the token is related to an entity.
-  d->code_view_context_menu.show_ref_explorer_action->setEnabled(
+  d->code_view_context_menu.show_call_hierarchy->setEnabled(
       related_entity_id_var.isValid());
 
   d->code_view_context_menu.menu->exec(QCursor::pos());
 }
 
 void MainWindow::OpenReferenceExplorer(
-    const RawEntityId &entity_id,
-    const IReferenceExplorerModel::ReferenceType &reference_type) {
+    std::shared_ptr<ITreeGenerator> generator) {
 
   QPoint dialog_pos;
   if (d->quick_ref_explorer != nullptr) {
@@ -444,9 +444,9 @@ void MainWindow::OpenReferenceExplorer(
   CloseAllPopups();
 
   d->quick_ref_explorer = std::make_unique<QuickReferenceExplorer>(
-      d->index, d->file_location_cache, entity_id,
+      d->index, d->file_location_cache, std::move(generator),
       d->enable_quick_ref_explorer_code_preview, *d->global_highlighter,
-      *d->macro_explorer, reference_type, this);
+      *d->macro_explorer, this);
 
   d->quick_ref_explorer->SetBrowserMode(d->toolbar.browser_mode->isChecked());
 
@@ -481,7 +481,7 @@ void MainWindow::OpenReferenceExplorer(
   d->quick_ref_explorer->show();
 }
 
-void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
+void MainWindow::OpenCallHierarchy(const QModelIndex &index) {
 
   QVariant related_entity_id_var =
       index.data(ICodeModel::RealRelatedEntityIdRole);
@@ -491,8 +491,8 @@ void MainWindow::OpenTokenReferenceExplorer(const QModelIndex &index) {
     return;
   }
 
-  OpenReferenceExplorer(qvariant_cast<RawEntityId>(related_entity_id_var),
-                        IReferenceExplorerModel::ReferenceType::Callers);
+  OpenReferenceExplorer(CallHierarchyGenerator::Create(
+      d->index, d->file_location_cache, qvariant_cast<RawEntityId>(related_entity_id_var)));
 }
 
 void MainWindow::OpenTokenEntityInfo(const QModelIndex &index,
@@ -882,8 +882,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
     if (keyboard_button.key == Qt::Key_X) {
       // Like in IDA Pro, pressing X while the cursor is on an entity shows us
       // its cross-references.
-
-      OpenTokenReferenceExplorer(index);
+      OpenCallHierarchy(index);
 
     } else if (keyboard_button.key == Qt::Key_P) {
       const auto &as_new_window{keyboard_button.shift_modifier};
@@ -932,14 +931,9 @@ void MainWindow::OnInformationExplorerSelectionChange(
 }
 
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
-  auto entity_id_role =
-      index.data(IReferenceExplorerModel::ReferencedEntityIdRole);
-
+  auto entity_id_role = index.data(ITreeExplorerModel::EntityIdRole);
   if (!entity_id_role.isValid()) {
-    entity_id_role = index.data(IReferenceExplorerModel::EntityIdRole);
-    if (!entity_id_role.isValid()) {
-      return;
-    }
+    return;
   }
 
   auto entity_id = qvariant_cast<RawEntityId>(entity_id_role);
@@ -957,8 +951,8 @@ void MainWindow::OnCodeViewContextMenuActionTriggered(QAction *action) {
   QModelIndex code_model_index =
       qvariant_cast<QModelIndex>(code_model_index_var);
 
-  if (action == d->code_view_context_menu.show_ref_explorer_action) {
-    OpenTokenReferenceExplorer(code_model_index);
+  if (action == d->code_view_context_menu.show_call_hierarchy) {
+    OpenCallHierarchy(code_model_index);
 
   } else if (action == d->code_view_context_menu.set_entity_highlight) {
     QVariant entity_id_var = code_model_index.data(kHighlightEntityIdRole);

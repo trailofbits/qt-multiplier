@@ -30,8 +30,11 @@ add_executable("Multiplier" ${executable_type}
   src/MainWindow.h
   src/MainWindow.cpp
 
-  src/meta_types.h
-  src/meta_types.cpp
+  src/CallHierarchyGenerator.h
+  src/CallHierarchyGenerator.cpp
+
+  src/MetaTypes.h
+  src/MetaTypes.cpp
   
   src/Style.h
   src/Style.cpp
@@ -58,7 +61,7 @@ target_link_libraries("Multiplier"
     "mx_database"
     "mx_fontdatabase"
     "mx_projectexplorer"
-    "mx_referenceexplorer"
+    "mx_treeexplorer"
     "mx_entityexplorer"
     "mx_historywidget"
     "mx_widgets"

@@ -12,7 +12,7 @@
 
 namespace mx::gui {
 
-void GetEntityName(QPromise<Token> &entity_name_promise,
+void GetEntityName(QPromise<TokenRange> &entity_name_promise,
                    const Index &index, RawEntityId entity_id) {
   VariantEntity ent = index.entity(entity_id);
   entity_name_promise.addResult(NameOfEntity(ent));

@@ -6,14 +6,15 @@
 
 #pragma once
 
-#include <multiplier/ui/IReferenceExplorer.h>
 #include <multiplier/ui/ICodeView.h>
-#include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/IMacroExplorer.h>
 
 #include <QWidget>
 
 namespace mx::gui {
+
+class IGlobalHighlighter;
+class IMacroExplorer;
+class ITreeExplorerModel;
 
 //! A container for a ReferenceExplorer and the linked ICodeView
 class PreviewableReferenceExplorer final : public QWidget {
@@ -23,7 +24,7 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Constructor
   PreviewableReferenceExplorer(const Index &index,
                                const FileLocationCache &file_location_cache,
-                               IReferenceExplorerModel *model,
+                               ITreeExplorerModel *model,
                                const bool &show_code_preview,
                                IGlobalHighlighter &highlighter,
                                IMacroExplorer &macro_explorer,
@@ -33,7 +34,7 @@ class PreviewableReferenceExplorer final : public QWidget {
   virtual ~PreviewableReferenceExplorer() override;
 
   //! Returns the active model
-  IReferenceExplorerModel *Model();
+  ITreeExplorerModel *Model();
 
   //! Disabled copy constructor
   PreviewableReferenceExplorer(const PreviewableReferenceExplorer &) = delete;
@@ -49,7 +50,7 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Initializes the internal widgets
   void InitializeWidgets(mx::Index index,
                          mx::FileLocationCache file_location_cache,
-                         IReferenceExplorerModel *model,
+                         ITreeExplorerModel *model,
                          const bool &show_code_preview,
                          IGlobalHighlighter &highlighter,
                          IMacroExplorer &macro_explorer);

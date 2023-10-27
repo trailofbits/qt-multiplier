@@ -99,7 +99,7 @@ Token FirstFileToken(const VariantEntity &ent);
 TokenRange InjectWhitespace(const TokenRange &toks);
 
 //! Return the name of an entity.
-Token NameOfEntity(const VariantEntity &ent);
+TokenRange NameOfEntity(const VariantEntity &ent);
 
 //! Return the name of an entity as a `QString`.
 std::optional<QString> NameOfEntityAsString(const VariantEntity &ent);
@@ -119,46 +119,6 @@ float GetColorContrast(const QColor &color);
 
 //! Returns the best foreground color for the given background
 QColor GetBestForegroundColor(const QColor &background_color);
-
-//// Try to determine the declarations associated with this token.
-//std::optional<Decl> DeclForToken(const Token &token);
-//
-//using EntityBaseOffsetPair = std::pair<RawEntityId, uint32_t>;
-//
-//// Returns a pair of `(fragment_id, offset)` or `(kInvalidEntityId, 0)` for a
-//// given raw entity id.
-//EntityBaseOffsetPair GetFragmentOffset(RawEntityId id);
-//
-//// Returns a pair of `(file_id, offset)` or `(kInvalidEntityId, 0)` for a
-//// given raw entity id.
-//EntityBaseOffsetPair GetFileOffset(RawEntityId id);
-//
-//// Return the "canonical" ID of a declaration. This tries to get us the
-//// definition when possible.
-//PackedDeclId CanonicalId(const Decl &decl);
-//
-//// Return the "canonical" version of a declaration. This tries to get us the
-//// definition when possible.
-//Decl CanonicalDecl(const Decl &decl);
-//
-//// Return some kind of name for a declaration.
-//QString DeclName(const Decl &decl);
-//
-//// Return the file location of an entity.
-//RawEntityId EntityFileLocation(const Index &index, RawEntityId eid);
-//
-//// Return the optional nearest file token associated with this declaration.
-//std::optional<Token> DeclFileToken(const Decl &decl);
-//
-//// Return the entity ID of the nearest file token associated with this
-//// declaration.
-//RawEntityId DeclFileLocation(const Decl &decl);
-//
-//// Try to get the nearest declaration for `id`. Ideally, `id` is a declaration
-//// ID. Otherwise, it will find the nearest enclosing declaration, and return
-//// that.
-//std::optional<Decl> NearestDeclFor(const Index &index, RawEntityId id);
-//
 
 }  // namespace gui
 }  // namespace mx

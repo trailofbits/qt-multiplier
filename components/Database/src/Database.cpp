@@ -71,7 +71,7 @@ Database::RequestExpandedTokenRangeData(RawEntityId entity_id,
                            d->file_location_cache, entity_id, tree, vis);
 }
 
-QFuture<Token> Database::RequestEntityName(RawEntityId fragment_id) {
+QFuture<TokenRange> Database::RequestEntityName(RawEntityId fragment_id) {
   return QtConcurrent::run(QThreadPool::globalInstance(), GetEntityName,
                            d->index, fragment_id);
 }

@@ -26,9 +26,9 @@ void GetRelatedEntities(
   }
 
   // Name.
-  related_entities.opt_name_token = NameOfEntity(ent);
-  if (related_entities.opt_name_token) {
-    std::string_view name = related_entities.opt_name_token.data();
+  related_entities.opt_name_tokens = NameOfEntity(ent);
+  if (related_entities.opt_name_tokens) {
+    std::string_view name = related_entities.opt_name_tokens.data();
     related_entities.name = QString::fromUtf8(
         name.data(), static_cast<qsizetype>(name.size()));
   }

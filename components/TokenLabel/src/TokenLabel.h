@@ -29,7 +29,7 @@ class TokenLabel final : public ITokenLabel {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  TokenLabel(Token token, QWidget *parent);
+  TokenLabel(TokenRange tokens, QWidget *parent);
 
  private slots:
   //! Called by the theme manager

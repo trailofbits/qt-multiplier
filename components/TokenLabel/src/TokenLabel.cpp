@@ -14,7 +14,7 @@ namespace mx::gui {
 
 struct TokenLabel::PrivateData final {
   std::unique_ptr<TokenPainter> token_painter;
-  Token token;
+  TokenRange tokens;
 };
 
 TokenLabel::~TokenLabel() {}
@@ -25,14 +25,14 @@ void TokenLabel::paintEvent(QPaintEvent *) {
   option.rect = rect();
 
   QPainter painter(this);
-  d->token_painter->Paint(&painter, option, d->token);
+  d->token_painter->Paint(&painter, option, d->tokens);
 }
 
-TokenLabel::TokenLabel(Token token, QWidget *parent)
+TokenLabel::TokenLabel(TokenRange tokens, QWidget *parent)
     : ITokenLabel(parent),
       d(new PrivateData) {
 
-  d->token = std::move(token);
+  d->tokens = std::move(tokens);
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
           &TokenLabel::OnThemeChange);

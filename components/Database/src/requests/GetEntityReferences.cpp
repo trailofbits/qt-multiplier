@@ -30,8 +30,8 @@ struct EntityQueueEntry final {
 
 using EntityQueue = std::vector<EntityQueueEntry>;
 
-VariantEntity NamedEntityContaining(const VariantEntity &entity,
-                                    const VariantEntity &containing) {
+static VariantEntity NamedEntityContaining(const VariantEntity &entity,
+                                           const VariantEntity &containing) {
   if (std::holds_alternative<Decl>(entity)) {
 
     if (auto contained_decl = std::get_if<Decl>(&containing);
