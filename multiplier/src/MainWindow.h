@@ -9,7 +9,6 @@
 #include "PreviewableReferenceExplorer.h"
 
 #include <multiplier/ui/ICodeView.h>
-#include <multiplier/ui/IReferenceExplorerModel.h>
 
 #include <multiplier/Index.h>
 
@@ -18,6 +17,7 @@
 namespace mx::gui {
 
 class ICodeView;
+class ITreeGenerator;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -46,12 +46,10 @@ class MainWindow final : public QMainWindow {
   void OpenEntityCode(RawEntityId entity_id, bool canonicalize = true);
   void OpenEntityInfo(RawEntityId entity_id);
   void OpenTokenContextMenu(const QModelIndex &index);
-  void OpenTokenReferenceExplorer(const QModelIndex &index);
+  void OpenCallHierarchy(const QModelIndex &index);
   void OpenTokenEntityInfo(const QModelIndex &index, const bool &new_window);
   void ExpandMacro(const QModelIndex &index);
-  void OpenReferenceExplorer(
-      const RawEntityId &entity_id,
-      const IReferenceExplorerModel::ReferenceType &reference_type);
+  void OpenReferenceExplorer(std::shared_ptr<ITreeGenerator> generator);
   std::optional<QRect> GetPopupPlacement();
   void OpenCodePreview(const QModelIndex &index, const bool &as_new_window);
   void CloseQuickRefExplorerPopup();

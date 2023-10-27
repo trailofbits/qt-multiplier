@@ -169,7 +169,7 @@ void GlobalHighlighter::UpdateItemList() {
 
     auto item = new GlobalHighlighterItem(
         primary_entity_id, entity_highlight.name,
-        entity_highlight.opt_name_token, entity_highlight.color, this);
+        entity_highlight.opt_name_tokens, entity_highlight.color, this);
 
     connect(item, &GlobalHighlighterItem::EntityClicked, this,
             &GlobalHighlighter::EntityClicked);
@@ -203,7 +203,7 @@ void GlobalHighlighter::EntityListFutureStatusChanged() {
 
     inc_entity_highlight.primary_entity_id = request_data.primary_entity_id;
     inc_entity_highlight.name = request_data.name;
-    inc_entity_highlight.opt_name_token = request_data.opt_name_token;
+    inc_entity_highlight.opt_name_tokens = request_data.opt_name_tokens;
     inc_entity_highlight.entity_id_list = request_data.entity_id_list;
     inc_entity_highlight.color = d->operation.color;
   }

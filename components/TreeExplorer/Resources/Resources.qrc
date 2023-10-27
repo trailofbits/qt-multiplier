@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/TreeExplorer">
+        <file alias="activate_ref_item">Icons/activate_ref_item.png</file>
+        <file alias="expand_ref_item">Icons/expand_ref_item.png</file>
+        <file alias="goto_ref_item">Icons/goto_ref_item.png</file>
+        <file alias="close_ref_item">Icons/close_ref_item.png</file>
+    </qresource>
+</RCC>

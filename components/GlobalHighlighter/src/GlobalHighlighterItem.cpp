@@ -49,7 +49,7 @@ bool GlobalHighlighterItem::eventFilter(QObject *object, QEvent *event) {
 
 GlobalHighlighterItem::GlobalHighlighterItem(
     const RawEntityId &entity_id, const QString &name,
-    const std::optional<Token> &opt_name_token, const QColor &color,
+    const std::optional<TokenRange> &opt_name_tokens, const QColor &color,
     QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
@@ -62,8 +62,8 @@ GlobalHighlighterItem::GlobalHighlighterItem(
   auto layout = new QHBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
 
-  if (opt_name_token.has_value()) {
-    d->entity_name = ITokenLabel::Create(opt_name_token.value());
+  if (opt_name_tokens.has_value()) {
+    d->entity_name = ITokenLabel::Create(opt_name_tokens.value());
   } else {
     d->entity_name = new QLabel(name);
   }

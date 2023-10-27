@@ -8,14 +8,13 @@
 
 #include "PreviewableReferenceExplorer.h"
 
-#include <multiplier/ui/IThemeManager.h>
-
 #include <QWidget>
 
 namespace mx::gui {
 
 class IGlobalHighlighter;
 class IMacroExplorer;
+class ITreeGenerator;
 
 //! A reference explorer for context menus
 class QuickReferenceExplorer final : public QWidget {
@@ -25,9 +24,8 @@ class QuickReferenceExplorer final : public QWidget {
   //! Constructor
   QuickReferenceExplorer(
       const Index &index, const FileLocationCache &file_location_cache,
-      RawEntityId entity_id, const bool &show_code_preview,
+      std::shared_ptr<ITreeGenerator> generator, const bool &show_code_preview,
       IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
-      const IReferenceExplorerModel::ReferenceType &reference_type,
       QWidget *parent = nullptr);
 
   //! Destructor
@@ -72,9 +70,8 @@ class QuickReferenceExplorer final : public QWidget {
   //! Initializes the internal widgets
   void InitializeWidgets(
       const Index &index, const FileLocationCache &file_location_cache,
-      RawEntityId entity_id, const bool &show_code_preview,
-      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
-      const IReferenceExplorerModel::ReferenceType &reference_type);
+      std::shared_ptr<ITreeGenerator> generator, const bool &show_code_preview,
+      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer);
 
   //! Used to start window dragging
   void OnTitleFrameMousePress(QMouseEvent *event);
@@ -84,19 +81,6 @@ class QuickReferenceExplorer final : public QWidget {
 
   //! Used to stop window dragging
   void OnTitleFrameMouseRelease(QMouseEvent *event);
-
-  //! Aborts the running request
-  void CancelRunningRequest();
-
-  //! Generate a new window name for the given entity name
-  static QString GenerateWindowName(
-      const QString &entity_name,
-      const IReferenceExplorerModel::ReferenceType &reference_type);
-
-  //! Generate a new window name for the given entity id
-  static QString GenerateWindowName(
-      const RawEntityId &entity_id,
-      const IReferenceExplorerModel::ReferenceType &reference_type);
 
   //! Update the widget icons to match the active theme
   void UpdateIcons();
@@ -108,12 +92,12 @@ class QuickReferenceExplorer final : public QWidget {
   //! Called when the save to new tab button is pressed
   void OnSaveReferenceExplorer();
 
-  //! Called when the entity name resolution has finished
-  void EntityNameFutureStatusChanged();
-
   //! Called by the theme manager
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);
+
+  //! Called when the model resolves the new name of the tree.
+  void OnTreeNameChanged(const QString &new_name);
 
  public slots:
   //! Enables or disables the browser mode of the inner code view

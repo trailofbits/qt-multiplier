@@ -24,7 +24,7 @@ using EntityColorMap = std::unordered_map<RawEntityId, QColor>;
 
 struct EntityHighlight final {
   QString name;
-  std::optional<Token> opt_name_token;
+  std::optional<TokenRange> opt_name_tokens;
   RawEntityId primary_entity_id{};
   QColor color;
   std::unordered_set<RawEntityId> entity_id_list;

@@ -17,6 +17,119 @@
 
 namespace mx::gui {
 
+VariantEntity NamedEntityContaining(const VariantEntity &entity) {
+  if (std::holds_alternative<Decl>(entity)) {
+
+    if (auto cd = NamedDeclContaining(std::get<Decl>(entity));
+        !std::holds_alternative<NotAnEntity>(cd)) {
+      return cd;
+    }
+
+    if (auto nd = NamedDecl::from(std::get<Decl>(entity))) {
+      return nd->canonical_declaration();
+    }
+
+    // TODO(pag): Do token-based lookup?
+
+  } else if (std::holds_alternative<Stmt>(entity)) {
+    const Stmt &stmt = std::get<Stmt>(entity);
+
+    if (auto nd = NamedDeclContaining(stmt);
+        !std::holds_alternative<NotAnEntity>(nd)) {
+      return nd;
+    }
+
+    // TODO(pag): Do token-based lookup? It might end up being a statement
+    //            in an attribute on a decl.
+
+    if (auto file = File::containing(stmt)) {
+      return file.value();
+    }
+
+  } else if (std::holds_alternative<Macro>(entity)) {
+
+    // It could be that we are looking at an expansion that isn't actually
+    // used per se (e.g. the expansion happens as a result of PASTA eagerly
+    // doing argument pre-expansions), but only the macro name gets used, so
+    // we can't connect any final parsed tokens to anything, and thus we want
+    // to instead go and find the root of the expansion and ask for the named
+    // declaration containing that.
+    //
+    // Another reason to look at the root macro expansion is that we may be
+    // asking for a use of a define that is in the same fragment as the
+    // expansion, and we don't want the expansion to put us into the body of
+    // a define, but to the use of the top-level macro expansion.
+    auto macro = std::get<Macro>(entity).root();
+
+    for (Token tok : macro.generate_expansion_tokens()) {
+      if (Token ptok = tok.parsed_token()) {
+        auto res = NamedDeclContaining(ptok);
+        if (!std::holds_alternative<NotAnEntity>(res)) {
+          return res;
+        }
+      }
+    }
+
+    // TODO(pag): Handle the case where a macro expands to nothing.
+
+    // If the macro wasn't used inside of a decl/statement, then go try to
+    // find the macro definition containing this macro.
+    if (auto dd = DefineMacroDirective::from(std::get<Macro>(entity))) {
+      return dd.value();
+    }
+
+  } else if (std::holds_alternative<File>(entity)) {
+    return entity;
+
+  } else if (std::holds_alternative<Fragment>(entity)) {
+    if (auto file = File::containing(std::get<Fragment>(entity))) {
+      return file.value();
+    }
+
+  } else if (std::holds_alternative<Designator>(entity)) {
+    const Designator &d = std::get<Designator>(entity);
+    if (auto fd = d.field()) {
+      return fd.value();
+    }
+
+  } else if (std::holds_alternative<Token>(entity)) {
+    const Token &tok = std::get<Token>(entity);
+
+    if (auto pt = tok.parsed_token()) {
+      if (auto nd = NamedDeclContaining(pt);
+          !std::holds_alternative<NotAnEntity>(nd)) {
+        return nd;
+      }
+    }
+
+    for (Macro m : Macro::containing(tok)) {
+      if (auto ne = NamedEntityContaining(std::move(m));
+          !std::holds_alternative<NotAnEntity>(ne)) {
+        return ne;
+      }
+    }
+
+    if (auto dt = tok.derived_token()) {
+      if (auto nd = NamedDeclContaining(dt);
+          !std::holds_alternative<NotAnEntity>(nd)) {
+        return nd;
+      }
+    }
+
+    if (std::optional<Fragment> frag = Fragment::containing(tok)) {
+      for (NamedDecl nd : NamedDecl::in(*frag)) {
+        if (nd.tokens().index_of(tok)) {
+          return nd;
+        }
+      }
+    }
+  }
+
+  // TODO(pag): CXXBaseSpecifier, CXXTemplateArgument, CXXTemplateParameterList.
+
+  return NotAnEntity{};
+}
+
 //! Return the optional nearest fragment token associated with this declaration.
 std::optional<Token> DeclFragmentToken(const Decl &decl) {
 
@@ -703,10 +816,10 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
 }
 
 //! Return the name of an entity.
-Token NameOfEntity(const VariantEntity &ent) {
+TokenRange NameOfEntity(const VariantEntity &ent) {
 
   const auto VariantEntityVisitor = Overload{
-      [](const Decl &decl) -> Token {
+      [](const Decl &decl) -> TokenRange {
         if (auto named = NamedDecl::from(decl)) {
           std::string_view name = named->name();
           Token name_tok = named->token();
@@ -722,10 +835,26 @@ Token NameOfEntity(const VariantEntity &ent) {
             }
           }
         }
-        return Token();
+        return TokenRange();
       },
 
-      [](const Macro &macro) -> Token {
+      [](const Stmt &stmt) -> TokenRange {
+        if (auto dre = DeclRefExpr::from(stmt)) {
+          return dre->expression_token();
+
+        } else if (auto me = MemberExpr::from(stmt)) {
+          return me->member_token();
+
+        } else if (auto ale = AddrLabelExpr::from(stmt)) {
+          return ale->label_token();
+        
+        } else if (auto ls = LabelStmt::from(stmt)) {
+          return ls->identifier_token();
+        }
+        return TokenRange();
+      },
+
+      [](const Macro &macro) -> TokenRange {
         if (auto named = DefineMacroDirective::from(macro)) {
           return named->name();
 
@@ -733,11 +862,11 @@ Token NameOfEntity(const VariantEntity &ent) {
           return param->name();
 
         } else {
-          return Token();
+          return TokenRange();
         }
       },
 
-      [](const File &file) -> Token {
+      [](const File &file) -> TokenRange {
         for (std::filesystem::path path : file.paths()) {
           SimpleToken tk;
           tk.data = path.generic_string();
@@ -746,23 +875,27 @@ Token NameOfEntity(const VariantEntity &ent) {
           tk.related_entity = file;
           std::vector<CustomToken> tokens;
           tokens.emplace_back(std::move(tk));
-          return TokenRange::create(std::move(tokens)).front();
+          return TokenRange::create(std::move(tokens));
         }
-        return Token();
+        return TokenRange();
       },
 
-      [](const Token &token) -> Token {
+      [](const Designator &designator) -> TokenRange {
+        return designator.field_token();
+      },
+
+      [](const Token &token) -> TokenRange {
         return token;
       },
 
-      [](auto) -> Token { return Token(); }};
+      [](auto) -> TokenRange { return TokenRange(); }};
 
-  return std::visit<Token>(VariantEntityVisitor, ent);
+  return std::visit<TokenRange>(VariantEntityVisitor, ent);
 }
 
 //! Return the name of an entity as a `QString`.
 std::optional<QString> NameOfEntityAsString(const VariantEntity &ent) {
-  if (Token name = NameOfEntity(ent)) {
+  if (auto name = NameOfEntity(ent)) {
     std::string_view data = name.data();
     if (!data.empty()) {
       return QString::fromUtf8(data.data(),
@@ -772,58 +905,40 @@ std::optional<QString> NameOfEntityAsString(const VariantEntity &ent) {
   return std::nullopt;
 }
 
-////! Return the name of an entity.
-//std::optional<QString> NameOfEntity(const VariantEntity &ent) {
-//
-//  const auto VariantEntityVisitor = Overload{
-//      [](const Decl &decl) -> std::optional<QString> {
-//        if (auto named = NamedDecl::from(decl)) {
-//          auto name = named->name();
-//          if (!name.empty()) {
-//            return QString::fromUtf8(name.data(),
-//                                     static_cast<qsizetype>(name.size()));
-//          }
-//
-//          for (NamedDecl redecl : named->redeclarations()) {
-//            name = redecl.name();
-//            if (!name.empty()) {
-//              return QString::fromUtf8(name.data(),
-//                                       static_cast<qsizetype>(name.size()));
-//            }
-//          }
-//        }
-//        return std::nullopt;
-//      },
-//
-//      [](const Macro &macro) -> std::optional<QString> {
-//        if (auto named = DefineMacroDirective::from(macro)) {
-//          auto name = named->name().data();
-//          return QString::fromUtf8(name.data(),
-//                                   static_cast<qsizetype>(name.size()));
-//
-//        } else if (auto param = MacroParameter::from(macro)) {
-//          auto name = param->name().data();
-//          return QString::fromUtf8(name.data(),
-//                                   static_cast<qsizetype>(name.size()));
-//        }
-//        return std::nullopt;
-//      },
-//
-//      [](const File &file) -> std::optional<QString> {
-//        for (std::filesystem::path path : file.paths()) {
-//          return QString::fromStdString(path.filename().generic_string());
-//        }
-//        return std::nullopt;
-//      },
-//
-//      [](const Token &token) -> std::optional<QString> {
-//        std::string_view d = token.data();
-//        return QString::fromUtf8(d.data(), static_cast<qsizetype>(d.size()));
-//      },
-//
-//      [](auto) -> std::optional<QString> { return std::nullopt; }};
-//  return std::visit<std::optional<QString>>(VariantEntityVisitor, ent);
-//}
+namespace {
+
+static QString FilePath(const File &file) {
+  for (auto path : file.paths()) {
+    return QString::fromStdString(path.generic_string());
+  }
+  return QString();
+}
+
+static QString FileLineColumn(const File &file, unsigned line, unsigned col) {
+  return QString("%1:%2:%3").arg(FilePath(file)).arg(line).arg(col);
+}
+
+}  // namespace
+
+QString LocationOfEntity(const FileLocationCache &file_location_cache,
+                         const VariantEntity &entity) {
+
+  QString location;
+  for (Token tok : FileTokens(entity)) {
+    auto file = File::containing(tok);
+    if (!file) {
+      continue;
+    }
+
+    if (auto line_col = tok.location(file_location_cache)) {
+      return FileLineColumn(file.value(), line_col->first, line_col->second);
+    }
+
+    location = FilePath(file.value());
+  }
+
+  return location;
+}
 
 //! Return the tokens of `ent` as a string.
 QString TokensToString(const VariantEntity &ent) {
@@ -847,215 +962,6 @@ QString TokensToString(const VariantEntity &ent) {
   }
   return data;
 }
-
-//// Returns a pair of `(fragment_id, offset)` or `(kInvalidEntityId, 0)` for a
-//// given raw entity id.
-//EntityBaseOffsetPair GetFragmentOffset(RawEntityId id) {
-//  auto fid = Frag
-//
-//  VariantId vid = EntityId(id).Unpack();
-//  if (std::holds_alternative<DeclId>(vid)) {
-//    auto eid = std::get<DeclId>(vid);
-//    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
-//
-//  } else if (std::holds_alternative<StmtId>(vid)) {
-//    auto eid = std::get<StmtId>(vid);
-//    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
-//
-//  } else if (std::holds_alternative<TypeId>(vid)) {
-//    auto eid = std::get<TypeId>(vid);
-//    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
-//
-//  } else if (std::holds_alternative<ParsedTokenId>(vid)) {
-//    auto eid = std::get<ParsedTokenId>(vid);
-//    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
-//
-//  } else if (std::holds_alternative<MacroId>(vid)) {
-//    auto eid = std::get<MacroId>(vid);
-//    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
-//
-//  } else if (std::holds_alternative<AttrId>(vid)) {
-//    auto eid = std::get<AttrId>(vid);
-//    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
-//
-//  } else if (std::holds_alternative<ParsedTokenId>(vid)) {
-//    auto eid = std::get<ParsedTokenId>(vid);
-//    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
-//
-//  } else if (std::holds_alternative<MacroTokenId>(vid)) {
-//    auto eid = std::get<MacroTokenId>(vid);
-//    return {EntityId(FragmentId(eid.fragment_id)).Pack(), eid.offset};
-//
-//  } else {
-//    return {kInvalidEntityId, 0u};
-//  }
-//}
-//
-//// Returns a pair of `(file_id, offset)` or `(kInvalidEntityId, 0)` for a
-//// given raw entity id.
-//EntityBaseOffsetPair GetFileOffset(RawEntityId id) {
-//  VariantId vid = EntityId(id).Unpack();
-//  if (std::holds_alternative<FileTokenId>(vid)) {
-//    auto eid = std::get<FileTokenId>(vid);
-//    return {EntityId(FileId(eid.file_id)).Pack(), eid.offset};
-//
-//  } else {
-//    return {kInvalidEntityId, 0u};
-//  }
-//}
-//
-//// Return the "canonical" version of a declaration. This tries to get us the
-//// definition when possible.
-//Decl CanonicalDecl(const Decl &decl) {
-//  for (const Decl &redecl : decl.redeclarations()) {
-//    return redecl;
-//  }
-//  return decl;
-//}
-//
-//// Return the "canonical" ID of a declaration. This tries to get us the
-//// definition when possible.
-//PackedDeclId CanonicalId(const Decl &decl) {
-//  return CanonicalDecl(decl).id();
-//}
-//
-//// Return some kind of name for a declaration.
-//QString DeclName(const Decl &decl) {
-//  if (auto nd = NamedDecl::from(decl)) {
-//    if (auto name_data = nd->name(); !name_data.empty()) {
-//      return QString::fromUtf8(name_data.data(),
-//                               static_cast<int>(name_data.size()));
-//    }
-//  }
-//  return QString("%1(%2)")
-//      .arg(EnumeratorName(decl.category()))
-//      .arg(decl.id().Pack());
-//}
-//
-//// Return the file location of an entity.
-//RawEntityId EntityFileLocation(const Index &index, RawEntityId eid) {
-//  VariantEntity entity = index.entity(eid);
-//  if (std::holds_alternative<Decl>(entity)) {
-//    return DeclFileLocation(std::get<Decl>(entity));
-//
-//    // Statement, walk to the first fragent token, or the beginning of the
-//    // fragment.
-//  }
-//  if (std::holds_alternative<Stmt>(entity)) {
-//    Stmt stmt = std::get<Stmt>(entity);
-//    for (Token token : stmt.tokens()) {
-//      if (auto nearest_file_loc = token.nearest_file_token()) {
-//        return nearest_file_loc.id().Pack();
-//      }
-//    }
-//
-//    if (auto file_toks = Fragment::containing(stmt).file_tokens()) {
-//      return file_toks.begin()->id().Pack();
-//    }
-//
-//    // Type; walk to the containing fragment.
-//  } else if (std::holds_alternative<Type>(entity)) {
-//    Type type = std::get<Type>(entity);
-//    if (auto file_toks = Fragment::containing(type).file_tokens()) {
-//      return file_toks.begin()->id().Pack();
-//    }
-//
-//    // Token substitution; walk up to the file location.
-//  } else if (std::holds_alternative<Macro>(entity)) {
-//    Macro macro = std::get<Macro>(entity);
-//    for (auto parent = macro.parent(); parent;
-//         macro = std::move(parent.value())) {
-//    }
-//
-//    for (auto made_progress = true; made_progress;) {
-//      made_progress = false;
-//      for (MacroOrToken node : macro.children()) {
-//        if (std::holds_alternative<Macro>(node)) {
-//          macro = std::move(std::get<Macro>(node));
-//          made_progress = true;
-//          break;
-//        } else if (std::holds_alternative<Token>(node)) {
-//          if (auto file_tok = std::get<Token>(node).nearest_file_token()) {
-//            return file_tok.id().Pack();
-//          }
-//        }
-//      }
-//    }
-//
-//  } else if (std::holds_alternative<Token>(entity)) {
-//    if (auto file_tok = std::get<Token>(entity).nearest_file_token()) {
-//      return file_tok.id().Pack();
-//    }
-//  }
-//  return kInvalidEntityId;
-//}
-//
-//// Return the optional nearest fragment token associated with this declaration.
-//std::optional<Token> DeclFragmentToken(const Decl &decl) {
-//
-//  // Structs and enums and such can often be defined inside of a typedef so we
-//  // want to go to the beginning of them.
-//  if (TypeDecl::from(decl)) {
-//    goto skip_name_match;
-//  }
-//
-//  if (auto nd = NamedDecl::from(decl)) {
-//    if (auto tok = nd->token()) {
-//      if (tok.data() == nd->name()) {
-//        return tok;
-//      }
-//    }
-//  }
-//
-//skip_name_match:
-//  for (Token decl_tok : decl.tokens()) {
-//    return decl_tok;
-//  }
-//
-//  for (Token parsed_tok : Fragment::containing(decl).parsed_tokens()) {
-//    return parsed_tok;
-//  }
-//
-//  return std::nullopt;
-//}
-//
-//// Return the optional nearest file token associated with this declaration.
-//std::optional<Token> DeclFileToken(const Decl &decl) {
-//  if (auto frag_tok = DeclFragmentToken(decl)) {
-//    return frag_tok->nearest_file_token();
-//  } else {
-//    return std::nullopt;
-//  }
-//}
-//
-//// Return the entity ID of the nearest file token associated with this
-//// declaration.
-//RawEntityId DeclFileLocation(const Decl &decl) {
-//  if (auto tok = DeclFileToken(decl)) {
-//    return tok->id().Pack();
-//  } else {
-//    return kInvalidEntityId;
-//  }
-//}
-
-//// Try to get the nearest declaration for `id`. Ideally, `id` is a declaration
-//// ID. Otherwise, it will find the nearest enclosing declaration, and return
-//// that.
-//std::optional<Decl> NearestDeclFor(const Index &index, RawEntityId id) {
-//  auto entity = index.entity(id);
-//  if (std::holds_alternative<Decl>(entity)) {
-//    return std::get<Decl>(entity);
-//  } else if (std::holds_alternative<Stmt>(entity)) {
-//    for (Decl decl : Decl::containing(std::get<Stmt>(entity))) {
-//      return decl;
-//    }
-//  } else if (std::holds_alternative<Token>(entity)) {
-//    for (Decl decl : Decl::containing(std::get<Token>(entity))) {
-//      return decl;
-//    }
-//  }
-//  return std::nullopt;
-//}
 
 namespace {
 
@@ -1185,10 +1091,7 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode) {
   return crumbs.Release();
 }
 
-std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
-                                         bool run_length_encode) {
-
-  std::optional<QString> output;
+QString EntityBreadCrumbs(const VariantEntity &ent, bool run_length_encode) {
 
   if (std::holds_alternative<Decl>(ent)) {
     const Decl &decl = std::get<Decl>(ent);
@@ -1206,10 +1109,13 @@ std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
     }
 
   } else if (std::holds_alternative<Macro>(ent)) {
-    const Macro &macro = std::get<Macro>(ent);
-    for (Token tok : macro.generate_expansion_tokens()) {
-      if (Token ptok = tok.parsed_token()) {
-        return TokenBreadCrumbs(tok, run_length_encode);
+    std::optional<Macro> m;
+    m.emplace(std::get<Macro>(ent));
+    for (; m; m = m->parent()) {
+      for (Token tok : m->generate_expansion_tokens()) {
+        if (Token ptok = tok.parsed_token()) {
+          return TokenBreadCrumbs(ptok, run_length_encode);
+        }
       }
     }
 
@@ -1223,7 +1129,7 @@ std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
     }
   }
 
-  return std::nullopt;
+  return {};
 }
 
 float GetColorContrast(const QColor &color) {

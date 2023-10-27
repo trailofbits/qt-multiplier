@@ -39,7 +39,7 @@ class GlobalHighlighterItem final : public QWidget {
 
   //! Constructor
   GlobalHighlighterItem(const RawEntityId &entity_id, const QString &name,
-                        const std::optional<Token> &opt_name_token,
+                        const std::optional<TokenRange> &opt_name_tokens,
                         const QColor &color, QWidget *parent);
 
   //! Updates the button icons based on the active theme

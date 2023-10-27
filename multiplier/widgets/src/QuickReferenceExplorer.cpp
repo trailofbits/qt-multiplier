@@ -9,6 +9,9 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/IDatabase.h>
 #include <multiplier/ui/Icons.h>
+#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/ui/ITreeExplorerModel.h>
+#include <multiplier/ui/ITreeGenerator.h>
 
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -20,7 +23,6 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QPoint>
-#include <QFutureWatcher>
 #include <QSizeGrip>
 #include <QGridLayout>
 
@@ -30,7 +32,7 @@
 namespace mx::gui {
 
 struct QuickReferenceExplorer::PrivateData final {
-  IReferenceExplorerModel *model{nullptr};
+  ITreeExplorerModel *model{nullptr};
   bool closed{false};
 
   QPushButton *close_button{nullptr};
@@ -41,37 +43,28 @@ struct QuickReferenceExplorer::PrivateData final {
   QLabel *window_title{nullptr};
 
   IDatabase::Ptr database;
-  QFuture<Token> entity_name_future;
-  QFutureWatcher<Token> future_watcher;
 
   PreviewableReferenceExplorer *reference_explorer{nullptr};
-  IReferenceExplorerModel::ReferenceType reference_type;
 };
 
 QuickReferenceExplorer::QuickReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id, const bool &show_code_preview,
+    std::shared_ptr<ITreeGenerator> generator, const bool &show_code_preview,
     IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
-    const IReferenceExplorerModel::ReferenceType &reference_type,
     QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
   d->database = IDatabase::Create(index, file_location_cache);
-  connect(&d->future_watcher,
-          &QFutureWatcher<QFuture<std::optional<QString>>>::finished, this,
-          &QuickReferenceExplorer::EntityNameFutureStatusChanged);
 
-  InitializeWidgets(index, file_location_cache, entity_id, show_code_preview,
-                    highlighter, macro_explorer, reference_type);
+  InitializeWidgets(index, file_location_cache, std::move(generator),
+                    show_code_preview, highlighter, macro_explorer);
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
           &QuickReferenceExplorer::OnThemeChange);
 }
 
-QuickReferenceExplorer::~QuickReferenceExplorer() {
-  CancelRunningRequest();
-}
+QuickReferenceExplorer::~QuickReferenceExplorer() {}
 
 void QuickReferenceExplorer::keyPressEvent(QKeyEvent *event) {
   if (event->key() == Qt::Key_Escape) {
@@ -126,9 +119,8 @@ void QuickReferenceExplorer::resizeEvent(QResizeEvent *event) {
 
 void QuickReferenceExplorer::InitializeWidgets(
     const Index &index, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id, const bool &show_code_preview,
-    IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
-    const IReferenceExplorerModel::ReferenceType &reference_type) {
+    std::shared_ptr<ITreeGenerator> generator, const bool &show_code_preview,
+    IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer) {
 
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
@@ -142,16 +134,7 @@ void QuickReferenceExplorer::InitializeWidgets(
   // Title bar
   //
 
-  // Use a temporary window name at first. This won't be shown at all if the
-  // name resolution is fast enough
-  d->reference_type = reference_type;
-
-  auto window_name = GenerateWindowName(entity_id, d->reference_type);
-  d->window_title = new QLabel(window_name);
-
-  // Start a request to fetch the real entity name
-  d->entity_name_future = d->database->RequestEntityName(entity_id);
-  d->future_watcher.setFuture(d->entity_name_future);
+  d->window_title = new QLabel(tr("Quick reference explorer"));
 
   // Save as new button
   d->save_to_new_ref_explorer_button = new QPushButton(QIcon(), "", this);
@@ -191,12 +174,16 @@ void QuickReferenceExplorer::InitializeWidgets(
   // Contents
   //
 
-  d->model = IReferenceExplorerModel::Create(index, file_location_cache, this);
+  d->model = ITreeExplorerModel::Create(this);
+
+  connect(d->model, &ITreeExplorerModel::TreeNameChanged,
+          this, &QuickReferenceExplorer::OnTreeNameChanged);
+
+  d->model->InstallGenerator(std::move(generator));
+
   d->reference_explorer = new PreviewableReferenceExplorer(
       index, file_location_cache, d->model, show_code_preview, highlighter,
       macro_explorer, this);
-
-  d->model->SetEntity(entity_id, reference_type);
 
   connect(d->reference_explorer,
           &PreviewableReferenceExplorer::SelectedItemChanged, this,
@@ -261,9 +248,7 @@ void QuickReferenceExplorer::OnApplicationStateChange(
 
 void QuickReferenceExplorer::OnSaveReferenceExplorer() {
   d->model->setParent(d->reference_explorer);
-
   d->reference_explorer->setWindowTitle(d->window_title->text());
-
   d->reference_explorer->hide();
   d->reference_explorer->setParent(nullptr);
 
@@ -273,60 +258,6 @@ void QuickReferenceExplorer::OnSaveReferenceExplorer() {
   disconnect(d->reference_explorer, nullptr, this, nullptr);
 
   close();
-}
-
-void QuickReferenceExplorer::EntityNameFutureStatusChanged() {
-  if (d->entity_name_future.isCanceled()) {
-    return;
-  }
-
-  Token opt_entity_name = d->entity_name_future.takeResult();
-  if (!opt_entity_name) {
-    return;
-  }
-
-  std::string_view entity_name = opt_entity_name.data();
-  if (entity_name.empty()) {
-    return;
-  }
-
-  auto qstr_entity_name = QString::fromUtf8(
-      entity_name.data(), static_cast<qsizetype>(entity_name.size()));
-
-  auto window_name = GenerateWindowName(qstr_entity_name, d->reference_type);
-  d->window_title->setText(window_name);
-}
-
-void QuickReferenceExplorer::CancelRunningRequest() {
-  if (!d->entity_name_future.isRunning()) {
-    return;
-  }
-
-  d->entity_name_future.cancel();
-  d->entity_name_future.waitForFinished();
-  d->entity_name_future = {};
-}
-
-QString QuickReferenceExplorer::GenerateWindowName(
-    const QString &entity_name,
-    const IReferenceExplorerModel::ReferenceType &reference_type) {
-
-  auto quoted_entity_name = QString("`") + entity_name + "`";
-
-  QString reference_type_name;
-  if (reference_type == IReferenceExplorerModel::ReferenceType::Callers) {
-    reference_type_name = tr("Call hierarchy of ");
-  }
-
-  return reference_type_name + quoted_entity_name;
-}
-
-QString QuickReferenceExplorer::GenerateWindowName(
-    const RawEntityId &entity_id,
-    const IReferenceExplorerModel::ReferenceType &reference_type) {
-
-  auto entity_name = tr("Entity ID #") + QString::number(entity_id);
-  return GenerateWindowName(entity_name, reference_type);
 }
 
 void QuickReferenceExplorer::UpdateIcons() {
@@ -343,6 +274,11 @@ void QuickReferenceExplorer::OnThemeChange(const QPalette &,
 
 void QuickReferenceExplorer::SetBrowserMode(const bool &enabled) {
   d->reference_explorer->SetBrowserMode(enabled);
+}
+
+//! Called when the model resolves the new name of the tree.
+void QuickReferenceExplorer::OnTreeNameChanged(const QString &new_name) {
+  d->window_title->setText(new_name);
 }
 
 }  // namespace mx::gui
