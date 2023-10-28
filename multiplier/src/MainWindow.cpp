@@ -131,7 +131,10 @@ struct MainWindow::PrivateData final {
   ToolBar toolbar;
 };
 
-MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
+MainWindow::MainWindow()
+    : QMainWindow(nullptr),
+      d(new PrivateData) {
+
   setWindowTitle("Multiplier");
   setWindowIcon(QIcon(":/Icons/Multiplier"));
 
@@ -145,8 +148,10 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
         this, tr("Select a Multiplier database"), QDir::homePath());
   }
 
-  d->index = mx::Index::in_memory_cache(
-      mx::Index::from_database(database_path.toStdString()));
+  if (database_path.size()) {
+    d->index = mx::Index::in_memory_cache(
+        mx::Index::from_database(database_path.toStdString()));
+  }
 
   InitializeWidgets();
   InitializeToolBar();

@@ -45,6 +45,8 @@ class Token;
 class TokenRange;
 namespace gui {
 
+VariantEntity NamedEntityContaining(const VariantEntity &entity);
+
 template <typename T>
 static VariantEntity NamedDeclContaining(const T &thing) requires(
     !std::is_same_v<T, VariantEntity>) {

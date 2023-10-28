@@ -29,6 +29,15 @@ class ITreeItem {
   // NOTE(pag): This must be non-blocking.
   virtual RawEntityId EntityId(void) const = 0;
 
+  // Returns the entity ID aliased by this entity, or `kInvalidEntityId`. This
+  // is a means of communicating equivalence of rows in terms of their
+  // child sets, but not necessarily in terms of their `Data`.
+  //
+  // NOTE(pag): If this returns a valid entity ID, then it must be one that was
+  //            associated with an item generated prior to this `ITreeItem` in
+  //            the current tree.
+  virtual RawEntityId AliasedEntityId(void) const;
+
   // Column data for the tree item.
   //
   // NOTE(pag): This must be non-blocking.

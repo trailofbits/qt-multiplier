@@ -17,6 +17,117 @@
 
 namespace mx::gui {
 
+VariantEntity NamedEntityContaining(const VariantEntity &entity) {
+  if (std::holds_alternative<Decl>(entity)) {
+
+    if (auto cd = NamedDeclContaining(std::get<Decl>(entity));
+        !std::holds_alternative<NotAnEntity>(cd)) {
+      return cd;
+    }
+
+    if (auto nd = NamedDecl::from(std::get<Decl>(entity))) {
+      return nd->canonical_declaration();
+    }
+
+    // TODO(pag): Do token-based lookup?
+
+  } else if (std::holds_alternative<Stmt>(entity)) {
+    const Stmt &stmt = std::get<Stmt>(entity);
+
+    if (auto nd = NamedDeclContaining(stmt);
+        !std::holds_alternative<NotAnEntity>(nd)) {
+      return nd;
+    }
+
+    // TODO(pag): Do token-based lookup? It might end up being a statement
+    //            in an attribute on a decl.
+
+    if (auto file = File::containing(stmt)) {
+      return file.value();
+    }
+
+  } else if (std::holds_alternative<Macro>(entity)) {
+
+    // It could be that we are looking at an expansion that isn't actually
+    // used per se (e.g. the expansion happens as a result of PASTA eagerly
+    // doing argument pre-expansions), but only the macro name gets used, so
+    // we can't connect any final parsed tokens to anything, and thus we want
+    // to instead go and find the root of the expansion and ask for the named
+    // declaration containing that.
+    //
+    // Another reason to look at the root macro expansion is that we may be
+    // asking for a use of a define that is in the same fragment as the
+    // expansion, and we don't want the expansion to put us into the body of
+    // a define, but to the use of the top-level macro expansion.
+    Macro macro = std::move(std::get<Macro>(entity)).root();
+
+    for (Token tok : macro.generate_expansion_tokens()) {
+      if (Token pt = tok.parsed_token()) {
+        if (auto nd = NamedDeclContaining(pt);
+            !std::holds_alternative<NotAnEntity>(nd)) {
+          return nd;
+        }
+      }
+    }
+
+    // If the macro wasn't used inside of a decl/statement, then go try to
+    // find the macro definition containing this macro.
+    if (auto dd = DefineMacroDirective::from(macro)) {
+      return dd.value();
+    }
+
+  } else if (std::holds_alternative<File>(entity)) {
+    return entity;
+
+  } else if (std::holds_alternative<Fragment>(entity)) {
+    if (auto file = File::containing(std::get<Fragment>(entity))) {
+      return file.value();
+    }
+
+  } else if (std::holds_alternative<Designator>(entity)) {
+    const Designator &d = std::get<Designator>(entity);
+    if (auto fd = d.field()) {
+      return fd.value();
+    }
+
+  } else if (std::holds_alternative<Token>(entity)) {
+    const Token &tok = std::get<Token>(entity);
+
+    if (auto pt = tok.parsed_token()) {
+      if (auto nd = NamedDeclContaining(pt);
+          !std::holds_alternative<NotAnEntity>(nd)) {
+        return nd;
+      }
+    }
+
+    for (Macro m : Macro::containing(tok)) {
+      if (auto ne = NamedEntityContaining(std::move(m));
+          !std::holds_alternative<NotAnEntity>(ne)) {
+        return ne;
+      }
+    }
+
+    if (auto dt = tok.derived_token()) {
+      if (auto nd = NamedDeclContaining(dt);
+          !std::holds_alternative<NotAnEntity>(nd)) {
+        return nd;
+      }
+    }
+
+    if (std::optional<Fragment> frag = Fragment::containing(tok)) {
+      for (NamedDecl nd : NamedDecl::in(*frag)) {
+        if (nd.tokens().index_of(tok)) {
+          return nd;
+        }
+      }
+    }
+  }
+
+  // TODO(pag): CXXBaseSpecifier, CXXTemplateArgument, CXXTemplateParameterList.
+
+  return NotAnEntity{};
+}
+
 //! Return the optional nearest fragment token associated with this declaration.
 std::optional<Token> DeclFragmentToken(const Decl &decl) {
 

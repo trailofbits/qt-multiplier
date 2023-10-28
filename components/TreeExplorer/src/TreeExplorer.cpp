@@ -333,16 +333,16 @@ void TreeExplorer::UpdateTreeViewItemButtons() {
   d->treeview_item_buttons.expand->setEnabled(false);
 
   auto entity_id_var = index.data(ITreeExplorerModel::EntityIdRole);
-
   if (entity_id_var.isValid() &&
       qvariant_cast<RawEntityId>(entity_id_var) != kInvalidEntityId) {
-
     d->treeview_item_buttons.open->setEnabled(true);
   }
 
   // Enable the expansion button if we haven't yet expanded the node.
   // TODO(alessandro): Fix the button visibility
-  d->treeview_item_buttons.expand->setEnabled(true);
+  auto expand_var = index.data(ITreeExplorerModel::CanBeExpanded);
+  d->treeview_item_buttons.expand->setEnabled(
+      expand_var.isValid() && expand_var.toBool());
 
   // Update the button positions
   auto rect = d->tree_view->visualRect(index);
@@ -404,12 +404,14 @@ void TreeExplorer::UpdateIcons() {
 }
 
 void TreeExplorer::OnModelReset() {
+  qDebug() << "OnModelReset";
   ExpandAllNodes();
   d->treeview_item_buttons.opt_hovered_index = std::nullopt;
   UpdateTreeViewItemButtons();
 }
 
 void TreeExplorer::OnDataChanged() {
+  qDebug() << "OnDataChanged";
   UpdateTreeViewItemButtons();
   ExpandAllNodes();
 
@@ -418,14 +420,13 @@ void TreeExplorer::OnDataChanged() {
 
 void TreeExplorer::ExpandAllNodes() {
   d->tree_view->expandAll();
-
   d->tree_view->resizeColumnToContents(0);
-  d->tree_view->resizeColumnToContents(1);
 }
 
-void TreeExplorer::OnRowsInserted(const QModelIndex &, int, int) {
-  qDebug() << "Rows were inserted";
-  ExpandAllNodes();
+void TreeExplorer::OnRowsInserted(const QModelIndex &parent, int, int) {
+  qDebug() << "OnRowsInserted" << parent;
+  d->tree_view->expandRecursively(parent);
+  d->tree_view->resizeColumnToContents(0);
 }
 
 void TreeExplorer::OnCurrentItemChanged(const QModelIndex &current_index,
@@ -473,6 +474,7 @@ void TreeExplorer::OnContextMenuActionTriggered(QAction *action) {
 
 void TreeExplorer::OnSearchParametersChange(
     const ISearchWidget::SearchParameters &search_parameters) {
+  qDebug() << "OnSearchParametersChange";
 
   QRegularExpression::PatternOptions options{
       QRegularExpression::NoPatternOption};
@@ -497,9 +499,7 @@ void TreeExplorer::OnSearchParametersChange(
          "Invalid regex found in CodeView::OnSearchParametersChange");
 
   d->model_proxy->setFilterRegularExpression(regex);
-
-  d->tree_view->expandRecursively(QModelIndex());
-  d->tree_view->resizeColumnToContents(0);
+  ExpandAllNodes();
 }
 
 void TreeExplorer::OnActivateTreeViewItem() {

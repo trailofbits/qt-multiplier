@@ -12,6 +12,13 @@
 
 namespace mx::gui {
 
+// Returns the entity ID aliased by this entity, or `kInvalidEntityId`. This
+// is a means of communicating equivalence of rows in terms of their
+// child sets, but not necessarily in terms of their `Data`.
+RawEntityId ITreeItem::AliasedEntityId(void) const {
+  return kInvalidEntityId;
+}
+
 // Generate the root / top-level items for the tree.
 //
 // NOTE(pag): These are `shared_ptr`s so that implementations have the

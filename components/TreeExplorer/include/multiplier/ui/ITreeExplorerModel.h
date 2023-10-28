@@ -32,7 +32,7 @@ class ITreeExplorerModel : public QAbstractItemModel {
     TokenRangeRole,
 
     //! Returns whether or not this row has been expanded.
-    HasBeenExpanded,
+    CanBeExpanded,
 
     //! Returns whether or not this row is a duplicate of another.
     IsDuplicate,
