@@ -43,12 +43,33 @@ enum class NodeState {
 };
 
 struct Node {
+  // Pointer to this node's parent.
   NodeKey *parent_key{nullptr};
-  int num_children{0};
+
+  // The current state of this node. By default, all nodes are unopened, i.e.
+  // we haven't tried to fetch their children. Some nodes are marked as
+  // duplicates.
   NodeState state{NodeState::kUnopened};
+
+  // The number of children of this node.
+  int num_children{0};
+
+  // Index into `d->child_keys` of the first child of this node, if
+  // `num_children` is greater than zero. The last child can be found at
+  // `d->child_keys[d->child_index + num_children - 1]`.
   unsigned child_index{0u};
+
+  // Index into `d->child_keys` of the next item sharing `d->parent_key`.
   unsigned sibling_index{0u};
+
+  // Index into `d->node_data`. `d->node_data[d->data_index]` is the data for
+  // first column, `d->node_data[d->data_index + 1]` for the second, ..., and
+  // `d->node_data[d->data_index + d->num_columns - 1]` for the last column.
   unsigned data_index{0u};
+
+  // Index into `d->child_keys`. If this node isn't a duplicate, then this index
+  // will reference back to the node itself. Otherwise it will reference the
+  // first/original node.
   unsigned alias_index{0u};
 
   inline Node(NodeKey *parent_key_)
