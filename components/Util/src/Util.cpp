@@ -59,20 +59,19 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity) {
     // asking for a use of a define that is in the same fragment as the
     // expansion, and we don't want the expansion to put us into the body of
     // a define, but to the use of the top-level macro expansion.
-    Macro macro = std::move(std::get<Macro>(entity)).root();
-
-    for (Token tok : macro.generate_expansion_tokens()) {
-      if (Token pt = tok.parsed_token()) {
-        if (auto nd = NamedDeclContaining(pt);
-            !std::holds_alternative<NotAnEntity>(nd)) {
-          return nd;
+    std::optional<Macro> m;
+    m.emplace(std::get<Macro>(entity));
+    for (; m; m = m->parent()) {
+      for (Token tok : m->generate_expansion_tokens()) {
+        if (Token ptok = tok.parsed_token()) {
+          return NamedDeclContaining(ptok);
         }
       }
     }
 
     // If the macro wasn't used inside of a decl/statement, then go try to
     // find the macro definition containing this macro.
-    if (auto dd = DefineMacroDirective::from(macro)) {
+    if (auto dd = DefineMacroDirective::from(std::get<Macro>(entity))) {
       return dd.value();
     }
 
