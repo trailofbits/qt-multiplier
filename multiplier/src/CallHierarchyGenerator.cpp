@@ -81,7 +81,8 @@ std::shared_ptr<ITreeItem> CallHierarchyItem::Create(
     RawEntityId aliased_entity_id_) {
 
   return std::make_shared<CallHierarchyItem>(
-      ::mx::EntityId(use).Pack(), aliased_entity_id_,
+      ::mx::EntityId(use).Pack(),
+      aliased_entity_id_,
       NameOfEntity(entity),
       LocationOfEntity(file_location_cache, use),
       EntityBreadCrumbs(use));
@@ -152,7 +153,18 @@ gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Children(
   for (Reference ref : Reference::to(containing_entity)) {
     auto use = ref.as_variant();
     auto user = NamedEntityContaining(use);
-    co_yield CallHierarchyItem::Create(file_location_cache, use, user);
+
+    // We might have many uses of a thing, e.g. multiple calls to a function
+    // A within a function B, and so we want the Nth call to reference the
+    // first call.
+    auto aliased_entity_id = kInvalidEntityId;
+    if (std::holds_alternative<Decl>(user)) {
+      aliased_entity_id =
+          std::get<Decl>(user).canonical_declaration().id().Pack();
+    }
+
+    co_yield CallHierarchyItem::Create(
+        file_location_cache, use, user, aliased_entity_id);
   }
 }
 

@@ -49,6 +49,7 @@ struct Node {
   unsigned child_index{0u};
   unsigned sibling_index{0u};
   unsigned data_index{0u};
+  unsigned alias_index{0u};
 
   inline Node(NodeKey *parent_key_)
       : parent_key(parent_key_) {}
@@ -92,6 +93,9 @@ struct TreeExplorerModel::PrivateData final {
 
   // The uniqued nodes of the tree.
   std::unordered_map<RawEntityId, Node> entity_to_node;
+
+  // Used to help deduplicate.
+  std::unordered_map<RawEntityId, NodeKey *> aliased_entity_to_key;
 
   // The "root" node. Its children represent the top-level items in the tree.
   Node root_node;
@@ -201,6 +205,7 @@ void TreeExplorerModel::InstallGenerator(
   d->generator = std::move(generator_);
   d->node_data.clear();
   d->entity_to_node.clear();
+  d->aliased_entity_to_key.clear();
   d->child_keys.clear();
   d->redundant_keys.clear();
   d->num_columns = d->generator->NumColumns();
@@ -527,10 +532,24 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
         // redeclaration of another one.
         const RawEntityId aliased_eid = item->AliasedEntityId();
         if (aliased_eid != kInvalidEntityId && aliased_eid != eid) {
-          auto alias_it = d->entity_to_node.find(aliased_eid);
-          if (alias_it != d->entity_to_node.end()) {
-            load_key = &*alias_it;
+          NodeKey *&alias_key = d->aliased_entity_to_key[aliased_eid];
+
+          if (!alias_key) {
+            auto alias_it = d->entity_to_node.find(aliased_eid);
+            if (alias_it != d->entity_to_node.end()) {
+              load_key = &*alias_it;
+              alias_key = load_key;
+            } else {
+              alias_key = curr_key;  // Store for future dedup.
+            }
+          } else {
+            load_key = alias_key;
           }
+        
+        // An existing thing notifies us of this alias.
+        } else if (auto alias_it = d->aliased_entity_to_key.find(eid);
+                   alias_it != d->aliased_entity_to_key.end()) {
+          load_key = alias_it->second;
         }
 
       } else {
@@ -549,7 +568,14 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
         load_keys.emplace_back(load_key, batch.remaining_depth);
       }
 
-      *(batch.index_ptr) = static_cast<unsigned>(d->child_keys.size());
+      // Make the node point to itself, and update the parent child index or
+      // previous sibling's next sibling index.
+      new_node->alias_index = static_cast<unsigned>(d->child_keys.size());
+      *(batch.index_ptr) = new_node->alias_index;
+
+      // Possibly make the node point to its alias.
+      new_node->alias_index = load_key->second.alias_index;
+
       d->child_keys.emplace_back(curr_key);
       batch.index_ptr = &(curr_key->second.sibling_index);
 
