@@ -59,15 +59,18 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity) {
     // asking for a use of a define that is in the same fragment as the
     // expansion, and we don't want the expansion to put us into the body of
     // a define, but to the use of the top-level macro expansion.
-    std::optional<Macro> m;
-    m.emplace(std::get<Macro>(entity));
-    for (; m; m = m->parent()) {
-      for (Token tok : m->generate_expansion_tokens()) {
-        if (Token ptok = tok.parsed_token()) {
-          return NamedDeclContaining(ptok);
+    auto macro = std::get<Macro>(entity).root();
+
+    for (Token tok : macro.generate_expansion_tokens()) {
+      if (Token ptok = tok.parsed_token()) {
+        auto res = NamedDeclContaining(ptok);
+        if (!std::holds_alternative<NotAnEntity>(res)) {
+          return res;
         }
       }
     }
+
+    // TODO(pag): Handle the case where a macro expands to nothing.
 
     // If the macro wasn't used inside of a decl/statement, then go try to
     // find the macro definition containing this macro.
