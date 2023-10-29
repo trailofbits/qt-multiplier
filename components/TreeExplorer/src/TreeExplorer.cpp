@@ -42,6 +42,8 @@ struct ContextMenu final {
 struct TreeviewItemButtons final {
   std::optional<QModelIndex> opt_hovered_index;
 
+  bool updating_buttons{false};
+
   // Keep up to date with UpdateTreeViewItemButtons
   QPushButton *open{nullptr};
   QPushButton *expand{nullptr};
@@ -317,6 +319,13 @@ bool TreeExplorer::eventFilter(QObject *obj, QEvent *event) {
 
 void TreeExplorer::UpdateTreeViewItemButtons() {
 
+  // TODO(pag): Sometimes we get infinite recursion from Qt doing a
+  // `sendSyntheticEnterLeave` below when we `setVisible(is_redundant)`.
+  if (d->treeview_item_buttons.updating_buttons) {
+    return;
+  }
+
+  d->treeview_item_buttons.updating_buttons = true;
   d->treeview_item_buttons.open->setVisible(false);
   d->treeview_item_buttons.goto_->setVisible(false);
   d->treeview_item_buttons.expand->setVisible(false);
@@ -326,6 +335,7 @@ void TreeExplorer::UpdateTreeViewItemButtons() {
   // reordering while the user is clicking them
   auto display_buttons = d->treeview_item_buttons.opt_hovered_index.has_value();
   if (!display_buttons) {
+    d->treeview_item_buttons.updating_buttons = false;
     return;
   }
 
@@ -398,6 +408,8 @@ void TreeExplorer::UpdateTreeViewItemButtons() {
 
     current_x += button_size + button_margin;
   }
+
+  d->treeview_item_buttons.updating_buttons = false;
 }
 
 void TreeExplorer::UpdateIcons() {
