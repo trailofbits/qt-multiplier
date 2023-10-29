@@ -25,10 +25,10 @@ class SearchFilterModelProxy final : public QSortFilterProxyModel {
   SearchFilterModelProxy(QObject *parent);
 
   //! Destructor
-  virtual ~SearchFilterModelProxy() override;
+  virtual ~SearchFilterModelProxy();
 
   //! Wraps `setSourceModel` in order to connect the required signals
-  virtual void setSourceModel(QAbstractItemModel *source_model) override;
+  void setSourceModel(QAbstractItemModel *source_model) Q_DECL_FINAL;
 
  public slots:
 
@@ -37,13 +37,8 @@ class SearchFilterModelProxy final : public QSortFilterProxyModel {
 
  protected:
   //! Returns true if the specified row should be included in the view
-  virtual bool
-  filterAcceptsRow(int source_row,
-                   const QModelIndex &source_parent) const override;
-
-  //! Used to sort the items based on the value of a single column
-  virtual bool lessThan(const QModelIndex &left,
-                        const QModelIndex &right) const override;
+  bool filterAcceptsRow(int source_row,
+                        const QModelIndex &source_parent) const Q_DECL_FINAL;
 
   //! Disabled copy constructor
   SearchFilterModelProxy(const SearchFilterModelProxy &) = delete;

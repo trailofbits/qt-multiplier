@@ -45,6 +45,7 @@ struct TreeviewItemButtons final {
   // Keep up to date with UpdateTreeViewItemButtons
   QPushButton *open{nullptr};
   QPushButton *expand{nullptr};
+  QPushButton *goto_{nullptr};
 };
 
 }  // namespace
@@ -131,6 +132,12 @@ void TreeExplorer::InitializeWidgets(ITreeExplorerModel *model) {
 
   connect(d->treeview_item_buttons.expand, &QPushButton::pressed, this,
           &TreeExplorer::OnExpandTreeViewItem);
+
+  d->treeview_item_buttons.goto_ = new QPushButton(QIcon(), "", this);
+  d->treeview_item_buttons.goto_->setToolTip(tr("Goto original"));
+
+  connect(d->treeview_item_buttons.goto_, &QPushButton::pressed, this,
+          &TreeExplorer::OnGotoOriginalTreeViewItem);
 
   // Create the search widget
   d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
@@ -309,19 +316,15 @@ bool TreeExplorer::eventFilter(QObject *obj, QEvent *event) {
 }
 
 void TreeExplorer::UpdateTreeViewItemButtons() {
-  // Keep up to date with TreeviewItemButtons
-  std::vector<QPushButton *> button_list{d->treeview_item_buttons.open,
-                                         d->treeview_item_buttons.expand};
+
+  d->treeview_item_buttons.open->setVisible(false);
+  d->treeview_item_buttons.goto_->setVisible(false);
+  d->treeview_item_buttons.expand->setVisible(false);
 
   // Always show the buttons, but disable the ones that are not
   // applicable. This is to prevent buttons from disappearing and/or
   // reordering while the user is clicking them
   auto display_buttons = d->treeview_item_buttons.opt_hovered_index.has_value();
-
-  for (auto &button : button_list) {
-    button->setVisible(display_buttons);
-  }
-
   if (!display_buttons) {
     return;
   }
@@ -330,6 +333,7 @@ void TreeExplorer::UpdateTreeViewItemButtons() {
 
   // Enable the go-to button if we have a referenced entity id.
   d->treeview_item_buttons.open->setEnabled(false);
+  d->treeview_item_buttons.expand->setEnabled(false);
   d->treeview_item_buttons.expand->setEnabled(false);
 
   auto entity_id_var = index.data(ITreeExplorerModel::EntityIdRole);
@@ -344,13 +348,28 @@ void TreeExplorer::UpdateTreeViewItemButtons() {
   d->treeview_item_buttons.expand->setEnabled(
       expand_var.isValid() && expand_var.toBool());
 
+  // Show/hide one of expand/goto if this is redundant.
+  auto redundant_var = index.data(ITreeExplorerModel::IsDuplicate);
+  auto is_redundant = redundant_var.isValid() && redundant_var.toBool();
+
+  d->treeview_item_buttons.open->setVisible(display_buttons);
+  d->treeview_item_buttons.goto_->setVisible(is_redundant);
+  d->treeview_item_buttons.expand->setVisible(!is_redundant);
+
+  // Keep up to date with TreeviewItemButtons
+  static constexpr auto kNumButtons = 2u;
+  QPushButton *button_list[kNumButtons] = {
+    d->treeview_item_buttons.open,
+    (is_redundant ? d->treeview_item_buttons.goto_ :
+     d->treeview_item_buttons.expand),
+  };
+
   // Update the button positions
   auto rect = d->tree_view->visualRect(index);
 
   auto button_margin = rect.height() / 6;
   auto button_size = rect.height() - (button_margin * 2);
-
-  auto button_count = static_cast<int>(button_list.size());
+  auto button_count = static_cast<int>(kNumButtons);
   auto button_area_width =
       (button_count * button_size) + (button_count * button_margin);
 
@@ -401,6 +420,16 @@ void TreeExplorer::UpdateIcons() {
       QIcon::Disabled, QIcon::On);
 
   d->treeview_item_buttons.expand->setIcon(expand_item_icon);
+
+  QIcon goto_item_icon;
+  goto_item_icon.addPixmap(GetPixmap(":/TreeExplorer/goto_ref_item"),
+                             QIcon::Normal, QIcon::On);
+
+  goto_item_icon.addPixmap(
+      GetPixmap(":/TreeExplorer/goto_ref_item", IconStyle::Disabled),
+      QIcon::Disabled, QIcon::On);
+
+  d->treeview_item_buttons.goto_->setIcon(goto_item_icon);
 }
 
 void TreeExplorer::OnModelReset() {
@@ -514,6 +543,15 @@ void TreeExplorer::OnExpandTreeViewItem() {
 
   const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
   ExpandTreeExplorerItem(index);
+}
+
+void TreeExplorer::OnGotoOriginalTreeViewItem(void) {
+  if (!d->treeview_item_buttons.opt_hovered_index.has_value()) {
+    return;
+  }
+
+  const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
+  (void) index;
 }
 
 void TreeExplorer::OnThemeChange(const QPalette &,

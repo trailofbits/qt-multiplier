@@ -96,6 +96,9 @@ class TreeExplorer final : public ITreeExplorer {
   //! Called when the "expand" item button has been pressed
   void OnExpandTreeViewItem();
 
+  //! Called when the "expand" item button has been pressed
+  void OnGotoOriginalTreeViewItem();
+
   //! Called by the theme manager
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);
