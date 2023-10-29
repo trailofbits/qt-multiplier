@@ -106,6 +106,9 @@ TokenRange NameOfEntity(const VariantEntity &ent);
 //! Return the name of an entity as a `QString`.
 std::optional<QString> NameOfEntityAsString(const VariantEntity &ent);
 
+QString LocationOfEntity(const FileLocationCache &file_location_cache,
+                         const VariantEntity &entity);
+
 //! Return the tokens of `ent` as a string.
 QString TokensToString(const VariantEntity &ent);
 
@@ -113,8 +116,8 @@ QString TokensToString(const VariantEntity &ent);
 QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 
 //! Create a breadcrumbs string of the token contexts.
-std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
-                                         bool run_length_encode = true);
+QString EntityBreadCrumbs(const VariantEntity &ent,
+                          bool run_length_encode = true);
 
 //! Returns the constrast for the given color
 float GetColorContrast(const QColor &color);

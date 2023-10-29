@@ -15,6 +15,7 @@
 #include <multiplier/Types.h>
 #include <multiplier/ui/ITreeExplorerModel.h>
 
+#include <atomic>
 #include <cstdint>
 #include <deque>
 #include <unordered_map>
@@ -87,6 +88,8 @@ class TreeExplorerModel final : public ITreeExplorerModel {
   void CancelRunningRequest() Q_DECL_FINAL;
 };
 
+using VersionNumber = std::shared_ptr<std::atomic<uint64_t>>;
+
 class ITreeExplorerExpansionThread : public QObject, public QRunnable {
   Q_OBJECT
  
@@ -98,7 +101,8 @@ class ITreeExplorerExpansionThread : public QObject, public QRunnable {
   virtual ~ITreeExplorerExpansionThread(void);
   explicit ITreeExplorerExpansionThread(
       std::shared_ptr<ITreeGenerator> generator_,
-      uint64_t version_number, RawEntityId parent_entity_id, unsigned depth);
+      const VersionNumber &version_number,
+      RawEntityId parent_entity_id, unsigned depth);
 
  signals:
   void NewTreeItems(uint64_t version_number,

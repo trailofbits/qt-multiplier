@@ -245,7 +245,7 @@ void TreeExplorer::resizeEvent(QResizeEvent *) {
   UpdateTreeViewItemButtons();
 }
 
-void TreeExplorer::CopyRefExplorerItemDetails(const QModelIndex &index) {
+void TreeExplorer::CopyTreeExplorerItemDetails(const QModelIndex &index) {
   auto tooltip_var = index.data(Qt::ToolTipRole);
   if (!tooltip_var.isValid()) {
     return;
@@ -257,7 +257,7 @@ void TreeExplorer::CopyRefExplorerItemDetails(const QModelIndex &index) {
   clipboard.setText(tooltip);
 }
 
-void TreeExplorer::ExpandRefExplorerItem(const QModelIndex &index) {
+void TreeExplorer::ExpandTreeExplorerItem(const QModelIndex &index) {
   auto &model = *static_cast<TreeExplorerModel *>(d->model);
   model.ExpandEntity(d->model_proxy->mapToSource(index), 1u);
 }
@@ -404,14 +404,12 @@ void TreeExplorer::UpdateIcons() {
 }
 
 void TreeExplorer::OnModelReset() {
-  qDebug() << "OnModelReset";
   ExpandAllNodes();
   d->treeview_item_buttons.opt_hovered_index = std::nullopt;
   UpdateTreeViewItemButtons();
 }
 
 void TreeExplorer::OnDataChanged() {
-  qDebug() << "OnDataChanged";
   UpdateTreeViewItemButtons();
   ExpandAllNodes();
 
@@ -424,7 +422,6 @@ void TreeExplorer::ExpandAllNodes() {
 }
 
 void TreeExplorer::OnRowsInserted(const QModelIndex &parent, int, int) {
-  qDebug() << "OnRowsInserted" << parent;
   d->tree_view->expandRecursively(parent);
   d->tree_view->resizeColumnToContents(0);
 }
@@ -468,13 +465,12 @@ void TreeExplorer::OnContextMenuActionTriggered(QAction *action) {
   }
 
   if (action == d->context_menu.copy_details_action) {
-    CopyRefExplorerItemDetails(index);
+    CopyTreeExplorerItemDetails(index);
   }
 }
 
 void TreeExplorer::OnSearchParametersChange(
     const ISearchWidget::SearchParameters &search_parameters) {
-  qDebug() << "OnSearchParametersChange";
 
   QRegularExpression::PatternOptions options{
       QRegularExpression::NoPatternOption};
@@ -517,7 +513,7 @@ void TreeExplorer::OnExpandTreeViewItem() {
   }
 
   const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
-  ExpandRefExplorerItem(index);
+  ExpandTreeExplorerItem(index);
 }
 
 void TreeExplorer::OnThemeChange(const QPalette &,

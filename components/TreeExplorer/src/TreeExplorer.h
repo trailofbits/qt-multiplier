@@ -45,10 +45,10 @@ class TreeExplorer final : public ITreeExplorer {
                     IGlobalHighlighter *global_highlighter);
 
   //! Called when copying the details of a reference explorer item
-  void CopyRefExplorerItemDetails(const QModelIndex &index);
+  void CopyTreeExplorerItemDetails(const QModelIndex &index);
 
   //! Called when attempt to expand a reference explorer item
-  void ExpandRefExplorerItem(const QModelIndex &index);
+  void ExpandTreeExplorerItem(const QModelIndex &index);
 
   //! Used for the tree view hover events
   bool eventFilter(QObject *obj, QEvent *event) Q_DECL_FINAL;

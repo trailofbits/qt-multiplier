@@ -817,7 +817,7 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
 TokenRange NameOfEntity(const VariantEntity &ent) {
 
   const auto VariantEntityVisitor = Overload{
-      [](const Decl &decl) -> Token {
+      [](const Decl &decl) -> TokenRange {
         if (auto named = NamedDecl::from(decl)) {
           std::string_view name = named->name();
           Token name_tok = named->token();
@@ -833,10 +833,26 @@ TokenRange NameOfEntity(const VariantEntity &ent) {
             }
           }
         }
-        return Token();
+        return TokenRange();
       },
 
-      [](const Macro &macro) -> Token {
+      [](const Stmt &stmt) -> TokenRange {
+        if (auto dre = DeclRefExpr::from(stmt)) {
+          return dre->expression_token();
+
+        } else if (auto me = MemberExpr::from(stmt)) {
+          return me->member_token();
+
+        } else if (auto ale = AddrLabelExpr::from(stmt)) {
+          return ale->label_token();
+        
+        } else if (auto ls = LabelStmt::from(stmt)) {
+          return ls->identifier_token();
+        }
+        return TokenRange();
+      },
+
+      [](const Macro &macro) -> TokenRange {
         if (auto named = DefineMacroDirective::from(macro)) {
           return named->name();
 
@@ -844,11 +860,11 @@ TokenRange NameOfEntity(const VariantEntity &ent) {
           return param->name();
 
         } else {
-          return Token();
+          return TokenRange();
         }
       },
 
-      [](const File &file) -> Token {
+      [](const File &file) -> TokenRange {
         for (std::filesystem::path path : file.paths()) {
           SimpleToken tk;
           tk.data = path.generic_string();
@@ -857,18 +873,22 @@ TokenRange NameOfEntity(const VariantEntity &ent) {
           tk.related_entity = file;
           std::vector<CustomToken> tokens;
           tokens.emplace_back(std::move(tk));
-          return TokenRange::create(std::move(tokens)).front();
+          return TokenRange::create(std::move(tokens));
         }
-        return Token();
+        return TokenRange();
       },
 
-      [](const Token &token) -> Token {
+      [](const Designator &designator) -> TokenRange {
+        return designator.field_token();
+      },
+
+      [](const Token &token) -> TokenRange {
         return token;
       },
 
-      [](auto) -> Token { return Token(); }};
+      [](auto) -> TokenRange { return TokenRange(); }};
 
-  return std::visit<Token>(VariantEntityVisitor, ent);
+  return std::visit<TokenRange>(VariantEntityVisitor, ent);
 }
 
 //! Return the name of an entity as a `QString`.
@@ -881,6 +901,41 @@ std::optional<QString> NameOfEntityAsString(const VariantEntity &ent) {
     }
   }
   return std::nullopt;
+}
+
+namespace {
+
+static QString FilePath(const File &file) {
+  for (auto path : file.paths()) {
+    return QString::fromStdString(path.generic_string());
+  }
+  return QString();
+}
+
+static QString FileLineColumn(const File &file, unsigned line, unsigned col) {
+  return QString("%1:%2:%3").arg(FilePath(file)).arg(line).arg(col);
+}
+
+}  // namespace
+
+QString LocationOfEntity(const FileLocationCache &file_location_cache,
+                         const VariantEntity &entity) {
+
+  QString location;
+  for (Token tok : FileTokens(entity)) {
+    auto file = File::containing(tok);
+    if (!file) {
+      continue;
+    }
+
+    if (auto line_col = tok.location(file_location_cache)) {
+      return FileLineColumn(file.value(), line_col->first, line_col->second);
+    }
+
+    location = FilePath(file.value());
+  }
+
+  return location;
 }
 
 //! Return the tokens of `ent` as a string.
@@ -1034,10 +1089,7 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode) {
   return crumbs.Release();
 }
 
-std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
-                                         bool run_length_encode) {
-
-  std::optional<QString> output;
+QString EntityBreadCrumbs(const VariantEntity &ent, bool run_length_encode) {
 
   if (std::holds_alternative<Decl>(ent)) {
     const Decl &decl = std::get<Decl>(ent);
@@ -1055,10 +1107,13 @@ std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
     }
 
   } else if (std::holds_alternative<Macro>(ent)) {
-    const Macro &macro = std::get<Macro>(ent);
-    for (Token tok : macro.generate_expansion_tokens()) {
-      if (Token ptok = tok.parsed_token()) {
-        return TokenBreadCrumbs(tok, run_length_encode);
+    std::optional<Macro> m;
+    m.emplace(std::get<Macro>(ent));
+    for (; m; m = m->parent()) {
+      for (Token tok : m->generate_expansion_tokens()) {
+        if (Token ptok = tok.parsed_token()) {
+          return TokenBreadCrumbs(ptok, run_length_encode);
+        }
       }
     }
 
@@ -1072,7 +1127,7 @@ std::optional<QString> EntityBreadCrumbs(const VariantEntity &ent,
     }
   }
 
-  return std::nullopt;
+  return {};
 }
 
 float GetColorContrast(const QColor &color) {

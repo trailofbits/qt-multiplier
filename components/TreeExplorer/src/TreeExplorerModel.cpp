@@ -104,7 +104,7 @@ struct TreeExplorerModel::PrivateData final {
 
   // Version number of this model. This is incremented when we install a new
   // generator.
-  uint64_t version_number{0u};
+  const VersionNumber version_number;
 
   //! Future used to resolve the name of the tree.
   QFuture<QString> tree_name_future;
@@ -117,7 +117,8 @@ struct TreeExplorerModel::PrivateData final {
   DataBatchQueue data_batch_queue;
 
   inline PrivateData(void)
-      : root_node(nullptr) {}
+      : root_node(nullptr),
+        version_number(std::make_shared<std::atomic<uint64_t>>()) {}
 
   NodeKey *NodeKeyFrom(const QModelIndex &index) const {
     if (!index.isValid()) {
@@ -179,14 +180,12 @@ void TreeExplorerModel::RunExpansionThread(
           this, &TreeExplorerModel::OnNewTreeItems);
 
   if (!d->num_pending_requests) {
-    qDebug() << "Started timer";
     d->import_timer.start(kFirstUpdateInterval);
     emit RequestStarted();
   }
 
   d->num_pending_requests += 1;
 
-  qDebug() << "Started expander" << d->num_pending_requests;
   QThreadPool::globalInstance()->start(expander);
 }
 
@@ -197,7 +196,7 @@ void TreeExplorerModel::InstallGenerator(
   CancelRunningRequest();
 
   emit beginResetModel();
-  d->version_number++;
+  d->version_number->fetch_add(1u);
   d->num_pending_requests = 0;
   d->generator = std::move(generator_);
   d->node_data.clear();
@@ -234,14 +233,7 @@ void TreeExplorerModel::ExpandEntity(const QModelIndex &index,
   }
 
   auto [entity_id, entity] = d->NodeFrom(index);
-  if (!entity) {
-    qDebug() << "Not opening invalid index";
-    return;
-  }
-
-  qDebug() << "ExpandEntity" << index << int(entity->state);
-
-  if (NodeState::kUnopened != entity->state) {
+  if (!entity || NodeState::kUnopened != entity->state) {
     return;
   }
 
@@ -350,6 +342,28 @@ QVariant TreeExplorerModel::data(const QModelIndex &index, int role) const {
     } else {
       value = std::get<QVariant>(data);
     }
+
+  // Tooltip used for hovering. Also, this is used for the copy details.
+  } else if (role == Qt::ToolTipRole) {
+    QString tooltip = tr("Entity id: ") + QString::number(entity_key->first);
+
+    for (int i = 0; i < d->num_columns; ++i) {
+      const NodeData &col_data = d->node_data[entity->data_index +
+                                              static_cast<unsigned>(i)];
+      if (std::holds_alternative<QVariant>(data)) {
+        continue;
+      }
+
+      tooltip += "\n" + d->generator->ColumnTitle(i) + ": ";
+      if (std::holds_alternative<QString>(col_data)) {
+        tooltip += std::get<QString>(col_data);
+
+      } else if (std::holds_alternative<TextAndTokenRange>(col_data)) {
+        tooltip += std::get<TextAndTokenRange>(col_data).first;
+      }
+    }
+    value.setValue(tooltip);
+
   } else if (role == ITreeExplorerModel::EntityIdRole) {
     value.setValue(entity_key->first);
 
@@ -386,7 +400,7 @@ void TreeExplorerModel::CancelRunningRequest() {
     return;
   }
 
-  d->version_number++;
+  d->version_number->fetch_add(1u);
   d->num_pending_requests = 0;
   d->import_timer.stop();
   d->data_batch_queue.clear();
@@ -398,18 +412,14 @@ void TreeExplorerModel::OnNewTreeItems(
     uint64_t version_number, RawEntityId parent_entity_id,
     QList<std::shared_ptr<ITreeItem>> child_items, unsigned remaining_depth) {
 
-  if (version_number != d->version_number) {
+  if (version_number != d->version_number->load()) {
     return;
   }
 
   d->num_pending_requests -= 1;
-
-  qDebug() << "Finished expander" << d->num_pending_requests;
-
   d->data_batch_queue.emplaceBack(
       d->NodeKeyFromId(parent_entity_id), std::move(child_items), remaining_depth);
 }
-
 
 // Go get all of our data for this node.
 void TreeExplorerModel::PrivateData::ImportData(
@@ -486,12 +496,7 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
     // If we already have this pointer, then we're resuming adding children
     // to `parent_entity` after we previous hit our batch size limit and
     // deferred further adding until another timer interval.
-    if (batch.index_ptr) {
-      qDebug() << "Resuming a paginated batch.";
-
-    // We're adding the first set of children to `parent_entity`.
-    } else {
-      qDebug() << "Dealing with a new batch.";
+    if (!batch.index_ptr) {
       batch.index_ptr = &(parent_entity->child_index);
     }
 
@@ -560,7 +565,6 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
       ++num_imported;
 
       if (kMaxBatchSize <= num_imported) {
-        qDebug() << "Paginating a batch.";
         break;
       }
     }
@@ -622,15 +626,17 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
 
 struct ITreeExplorerExpansionThread::PrivateData {
   const std::shared_ptr<ITreeGenerator> generator;
-  const uint64_t version_number;
+  const VersionNumber version_number;
+  const uint64_t captured_version_number;
   const RawEntityId parent_entity_id;
   const unsigned depth;
 
   inline PrivateData(std::shared_ptr<ITreeGenerator> generator_,
-                     uint64_t version_number_, RawEntityId parent_entity_id_,
+                     const VersionNumber &version_number_, RawEntityId parent_entity_id_,
                      unsigned depth_)
       : generator(std::move(generator_)),
         version_number(version_number_),
+        captured_version_number(version_number->load()),
         parent_entity_id(parent_entity_id_),
         depth(depth_) {}
 };
@@ -639,7 +645,7 @@ ITreeExplorerExpansionThread::~ITreeExplorerExpansionThread(void) {}
 
 ITreeExplorerExpansionThread::ITreeExplorerExpansionThread(
     std::shared_ptr<ITreeGenerator> generator_,
-    uint64_t version_number, RawEntityId parent_entity_id,
+    const VersionNumber &version_number, RawEntityId parent_entity_id,
     unsigned depth)
     : d(new PrivateData(std::move(generator_), version_number,
                         parent_entity_id, depth)) {
@@ -649,20 +655,31 @@ ITreeExplorerExpansionThread::ITreeExplorerExpansionThread(
 void InitTreeExplorerThread::run(void) {
   QList<std::shared_ptr<ITreeItem>> items;
   for (auto item : d->generator->Roots(d->generator)) {
-    qDebug() << "Generated root item";
+    if (d->version_number->load() != d->captured_version_number) {
+      return;
+    }
     items.emplaceBack(std::move(item));
   }
+  if (d->version_number->load() != d->captured_version_number) {
+    return;
+  }
   emit NewTreeItems(
-      d->version_number, d->parent_entity_id, items, d->depth - 1u);
+      d->captured_version_number, d->parent_entity_id, items, d->depth - 1u);
 }
 
 void ExpandTreeExplorerThread::run(void) {
   QList<std::shared_ptr<ITreeItem>> items;
   for (auto item : d->generator->Children(d->generator, d->parent_entity_id)) {
+    if (d->version_number->load() != d->captured_version_number) {
+      return;
+    }
     items.emplaceBack(std::move(item));
   }
+  if (d->version_number->load() != d->captured_version_number) {
+    return;
+  }
   emit NewTreeItems(
-      d->version_number, d->parent_entity_id, items, d->depth - 1u);
+      d->captured_version_number, d->parent_entity_id, items, d->depth - 1u);
 }
 
 }  // namespace mx::gui

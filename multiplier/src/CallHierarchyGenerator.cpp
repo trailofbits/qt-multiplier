@@ -6,6 +6,8 @@
 
 #include "CallHierarchyGenerator.h"
 
+#include <QDebug>
+
 #include <filesystem>
 #include <multiplier/Entity.h>
 #include <multiplier/Token.h>
@@ -72,45 +74,6 @@ class CallHierarchyItem final : public ITreeItem {
   }
 };
 
-static QString FilePath(const File &file) {
-  for (auto path : file.paths()) {
-    return QString::fromStdString(path.generic_string());
-  }
-  return QString();
-}
-
-static QString FileLineColumn(const File &file, unsigned line, unsigned col) {
-  return QString("%1:%2:%3").arg(FilePath(file)).arg(line).arg(col);
-}
-
-static QString Location(const FileLocationCache &file_location_cache,
-                        const VariantEntity &entity) {
-
-  QString location;
-  for (Token tok : FileTokens(entity)) {
-    auto file = File::containing(tok);
-    if (!file) {
-      continue;
-    }
-
-    if (auto line_col = tok.location(file_location_cache)) {
-      return FileLineColumn(file.value(), line_col->first, line_col->second);
-    }
-
-    location = FilePath(file.value());
-  }
-
-  return location;
-}
-
-static QString BreadCrumbs(const VariantEntity &entity) {
-  if (auto bc = EntityBreadCrumbs(entity)) {
-    return bc.value();
-  }
-
-  return QString();
-}
-
 // Given that `use` is a use of `entity`, get us information about it.
 std::shared_ptr<ITreeItem> CallHierarchyItem::Create(
     const FileLocationCache &file_location_cache,
@@ -120,8 +83,8 @@ std::shared_ptr<ITreeItem> CallHierarchyItem::Create(
   return std::make_shared<CallHierarchyItem>(
       ::mx::EntityId(use).Pack(), aliased_entity_id_,
       NameOfEntity(entity),
-      Location(file_location_cache, use),
-      BreadCrumbs(use));
+      LocationOfEntity(file_location_cache, use),
+      EntityBreadCrumbs(use));
 }
 
 }  // namespace
@@ -130,12 +93,12 @@ int CallHierarchyGenerator::NumColumns(void) const {
   return 3;
 }
 
-QVariant CallHierarchyGenerator::ColumnTitle(int col) const {
+QString CallHierarchyGenerator::ColumnTitle(int col) const {
   switch (col) {
     case 0: return tr("Entity");
     case 1: return tr("File name");
     case 2: return tr("Breadcrumbs");
-    default: return QVariant();
+    default: return QString();
   }
 }
 

@@ -60,7 +60,7 @@ class ITreeGenerator : public QObject {
   // Return the `Nth` column title.
   //
   // NOTE(pag): This must be non-blocking.
-  virtual QVariant ColumnTitle(int) const = 0;
+  virtual QString ColumnTitle(int) const = 0;
 
   // Return the name of this tree.
   //

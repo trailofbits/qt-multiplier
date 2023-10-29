@@ -42,7 +42,7 @@ class CallHierarchyGenerator final : public ITreeGenerator {
 
   int NumColumns(void) const Q_DECL_FINAL;
 
-  QVariant ColumnTitle(int) const Q_DECL_FINAL;
+  QString ColumnTitle(int) const Q_DECL_FINAL;
 
   QString TreeName(
       const std::shared_ptr<ITreeGenerator> &self) const Q_DECL_FINAL;
