@@ -185,9 +185,9 @@ void TreeExplorer::InitializeWidgets(ITreeExplorerModel *model) {
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->tree_view);
+  layout->addWidget(d->status_widget);
   layout->addWidget(d->filter_settings_widget);
   layout->addWidget(d->search_widget);
-  layout->addWidget(d->status_widget);
   setLayout(layout);
 
   // Setup che custom context menu
@@ -222,9 +222,8 @@ void TreeExplorer::InstallModel(ITreeExplorerModel *model,
   d->model_proxy->setDynamicSortFilter(true);
 
   connect(d->filter_settings_widget,
-          &FilterSettingsWidget::FilterParametersChanged,
-          d->model_proxy, 
-          &SearchFilterModelProxy::OnStateChange);
+          &FilterSettingsWidget::ColumnFilterStateListChanged, d->model_proxy,
+          &SearchFilterModelProxy::OnColumnFilterStateListChange);
 
   d->tree_view->setModel(d->model_proxy);
 
