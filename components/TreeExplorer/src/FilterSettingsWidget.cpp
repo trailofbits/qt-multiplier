@@ -8,137 +8,120 @@
 
 #include "FilterSettingsWidget.h"
 
-#include <algorithm>
-
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QCheckBox>
+
+#include <algorithm>
 
 namespace mx::gui {
 
 struct FilterSettingsWidget::PrivateData final {
   QAbstractItemModel *model{nullptr};
-  int num_columns{0};
-  std::vector<QCheckBox *> column_checks;
-
-  std::vector<bool> State(void) const {
-    std::vector<bool> checks;
-    for (auto check : column_checks) {
-      if (check) {
-        checks.push_back(check->isChecked());
-      } else {
-        checks.push_back(false);
-      }
-    }
-    return checks;
-  }
+  std::vector<QCheckBox *> checkbox_list;
 };
 
-FilterSettingsWidget::FilterSettingsWidget(QAbstractItemModel *model, QWidget *parent)
+FilterSettingsWidget::FilterSettingsWidget(QAbstractItemModel *model,
+                                           QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
-  InstallModel(model);
-  ResetSearchSettings();
-}
 
-FilterSettingsWidget::~FilterSettingsWidget() {}
-
-//! Initializes the widget from the model.
-void FilterSettingsWidget::InstallModel(QAbstractItemModel *model) {
   d->model = model;
-  connect(model, &QAbstractItemModel::modelReset,
-          this, &FilterSettingsWidget::OnModelReset);
+  connect(model, &QAbstractItemModel::modelReset, this,
+          &FilterSettingsWidget::OnModelReset);
 
   OnModelReset();
 }
 
-void FilterSettingsWidget::OnModelReset(void) {
-  QModelIndex root_index;
-  d->num_columns = std::max(0, d->model->columnCount(root_index));
+FilterSettingsWidget::~FilterSettingsWidget() {}
 
-  auto old_layout = layout();
-  InitializeWidgets();
+std::vector<bool> FilterSettingsWidget::GetColumnFilterStateList() {
+  std::vector<bool> state_list;
 
-  if (old_layout) {
-    old_layout->deleteLater();
+  for (const auto &checkbox : d->checkbox_list) {
+    state_list.push_back(checkbox->isChecked());
   }
+
+  return state_list;
 }
 
-//! Returns true if the Nth column should be filtered.
-bool FilterSettingsWidget::FilterByColumn(int n) const {
-  if (0 > n) {
-    return false;
-  }
-
-  auto i = static_cast<unsigned>(n);
-  if (i >= d->column_checks.size()) {
-    return false;
-  }
-
-  QCheckBox *check = d->column_checks[i];
-  if (!check) {
-    return false;
-  }
-
-  return check->isChecked();
+void FilterSettingsWidget::OnModelReset(void) {
+  InitializeWidgets();
 }
 
 void FilterSettingsWidget::InitializeWidgets() {
   setContentsMargins(0, 0, 0, 0);
 
-  auto layout = new QHBoxLayout();
-  layout->setContentsMargins(0, 0, 0, 0);
+  auto new_layout = new QHBoxLayout();
+  new_layout->setContentsMargins(0, 0, 0, 0);
 
-  auto has_any = false;
-  d->column_checks.clear();
+  d->checkbox_list.clear();
 
-  for (auto i = 0; i < d->num_columns; ++i) {
-    QVariant data = d->model->headerData(i, Qt::Horizontal, Qt::DisplayRole);
-    QString label = data.toString();
-    if (!label.size()) {
-      d->column_checks.push_back(nullptr);
-      continue;
+  QModelIndex root_index;
+  int column_count = std::max(0, d->model->columnCount(root_index));
+
+  new_layout->addWidget(new QLabel(tr("Filter: ")));
+
+  for (auto i = 0; i < column_count; ++i) {
+    QString column_name;
+
+    if (auto column_name_var =
+            d->model->headerData(i, Qt::Horizontal, Qt::DisplayRole);
+        column_name_var.isValid()) {
+      column_name = column_name_var.toString();
     }
 
-    if (!has_any) {
-      layout->addWidget(new QLabel(tr("Filter: ")));
-      has_any = true;
+    if (column_name.isEmpty()) {
+      column_name = tr("Column #") + QString::number(i);
+      qDebug() << "Warning: column" << i << "has no headerData value";
     }
 
-    auto check = new QCheckBox(label);
-    check->setChecked(true);
-    layout->addWidget(check);
+    auto checkbox = new QCheckBox(column_name);
+    checkbox->setChecked(true);
 
-    connect(check, &QCheckBox::stateChanged, this,
-            &FilterSettingsWidget::OnStateChange);
-    d->column_checks.push_back(check);
+    connect(checkbox, &QCheckBox::stateChanged, this,
+            &FilterSettingsWidget::OnCheckboxStateChange);
+
+    d->checkbox_list.push_back(checkbox);
+    new_layout->addWidget(checkbox);
   }
 
-  layout->addStretch();
-  setLayout(layout);
+  new_layout->addStretch();
+
+  auto old_layout = layout();
+  setLayout(new_layout);
+
+  if (old_layout != nullptr) {
+    old_layout->deleteLater();
+  }
+
+  EmitColumnFilterStateListChanged();
 }
 
-void FilterSettingsWidget::OnStateChange(int) {
-  emit FilterParametersChanged(d->State());
+void FilterSettingsWidget::OnCheckboxStateChange(int) {
+  EmitColumnFilterStateListChanged();
 }
 
 void FilterSettingsWidget::Activate() {
+  ResetCheckboxes();
   show();
-  emit FilterParametersChanged(d->State());
 }
 
 void FilterSettingsWidget::Deactivate() {
+  ResetCheckboxes();
   hide();
-  ResetSearchSettings();
-  emit FilterParametersChanged(d->State());
 }
 
-void FilterSettingsWidget::ResetSearchSettings() {
-  for (auto check : d->column_checks) {
-    if (check) {
-      check->setChecked(true);
-    }
+void FilterSettingsWidget::ResetCheckboxes() {
+  for (auto checkbox : d->checkbox_list) {
+    checkbox->setChecked(true);
   }
+
+  EmitColumnFilterStateListChanged();
+}
+
+void FilterSettingsWidget::EmitColumnFilterStateListChanged() {
+  emit ColumnFilterStateListChanged(GetColumnFilterStateList());
 }
 
 }  // namespace mx::gui

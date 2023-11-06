@@ -31,9 +31,9 @@ class SearchFilterModelProxy final : public QSortFilterProxyModel {
   void setSourceModel(QAbstractItemModel *source_model) Q_DECL_FINAL;
 
  public slots:
-
   //! Enables or disables filtering on the columns.
-  void OnStateChange(std::vector<bool> new_states);
+  void OnColumnFilterStateListChange(
+      const std::vector<bool> &column_filter_state_list);
 
  protected:
   //! Returns true if the specified row should be included in the view
@@ -54,7 +54,5 @@ class SearchFilterModelProxy final : public QSortFilterProxyModel {
   //! Forwards the dataChanged signal
   void OnDataChange(const QModelIndex &top_left,
                     const QModelIndex &bottom_right, const QList<int> &roles);
-
-  void OnModelReset(void);
 };
 }  // namespace mx::gui

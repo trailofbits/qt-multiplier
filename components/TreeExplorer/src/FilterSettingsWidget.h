@@ -27,9 +27,6 @@ class FilterSettingsWidget final : public QWidget {
   //! Destructor
   virtual ~FilterSettingsWidget() override;
 
-  //! Returns true if the Nth column should be filtered.
-  bool FilterByColumn(int) const;
-
   //! Disabled copy constructor
   FilterSettingsWidget(const FilterSettingsWidget &) = delete;
 
@@ -37,35 +34,39 @@ class FilterSettingsWidget final : public QWidget {
   FilterSettingsWidget &operator=(const FilterSettingsWidget &) = delete;
 
  public slots:
-  //! Shows the widget, then signals FilterParametersChanged
+  //! Shows the widget, then signals ColumnFilterStateListChanged
   void Activate();
 
-  //! Hides the widget, resets all options, then signals FilterParametersChanged
+  //! Hides the widget, resets all options, then signals ColumnFilterStateListChanged
   void Deactivate();
 
  signals:
-
   //! Emitted when any of the settings have changed.
-  void FilterParametersChanged(std::vector<bool>);
+  void ColumnFilterStateListChanged(
+      const std::vector<bool> &column_filter_state_list);
 
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
-  //! Initializes the widget from the model.
-  void InstallModel(QAbstractItemModel *model);
+  //! Returns the column filter state list
+  std::vector<bool> GetColumnFilterStateList();
 
-  //! Initializes the internal widgets.
+  //! Initializes the internal widgets, releasing any previous layout
   void InitializeWidgets();
 
   //! Resets the search settings to the default values.
-  void ResetSearchSettings();
+  void ResetCheckboxes();
+
+  //! Emits the ColumnFilterStateListChanged signal
+  void EmitColumnFilterStateListChanged();
 
  private slots:
+  //! Use to (re)generate the filter checkboxes in the layout
   void OnModelReset(void);
 
   //! Emitted when any of the settings have changed.
-  void OnStateChange(int);
+  void OnCheckboxStateChange(int);
 };
 
 }  // namespace mx::gui
