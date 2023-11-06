@@ -7,9 +7,9 @@
 */
 
 #include "TreeExplorerModel.h"
+#include "InitTreeExplorerThread.h"
+#include "ExpandTreeExplorerThread.h"
 
-#include <algorithm>
-#include <cassert>
 #include <multiplier/Token.h>
 
 #include <QColor>
@@ -20,6 +20,9 @@
 #include <QPalette>
 #include <QtConcurrent>
 #include <QDebug>
+
+#include <algorithm>
+#include <cassert>
 
 namespace mx::gui {
 
@@ -35,12 +38,7 @@ using TextAndTokenRange = std::pair<QString, TokenRange>;
 using NodeData = std::variant<QString, TextAndTokenRange, QVariant>;
 using NodeKey = std::pair<const RawEntityId, Node>;
 
-enum class NodeState {
-  kUnopened,
-  kOpening,
-  kOpened,
-  kDuplicate
-};
+enum class NodeState { kUnopened, kOpening, kOpened, kDuplicate };
 
 struct Node {
   // Pointer to this node's parent.
@@ -72,8 +70,7 @@ struct Node {
   // first/original node.
   unsigned alias_index{0u};
 
-  inline Node(NodeKey *parent_key_)
-      : parent_key(parent_key_) {}
+  inline Node(NodeKey *parent_key_) : parent_key(parent_key_) {}
 };
 
 struct DataBatch {
@@ -150,8 +147,8 @@ struct TreeExplorerModel::PrivateData final {
       return nullptr;
     }
 
-    return const_cast<NodeKey *>(reinterpret_cast<const NodeKey *>(
-        index.internalPointer()));
+    return const_cast<NodeKey *>(
+        reinterpret_cast<const NodeKey *>(index.internalPointer()));
   }
 
   std::pair<RawEntityId, Node *> NodeFrom(const QModelIndex &index) const {
@@ -187,11 +184,11 @@ TreeExplorerModel::TreeExplorerModel(QObject *parent)
       d(new PrivateData) {
 
   connect(&(d->tree_name_future_watcher),
-          &QFutureWatcher<QFuture<QString>>::finished,
-          this, &TreeExplorerModel::OnNameResolved);
+          &QFutureWatcher<QFuture<QString>>::finished, this,
+          &TreeExplorerModel::OnNameResolved);
 
-  connect(&d->import_timer, &QTimer::timeout,
-          this, &TreeExplorerModel::ProcessDataBatchQueue);
+  connect(&d->import_timer, &QTimer::timeout, this,
+          &TreeExplorerModel::ProcessDataBatchQueue);
 }
 
 TreeExplorerModel::~TreeExplorerModel() {
@@ -201,8 +198,8 @@ TreeExplorerModel::~TreeExplorerModel() {
 void TreeExplorerModel::RunExpansionThread(
     ITreeExplorerExpansionThread *expander) {
 
-  connect(expander, &ITreeExplorerExpansionThread::NewTreeItems,
-          this, &TreeExplorerModel::OnNewTreeItems);
+  connect(expander, &ITreeExplorerExpansionThread::NewTreeItems, this,
+          &TreeExplorerModel::OnNewTreeItems);
 
   if (!d->num_pending_requests) {
     d->import_timer.start(kFirstUpdateInterval);
@@ -241,19 +238,17 @@ void TreeExplorerModel::InstallGenerator(
   emit endResetModel();
 
   // Start a request to fetch the name of this tree.
-  d->tree_name_future = QtConcurrent::run([gen = d->generator] (void) -> QString {
-    return gen->TreeName(gen);
-  });
+  d->tree_name_future = QtConcurrent::run(
+      [gen = d->generator](void) -> QString { return gen->TreeName(gen); });
   d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
   // Go load up the roots.
   d->root_node.state = NodeState::kOpening;
-  RunExpansionThread(new InitTreeExplorerThread(
-      d->generator, d->version_number, kInvalidEntityId, 2u));
+  RunExpansionThread(new InitTreeExplorerThread(d->generator, d->version_number,
+                                                kInvalidEntityId, 2u));
 }
 
-void TreeExplorerModel::ExpandEntity(const QModelIndex &index,
-                                     unsigned depth) {
+void TreeExplorerModel::ExpandEntity(const QModelIndex &index, unsigned depth) {
   if (!depth) {
     return;
   }
@@ -281,13 +276,12 @@ QModelIndex TreeExplorerModel::index(int row, int column,
     entity = &(d->root_node);
   }
 
-  if (NodeState::kUnopened == entity->state ||
-      row >= entity->num_children) {
+  if (NodeState::kUnopened == entity->state || row >= entity->num_children) {
     return QModelIndex();
   }
 
-  NodeKey *child_key = d->child_keys[entity->child_index +
-                                     static_cast<unsigned>(row)];
+  NodeKey *child_key =
+      d->child_keys[entity->child_index + static_cast<unsigned>(row)];
   return createIndex(row, column, static_cast<const void *>(child_key));
 }
 
@@ -299,18 +293,17 @@ QModelIndex TreeExplorerModel::parent(const QModelIndex &child) const {
 
   NodeKey *parent_key = entity->parent_key;
   Node *parent_node = &(entity->parent_key->second);
-  Node *grandparent_node = parent_node->parent_key ?
-                           &(parent_node->parent_key->second) :
-                           &(d->root_node);
+  Node *grandparent_node = parent_node->parent_key
+                               ? &(parent_node->parent_key->second)
+                               : &(d->root_node);
 
   assert(parent_key != nullptr);
 
   // Figure out the position of the parent among its siblings.
   return createIndex(
-      static_cast<int>(entity->sibling_index -
-                       grandparent_node->child_index) - 1,
-      0,
-      reinterpret_cast<const void *>(parent_key));
+      static_cast<int>(entity->sibling_index - grandparent_node->child_index) -
+          1,
+      0, reinterpret_cast<const void *>(parent_key));
 }
 
 int TreeExplorerModel::rowCount(const QModelIndex &parent) const {
@@ -333,12 +326,11 @@ int TreeExplorerModel::columnCount(const QModelIndex &) const {
   return d->num_columns;
 }
 
-QVariant TreeExplorerModel::headerData(int section,
-                                       Qt::Orientation orientation,
+QVariant TreeExplorerModel::headerData(int section, Qt::Orientation orientation,
                                        int role) const {
 
-  if (orientation != Qt::Horizontal || role != Qt::DisplayRole ||
-      section < 0 || section >= d->num_columns) {
+  if (orientation != Qt::Horizontal || role != Qt::DisplayRole || section < 0 ||
+      section >= d->num_columns) {
     return QVariant();
   }
 
@@ -355,8 +347,8 @@ QVariant TreeExplorerModel::data(const QModelIndex &index, int role) const {
 
   Node *entity = &(entity_key->second);
 
-  const NodeData &data = d->node_data[entity->data_index +
-                                      static_cast<unsigned>(index.column())];
+  const NodeData &data =
+      d->node_data[entity->data_index + static_cast<unsigned>(index.column())];
 
   if (role == Qt::DisplayRole) {
     if (std::holds_alternative<QString>(data)) {
@@ -369,13 +361,13 @@ QVariant TreeExplorerModel::data(const QModelIndex &index, int role) const {
       value = std::get<QVariant>(data);
     }
 
-  // Tooltip used for hovering. Also, this is used for the copy details.
+    // Tooltip used for hovering. Also, this is used for the copy details.
   } else if (role == Qt::ToolTipRole) {
     QString tooltip = tr("Entity id: ") + QString::number(entity_key->first);
 
     for (int i = 0; i < d->num_columns; ++i) {
-      const NodeData &col_data = d->node_data[entity->data_index +
-                                              static_cast<unsigned>(i)];
+      const NodeData &col_data =
+          d->node_data[entity->data_index + static_cast<unsigned>(i)];
       if (std::holds_alternative<QVariant>(data)) {
         continue;
       }
@@ -397,9 +389,9 @@ QVariant TreeExplorerModel::data(const QModelIndex &index, int role) const {
     if (std::holds_alternative<TextAndTokenRange>(data)) {
       value.setValue(std::get<TextAndTokenRange>(data).second);
     }
-  
+
   } else if (role == ITreeExplorerModel::CanBeExpanded) {
-    value.setValue(NodeState::kUnopened == entity->state); 
+    value.setValue(NodeState::kUnopened == entity->state);
 
   } else if (role == ITreeExplorerModel::IsDuplicate) {
     value.setValue(NodeState::kDuplicate == entity->state);
@@ -443,8 +435,8 @@ void TreeExplorerModel::OnNewTreeItems(
   }
 
   d->num_pending_requests -= 1;
-  d->data_batch_queue.emplaceBack(
-      d->NodeKeyFromId(parent_entity_id), std::move(child_items), remaining_depth);
+  d->data_batch_queue.emplaceBack(d->NodeKeyFromId(parent_entity_id),
+                                  std::move(child_items), remaining_depth);
 }
 
 // Go get all of our data for this node.
@@ -461,11 +453,10 @@ void TreeExplorerModel::PrivateData::ImportData(
     } else if (col_data.canConvert<TokenRange>()) {
       TokenRange tok_range = col_data.value<TokenRange>();
       auto char_data = tok_range.data();
-      node_data.emplace_back(
-          TextAndTokenRange{
-              QString::fromUtf8(char_data.data(),
-                                static_cast<qsizetype>(char_data.size())),
-              std::move(tok_range)});
+      node_data.emplace_back(TextAndTokenRange{
+          QString::fromUtf8(char_data.data(),
+                            static_cast<qsizetype>(char_data.size())),
+          std::move(tok_range)});
 
     } else {
       node_data.emplace_back(std::move(col_data));
@@ -482,7 +473,7 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
   // timer events.
   int num_imported = 0;
 
-  Node * const root_entity = &(d->root_node);
+  Node *const root_entity = &(d->root_node);
 
   while (!d->data_batch_queue.empty()) {
     DataBatch &batch = d->data_batch_queue.front();
@@ -495,9 +486,10 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
       parent_entity = &(batch.parent_key->second);
 
       // Figure out the iterator pointing to the sibling list of the parent.
-      unsigned sibling_index = parent_entity->parent_key ?
-                               parent_entity->parent_key->second.child_index :
-                              root_entity->child_index;
+      unsigned sibling_index =
+          parent_entity->parent_key
+              ? parent_entity->parent_key->second.child_index
+              : root_entity->child_index;
 
       parent_index = createIndex(
           static_cast<int>(parent_entity->sibling_index - sibling_index) - 1, 0,
@@ -541,8 +533,8 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
       // node, then the node key is in our `entity_to_node` map; otherwise we
       // make a redundant key in `redundant_keys`.
       NodeKey *curr_key = nullptr;
-      auto [node_it, added] = d->entity_to_node.try_emplace(
-          eid, batch.parent_key);
+      auto [node_it, added] =
+          d->entity_to_node.try_emplace(eid, batch.parent_key);
       NodeKey *load_key = &*node_it;
       if (added) {
         curr_key = load_key;
@@ -566,18 +558,19 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
           } else {
             load_key = alias_key;
           }
-        
-        // An existing thing notifies us of this alias.
+
+          // An existing thing notifies us of this alias.
         } else if (auto alias_it = d->aliased_entity_to_key.find(eid);
                    alias_it != d->aliased_entity_to_key.end()) {
           load_key = alias_it->second;
         }
 
       } else {
-        curr_key = &(d->redundant_keys.emplace_back(eid, Node{batch.parent_key}));
+        curr_key =
+            &(d->redundant_keys.emplace_back(eid, Node{batch.parent_key}));
       }
 
-      Node * const new_node = &(curr_key->second);
+      Node *const new_node = &(curr_key->second);
 
       if (load_key != curr_key) {
         new_node->state = NodeState::kDuplicate;
@@ -624,14 +617,14 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
     }
 
     // Update the number of children of the parent.
-    emit beginInsertRows(parent_index,
-        parent_entity->num_children,
+    emit beginInsertRows(
+        parent_index, parent_entity->num_children,
         parent_entity->num_children + num_imported_children - 1);
 
     parent_entity->num_children += num_imported_children;
 
     // End each list of children with a dummy node, so that we can use the
-    // sibling iterator to get a node's index. 
+    // sibling iterator to get a node's index.
     *(batch.index_ptr) = static_cast<unsigned>(d->child_keys.size());
 
     emit endInsertRows();
@@ -671,62 +664,5 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
   }
 }
 
-struct ITreeExplorerExpansionThread::PrivateData {
-  const std::shared_ptr<ITreeGenerator> generator;
-  const VersionNumber version_number;
-  const uint64_t captured_version_number;
-  const RawEntityId parent_entity_id;
-  const unsigned depth;
-
-  inline PrivateData(std::shared_ptr<ITreeGenerator> generator_,
-                     const VersionNumber &version_number_, RawEntityId parent_entity_id_,
-                     unsigned depth_)
-      : generator(std::move(generator_)),
-        version_number(version_number_),
-        captured_version_number(version_number->load()),
-        parent_entity_id(parent_entity_id_),
-        depth(depth_) {}
-};
-
-ITreeExplorerExpansionThread::~ITreeExplorerExpansionThread(void) {}
-
-ITreeExplorerExpansionThread::ITreeExplorerExpansionThread(
-    std::shared_ptr<ITreeGenerator> generator_,
-    const VersionNumber &version_number, RawEntityId parent_entity_id,
-    unsigned depth)
-    : d(new PrivateData(std::move(generator_), version_number,
-                        parent_entity_id, depth)) {
-  setAutoDelete(true);
-}
-
-void InitTreeExplorerThread::run(void) {
-  QList<std::shared_ptr<ITreeItem>> items;
-  for (auto item : d->generator->Roots(d->generator)) {
-    if (d->version_number->load() != d->captured_version_number) {
-      return;
-    }
-    items.emplaceBack(std::move(item));
-  }
-  if (d->version_number->load() != d->captured_version_number) {
-    return;
-  }
-  emit NewTreeItems(
-      d->captured_version_number, d->parent_entity_id, items, d->depth - 1u);
-}
-
-void ExpandTreeExplorerThread::run(void) {
-  QList<std::shared_ptr<ITreeItem>> items;
-  for (auto item : d->generator->Children(d->generator, d->parent_entity_id)) {
-    if (d->version_number->load() != d->captured_version_number) {
-      return;
-    }
-    items.emplaceBack(std::move(item));
-  }
-  if (d->version_number->load() != d->captured_version_number) {
-    return;
-  }
-  emit NewTreeItems(
-      d->captured_version_number, d->parent_entity_id, items, d->depth - 1u);
-}
 
 }  // namespace mx::gui

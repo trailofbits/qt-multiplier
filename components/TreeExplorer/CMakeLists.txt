@@ -33,6 +33,18 @@ add_library("mx_treeexplorer"
 
   src/TreeExplorer.h
   src/TreeExplorer.cpp
+
+  src/ITreeExplorerExpansionThread.h
+  src/ITreeExplorerExpansionThread.cpp
+
+  src/InitTreeExplorerThread.h
+  src/InitTreeExplorerThread.cpp
+
+  src/InitTreeExplorerThread.h
+  src/InitTreeExplorerThread.cpp
+
+  src/ExpandTreeExplorerThread.h
+  src/ExpandTreeExplorerThread.cpp
 )
 
 target_sources("mx_treeexplorer" INTERFACE

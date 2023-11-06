@@ -8,12 +8,15 @@
 
 #pragma once
 
+#include "ITreeExplorerExpansionThread.h"
+
+#include <multiplier/ui/ITreeExplorerModel.h>
+
+#include <multiplier/Types.h>
+
 #include <QAbstractItemModel>
 #include <QList>
 #include <QRunnable>
-
-#include <multiplier/Types.h>
-#include <multiplier/ui/ITreeExplorerModel.h>
 
 #include <atomic>
 #include <cstdint>
@@ -33,7 +36,6 @@ class TreeExplorerModel final : public ITreeExplorerModel {
   std::unique_ptr<PrivateData> d;
 
  public:
-
   //! Constructor
   TreeExplorerModel(QObject *parent);
 
@@ -41,14 +43,15 @@ class TreeExplorerModel final : public ITreeExplorerModel {
   virtual ~TreeExplorerModel(void);
 
   //! Install a new generator to back the data of this model.
-  void InstallGenerator(std::shared_ptr<ITreeGenerator> generator_) Q_DECL_FINAL;
+  void
+  InstallGenerator(std::shared_ptr<ITreeGenerator> generator_) Q_DECL_FINAL;
 
   //! Expands the given entity
   void ExpandEntity(const QModelIndex &index, unsigned depth);
 
   //! Creates a new Qt model index
   QModelIndex index(int row, int column,
-                            const QModelIndex &parent) const Q_DECL_FINAL;
+                    const QModelIndex &parent) const Q_DECL_FINAL;
 
   //! Returns the parent of the given model index
   QModelIndex parent(const QModelIndex &child) const Q_DECL_FINAL;
@@ -66,15 +69,15 @@ class TreeExplorerModel final : public ITreeExplorerModel {
 
   //! Returns the column names for the tree view header
   QVariant headerData(int section, Qt::Orientation orientation,
-                              int role) const Q_DECL_FINAL;
+                      int role) const Q_DECL_FINAL;
+
  private:
   void RunExpansionThread(ITreeExplorerExpansionThread *thread);
 
  private slots:
 
   //! Notify us when there's a batch of new data to update.
-  void OnNewTreeItems(uint64_t version_number,
-                      RawEntityId parent_entity_id,
+  void OnNewTreeItems(uint64_t version_number, RawEntityId parent_entity_id,
                       QList<std::shared_ptr<ITreeItem>> child_items,
                       unsigned remaining_depth);
 
@@ -86,53 +89,6 @@ class TreeExplorerModel final : public ITreeExplorerModel {
 
  public slots:
   void CancelRunningRequest() Q_DECL_FINAL;
-};
-
-using VersionNumber = std::shared_ptr<std::atomic<uint64_t>>;
-
-class ITreeExplorerExpansionThread : public QObject, public QRunnable {
-  Q_OBJECT
- 
- protected:
-  struct PrivateData;
-  std::unique_ptr<PrivateData> d;
-
- public:
-  virtual ~ITreeExplorerExpansionThread(void);
-  explicit ITreeExplorerExpansionThread(
-      std::shared_ptr<ITreeGenerator> generator_,
-      const VersionNumber &version_number,
-      RawEntityId parent_entity_id, unsigned depth);
-
- signals:
-  void NewTreeItems(uint64_t version_number,
-                    RawEntityId parent_entity_id,
-                    QList<std::shared_ptr<ITreeItem>> child_items,
-                    unsigned remaining_depth);
-};
-
-//! A background thread that computes the first level of the tree explorer.
-class InitTreeExplorerThread final : public ITreeExplorerExpansionThread {
-  Q_OBJECT
-
-  void run(void) Q_DECL_FINAL;
-
- public:
-  using ITreeExplorerExpansionThread::ITreeExplorerExpansionThread;
-
-  virtual ~InitTreeExplorerThread(void) = default;
-};
-
-//! A background thread that computes the Nth level of the tree explorer.
-class ExpandTreeExplorerThread final : public ITreeExplorerExpansionThread {
-  Q_OBJECT
-
-  void run(void) Q_DECL_FINAL;
-
- public:
-  using ITreeExplorerExpansionThread::ITreeExplorerExpansionThread;
-
-  virtual ~ExpandTreeExplorerThread(void) = default;
 };
 
 }  // namespace mx::gui
