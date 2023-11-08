@@ -11,6 +11,7 @@ set(qt_component_list
   "Widgets"
   "Concurrent"
   "Core5Compat"
+  "Test"
 )
 
 find_package("Qt6"
