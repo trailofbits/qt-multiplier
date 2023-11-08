@@ -8,17 +8,18 @@
 
 #include "SearchFilterModelProxy.h"
 
-#include <algorithm>
 #include <multiplier/ui/ITreeExplorerModel.h>
+
+#include <QDebug>
+
+#include <algorithm>
 #include <vector>
 
 namespace mx::gui {
 
 struct SearchFilterModelProxy::PrivateData final {
-  std::vector<bool> filter;
-  QMetaObject::Connection model_reset_connection;
+  std::vector<bool> column_filter_state_list;
   QMetaObject::Connection data_changed_connection;
-  int num_columns{0};
 };
 
 SearchFilterModelProxy::SearchFilterModelProxy(QObject *parent)
@@ -27,61 +28,64 @@ SearchFilterModelProxy::SearchFilterModelProxy(QObject *parent)
 
 SearchFilterModelProxy::~SearchFilterModelProxy() {}
 
-//! Enables or disables filtering on the columns.
-void SearchFilterModelProxy::OnStateChange(std::vector<bool> new_states) {
-  if (d->filter == new_states) {
-    return;
-  }
+void SearchFilterModelProxy::OnColumnFilterStateListChange(
+    const std::vector<bool> &column_filter_state_list) {
 
-  d->filter = std::move(new_states);
-  d->filter.resize(static_cast<unsigned>(d->num_columns));
+  // Each parent item can have an arbitrary amount of columns when
+  // dealing with a QAbstractItemModel that models a tree, so just
+  // take and save whatever we were given
+  d->column_filter_state_list = column_filter_state_list;
   invalidateFilter();
 }
 
-void SearchFilterModelProxy::OnModelReset(void) {
-  QModelIndex root_index;
-  d->num_columns = std::max(0, sourceModel()->columnCount(root_index));
-  d->filter.clear();
-
-  bool accept = true;
-  d->filter.insert(d->filter.end(), static_cast<unsigned>(d->num_columns),
-                   accept);
-}
-
 void SearchFilterModelProxy::setSourceModel(QAbstractItemModel *source_model) {
-  if (d->model_reset_connection) {
-    disconnect(d->model_reset_connection);
-  }
-
-  if (d->data_changed_connection) {
+  if (d->data_changed_connection != nullptr) {
     disconnect(d->data_changed_connection);
   }
 
   QSortFilterProxyModel::setSourceModel(source_model);
 
-  d->model_reset_connection = connect(
-      source_model, &QAbstractItemModel::modelReset,
-      this, &SearchFilterModelProxy::OnModelReset);
-
-  d->data_changed_connection = connect(
-      source_model, &QAbstractItemModel::dataChanged,
-      this, &SearchFilterModelProxy::OnDataChange);
-
-  OnModelReset();
+  d->data_changed_connection =
+      connect(source_model, &QAbstractItemModel::dataChanged, this,
+              &SearchFilterModelProxy::OnDataChange);
 }
 
 bool SearchFilterModelProxy::filterAcceptsRow(
     int source_row, const QModelIndex &source_parent) const {
 
+  const auto &filter_expression = filterRegularExpression();
+  if (!filter_expression.isValid() || filter_expression.pattern().isEmpty()) {
+    return true;
+  }
+
+  std::size_t enabled_filter_count{0};
+  for (const auto &filter : d->column_filter_state_list) {
+    if (filter) {
+      ++enabled_filter_count;
+    }
+  }
+
+  // Accept all rows if there are no filters enabled
+  if (enabled_filter_count == 0) {
+    return true;
+  }
+
   auto source_model = sourceModel();
-  for (auto col = 0; col < d->num_columns; ++col) {
-    if (!d->filter[static_cast<unsigned>(col)]) {
+  auto filter_role = filterRole();
+
+  for (auto col = 0; col < d->column_filter_state_list.size(); ++col) {
+    if (!d->column_filter_state_list[static_cast<unsigned>(col)]) {
       continue;
     }
 
     auto index = source_model->index(source_row, col, source_parent);
-    auto var = index.data(Qt::DisplayRole);
-    if (var.isValid() && var.toString().contains(filterRegularExpression())) {
+    auto filter_role_value_var = index.data(filter_role);
+    if (!filter_role_value_var.isValid()) {
+      continue;
+    }
+
+    const auto &filter_role_value = filter_role_value_var.toString();
+    if (filter_role_value.contains(filter_expression)) {
       return true;
     }
   }
