@@ -27,6 +27,8 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QScrollBar>
+#include <QAbstractItemModelTester>
+#include <QLoggingCategory>
 
 #include <optional>
 
@@ -54,6 +56,7 @@ struct TreeviewItemButtons final {
 
 struct TreeExplorer::PrivateData final {
   ITreeExplorerModel *model{nullptr};
+  QAbstractItemModelTester *model_tester{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
   QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
@@ -70,6 +73,10 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
                            IGlobalHighlighter *global_highlighter)
     : ITreeExplorer(parent),
       d(new PrivateData) {
+
+  QLoggingCategory::setFilterRules("qt.modeltest=true");
+  d->model_tester = new QAbstractItemModelTester(
+      model, QAbstractItemModelTester::FailureReportingMode::Warning, this);
 
   InitializeWidgets(model);
   InstallModel(model, global_highlighter);
