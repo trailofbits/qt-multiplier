@@ -292,12 +292,12 @@ QModelIndex TreeExplorerModel::parent(const QModelIndex &child) const {
   }
 
   NodeKey *parent_key = entity->parent_key;
-  Node *parent_node = &(entity->parent_key->second);
+
+  assert(parent_key != nullptr);
+  Node *parent_node = &(parent_key->second);
   Node *grandparent_node = parent_node->parent_key
                                ? &(parent_node->parent_key->second)
                                : &(d->root_node);
-
-  assert(parent_key != nullptr);
 
   // Figure out the position of the parent among its siblings.
   return createIndex(
