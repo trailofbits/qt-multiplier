@@ -73,12 +73,13 @@ bool SearchFilterModelProxy::filterAcceptsRow(
   auto source_model = sourceModel();
   auto filter_role = filterRole();
 
-  for (auto col = 0; col < d->column_filter_state_list.size(); ++col) {
-    if (!d->column_filter_state_list[static_cast<unsigned>(col)]) {
+  for (auto col = 0u; col < d->column_filter_state_list.size(); ++col) {
+    if (!d->column_filter_state_list[col]) {
       continue;
     }
 
-    auto index = source_model->index(source_row, col, source_parent);
+    auto index = source_model->index(source_row, static_cast<int>(col),
+                                     source_parent);
     auto filter_role_value_var = index.data(filter_role);
     if (!filter_role_value_var.isValid()) {
       continue;

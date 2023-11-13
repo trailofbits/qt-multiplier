@@ -18,6 +18,7 @@
 #include <multiplier/Entities/Stmt.h>
 #include <multiplier/Entities/Token.h>
 #include <multiplier/ui/Assert.h>
+#include <multiplier/ui/Util.h>
 #include <multiplier/TokenTree.h>
 
 namespace mx::gui {
@@ -176,10 +177,6 @@ static void GenerateLineHashes(IndexedTokenRangeData &res) {
     auto succeeded = XXH64_reset(xxhash_state, kXxhashSeed) != XXH_ERROR;
     Assert(succeeded, "Failed to reset the xxHash state");
 
-    auto line_count{res.lines.size()};
-    succeeded = XXH64_update(xxhash_state, &line_count, sizeof(line_count)) !=
-                XXH_ERROR;
-
     Assert(succeeded, "Failed to update the xxHash state");
 
     for (const auto &column : line.columns) {
@@ -246,12 +243,11 @@ static void PostProcessLineObjects(const FileLocationCache &file_location_cache,
   GenerateLineHashes(res);
 }
 
-}  // namespace
-
-void GetExpandedTokenRangeData(
+void GetExpandedTokenRangeDataImpl(
     QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
     const Index &, const FileLocationCache &file_location_cache,
-    RawEntityId entity_id, TokenTree tree, const TokenTreeVisitor *vis) {
+    RawEntityId entity_id, TokenTree tree, const TokenTreeVisitor *vis,
+    std::optional<std::pair<unsigned, unsigned>> line_col) {
 
   IndexedTokenRangeData res;
   std::optional<Fragment> frag = Fragment::containing(tree);
@@ -269,6 +265,7 @@ void GetExpandedTokenRangeData(
   }
 
   res.requested_id = entity_id;
+  res.line_col = std::move(line_col);
   res.tokens = tree.serialize(*vis);
   res.lines.emplace_back();
 
@@ -284,6 +281,29 @@ void GetExpandedTokenRangeData(
   PostProcessLineObjects(file_location_cache, res);
 
   result_promise.addResult(std::move(res));
+}
+
+}  // namespace
+
+void GetExpandedTokenRangeData(
+    QPromise<IDatabase::IndexedTokenRangeDataResult> &result_promise,
+    const Index &index, const FileLocationCache &file_location_cache,
+    RawEntityId entity_id, TokenTree tree, const TokenTreeVisitor *vis) {
+
+  VariantEntity ent = index.entity(entity_id);
+  if (std::holds_alternative<NotAnEntity>(ent)) {
+    result_promise.addResult(RPCErrorCode::InvalidEntityID);
+    return;
+  }
+
+  TokenTreeVisitor empty_vis;
+  if (!vis) {
+    vis = &empty_vis;
+  }
+
+  GetExpandedTokenRangeDataImpl(
+      result_promise, index, file_location_cache, entity_id, std::move(tree),
+      vis, FirstFileToken(ent).location(file_location_cache));
 }
 
 void GetIndexedTokenRangeData(
@@ -314,11 +334,6 @@ void GetIndexedTokenRangeData(
     // TODO(pag): Support token trees for types? That would go in mx-api.
     result_promise.addResult(RPCErrorCode::UnsupportedTokenTreeEntityType);
     return;
-  }
-
-  TokenTreeVisitor empty_vis;
-  if (!vis) {
-    vis = &empty_vis;
   }
 
   GetExpandedTokenRangeData(result_promise, index, file_location_cache,

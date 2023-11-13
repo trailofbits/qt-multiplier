@@ -10,6 +10,7 @@
 #include "InitTreeExplorerThread.h"
 #include "ExpandTreeExplorerThread.h"
 
+#include <gap/core/coroutine.hpp>
 #include <multiplier/Token.h>
 
 #include <QColor>
@@ -175,8 +176,40 @@ struct TreeExplorerModel::PrivateData final {
     return nullptr;
   }
 
+  // Convert a `node_key` into a `QModelIndex`.
+  QModelIndex ToIndex(const TreeExplorerModel *model,
+                      const NodeKey *node_key) const;
+
+  gap::generator<NodeKey *> Children(Node *node) &;
+
   void ImportData(Node *new_node, const std::shared_ptr<ITreeItem> &item);
 };
+
+// Convert a `node_key` into a `QModelIndex`.
+QModelIndex TreeExplorerModel::PrivateData::ToIndex(
+    const TreeExplorerModel *model, const NodeKey *node_key) const {
+
+  if (!node_key) {
+    return QModelIndex();  // Root.
+  }
+
+  const Node &node = node_key->second;
+  const Node *parent_node = &(root_node);
+  if (node.parent_key) {
+    parent_node = &(node.parent_key->second);
+  }
+
+  auto row = node.sibling_index - parent_node->child_index - 1u;
+  return model->createIndex(
+    static_cast<int>(row), 0, static_cast<const void *>(node_key));
+}
+
+gap::generator<NodeKey *> TreeExplorerModel::PrivateData::Children(
+    Node *node) & {
+  for (auto i = 0; i < node->num_children; ++i) {
+    co_yield child_keys[node->child_index + static_cast<unsigned>(i)];
+  }
+}
 
 //! Constructor
 TreeExplorerModel::TreeExplorerModel(QObject *parent)
@@ -211,6 +244,72 @@ void TreeExplorerModel::RunExpansionThread(
   QThreadPool::globalInstance()->start(expander);
 }
 
+//! Find the original version of an item.
+QModelIndex TreeExplorerModel::Deduplicate(const QModelIndex &index) {
+  if (NodeKey *node_key = d->NodeKeyFrom(index)) {
+    return d->ToIndex(this, d->child_keys[node_key->second.alias_index]);
+  }
+  return QModelIndex();
+}
+
+//! Expand starting at the model index, going up to `depth` levels deep.
+void TreeExplorerModel::Expand(const QModelIndex &index, unsigned depth) {
+
+  if (!depth) {
+    return;
+  }
+
+  NodeKey *node_key = d->NodeKeyFrom(index);
+
+  if (!node_key) {
+    if (d->root_node.state == NodeState::kUnopened) {
+      d->root_node.state = NodeState::kOpening;
+      RunExpansionThread(
+          new InitTreeExplorerThread(d->generator, d->version_number,
+                                     kInvalidEntityId, depth));
+    }
+    return;
+  }
+  
+  Node *entity = &(node_key->second);
+  if (entity->state == NodeState::kUnopened) {
+    entity->state = NodeState::kOpening;
+    RunExpansionThread(new ExpandTreeExplorerThread(
+        d->generator, d->version_number, node_key->first, depth));
+    return;
+  }
+
+  // Initialize a worklist.
+  std::vector<std::pair<NodeKey *, unsigned>> todo;
+  todo.emplace_back(node_key, depth);
+
+  // Run through the worklist to recursively expand.
+  for (auto i = 0ul; i < todo.size(); ) {
+    auto [child_key, child_depth] = todo[i++];
+
+    entity = &(child_key->second);
+
+    // This node isn't opened yet, go and process it.
+    if (entity->state == NodeState::kUnopened) {
+      entity->state = NodeState::kOpening;
+      RunExpansionThread(new ExpandTreeExplorerThread(
+          d->generator, d->version_number, child_key->first, child_depth));
+
+    // This node is already open, go and work on its children.
+    } else if (entity->state == NodeState::kOpened &&
+               1u < child_depth) {
+      for (auto grandchild_key : d->Children(entity)) {
+        todo.emplace_back(grandchild_key, child_depth - 1u);
+      }
+    
+    // If we hit a duplicate, try to expand the original.
+    } else if (entity->state == NodeState::kDuplicate) {
+      --i;
+      todo[i].first = d->child_keys[entity->alias_index];
+    }
+  }
+}
+
 //! Install a new generator to back the data of this model.
 void TreeExplorerModel::InstallGenerator(
     std::shared_ptr<ITreeGenerator> generator_) {
@@ -242,25 +341,7 @@ void TreeExplorerModel::InstallGenerator(
       [gen = d->generator](void) -> QString { return gen->TreeName(gen); });
   d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
-  // Go load up the roots.
-  d->root_node.state = NodeState::kOpening;
-  RunExpansionThread(new InitTreeExplorerThread(d->generator, d->version_number,
-                                                kInvalidEntityId, 2u));
-}
-
-void TreeExplorerModel::ExpandEntity(const QModelIndex &index, unsigned depth) {
-  if (!depth) {
-    return;
-  }
-
-  auto [entity_id, entity] = d->NodeFrom(index);
-  if (!entity || NodeState::kUnopened != entity->state) {
-    return;
-  }
-
-  entity->state = NodeState::kOpening;
-  RunExpansionThread(new ExpandTreeExplorerThread(
-      d->generator, d->version_number, entity_id, depth));
+  Expand(QModelIndex(), 2u);
 }
 
 QModelIndex TreeExplorerModel::index(int row, int column,
@@ -287,23 +368,11 @@ QModelIndex TreeExplorerModel::index(int row, int column,
 
 QModelIndex TreeExplorerModel::parent(const QModelIndex &child) const {
   auto [entity_id, entity] = d->NodeFrom(child);
-  if (!entity || !entity->parent_key) {
+  if (!entity) {
     return QModelIndex();
   }
 
-  NodeKey *parent_key = entity->parent_key;
-
-  assert(parent_key != nullptr);
-  Node *parent_node = &(parent_key->second);
-  Node *grandparent_node = parent_node->parent_key
-                               ? &(parent_node->parent_key->second)
-                               : &(d->root_node);
-
-  // Figure out the position of the parent among its siblings.
-  return createIndex(
-      static_cast<int>(entity->sibling_index - grandparent_node->child_index) -
-          1,
-      0, reinterpret_cast<const void *>(parent_key));
+  return d->ToIndex(this, entity->parent_key);
 }
 
 int TreeExplorerModel::rowCount(const QModelIndex &parent) const {
@@ -314,7 +383,7 @@ int TreeExplorerModel::rowCount(const QModelIndex &parent) const {
   int row_count = d->root_node.num_children;
   if (parent.isValid()) {
     row_count = 0;
-    if (auto entity = &(d->NodeKeyFrom(parent)->second)) {
+    if (auto entity = d->NodeFrom(parent).second) {
       row_count = entity->num_children;
     }
   }
@@ -479,25 +548,8 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
     DataBatch &batch = d->data_batch_queue.front();
 
     // The parent for this batch already has children.
-    Node *parent_entity = nullptr;
-
-    QModelIndex parent_index;
-    if (batch.parent_key) {
-      parent_entity = &(batch.parent_key->second);
-
-      // Figure out the iterator pointing to the sibling list of the parent.
-      unsigned sibling_index =
-          parent_entity->parent_key
-              ? parent_entity->parent_key->second.child_index
-              : root_entity->child_index;
-
-      parent_index = createIndex(
-          static_cast<int>(parent_entity->sibling_index - sibling_index) - 1, 0,
-          reinterpret_cast<const void *>(batch.parent_key));
-
-    } else {
-      parent_entity = root_entity;
-    }
+    Node *parent_entity = batch.parent_key ? &(batch.parent_key->second) :
+                          root_entity;
 
     // We've already loaded the children for this parent.
     if (NodeState::kOpening != parent_entity->state) {
@@ -585,13 +637,16 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
       // Make the node point to itself, and update the parent child index or
       // previous sibling's next sibling index.
       new_node->alias_index = static_cast<unsigned>(d->child_keys.size());
+
+      // Make the prior node's `sibling_index`, or the parent node's
+      // `child_index` point to this node key pointer in `d->child_keys`.
       *(batch.index_ptr) = new_node->alias_index;
 
       // Possibly make the node point to its alias.
       new_node->alias_index = load_key->second.alias_index;
 
       d->child_keys.emplace_back(curr_key);
-      batch.index_ptr = &(curr_key->second.sibling_index);
+      batch.index_ptr = &(new_node->sibling_index);
 
       // If this is a new node, then import the data, otherwise reference the
       // existing data.
@@ -609,6 +664,10 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
       }
     }
 
+    // End each list of children with a dummy node, so that we can use the
+    // sibling iterator to get a node's index.
+    *(batch.index_ptr) = static_cast<unsigned>(d->child_keys.size());
+
     // We didn't end up importing anything.
     if (!num_imported_children) {
       parent_entity->state = NodeState::kOpened;
@@ -618,14 +677,11 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
 
     // Update the number of children of the parent.
     emit beginInsertRows(
-        parent_index, parent_entity->num_children,
+        d->ToIndex(this, batch.parent_key),
+        parent_entity->num_children,
         parent_entity->num_children + num_imported_children - 1);
 
     parent_entity->num_children += num_imported_children;
-
-    // End each list of children with a dummy node, so that we can use the
-    // sibling iterator to get a node's index.
-    *(batch.index_ptr) = static_cast<unsigned>(d->child_keys.size());
 
     emit endInsertRows();
 
