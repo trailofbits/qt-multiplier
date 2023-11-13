@@ -10,7 +10,7 @@ cmake_minimum_required(VERSION 3.19)
 
 include("cmake/ccache.cmake")
 
-project(qt-multiplier CXX)
+project(qt-multiplier C CXX)
 
 include("cmake/version.cmake")
 include("cmake/utils.cmake")

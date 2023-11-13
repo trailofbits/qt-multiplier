@@ -13,6 +13,7 @@
 
 #include <multiplier/Entities/TokenCategory.h>
 
+#include <QAbstractProxyModel>
 #include <QFont>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -225,10 +226,10 @@ bool CodeView::ScrollToLineNumber(unsigned line) {
   if (state == ICodeModel::ModelState::Ready) {
     d->deferred_scroll_to_line.reset();
     return ScrollToLineNumberInternal(line);
-  } else {
-    d->deferred_scroll_to_line = line;
-    return false;
   }
+
+  d->deferred_scroll_to_line = line;
+  return false;
 }
 
 void CodeView::SetBrowserMode(const bool &enabled) {
@@ -326,6 +327,22 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
   return false;
 }
 
+namespace {
+
+static ICodeModel *UnderlyingCodeModel(QAbstractItemModel *model) {
+  if (auto code_model = dynamic_cast<ICodeModel *>(model)) {
+    return code_model;
+  }
+
+  if (auto proxy = dynamic_cast<QAbstractProxyModel *>(model)) {
+    return UnderlyingCodeModel(proxy->sourceModel());
+  }
+
+  return nullptr;
+}
+
+}  // namespace
+
 void CodeView::InstallModel(QAbstractItemModel *model) {
   d->model = model;
   d->model->setParent(this);
@@ -341,6 +358,11 @@ void CodeView::InstallModel(QAbstractItemModel *model) {
 
   connect(d->model, &QAbstractItemModel::dataChanged, this,
           &CodeView::OnDataChange);
+
+  if (auto code_model = UnderlyingCodeModel(d->model)) {
+    connect(code_model, &ICodeModel::EntityLocation, this,
+            &CodeView::OnEntityLocation);
+  }
 }
 
 void CodeView::InitializeWidgets() {
@@ -1237,16 +1259,9 @@ void CodeView::OnModelReset() {
   // If there was a request to scroll to a line, but the document wasn't ready
   // at the time of the request, then enact the scroll now.
   if (d->deferred_scroll_to_line.has_value()) {
-    auto model_state_var =
-        d->model->data(QModelIndex(), ICodeModel::ModelStateRole);
-    Assert(model_state_var.isValid(), "This should always work");
-    ICodeModel::ModelState state =
-        static_cast<ICodeModel::ModelState>(model_state_var.toInt());
-    if (state == ICodeModel::ModelState::Ready) {
-      auto line_number = d->deferred_scroll_to_line.value();
-      d->deferred_scroll_to_line = std::nullopt;
-      ScrollToLineNumberInternal(line_number);
-    }
+    auto line = d->deferred_scroll_to_line.value();
+    d->deferred_scroll_to_line.reset();
+    ScrollToLineNumber(line);
   }
 
   emit DocumentChanged();
@@ -1492,6 +1507,12 @@ void CodeView::OnZoomOut() {
 
 void CodeView::OnResetZoom() {
   SetZoom(d->default_font_point_size);
+}
+
+void CodeView::OnEntityLocation(RawEntityId, unsigned line, unsigned) {
+  if (line && !d->deferred_scroll_to_line.has_value()) {
+    ScrollToLineNumber(line); 
+  }
 }
 
 }  // namespace mx::gui

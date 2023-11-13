@@ -90,6 +90,11 @@ class ICodeModel : public QAbstractItemModel {
 
   //! Disabled copy assignment operator
   ICodeModel &operator=(const ICodeModel &) = delete;
+ 
+ signals:
+  //! Just before model will be loaded, this tells us the location of the
+  //! entity corresponding to the last call to `SetEntity`.
+  void EntityLocation(RawEntityId id, unsigned line, unsigned col);
 
  public slots:
   //! Tells this code view to use the `TokenTreeVisitor` to expand some

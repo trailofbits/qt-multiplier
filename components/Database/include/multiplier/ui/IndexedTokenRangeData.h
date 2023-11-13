@@ -37,6 +37,9 @@ class IndexedTokenRangeData final {
   //! File ID associated with the "base" tokens. This affects line numbering.
   RawEntityId file_id{kInvalidEntityId};
 
+  // Line and column of `requested_id`.
+  std::optional<std::pair<unsigned, unsigned>> line_col;
+
   //! Range of tokens in this data.
   TokenRange tokens;
 

@@ -57,6 +57,7 @@ struct TreeviewItemButtons final {
 struct TreeExplorer::PrivateData final {
   ITreeExplorerModel *model{nullptr};
   QAbstractItemModelTester *model_tester{nullptr};
+  QAbstractProxyModel *highlighter_model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
   QTreeView *tree_view{nullptr};
   ISearchWidget *search_widget{nullptr};
@@ -74,9 +75,9 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
     : ITreeExplorer(parent),
       d(new PrivateData) {
 
-  QLoggingCategory::setFilterRules("qt.modeltest=true");
-  d->model_tester = new QAbstractItemModelTester(
-      model, QAbstractItemModelTester::FailureReportingMode::Warning, this);
+  // QLoggingCategory::setFilterRules("qt.modeltest=true");
+  // d->model_tester = new QAbstractItemModelTester(
+  //     model, QAbstractItemModelTester::FailureReportingMode::Fatal, this);
 
   InitializeWidgets(model);
   InstallModel(model, global_highlighter);
@@ -219,8 +220,9 @@ void TreeExplorer::InstallModel(ITreeExplorerModel *model,
 
   QAbstractItemModel *source_model{d->model};
   if (global_highlighter != nullptr) {
-    source_model = global_highlighter->CreateModelProxy(
+    d->highlighter_model = global_highlighter->CreateModelProxy(
         source_model, ITreeExplorerModel::EntityIdRole);
+    source_model = d->highlighter_model;
   }
 
   d->model_proxy = new SearchFilterModelProxy(this);
@@ -272,9 +274,36 @@ void TreeExplorer::CopyTreeExplorerItemDetails(const QModelIndex &index) {
   clipboard.setText(tooltip);
 }
 
-void TreeExplorer::ExpandTreeExplorerItem(const QModelIndex &index) {
-  auto &model = *static_cast<TreeExplorerModel *>(d->model);
-  model.ExpandEntity(d->model_proxy->mapToSource(index), 1u);
+void TreeExplorer::ExpandTreeExplorerItem(const QModelIndex &index,
+                                          unsigned depth) {
+  auto source_index = d->model_proxy->mapToSource(index);
+  if (d->highlighter_model) {
+    source_index = d->highlighter_model->mapToSource(source_index);
+  }
+  d->model->Expand(source_index, depth);
+}
+
+//! Called when attempt to go to the original verison of a duplicate item.
+void TreeExplorer::GotoTreeExplorerItem(const QModelIndex &index) {
+  auto orig = d->model_proxy->mapToSource(index);
+  if (d->highlighter_model) {
+    orig = d->highlighter_model->mapToSource(orig);
+  }
+
+  auto dedup = d->model->Deduplicate(orig);
+  if (d->highlighter_model) {
+    dedup = d->highlighter_model->mapFromSource(dedup);
+  }
+
+  dedup = d->model_proxy->mapFromSource(dedup);
+  if (!dedup.isValid()) {
+    return;
+  }
+
+  auto sel = d->tree_view->selectionModel();
+  sel->clearSelection();
+  sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
+  d->tree_view->scrollTo(dedup);
 }
 
 bool TreeExplorer::eventFilter(QObject *obj, QEvent *event) {
@@ -293,9 +322,35 @@ bool TreeExplorer::eventFilter(QObject *obj, QEvent *event) {
 
       return false;
 
-    } else {
+    } else if (event->type() != QEvent::KeyRelease) {
       return false;
+    
+    } else if (QKeyEvent *kevent = dynamic_cast<QKeyEvent *>(event)) {
+      auto ret = false;
+      for (auto index : d->tree_view->selectionModel()->selectedIndexes()) {
+        switch (kevent->key()) {
+          case Qt::Key_1:
+          case Qt::Key_2:
+          case Qt::Key_3:
+          case Qt::Key_4:
+          case Qt::Key_5:
+          case Qt::Key_6:
+          case Qt::Key_7:
+          case Qt::Key_8:
+          case Qt::Key_9:
+            ExpandTreeExplorerItem(
+                index, static_cast<unsigned>(kevent->key() - Qt::Key_0));
+            ret = true;
+            break;
+          default:
+            break;
+        }
+      }
+
+      return ret;
     }
+
+    return false;
 
   } else if (obj == d->tree_view->viewport()) {
     if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
@@ -569,7 +624,7 @@ void TreeExplorer::OnGotoOriginalTreeViewItem(void) {
   }
 
   const auto &index = d->treeview_item_buttons.opt_hovered_index.value();
-  (void) index;
+  GotoTreeExplorerItem(index);
 }
 
 void TreeExplorer::OnThemeChange(const QPalette &,

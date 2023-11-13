@@ -42,8 +42,6 @@ struct QuickReferenceExplorer::PrivateData final {
   std::optional<QPoint> opt_previous_drag_pos;
   QLabel *window_title{nullptr};
 
-  IDatabase::Ptr database;
-
   PreviewableReferenceExplorer *reference_explorer{nullptr};
 };
 
@@ -54,8 +52,6 @@ QuickReferenceExplorer::QuickReferenceExplorer(
     QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
-
-  d->database = IDatabase::Create(index, file_location_cache);
 
   InitializeWidgets(index, file_location_cache, std::move(generator),
                     show_code_preview, highlighter, macro_explorer);
