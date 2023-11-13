@@ -76,7 +76,7 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
 
   QLoggingCategory::setFilterRules("qt.modeltest=true");
   d->model_tester = new QAbstractItemModelTester(
-      model, QAbstractItemModelTester::FailureReportingMode::Warning, this);
+      model, QAbstractItemModelTester::FailureReportingMode::Fatal, this);
 
   InitializeWidgets(model);
   InstallModel(model, global_highlighter);

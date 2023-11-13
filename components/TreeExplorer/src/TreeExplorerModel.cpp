@@ -292,17 +292,24 @@ QModelIndex TreeExplorerModel::parent(const QModelIndex &child) const {
   }
 
   NodeKey *parent_key = entity->parent_key;
-
   assert(parent_key != nullptr);
+
   Node *parent_node = &(parent_key->second);
+  unsigned next_sibling_index = parent_node->sibling_index;
+  assert(parent_key == d->child_keys[next_sibling_index - 1u]);
+
   Node *grandparent_node = parent_node->parent_key
                                ? &(parent_node->parent_key->second)
                                : &(d->root_node);
 
+  unsigned first_sibling_index = grandparent_node->child_index;
+  assert(first_sibling_index < next_sibling_index);
+  assert((next_sibling_index - first_sibling_index) <=
+         static_cast<unsigned>(grandparent_node->num_children));
+
   // Figure out the position of the parent among its siblings.
   return createIndex(
-      static_cast<int>(entity->sibling_index - grandparent_node->child_index) -
-          1,
+      static_cast<int>(next_sibling_index - first_sibling_index) - 1,
       0, reinterpret_cast<const void *>(parent_key));
 }
 
@@ -314,7 +321,7 @@ int TreeExplorerModel::rowCount(const QModelIndex &parent) const {
   int row_count = d->root_node.num_children;
   if (parent.isValid()) {
     row_count = 0;
-    if (auto entity = &(d->NodeKeyFrom(parent)->second)) {
+    if (auto entity = d->NodeFrom(parent).second) {
       row_count = entity->num_children;
     }
   }
@@ -485,14 +492,22 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
     if (batch.parent_key) {
       parent_entity = &(batch.parent_key->second);
 
+      Node *grandparent_node = parent_entity->parent_key
+                               ? &(parent_entity->parent_key->second)
+                               : &(d->root_node);
+
+      unsigned next_sibling_index = parent_entity->sibling_index;
+      assert(d->child_keys[next_sibling_index - 1u] == batch.parent_key);
+
       // Figure out the iterator pointing to the sibling list of the parent.
-      unsigned sibling_index =
-          parent_entity->parent_key
-              ? parent_entity->parent_key->second.child_index
-              : root_entity->child_index;
+      unsigned first_sibling_index = grandparent_node->child_index;
+      assert(first_sibling_index < next_sibling_index);
+      assert((next_sibling_index - first_sibling_index) <=
+             static_cast<unsigned>(grandparent_node->num_children));
 
       parent_index = createIndex(
-          static_cast<int>(parent_entity->sibling_index - sibling_index) - 1, 0,
+          static_cast<int>(next_sibling_index - first_sibling_index) - 1,
+          0,
           reinterpret_cast<const void *>(batch.parent_key));
 
     } else {
@@ -585,13 +600,16 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
       // Make the node point to itself, and update the parent child index or
       // previous sibling's next sibling index.
       new_node->alias_index = static_cast<unsigned>(d->child_keys.size());
+
+      // Make the prior node's `sibling_index`, or the parent node's
+      // `child_index` point to this node key pointer in `d->child_keys`.
       *(batch.index_ptr) = new_node->alias_index;
 
       // Possibly make the node point to its alias.
       new_node->alias_index = load_key->second.alias_index;
 
       d->child_keys.emplace_back(curr_key);
-      batch.index_ptr = &(curr_key->second.sibling_index);
+      batch.index_ptr = &(new_node->sibling_index);
 
       // If this is a new node, then import the data, otherwise reference the
       // existing data.
@@ -609,6 +627,10 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
       }
     }
 
+    // End each list of children with a dummy node, so that we can use the
+    // sibling iterator to get a node's index.
+    *(batch.index_ptr) = static_cast<unsigned>(d->child_keys.size());
+
     // We didn't end up importing anything.
     if (!num_imported_children) {
       parent_entity->state = NodeState::kOpened;
@@ -622,10 +644,6 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
         parent_entity->num_children + num_imported_children - 1);
 
     parent_entity->num_children += num_imported_children;
-
-    // End each list of children with a dummy node, so that we can use the
-    // sibling iterator to get a node's index.
-    *(batch.index_ptr) = static_cast<unsigned>(d->child_keys.size());
 
     emit endInsertRows();
 
