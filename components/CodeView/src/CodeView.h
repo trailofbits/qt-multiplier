@@ -294,6 +294,10 @@ class CodeView final : public ICodeView {
   //! Called by the reset zoom shortcut
   void OnResetZoom();
 
+  //! Just before model will be loaded, this tells us the location of the
+  //! entity corresponding to the last call to `SetEntity`.
+  void OnEntityLocation(RawEntityId id, unsigned line, unsigned col);
+
   friend class ICodeView;
 };
 

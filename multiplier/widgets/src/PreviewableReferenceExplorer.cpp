@@ -113,16 +113,8 @@ void PreviewableReferenceExplorer::UpdateCodePreview(const QModelIndex &index) {
     return;
   }
 
-  // auto line_number_var = index.data(ITreeExplorerModel::LineNumberRole);
-  // if (!line_number_var.isValid()) {
-  //   return;
-  // }
-
-  // auto line_number = qvariant_cast<unsigned>(line_number_var);
-
   auto file_raw_entity_id = qvariant_cast<RawEntityId>(file_raw_entity_id_var);
   d->code_model->SetEntity(file_raw_entity_id);
-  // d->code_view->ScrollToLineNumber(line_number);
 }
 
 void PreviewableReferenceExplorer::OnReferenceExplorerSelectedItemChanged(

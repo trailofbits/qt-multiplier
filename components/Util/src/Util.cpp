@@ -677,7 +677,6 @@ static bool AddTrailingWhitespace(TokenKind tk) {
   }
 }
 
-
 static bool AddTrailingWhitespaceAsFirst(TokenKind tk) {
   switch (tk) {
     case TokenKind::STAR:
@@ -689,7 +688,6 @@ static bool AddTrailingWhitespaceAsFirst(TokenKind tk) {
       return AddTrailingWhitespace(tk);
   }
 }
-
 
 static bool SuppressLeadingWhitespace(TokenKind tk) {
   switch (tk) {

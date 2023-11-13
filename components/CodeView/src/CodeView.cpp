@@ -13,6 +13,7 @@
 
 #include <multiplier/Entities/TokenCategory.h>
 
+#include <QAbstractProxyModel>
 #include <QFont>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -326,6 +327,22 @@ bool CodeView::eventFilter(QObject *obj, QEvent *event) {
   return false;
 }
 
+namespace {
+
+static ICodeModel *UnderlyingCodeModel(QAbstractItemModel *model) {
+  if (auto code_model = dynamic_cast<ICodeModel *>(model)) {
+    return code_model;
+  }
+
+  if (auto proxy = dynamic_cast<QAbstractProxyModel *>(model)) {
+    return UnderlyingCodeModel(proxy->sourceModel());
+  }
+
+  return nullptr;
+}
+
+}  // namespace
+
 void CodeView::InstallModel(QAbstractItemModel *model) {
   d->model = model;
   d->model->setParent(this);
@@ -341,6 +358,11 @@ void CodeView::InstallModel(QAbstractItemModel *model) {
 
   connect(d->model, &QAbstractItemModel::dataChanged, this,
           &CodeView::OnDataChange);
+
+  if (auto code_model = UnderlyingCodeModel(d->model)) {
+    connect(code_model, &ICodeModel::EntityLocation, this,
+            &CodeView::OnEntityLocation);
+  }
 }
 
 void CodeView::InitializeWidgets() {
@@ -1492,6 +1514,12 @@ void CodeView::OnZoomOut() {
 
 void CodeView::OnResetZoom() {
   SetZoom(d->default_font_point_size);
+}
+
+void CodeView::OnEntityLocation(RawEntityId, unsigned line, unsigned) {
+  if (line) {
+    ScrollToLineNumber(line); 
+  }
 }
 
 }  // namespace mx::gui

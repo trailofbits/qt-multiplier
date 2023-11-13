@@ -104,7 +104,7 @@ QString CallHierarchyGenerator::ColumnTitle(int col) const {
 }
 
 QString CallHierarchyGenerator::TreeName(
-    const std::shared_ptr<ITreeGenerator> &self) const {
+    const std::shared_ptr<ITreeGenerator> &) const {
 
   if (auto name = NameOfEntityAsString(index.entity(root_entity_id))) {
     return tr("Call hierarchy of `%1`").arg(name.value());

@@ -295,6 +295,13 @@ void CodeModel::FutureResultStateChanged() {
   }
 
   IndexedTokenRangeData new_tokens = future_result.TakeValue();
+
+  if (new_tokens.line_col) {
+    emit EntityLocation(new_tokens.requested_id,
+                        new_tokens.line_col->first,
+                        new_tokens.line_col->second);
+  }
+
   if (new_tokens.requested_id != d->tokens.requested_id ||
       new_tokens.response_id != d->tokens.response_id) {
 
