@@ -139,20 +139,31 @@ gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Roots(
 gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Children(
     const std::shared_ptr<ITreeGenerator> &self,
     RawEntityId parent_entity_id) {
-  
+
   VariantEntity entity = index.entity(parent_entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     co_return;
   }
 
-  VariantEntity containing_entity = NamedEntityContaining(entity);
+  VariantEntity containing_entity = entity;
+  if (!Decl::from(entity)) {
+    containing_entity = NamedEntityContaining(entity);
+  }
+
   if (std::holds_alternative<NotAnEntity>(containing_entity)) {
     co_return;
   }
 
   for (Reference ref : Reference::to(containing_entity)) {
     auto use = ref.as_variant();
+
     auto user = NamedEntityContaining(use);
+
+    if (auto bk = ref.builtin_reference_kind()) {
+      if (bk.value() == BuiltinReferenceKind::USES_TYPE) {
+        user = use;
+      }
+    }
 
     // We might have many uses of a thing, e.g. multiple calls to a function
     // A within a function B, and so we want the Nth call to reference the
