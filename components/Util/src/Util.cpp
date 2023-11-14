@@ -6,6 +6,7 @@
 
 #include "Util.h"
 
+#include <QDebug>
 #include <cassert>
 #include <multiplier/AST.h>
 #include <multiplier/Fragment.h>
@@ -39,8 +40,21 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity) {
       return nd;
     }
 
-    // TODO(pag): Do token-based lookup? It might end up being a statement
-    //            in an attribute on a decl.
+    // // TODO(pag): Do token-based lookup? It might end up being a statement
+    // //            in an attribute on a decl.
+    // qDebug() << "Statement" << stmt.id().Pack() << "doesn't have a named containing decl";
+    // for (auto ancestor = stmt.parent_declaration(); ancestor.has_value();
+    //      ancestor = ancestor->parent_declaration()) {
+    //   qDebug() << "Ancestor id:" << ancestor->id().Pack();
+    // }
+
+    // for (auto ancestor = stmt.parent_statement(); ancestor.has_value();
+    //      ancestor = ancestor->parent_statement()) {
+    //   qDebug() << "Ancestor statement id:" << ancestor->id().Pack();
+    //   if (auto gp = ancestor->parent_declaration()) {
+    //     qDebug() << "Gradnparent declaration id:" << gp->id().Pack();
+    //   }
+    // }
 
     if (auto file = File::containing(stmt)) {
       return file.value();

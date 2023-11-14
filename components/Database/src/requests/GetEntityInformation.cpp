@@ -270,7 +270,7 @@ FillTypeInformation(QPromise<bool> &result_promise,
                     const FileLocationCache &file_location_cache,
                     DataBatch &batch, TypeDecl entity) {
 
-  for (Reference ref : entity.references()) {
+  for (Reference ref : Reference::to(entity)) {
     if (result_promise.isCanceled()) {
       return;
     }
@@ -511,7 +511,7 @@ FillVariableInformation(QPromise<bool> &result_promise,
                         const FileLocationCache &file_location_cache,
                         DataBatch &batch, const ValueDecl &var) {
 
-  for (Reference ref : var.references()) {
+  for (Reference ref : Reference::to(var)) {
     if (std::optional<Stmt> stmt = ref.as_statement()) {
       FillVariableUsedByStatementInformation(result_promise, receiver,
                                              file_location_cache, batch,
@@ -527,7 +527,7 @@ FillFunctionInformation(QPromise<bool> &result_promise,
                         const FileLocationCache &file_location_cache,
                         DataBatch &batch, FunctionDecl func) {
 
-  for (Reference ref : func.references()) {
+  for (Reference ref : Reference::to(func)) {
     if (result_promise.isCanceled()) {
       return;
     }
@@ -822,7 +822,7 @@ GetFileInformation(QPromise<bool> &result_promise,
     }
   }
 
-  for (Reference ref : entity.references()) {
+  for (Reference ref : Reference::to(entity)) {
     if (result_promise.isCanceled()) {
       return;
     }
@@ -992,7 +992,7 @@ GetMacroInformation(QPromise<bool> &result_promise,
     SendBatch(receiver, batch);
   }
 
-  for (Reference ref : entity.references()) {
+  for (Reference ref : Reference::to(entity)) {
     if (result_promise.isCanceled()) {
       return;
     }
