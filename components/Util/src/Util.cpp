@@ -1093,7 +1093,13 @@ QString EntityBreadCrumbs(const VariantEntity &ent, bool run_length_encode) {
 
   if (std::holds_alternative<Decl>(ent)) {
     const Decl &decl = std::get<Decl>(ent);
-    return TokenBreadCrumbs(decl.token(), run_length_encode);
+    auto tok = decl.token();
+    if (auto nd = NamedDecl::from(decl)) {
+      if (nd->name().empty()) {
+        tok = decl.tokens().front();
+      }
+    }
+    return TokenBreadCrumbs(tok, run_length_encode);
 
   } else if (std::holds_alternative<Stmt>(ent)) {
     const Stmt &stmt = std::get<Stmt>(ent);
