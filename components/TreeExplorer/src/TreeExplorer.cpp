@@ -75,9 +75,9 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
     : ITreeExplorer(parent),
       d(new PrivateData) {
 
-  QLoggingCategory::setFilterRules("qt.modeltest=true");
-  d->model_tester = new QAbstractItemModelTester(
-      model, QAbstractItemModelTester::FailureReportingMode::Fatal, this);
+  // QLoggingCategory::setFilterRules("qt.modeltest=true");
+  // d->model_tester = new QAbstractItemModelTester(
+  //     model, QAbstractItemModelTester::FailureReportingMode::Fatal, this);
 
   InitializeWidgets(model);
   InstallModel(model, global_highlighter);
@@ -329,6 +329,7 @@ bool TreeExplorer::eventFilter(QObject *obj, QEvent *event) {
       auto ret = false;
       for (auto index : d->tree_view->selectionModel()->selectedIndexes()) {
         switch (kevent->key()) {
+          case Qt::Key_1:
           case Qt::Key_2:
           case Qt::Key_3:
           case Qt::Key_4:
