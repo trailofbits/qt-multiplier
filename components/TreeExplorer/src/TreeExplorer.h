@@ -47,8 +47,11 @@ class TreeExplorer final : public ITreeExplorer {
   //! Called when copying the details of a reference explorer item
   void CopyTreeExplorerItemDetails(const QModelIndex &index);
 
-  //! Called when attempt to expand a reference explorer item
-  void ExpandTreeExplorerItem(const QModelIndex &index);
+  //! Called when attempt to expand a tree item.
+  void ExpandTreeExplorerItem(const QModelIndex &index, unsigned depth=1u);
+
+  //! Called when attempt to go to the original verison of a duplicate item.
+  void GotoTreeExplorerItem(const QModelIndex &index);
 
   //! Used for the tree view hover events
   bool eventFilter(QObject *obj, QEvent *event) Q_DECL_FINAL;

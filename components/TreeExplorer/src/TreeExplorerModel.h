@@ -33,6 +33,8 @@ class TreeExplorerModel final : public ITreeExplorerModel {
 
   struct PrivateData;
 
+  friend struct PrivateData;
+
   std::unique_ptr<PrivateData> d;
 
  public:
@@ -46,8 +48,11 @@ class TreeExplorerModel final : public ITreeExplorerModel {
   void
   InstallGenerator(std::shared_ptr<ITreeGenerator> generator_) Q_DECL_FINAL;
 
-  //! Expands the given entity
-  void ExpandEntity(const QModelIndex &index, unsigned depth);
+  //! Expand starting at the model index, going up to `depth` levels deep.
+  void Expand(const QModelIndex &, unsigned depth) Q_DECL_FINAL;
+
+  //! Find the original version of an item.
+  QModelIndex Deduplicate(const QModelIndex &) Q_DECL_FINAL;
 
   //! Creates a new Qt model index
   QModelIndex index(int row, int column,
