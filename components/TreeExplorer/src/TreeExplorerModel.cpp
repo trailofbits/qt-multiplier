@@ -40,19 +40,18 @@ struct TreeExplorerModel::PrivateData final {
   // Returns the number of pending requests.
   int num_pending_requests{};
 
-  // Version number of this model. This is incremented when we install a new
-  // generator.
-  const VersionNumber version_number;
+  //! Version number of this model. This is incremented when we install a new
+  //! generator.
+  std::atomic_uint64_t version_number{};
 
   //! Future used to resolve the name of the tree.
   QFuture<QString> tree_name_future;
+
+  //! \todo document this
   QFutureWatcher<QString> tree_name_future_watcher;
 
   //! A timer used to import the data received from the `generator`
   QTimer import_timer;
-
-  inline PrivateData(void)
-      : version_number(std::make_shared<std::atomic<uint64_t>>()) {}
 };
 
 TreeExplorerModel::TreeExplorerModel(QObject *parent)
@@ -96,7 +95,7 @@ void TreeExplorerModel::InstallGenerator(
   d->generator = std::move(generator_);
   InitializeContext(d->context);
   d->column_count = static_cast<std::size_t>(d->generator->NumColumns());
-  d->version_number->fetch_add(1u);
+  d->version_number.fetch_add(1u);
   d->num_pending_requests = 0;
   d->import_timer.stop();
   emit endResetModel();
@@ -422,7 +421,7 @@ void TreeExplorerModel::CancelRunningRequest() {
     return;
   }
 
-  d->version_number->fetch_add(1u);
+  d->version_number.fetch_add(1u);
   d->num_pending_requests = 0;
   d->import_timer.stop();
   d->context.incoming_subtree_list.clear();
@@ -435,7 +434,7 @@ void TreeExplorerModel::OnNewTreeItems(
 
   // Ensure this is coming from our current generator
   //! \todo Just stop all workers and make it so we can't end up here
-  if (version_number != d->version_number->load()) {
+  if (version_number != d->version_number.load()) {
     return;
   }
 
