@@ -7,6 +7,7 @@
 */
 
 #include "TreeExplorerModel.h"
+#include "ITreeExplorerExpansionThread.h"
 #include "InitTreeExplorerThread.h"
 #include "ExpandTreeExplorerThread.h"
 
@@ -37,9 +38,6 @@ struct TreeExplorerModel::PrivateData final {
   //! Column count, as returned by the generator
   std::size_t column_count{};
 
-  // Returns the number of pending requests.
-  int num_pending_requests{};
-
   //! Version number of this model. This is incremented when we install a new
   //! generator.
   std::atomic_uint64_t version_number{};
@@ -52,6 +50,12 @@ struct TreeExplorerModel::PrivateData final {
 
   //! A timer used to import the data received from the `generator`
   QTimer import_timer;
+
+  //! Active expansion threads
+  std::vector<ITreeExplorerExpansionThread *> expansion_thread_list;
+
+  //! Local thread pool, used for the expansion threads
+  QThreadPool thread_pool;
 };
 
 TreeExplorerModel::TreeExplorerModel(QObject *parent)
@@ -64,6 +68,8 @@ TreeExplorerModel::TreeExplorerModel(QObject *parent)
 
   connect(&d->import_timer, &QTimer::timeout, this,
           &TreeExplorerModel::ProcessDataBatchQueue);
+
+  d->import_timer.start(kImportInterval);
 }
 
 TreeExplorerModel::~TreeExplorerModel() {
@@ -76,14 +82,16 @@ void TreeExplorerModel::RunExpansionThread(
   connect(expander, &ITreeExplorerExpansionThread::NewTreeItems, this,
           &TreeExplorerModel::OnNewTreeItems);
 
-  if (!d->num_pending_requests) {
+
+  auto is_first_request = (d->thread_pool.activeThreadCount() == 0);
+  emit RequestStarted();
+
+  d->thread_pool.start(expander);
+
+  // Hasten the first import
+  if (is_first_request) {
     d->import_timer.start(kFirstUpdateInterval);
-    emit RequestStarted();
   }
-
-  d->num_pending_requests += 1;
-
-  QThreadPool::globalInstance()->start(expander);
 }
 
 void TreeExplorerModel::InstallGenerator(
@@ -92,12 +100,13 @@ void TreeExplorerModel::InstallGenerator(
   CancelRunningRequest();
 
   emit beginResetModel();
+
   d->generator = std::move(generator_);
-  InitializeContext(d->context);
   d->column_count = static_cast<std::size_t>(d->generator->NumColumns());
   d->version_number.fetch_add(1u);
-  d->num_pending_requests = 0;
-  d->import_timer.stop();
+
+  InitializeContext(d->context);
+
   emit endResetModel();
 
   // Start a request to fetch the name of this tree.
@@ -409,22 +418,25 @@ void TreeExplorerModel::OnNameResolved(void) {
     return;
   }
 
-  emit TreeNameChanged(d->tree_name_future.takeResult());
+  auto tree_name = d->tree_name_future.takeResult();
+  d->tree_name_future = {};
+
+  emit TreeNameChanged(tree_name);
 }
 
 void TreeExplorerModel::CancelRunningRequest() {
-  d->tree_name_future.cancel();
-  d->tree_name_future.waitForFinished();
-  d->tree_name_future = {};
-
-  if (!d->num_pending_requests && d->context.incoming_subtree_list.empty()) {
-    return;
+  if (d->tree_name_future.isRunning()) {
+    d->tree_name_future.cancel();
+    d->tree_name_future_watcher.waitForFinished();
+    d->tree_name_future = {};
   }
 
   d->version_number.fetch_add(1u);
-  d->num_pending_requests = 0;
+  d->thread_pool.waitForDone();
+
   d->import_timer.stop();
   d->context.incoming_subtree_list.clear();
+
   emit RequestFinished();
 }
 
@@ -433,12 +445,9 @@ void TreeExplorerModel::OnNewTreeItems(
     QList<std::shared_ptr<ITreeItem>> child_items, unsigned remaining_depth) {
 
   // Ensure this is coming from our current generator
-  //! \todo Just stop all workers and make it so we can't end up here
   if (version_number != d->version_number.load()) {
     return;
   }
-
-  d->num_pending_requests -= 1;
 
   // Determine where we have to insert our new nodes; if we get
   // the magic number kInvalidEntityId, then insert at the
@@ -713,13 +722,13 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
     processed_node_id_list.clear();
   }
 
-  // Restart or stop the timer according to how many subtrees
-  // there are left
-  if (!context.incoming_subtree_list.empty() || d->num_pending_requests > 0) {
-    d->import_timer.start(kImportInterval);
+  // Restart the timer, ensuring we wait kImportInterval msecs from
+  // the end of the last data import
+  d->import_timer.start(kImportInterval);
 
-  } else {
-    d->import_timer.stop();
+  // Emit the RequestFinished signal, if applicable
+  if (d->thread_pool.activeThreadCount() == 0 &&
+      context.incoming_subtree_list.empty()) {
     emit RequestFinished();
   }
 }
