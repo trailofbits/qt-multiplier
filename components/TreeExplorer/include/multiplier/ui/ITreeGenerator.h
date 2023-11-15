@@ -13,7 +13,6 @@
 #include <memory>
 #include <multiplier/Types.h>
 
-#include <QObject>
 #include <QString>
 #include <QVariant>
 
@@ -46,9 +45,7 @@ class ITreeItem {
 
 //! Data generator for an entity tree. The data generator can be arbitrarily
 //! slow at generating its data.
-class ITreeGenerator : public QObject {
-  Q_OBJECT
-
+class ITreeGenerator : public std::enable_shared_from_this<ITreeGenerator> {
  public:
   virtual ~ITreeGenerator(void) = default;
 
