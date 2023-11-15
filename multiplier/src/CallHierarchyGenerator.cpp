@@ -7,6 +7,7 @@
 #include "CallHierarchyGenerator.h"
 
 #include <QDebug>
+#include <QObject>
 
 #include <filesystem>
 #include <multiplier/Entity.h>
@@ -96,9 +97,9 @@ int CallHierarchyGenerator::NumColumns(void) const {
 
 QString CallHierarchyGenerator::ColumnTitle(int col) const {
   switch (col) {
-    case 0: return tr("Entity");
-    case 1: return tr("File name");
-    case 2: return tr("Breadcrumbs");
+    case 0: return QObject::tr("Entity");
+    case 1: return QObject::tr("File name");
+    case 2: return QObject::tr("Breadcrumbs");
     default: return QString();
   }
 }
@@ -107,10 +108,10 @@ QString CallHierarchyGenerator::TreeName(
     const std::shared_ptr<ITreeGenerator> &) const {
 
   if (auto name = NameOfEntityAsString(index.entity(root_entity_id))) {
-    return tr("Call hierarchy of `%1`").arg(name.value());
+    return QObject::tr("Call hierarchy of `%1`").arg(name.value());
   
   } else {
-    return tr("Call hierarchy of entity %1").arg(root_entity_id);
+    return QObject::tr("Call hierarchy of entity %1").arg(root_entity_id);
   }
 }
 

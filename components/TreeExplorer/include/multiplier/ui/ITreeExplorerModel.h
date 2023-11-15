@@ -8,14 +8,15 @@
 
 #pragma once
 
+#include <memory>
 #include <multiplier/Types.h>
 #include <multiplier/Index.h>
 
 #include <QAbstractItemModel>
 
-#include "ITreeGenerator.h"
-
 namespace mx::gui {
+
+class ITreeGenerator;
 
 //! A model for the reference explorer widget
 class ITreeExplorerModel : public QAbstractItemModel {
@@ -53,7 +54,7 @@ class ITreeExplorerModel : public QAbstractItemModel {
   ITreeExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}
 
   //! Destructor
-  virtual ~ITreeExplorerModel() override = default;
+  virtual ~ITreeExplorerModel();
 
   //! Install a new generator to back the data of this model.
   virtual void InstallGenerator(std::shared_ptr<ITreeGenerator> generator_) = 0;

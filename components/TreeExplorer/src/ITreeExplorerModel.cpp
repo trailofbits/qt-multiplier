@@ -8,9 +8,12 @@
 
 #include "TreeExplorerModel.h"
 
+#include <multiplier/ui/ITreeGenerator.h>
 #include <multiplier/ui/ITreeExplorerModel.h>
 
 namespace mx::gui {
+
+ITreeExplorerModel::~ITreeExplorerModel(void) {}
 
 ITreeExplorerModel *ITreeExplorerModel::Create(QObject *parent) {
   return new TreeExplorerModel(parent);
