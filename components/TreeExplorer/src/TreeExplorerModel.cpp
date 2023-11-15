@@ -146,25 +146,47 @@ void TreeExplorerModel::Expand(const QModelIndex &index,
     return;
   }
 
-  // Check the node state before we start a new expansion request
+  // Get the node
   auto node_id = static_cast<Context::Node::ID>(index.internalId());
-
   auto node_ptr = GetNodeFromID(d->context, node_id);
   if (node_ptr == nullptr) {
     return;
   }
 
   auto &node = *node_ptr;
-  if (node.state != Context::Node::State::Unopened) {
-    return;
+
+  // Handle the expansion request, depending on its state:
+  // Unopened: Process the expansion directly
+  // Opened: Forward to the child nodes
+  // Opening: Skip, someone else is already handling it
+  switch (node.state) {
+    case Context::Node::State::Unopened:
+      node.state = Context::Node::State::Opening;
+
+      RunExpansionThread(new ExpandTreeExplorerThread(
+          d->generator, d->version_number, node.data.entity_id,
+          static_cast<unsigned>(depth)));
+
+      break;
+
+    case Context::Node::State::Opened: {
+      auto next_depth = depth - 1;
+
+      for (const auto &child_node_id : node.child_node_id_list) {
+        // Expand the aliased node, if applicable
+        auto actual_child_node_id =
+            node.opt_aliased_node_id.value_or(child_node_id);
+        auto child_node_index =
+            GetModelIndexFromNodeID(d->context, actual_child_node_id, 0);
+
+        Expand(child_node_index, next_depth);
+      }
+
+      break;
+    }
+
+    case Context::Node::State::Opening: break;
   }
-
-  // Start the expansion request
-  node.state = Context::Node::State::Opening;
-
-  RunExpansionThread(new ExpandTreeExplorerThread(
-      d->generator, d->version_number, node.data.entity_id,
-      static_cast<unsigned>(depth)));
 }
 
 QModelIndex TreeExplorerModel::Deduplicate(const QModelIndex &index) {
