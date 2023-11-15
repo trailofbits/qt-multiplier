@@ -582,21 +582,26 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
     context.incoming_subtree_list.clear();
 
   } else {
-    auto start_rev_it = context.incoming_subtree_list.rbegin();
-    auto end_rev_it =
-        std::next(start_rev_it, static_cast<int>(max_subtree_count));
+    auto subtree_count = static_cast<int>(context.incoming_subtree_list.size() -
+                                          max_subtree_count);
 
-    incoming_subtree_list.insert(incoming_subtree_list.end(), start_rev_it,
-                                 end_rev_it);
+    auto start_it =
+        std::next(context.incoming_subtree_list.begin(), subtree_count);
+    auto end_it = context.incoming_subtree_list.end();
 
-    std::advance(start_rev_it, 1);
-    std::advance(end_rev_it, 1);
+    incoming_subtree_list.insert(incoming_subtree_list.end(),
+                                 std::make_move_iterator(start_it),
+                                 std::make_move_iterator(end_it));
 
-    context.incoming_subtree_list.erase(start_rev_it.base(), end_rev_it.base());
+    context.incoming_subtree_list.erase(start_it, end_it);
   }
 
   // Go through each one of the subtrees that we need to import
-  for (auto &subtree : incoming_subtree_list) {
+  for (auto subtree_it = incoming_subtree_list.rbegin();
+       subtree_it != incoming_subtree_list.rend(); ++subtree_it) {
+
+    auto &subtree = *subtree_it;
+
     // Get the parent node
     auto parent_node_ptr = GetNodeFromID(context, subtree.parent_node_id);
     if (parent_node_ptr == nullptr) {
