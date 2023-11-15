@@ -21,10 +21,17 @@ namespace mx::gui {
 
 namespace {
 
+//! The ID of the internal root item
 const TreeExplorerModel::Context::Node::ID kRootNodeID{1};
+
+//! Update timer used for first requests
 const int kFirstUpdateInterval{500};
+
+//! Standard update timer
 const int kImportInterval{1500};
-const int kMaxBatchSize{10000};
+
+//! Batch size
+const int kMaxBatchSize{100};
 
 }  // namespace
 
@@ -45,7 +52,7 @@ struct TreeExplorerModel::PrivateData final {
   //! Future used to resolve the name of the tree.
   QFuture<QString> tree_name_future;
 
-  //! \todo document this
+  //! Notifies us when the tree name has been fetched
   QFutureWatcher<QString> tree_name_future_watcher;
 
   //! A timer used to import the data received from the `generator`
