@@ -8,6 +8,8 @@
 
 #include "ITreeExplorerExpansionThread.h"
 
+#include <multiplier/ui/ITreeGenerator.h>
+
 namespace mx::gui {
 
 ITreeExplorerExpansionThread::~ITreeExplorerExpansionThread(void) {}
@@ -20,5 +22,7 @@ ITreeExplorerExpansionThread::ITreeExplorerExpansionThread(
                        depth)) {
   setAutoDelete(true);
 }
+
+ITreeExplorerExpansionThread::ThreadData::~ThreadData(void) {}
 
 }  // namespace mx::gui

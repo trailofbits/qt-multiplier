@@ -11,6 +11,12 @@
 #include "InitTreeExplorerThread.h"
 #include "ExpandTreeExplorerThread.h"
 
+#include <gap/core/coroutine.hpp>
+#include <multiplier/Token.h>
+#include <multiplier/ui/ITreeGenerator.h>
+
+#include <QColor>
+#include <QApplication>
 #include <QFutureWatcher>
 #include <QThreadPool>
 #include <QTimer>

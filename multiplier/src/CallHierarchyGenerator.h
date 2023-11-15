@@ -18,8 +18,6 @@ class FileLocationCache;
 namespace gui {
 
 class CallHierarchyGenerator final : public ITreeGenerator {
-  Q_OBJECT
-
   const Index index;
   const FileLocationCache file_location_cache;
   const RawEntityId root_entity_id;

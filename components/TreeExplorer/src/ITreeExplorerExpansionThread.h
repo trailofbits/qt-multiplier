@@ -8,14 +8,19 @@
 
 #pragma once
 
-#include <multiplier/ui/ITreeGenerator.h>
-
 #include <multiplier/Types.h>
 
 #include <QRunnable>
 #include <QObject>
 
+#include <memory>
+
 namespace mx::gui {
+
+class ITreeGenerator;
+class ITreeItem;
+
+using VersionNumber = std::shared_ptr<std::atomic<uint64_t>>;
 
 class ITreeExplorerExpansionThread : public QObject, public QRunnable {
   Q_OBJECT
@@ -43,6 +48,8 @@ struct ITreeExplorerExpansionThread::ThreadData {
   const uint64_t captured_version_number;
   const RawEntityId parent_entity_id;
   const unsigned depth;
+
+  ~ThreadData(void);
 
   inline ThreadData(std::shared_ptr<ITreeGenerator> generator_,
                     const std::atomic_uint64_t &version_number_,
