@@ -14,18 +14,11 @@
 
 #include <multiplier/Types.h>
 
-#include <QAbstractItemModel>
 #include <QList>
-#include <QRunnable>
 
-#include <atomic>
-#include <cstdint>
-#include <deque>
 #include <unordered_map>
 
 namespace mx::gui {
-
-class ITreeExplorerExpansionThread;
 
 //! Implements the IReferenceExplorerModel interface
 class TreeExplorerModel final : public ITreeExplorerModel {
