@@ -130,8 +130,8 @@ class TreeExplorerModel final : public ITreeExplorerModel {
       //! The baked row number of this node
       int row{};
 
-      //! An optional destination node ID
-      std::optional<Node::ID> opt_aliased_node_id;
+      //! This node could optionally be an alias for another entity
+      std::optional<RawEntityId> opt_aliased_entity_id;
 
       //! Current node state
       State state{State::Unopened};
@@ -196,6 +196,14 @@ class TreeExplorerModel final : public ITreeExplorerModel {
   //! \note This can't be `static` since we need to call `GetModelIndexFromNodeID`
   void ImportIncomingSubtreeList(Context &context,
                                  const std::size_t &max_subtree_count);
+
+  //! Dereferences the given node id
+  static std::optional<Context::Node::ID>
+  DereferenceNodeID(const Context &context, Context::Node::ID node_id);
+
+  //! Returns the node id for the given entity id
+  static std::optional<Context::Node::ID>
+  GetNodeIDFromEntityID(const Context &context, const RawEntityId &entity_id);
 };
 
 }  // namespace mx::gui

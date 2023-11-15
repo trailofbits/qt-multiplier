@@ -148,6 +148,15 @@ void TreeExplorerModel::Expand(const QModelIndex &index,
 
   // Get the node
   auto node_id = static_cast<Context::Node::ID>(index.internalId());
+
+  auto opt_dereferenced_node_id = DereferenceNodeID(d->context, node_id);
+  if (!opt_dereferenced_node_id.has_value()) {
+    // This is a deduplicated node, but we can't access it yet
+    return;
+  }
+
+  node_id = opt_dereferenced_node_id.value();
+
   auto node_ptr = GetNodeFromID(d->context, node_id);
   if (node_ptr == nullptr) {
     return;
@@ -172,12 +181,17 @@ void TreeExplorerModel::Expand(const QModelIndex &index,
     case Context::Node::State::Opened: {
       auto next_depth = depth - 1;
 
-      for (const auto &child_node_id : node.child_node_id_list) {
-        // Expand the aliased node, if applicable
-        auto actual_child_node_id =
-            node.opt_aliased_node_id.value_or(child_node_id);
+      for (auto child_node_id : node.child_node_id_list) {
+        opt_dereferenced_node_id = DereferenceNodeID(d->context, child_node_id);
+        if (!opt_dereferenced_node_id.has_value()) {
+          // This is a deduplicated node, but we can't access it yet
+          continue;
+        }
+
+        child_node_id = opt_dereferenced_node_id.value();
+
         auto child_node_index =
-            GetModelIndexFromNodeID(d->context, actual_child_node_id, 0);
+            GetModelIndexFromNodeID(d->context, child_node_id, 0);
 
         Expand(child_node_index, next_depth);
       }
@@ -211,11 +225,20 @@ QModelIndex TreeExplorerModel::Deduplicate(const QModelIndex &index) {
 
   // If this node is aliasing another one, then return the destination
   // index
-  if (!node.opt_aliased_node_id.has_value()) {
+  if (!node.opt_aliased_entity_id.has_value()) {
     return QModelIndex();
   }
 
-  const auto &aliased_node_id = node.opt_aliased_node_id.value();
+  const auto &aliased_entity_id = node.opt_aliased_entity_id.value();
+
+  auto opt_aliased_node_id =
+      GetNodeIDFromEntityID(d->context, aliased_entity_id);
+
+  if (!opt_aliased_node_id.has_value()) {
+    return QModelIndex();
+  }
+
+  const auto &aliased_node_id = opt_aliased_node_id.value();
   return GetModelIndexFromNodeID(d->context, aliased_node_id, 0);
 }
 
@@ -430,7 +453,7 @@ QVariant TreeExplorerModel::data(const QModelIndex &index, int role) const {
     }
 
     case ITreeExplorerModel::IsDuplicate: {
-      auto is_duplicate = node.opt_aliased_node_id.has_value();
+      auto is_duplicate = node.opt_aliased_entity_id.has_value();
       value.setValue(is_duplicate);
 
       break;
@@ -525,7 +548,7 @@ void TreeExplorerModel::InitializeContext(Context &context) {
     // Node::row
     0,
 
-    // Node::opt_aliased_node_id
+    // Node::opt_aliased_entity_id
     std::nullopt,
 
     // Node::state
@@ -597,6 +620,10 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
     Context &context, const std::size_t &max_subtree_count) {
 
   // Slice the exact amount of subtrees that we need to import
+  if (context.incoming_subtree_list.empty()) {
+    return;
+  }
+
   Context::SubtreeList incoming_subtree_list;
 
   if (max_subtree_count >= context.incoming_subtree_list.size()) {
@@ -609,6 +636,7 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
 
     auto start_it =
         std::next(context.incoming_subtree_list.begin(), subtree_count);
+
     auto end_it = context.incoming_subtree_list.end();
 
     incoming_subtree_list.insert(incoming_subtree_list.end(),
@@ -632,8 +660,10 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
 
     auto &parent_node = *parent_node_ptr;
 
-    // Ignore this subtree if we are already expanding it
-    if (parent_node.state != Context::Node::State::Opening) {
+    // Ignore this subtree if we are already expanding it or if we know
+    // that it is a duplicate
+    if (parent_node.state != Context::Node::State::Opening ||
+        parent_node.opt_aliased_entity_id.has_value()) {
       continue;
     }
 
@@ -688,7 +718,7 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
       auto node_id = GenerateNodeID(context);
       processed_node_id_list.push_back(node_id);
 
-      Context::Node node;
+      Context::Node node{};
       node.node_id = node_id;
       node.parent_node_id = parent_node.node_id;
       node.row = static_cast<int>(parent_node.child_node_id_list.size());
@@ -701,12 +731,27 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
       auto insert_status = context.mx_entity_id_to_node_id.insert(
           {node.data.entity_id, node.node_id});
 
-      const auto &is_duplicate = !insert_status.second;
+      auto is_duplicate = !insert_status.second;
       if (is_duplicate) {
-        node.opt_aliased_node_id =
-            context.mx_entity_id_to_node_id[node.data.entity_id];
+        node.opt_aliased_entity_id = node.data.entity_id;
 
-        // Ensure we can't expand this further
+      } else {
+        auto aliased_entity_id = tree_item->AliasedEntityId();
+
+        if (aliased_entity_id != kInvalidEntityId &&
+            aliased_entity_id != node.data.entity_id) {
+
+          insert_status = context.mx_entity_id_to_node_id.insert(
+              {aliased_entity_id, node.node_id});
+
+          is_duplicate = !insert_status.second;
+          if (is_duplicate) {
+            node.opt_aliased_entity_id = aliased_entity_id;
+          }
+        }
+      }
+
+      if (node.opt_aliased_entity_id.has_value()) {
         node.state = Context::Node::State::Opened;
       }
 
@@ -727,24 +772,33 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
     // We may still have additional expansion tasks to queue
     if (subtree.remaining_depth > 0) {
       // Go through all the nodes we processed
-      for (const auto &processed_node_id : processed_node_id_list) {
-        // Check the node state
+      for (auto processed_node_id : processed_node_id_list) {
+        // Get the node
+        auto opt_dereferenced_node_id =
+            DereferenceNodeID(context, processed_node_id);
+
+        if (!opt_dereferenced_node_id.has_value()) {
+          // This is a deduplicated node, but we can't access it yet
+          continue;
+        }
+
+        processed_node_id = opt_dereferenced_node_id.value();
+
         auto node_ptr = GetNodeFromID(context, processed_node_id);
         if (node_ptr == nullptr) {
           continue;
         }
 
+        // Start a new expansion thread for this node
         auto &node = *node_ptr;
         if (node.state != Context::Node::State::Unopened) {
           continue;
         }
 
-        // Ignore if there is no valid entity id we can use
         if (node.data.entity_id == kInvalidEntityId) {
           continue;
         }
 
-        // Start a new expansion thread for this node
         node.state = Context::Node::State::Opening;
 
         RunExpansionThread(new ExpandTreeExplorerThread(
@@ -765,6 +819,45 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
       context.incoming_subtree_list.empty()) {
     emit RequestFinished();
   }
+}
+
+std::optional<TreeExplorerModel::Context::Node::ID>
+TreeExplorerModel::DereferenceNodeID(const Context &context,
+                                     Context::Node::ID node_id) {
+
+  for (;;) {
+    auto tree_it = context.tree.find(node_id);
+    if (tree_it == context.tree.end()) {
+      return node_id;
+    }
+
+    const auto &node = tree_it->second;
+    if (!node.opt_aliased_entity_id.has_value()) {
+      return node_id;
+    }
+
+    auto opt_node_id =
+        GetNodeIDFromEntityID(context, node.opt_aliased_entity_id.value());
+
+    if (!opt_node_id.has_value()) {
+      return std::nullopt;
+    }
+
+    node_id = opt_node_id.value();
+  }
+}
+
+std::optional<TreeExplorerModel::Context::Node::ID>
+TreeExplorerModel::GetNodeIDFromEntityID(
+    const TreeExplorerModel::Context &context, const RawEntityId &entity_id) {
+
+  auto node_id_it = context.mx_entity_id_to_node_id.find(entity_id);
+  if (node_id_it == context.mx_entity_id_to_node_id.end()) {
+    return std::nullopt;
+  }
+
+  const auto &node_id = node_id_it->second;
+  return node_id;
 }
 
 }  // namespace mx::gui
