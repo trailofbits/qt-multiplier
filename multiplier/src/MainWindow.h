@@ -130,6 +130,10 @@ class MainWindow final : public QMainWindow {
   //! Called when the browser mode action is interacted with
   void OnBrowserModeToggled();
 
+  //! Called when one of the tree explorers wants to extract a subtree
+  //! in a new window
+  void OnExtractTreeExplorerSubtree(const QModelIndex &index);
+
  signals:
   //! Emitted when the browse mode is toggled
   void BrowserModeToggled(const bool &enabled);

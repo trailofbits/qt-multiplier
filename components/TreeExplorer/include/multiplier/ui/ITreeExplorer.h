@@ -24,8 +24,7 @@ class ITreeExplorer : public QWidget {
  public:
   //! Factory method
   static ITreeExplorer *
-  Create(ITreeExplorerModel *model_,
-         QWidget *parent = nullptr,
+  Create(ITreeExplorerModel *model_, QWidget *parent = nullptr,
          IGlobalHighlighter *global_highlighter = nullptr);
 
   //! Constructor
@@ -49,6 +48,9 @@ class ITreeExplorer : public QWidget {
 
   //! Emitted when an item has been activated using the dedicated button
   void ItemActivated(const QModelIndex &index);
+
+  //! Emitted when the selected item should be extracted in its own view
+  void ExtractSubtree(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

@@ -27,6 +27,7 @@
 #include <multiplier/ui/IThemeManager.h>
 #include <multiplier/ui/ITreeExplorerModel.h>
 #include <multiplier/ui/Util.h>
+#include <multiplier/ui/ITreeExplorer.h>
 
 #include <multiplier/Entities/StmtKind.h>
 
@@ -131,9 +132,7 @@ struct MainWindow::PrivateData final {
   ToolBar toolbar;
 };
 
-MainWindow::MainWindow()
-    : QMainWindow(nullptr),
-      d(new PrivateData) {
+MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
 
   setWindowTitle("Multiplier");
   setWindowIcon(QIcon(":/Icons/Multiplier"));
@@ -459,6 +458,9 @@ void MainWindow::OpenReferenceExplorer(
           &QuickReferenceExplorer::SaveReferenceExplorer, this,
           &MainWindow::SaveReferenceExplorer);
 
+  connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ExtractSubtree,
+          this, &MainWindow::OnExtractTreeExplorerSubtree);
+
   connect(d->quick_ref_explorer.get(), &QuickReferenceExplorer::ItemActivated,
           this, &MainWindow::OnReferenceExplorerItemActivated);
 
@@ -497,7 +499,8 @@ void MainWindow::OpenCallHierarchy(const QModelIndex &index) {
   }
 
   OpenReferenceExplorer(CallHierarchyGenerator::Create(
-      d->index, d->file_location_cache, qvariant_cast<RawEntityId>(related_entity_id_var)));
+      d->index, d->file_location_cache,
+      qvariant_cast<RawEntityId>(related_entity_id_var)));
 }
 
 void MainWindow::OpenTokenEntityInfo(const QModelIndex &index,
@@ -1141,6 +1144,18 @@ void MainWindow::UpdateIcons() {
 void MainWindow::OnBrowserModeToggled() {
   UpdateIcons();
   emit BrowserModeToggled(d->toolbar.browser_mode->isChecked());
+}
+
+void MainWindow::OnExtractTreeExplorerSubtree(const QModelIndex &index) {
+  auto dest_model = ITreeExplorerModel::CreateFrom(index);
+
+  auto tree_explorer = new PreviewableReferenceExplorer(
+      d->index, d->file_location_cache, dest_model, false,
+      *d->global_highlighter, *d->macro_explorer, this);
+
+  dest_model->setParent(tree_explorer);
+
+  SaveReferenceExplorer(tree_explorer);
 }
 
 }  // namespace mx::gui

@@ -39,6 +39,7 @@ namespace {
 struct ContextMenu final {
   QMenu *menu{nullptr};
   QAction *copy_details_action{nullptr};
+  QAction *extract_subtree_action{nullptr};
 };
 
 struct TreeviewItemButtons final {
@@ -69,8 +70,7 @@ struct TreeExplorer::PrivateData final {
 
 TreeExplorer::~TreeExplorer() {}
 
-TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
-                           QWidget *parent,
+TreeExplorer::TreeExplorer(ITreeExplorerModel *model, QWidget *parent,
                            IGlobalHighlighter *global_highlighter)
     : ITreeExplorer(parent),
       d(new PrivateData) {
@@ -127,8 +127,8 @@ void TreeExplorer::InitializeWidgets(ITreeExplorerModel *model) {
   d->tree_view->viewport()->installEventFilter(this);
   d->tree_view->viewport()->setMouseTracking(true);
 
-  connect(d->tree_view, &TreeExplorerTreeView::customContextMenuRequested,
-          this, &TreeExplorer::OnOpenItemContextMenu);
+  connect(d->tree_view, &TreeExplorerTreeView::customContextMenuRequested, this,
+          &TreeExplorer::OnOpenItemContextMenu);
 
   // Initialize the treeview item buttons
   d->treeview_item_buttons.open = new QPushButton(QIcon(), "", this);
@@ -176,14 +176,14 @@ void TreeExplorer::InitializeWidgets(ITreeExplorerModel *model) {
   auto cancel_button = new QPushButton(tr("Cancel"), this);
   status_widget_layout->addWidget(cancel_button);
 
-  connect(cancel_button, &QPushButton::pressed,
-          model, &ITreeExplorerModel::CancelRunningRequest);
+  connect(cancel_button, &QPushButton::pressed, model,
+          &ITreeExplorerModel::CancelRunningRequest);
 
-  connect(model, &ITreeExplorerModel::RequestStarted,
-          this, &TreeExplorer::OnModelRequestStarted);
+  connect(model, &ITreeExplorerModel::RequestStarted, this,
+          &TreeExplorer::OnModelRequestStarted);
 
-  connect(model, &ITreeExplorerModel::RequestFinished,
-          this, &TreeExplorer::OnModelRequestFinished);
+  connect(model, &ITreeExplorerModel::RequestFinished, this,
+          &TreeExplorer::OnModelRequestFinished);
 
   d->status_widget->setLayout(status_widget_layout);
 
@@ -201,8 +201,10 @@ void TreeExplorer::InitializeWidgets(ITreeExplorerModel *model) {
   // Setup che custom context menu
   d->context_menu.menu = new QMenu(tr("Entity tree browser menu"));
   d->context_menu.copy_details_action = new QAction(tr("Copy details"));
+  d->context_menu.extract_subtree_action = new QAction(tr("Extract subtree"));
 
   d->context_menu.menu->addAction(d->context_menu.copy_details_action);
+  d->context_menu.menu->addAction(d->context_menu.extract_subtree_action);
 
   connect(d->context_menu.menu, &QMenu::triggered, this,
           &TreeExplorer::OnContextMenuActionTriggered);
@@ -324,7 +326,7 @@ bool TreeExplorer::eventFilter(QObject *obj, QEvent *event) {
 
     } else if (event->type() != QEvent::KeyRelease) {
       return false;
-    
+
     } else if (QKeyEvent *kevent = dynamic_cast<QKeyEvent *>(event)) {
       auto ret = false;
       for (auto index : d->tree_view->selectionModel()->selectedIndexes()) {
@@ -342,8 +344,7 @@ bool TreeExplorer::eventFilter(QObject *obj, QEvent *event) {
                 index, static_cast<unsigned>(kevent->key() - Qt::Key_0));
             ret = true;
             break;
-          default:
-            break;
+          default: break;
         }
       }
 
@@ -416,8 +417,8 @@ void TreeExplorer::UpdateTreeViewItemButtons() {
   // Enable the expansion button if we haven't yet expanded the node.
   // TODO(alessandro): Fix the button visibility
   auto expand_var = index.data(ITreeExplorerModel::CanBeExpanded);
-  d->treeview_item_buttons.expand->setEnabled(
-      expand_var.isValid() && expand_var.toBool());
+  d->treeview_item_buttons.expand->setEnabled(expand_var.isValid() &&
+                                              expand_var.toBool());
 
   // Show/hide one of expand/goto if this is redundant.
   auto redundant_var = index.data(ITreeExplorerModel::IsDuplicate);
@@ -430,9 +431,9 @@ void TreeExplorer::UpdateTreeViewItemButtons() {
   // Keep up to date with TreeviewItemButtons
   static constexpr auto kNumButtons = 2u;
   QPushButton *button_list[kNumButtons] = {
-    d->treeview_item_buttons.open,
-    (is_redundant ? d->treeview_item_buttons.goto_ :
-     d->treeview_item_buttons.expand),
+      d->treeview_item_buttons.open,
+      (is_redundant ? d->treeview_item_buttons.goto_
+                    : d->treeview_item_buttons.expand),
   };
 
   // Update the button positions
@@ -496,7 +497,7 @@ void TreeExplorer::UpdateIcons() {
 
   QIcon goto_item_icon;
   goto_item_icon.addPixmap(GetPixmap(":/TreeExplorer/goto_ref_item"),
-                             QIcon::Normal, QIcon::On);
+                           QIcon::Normal, QIcon::On);
 
   goto_item_icon.addPixmap(
       GetPixmap(":/TreeExplorer/goto_ref_item", IconStyle::Disabled),
@@ -568,6 +569,18 @@ void TreeExplorer::OnContextMenuActionTriggered(QAction *action) {
 
   if (action == d->context_menu.copy_details_action) {
     CopyTreeExplorerItemDetails(index);
+
+  } else if (action == d->context_menu.extract_subtree_action) {
+    QModelIndex source_index{index};
+    if (d->model_proxy != nullptr) {
+      source_index = d->model_proxy->mapToSource(index);
+    }
+
+    if (d->highlighter_model != nullptr) {
+      source_index = d->highlighter_model->mapToSource(source_index);
+    }
+
+    emit ExtractSubtree(source_index);
   }
 }
 

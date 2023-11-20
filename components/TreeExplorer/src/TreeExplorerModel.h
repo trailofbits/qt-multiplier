@@ -34,6 +34,14 @@ class TreeExplorerModel final : public ITreeExplorerModel {
   //! Constructor
   TreeExplorerModel(QObject *parent);
 
+  //! This constructor creates a new model, using `source_model` as a base
+  //! and `root_item` as the new root item
+  TreeExplorerModel(const TreeExplorerModel &source_model,
+                    const QModelIndex &root_item, QObject *parent);
+
+  //! Common code for all constructors
+  void InitializeModel();
+
   //! Destructor
   virtual ~TreeExplorerModel(void);
 
@@ -118,6 +126,9 @@ class TreeExplorerModel final : public ITreeExplorerModel {
         RawEntityId entity_id;
       };
 
+      //! The ID of the internal root item
+      static const ID kRootNodeID;
+
       //! The ID for this node
       ID node_id{};
 
@@ -168,12 +179,19 @@ class TreeExplorerModel final : public ITreeExplorerModel {
     //! The node tree that contains the model data
     std::unordered_map<Node::ID, Node> tree;
 
+    //! Column title list
+    std::vector<QString> column_title_list;
+
     //! A list of subtrees that need to be inserted
     SubtreeList incoming_subtree_list;
+
+    //! The name of this tree
+    QString tree_name;
   };
 
   //! Resets the context structure, initializing a root item
-  static void InitializeContext(Context &context);
+  static void InitializeContext(Context &context,
+                                const std::vector<QString> &column_title_list);
 
   //! Generates a new node id
   static Context::Node::ID GenerateNodeID(Context &context);
@@ -194,8 +212,9 @@ class TreeExplorerModel final : public ITreeExplorerModel {
 
   //! Imports the subtrees scheduled for merging inside the Context struct
   //! \note This can't be `static` since we need to call `GetModelIndexFromNodeID`
-  void ImportIncomingSubtreeList(Context &context,
-                                 const std::size_t &max_subtree_count);
+  void ImportIncomingSubtreeList(
+      Context &context,
+      const std::optional<std::size_t> &opt_max_subtree_count = std::nullopt);
 
   //! Dereferences the given node id
   static std::optional<Context::Node::ID>
@@ -204,6 +223,11 @@ class TreeExplorerModel final : public ITreeExplorerModel {
   //! Returns the node id for the given entity id
   static std::optional<Context::Node::ID>
   GetNodeIDFromEntityID(const Context &context, const RawEntityId &entity_id);
+
+  //! Imports a subtree from the given context
+  static bool ImportContextSubtree(Context &dest_context,
+                                   const Context &source_context,
+                                   const Context::Node::ID &root_node_id);
 };
 
 }  // namespace mx::gui
