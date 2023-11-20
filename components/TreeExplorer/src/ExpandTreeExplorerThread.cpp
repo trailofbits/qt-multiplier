@@ -13,12 +13,12 @@ namespace mx::gui {
 void ExpandTreeExplorerThread::run(void) {
   QList<std::shared_ptr<ITreeItem>> items;
   for (auto item : d->generator->Children(d->generator, d->parent_entity_id)) {
-    if (d->version_number->load() != d->captured_version_number) {
+    if (d->version_number.load() != d->captured_version_number) {
       return;
     }
     items.emplaceBack(std::move(item));
   }
-  if (d->version_number->load() != d->captured_version_number) {
+  if (d->version_number.load() != d->captured_version_number) {
     return;
   }
   emit NewTreeItems(d->captured_version_number, d->parent_entity_id, items,

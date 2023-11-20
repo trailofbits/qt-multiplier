@@ -7,211 +7,64 @@
 */
 
 #include "TreeExplorerModel.h"
+#include "ITreeExplorerExpansionThread.h"
 #include "InitTreeExplorerThread.h"
 #include "ExpandTreeExplorerThread.h"
 
-#include <gap/core/coroutine.hpp>
-#include <multiplier/Token.h>
-
-#include <QColor>
-#include <QApplication>
 #include <QFutureWatcher>
 #include <QThreadPool>
 #include <QTimer>
-#include <QPalette>
 #include <QtConcurrent>
 #include <QDebug>
-
-#include <algorithm>
-#include <cassert>
 
 namespace mx::gui {
 
 namespace {
 
+//! The ID of the internal root item
+const TreeExplorerModel::Context::Node::ID kRootNodeID{1};
+
+//! Update timer used for first requests
 const int kFirstUpdateInterval{500};
+
+//! Standard update timer
 const int kImportInterval{1500};
+
+//! Batch size
 const int kMaxBatchSize{100};
-
-struct Node;
-
-using TextAndTokenRange = std::pair<QString, TokenRange>;
-using NodeData = std::variant<QString, TextAndTokenRange, QVariant>;
-using NodeKey = std::pair<const RawEntityId, Node>;
-
-enum class NodeState { kUnopened, kOpening, kOpened, kDuplicate };
-
-struct Node {
-  // Pointer to this node's parent.
-  NodeKey *parent_key{nullptr};
-
-  // The current state of this node. By default, all nodes are unopened, i.e.
-  // we haven't tried to fetch their children. Some nodes are marked as
-  // duplicates.
-  NodeState state{NodeState::kUnopened};
-
-  // The number of children of this node.
-  int num_children{0};
-
-  // Index into `d->child_keys` of the first child of this node, if
-  // `num_children` is greater than zero. The last child can be found at
-  // `d->child_keys[d->child_index + num_children - 1]`.
-  unsigned child_index{0u};
-
-  // Index into `d->child_keys` of the next item sharing `d->parent_key`.
-  unsigned sibling_index{0u};
-
-  // Index into `d->node_data`. `d->node_data[d->data_index]` is the data for
-  // first column, `d->node_data[d->data_index + 1]` for the second, ..., and
-  // `d->node_data[d->data_index + d->num_columns - 1]` for the last column.
-  unsigned data_index{0u};
-
-  // Index into `d->child_keys`. If this node isn't a duplicate, then this index
-  // will reference back to the node itself. Otherwise it will reference the
-  // first/original node.
-  unsigned alias_index{0u};
-
-  inline Node(NodeKey *parent_key_) : parent_key(parent_key_) {}
-};
-
-struct DataBatch {
-  NodeKey *parent_key;
-  QList<std::shared_ptr<ITreeItem>> child_items;
-  unsigned remaining_depth;
-  unsigned *index_ptr{nullptr};
-
-  inline DataBatch(NodeKey *parent_key_,
-                   QList<std::shared_ptr<ITreeItem>> child_items_,
-                   unsigned remaining_depth_)
-      : parent_key(parent_key_),
-        child_items(std::move(child_items_)),
-        remaining_depth(remaining_depth_) {}
-};
-
-using DataBatchQueue = QList<DataBatch>;
 
 }  // namespace
 
 struct TreeExplorerModel::PrivateData final {
+  //! The tree data
+  Context context;
 
-  // Data generator.
+  //! The active data generator.
   std::shared_ptr<ITreeGenerator> generator;
 
-  // The non-uniqued nodes of the tree.
-  std::deque<NodeKey *> child_keys;
+  //! Column count, as returned by the generator
+  std::size_t column_count{};
 
-  // The redundant node keys. Sometimes we already have something in
-  // `entity_to_node`, in which case, we leave it there, but we still make
-  // a redundant node here in `redundant_keys` so that we can link together
-  // things into a sibling list, but also know that we shouldn't actually
-  // expand underneath something.
-  std::deque<NodeKey> redundant_keys;
-
-  // The data for all nodes.
-  std::deque<NodeData> node_data;
-
-  // The uniqued nodes of the tree.
-  std::unordered_map<RawEntityId, Node> entity_to_node;
-
-  // Used to help deduplicate.
-  std::unordered_map<RawEntityId, NodeKey *> aliased_entity_to_key;
-
-  // The "root" node. Its children represent the top-level items in the tree.
-  Node root_node;
-
-  // Number of columns.
-  int num_columns{0};
-
-  // Returns the number of pending requests.
-  int num_pending_requests{0};
-
-  // Version number of this model. This is incremented when we install a new
-  // generator.
-  const VersionNumber version_number;
+  //! Version number of this model. This is incremented when we install a new
+  //! generator.
+  std::atomic_uint64_t version_number{};
 
   //! Future used to resolve the name of the tree.
   QFuture<QString> tree_name_future;
+
+  //! Notifies us when the tree name has been fetched
   QFutureWatcher<QString> tree_name_future_watcher;
 
-  //! A timer used to import data from the data batch queue
+  //! A timer used to import the data received from the `generator`
   QTimer import_timer;
 
-  // Queue of groups of children `ITreeItem`s to insert into the model.
-  DataBatchQueue data_batch_queue;
+  //! Active expansion threads
+  std::vector<ITreeExplorerExpansionThread *> expansion_thread_list;
 
-  inline PrivateData(void)
-      : root_node(nullptr),
-        version_number(std::make_shared<std::atomic<uint64_t>>()) {}
-
-  NodeKey *NodeKeyFrom(const QModelIndex &index) const {
-    if (!index.isValid()) {
-      return nullptr;
-    }
-
-    return const_cast<NodeKey *>(
-        reinterpret_cast<const NodeKey *>(index.internalPointer()));
-  }
-
-  std::pair<RawEntityId, Node *> NodeFrom(const QModelIndex &index) const {
-    auto ret = NodeKeyFrom(index);
-    if (!ret) {
-      return {kInvalidEntityId, nullptr};
-    }
-
-    return {ret->first, &(ret->second)};
-  }
-
-  NodeKey *NodeKeyFromId(RawEntityId entity_id) {
-    auto it = entity_to_node.find(entity_id);
-    if (it == entity_to_node.end()) {
-      return nullptr;
-    }
-    return &*it;
-  }
-
-  Node *NodeFromId(RawEntityId entity_id) {
-    if (auto key = NodeKeyFromId(entity_id)) {
-      return &(key->second);
-    }
-    return nullptr;
-  }
-
-  // Convert a `node_key` into a `QModelIndex`.
-  QModelIndex ToIndex(const TreeExplorerModel *model,
-                      const NodeKey *node_key) const;
-
-  gap::generator<NodeKey *> Children(Node *node) &;
-
-  void ImportData(Node *new_node, const std::shared_ptr<ITreeItem> &item);
+  //! Local thread pool, used for the expansion threads
+  QThreadPool thread_pool;
 };
 
-// Convert a `node_key` into a `QModelIndex`.
-QModelIndex TreeExplorerModel::PrivateData::ToIndex(
-    const TreeExplorerModel *model, const NodeKey *node_key) const {
-
-  if (!node_key) {
-    return QModelIndex();  // Root.
-  }
-
-  const Node &node = node_key->second;
-  const Node *parent_node = &(root_node);
-  if (node.parent_key) {
-    parent_node = &(node.parent_key->second);
-  }
-
-  auto row = node.sibling_index - parent_node->child_index - 1u;
-  return model->createIndex(
-    static_cast<int>(row), 0, static_cast<const void *>(node_key));
-}
-
-gap::generator<NodeKey *> TreeExplorerModel::PrivateData::Children(
-    Node *node) & {
-  for (auto i = 0; i < node->num_children; ++i) {
-    co_yield child_keys[node->child_index + static_cast<unsigned>(i)];
-  }
-}
-
-//! Constructor
 TreeExplorerModel::TreeExplorerModel(QObject *parent)
     : ITreeExplorerModel(parent),
       d(new PrivateData) {
@@ -222,6 +75,8 @@ TreeExplorerModel::TreeExplorerModel(QObject *parent)
 
   connect(&d->import_timer, &QTimer::timeout, this,
           &TreeExplorerModel::ProcessDataBatchQueue);
+
+  d->import_timer.start(kImportInterval);
 }
 
 TreeExplorerModel::~TreeExplorerModel() {
@@ -234,114 +89,157 @@ void TreeExplorerModel::RunExpansionThread(
   connect(expander, &ITreeExplorerExpansionThread::NewTreeItems, this,
           &TreeExplorerModel::OnNewTreeItems);
 
-  if (!d->num_pending_requests) {
+
+  auto is_first_request = (d->thread_pool.activeThreadCount() == 0);
+  emit RequestStarted();
+
+  d->thread_pool.start(expander);
+
+  // Hasten the first import
+  if (is_first_request) {
     d->import_timer.start(kFirstUpdateInterval);
-    emit RequestStarted();
-  }
-
-  d->num_pending_requests += 1;
-
-  QThreadPool::globalInstance()->start(expander);
-}
-
-//! Find the original version of an item.
-QModelIndex TreeExplorerModel::Deduplicate(const QModelIndex &index) {
-  if (NodeKey *node_key = d->NodeKeyFrom(index)) {
-    return d->ToIndex(this, d->child_keys[node_key->second.alias_index]);
-  }
-  return QModelIndex();
-}
-
-//! Expand starting at the model index, going up to `depth` levels deep.
-void TreeExplorerModel::Expand(const QModelIndex &index, unsigned depth) {
-
-  if (!depth) {
-    return;
-  }
-
-  NodeKey *node_key = d->NodeKeyFrom(index);
-
-  if (!node_key) {
-    if (d->root_node.state == NodeState::kUnopened) {
-      d->root_node.state = NodeState::kOpening;
-      RunExpansionThread(
-          new InitTreeExplorerThread(d->generator, d->version_number,
-                                     kInvalidEntityId, depth));
-    }
-    return;
-  }
-  
-  Node *entity = &(node_key->second);
-  if (entity->state == NodeState::kUnopened) {
-    entity->state = NodeState::kOpening;
-    RunExpansionThread(new ExpandTreeExplorerThread(
-        d->generator, d->version_number, node_key->first, depth));
-    return;
-  }
-
-  // Initialize a worklist.
-  std::vector<std::pair<NodeKey *, unsigned>> todo;
-  todo.emplace_back(node_key, depth);
-
-  // Run through the worklist to recursively expand.
-  for (auto i = 0ul; i < todo.size(); ) {
-    auto [child_key, child_depth] = todo[i++];
-
-    entity = &(child_key->second);
-
-    // This node isn't opened yet, go and process it.
-    if (entity->state == NodeState::kUnopened) {
-      entity->state = NodeState::kOpening;
-      RunExpansionThread(new ExpandTreeExplorerThread(
-          d->generator, d->version_number, child_key->first, child_depth));
-
-    // This node is already open, go and work on its children.
-    } else if (entity->state == NodeState::kOpened &&
-               1u < child_depth) {
-      for (auto grandchild_key : d->Children(entity)) {
-        todo.emplace_back(grandchild_key, child_depth - 1u);
-      }
-    
-    // If we hit a duplicate, try to expand the original.
-    } else if (entity->state == NodeState::kDuplicate) {
-      --i;
-      todo[i].first = d->child_keys[entity->alias_index];
-    }
   }
 }
 
-//! Install a new generator to back the data of this model.
 void TreeExplorerModel::InstallGenerator(
     std::shared_ptr<ITreeGenerator> generator_) {
 
   CancelRunningRequest();
 
   emit beginResetModel();
-  d->version_number->fetch_add(1u);
-  d->num_pending_requests = 0;
+
   d->generator = std::move(generator_);
-  d->node_data.clear();
-  d->entity_to_node.clear();
-  d->aliased_entity_to_key.clear();
-  d->child_keys.clear();
-  d->redundant_keys.clear();
-  d->num_columns = d->generator->NumColumns();
-  d->root_node.parent_key = nullptr;
-  d->root_node.data_index = 0u;
-  d->root_node.child_index = 0u;
-  d->root_node.sibling_index = 0u;
-  d->root_node.num_children = 0;
-  d->root_node.state = NodeState::kUnopened;
-  d->import_timer.stop();
-  d->data_batch_queue.clear();
+  d->column_count = static_cast<std::size_t>(d->generator->NumColumns());
+  d->version_number.fetch_add(1u);
+
+  InitializeContext(d->context);
+
   emit endResetModel();
 
   // Start a request to fetch the name of this tree.
   d->tree_name_future = QtConcurrent::run(
       [gen = d->generator](void) -> QString { return gen->TreeName(gen); });
+
   d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
-  Expand(QModelIndex(), 2u);
+  // Mark the internal root item as "opening", then start the
+  // expansion task
+  auto root_node_ptr = GetNodeFromID(d->context, kRootNodeID);
+  if (root_node_ptr == nullptr) {
+    qDebug() << "The internal root node is missing";
+    return;
+  }
+
+  auto &root_node = *root_node_ptr;
+  root_node.state = Context::Node::State::Opening;
+
+  RunExpansionThread(new InitTreeExplorerThread(d->generator, d->version_number,
+                                                kInvalidEntityId, 2u));
+}
+
+void TreeExplorerModel::Expand(const QModelIndex &index,
+                               const std::size_t &depth) {
+
+  // Skip if this is the root item or if we don't need to do
+  // any expansion
+  if (depth == 0 || !index.isValid()) {
+    return;
+  }
+
+  // Get the node
+  auto node_id = static_cast<Context::Node::ID>(index.internalId());
+
+  auto opt_dereferenced_node_id = DereferenceNodeID(d->context, node_id);
+  if (!opt_dereferenced_node_id.has_value()) {
+    // This is a deduplicated node, but we can't access it yet
+    return;
+  }
+
+  node_id = opt_dereferenced_node_id.value();
+
+  auto node_ptr = GetNodeFromID(d->context, node_id);
+  if (node_ptr == nullptr) {
+    return;
+  }
+
+  auto &node = *node_ptr;
+
+  // Handle the expansion request, depending on its state:
+  // Unopened: Process the expansion directly
+  // Opened: Forward to the child nodes
+  // Opening: Skip, someone else is already handling it
+  switch (node.state) {
+    case Context::Node::State::Unopened:
+      node.state = Context::Node::State::Opening;
+
+      RunExpansionThread(new ExpandTreeExplorerThread(
+          d->generator, d->version_number, node.data.entity_id,
+          static_cast<unsigned>(depth)));
+
+      break;
+
+    case Context::Node::State::Opened: {
+      auto next_depth = depth - 1;
+
+      for (auto child_node_id : node.child_node_id_list) {
+        opt_dereferenced_node_id = DereferenceNodeID(d->context, child_node_id);
+        if (!opt_dereferenced_node_id.has_value()) {
+          // This is a deduplicated node, but we can't access it yet
+          continue;
+        }
+
+        child_node_id = opt_dereferenced_node_id.value();
+
+        auto child_node_index =
+            GetModelIndexFromNodeID(d->context, child_node_id, 0);
+
+        Expand(child_node_index, next_depth);
+      }
+
+      break;
+    }
+
+    case Context::Node::State::Opening: break;
+  }
+}
+
+QModelIndex TreeExplorerModel::Deduplicate(const QModelIndex &index) {
+  // Get the node ID, and ignore the root item (both the qt one
+  // and our internal one)
+  if (!index.isValid()) {
+    return QModelIndex();
+  }
+
+  auto node_id = static_cast<Context::Node::ID>(index.internalId());
+  if (node_id == kRootNodeID) {
+    return QModelIndex();
+  }
+
+  // Get the node
+  auto node_ptr = GetNodeFromID(d->context, node_id);
+  if (node_ptr == nullptr) {
+    return QModelIndex();
+  }
+
+  const auto &node = *node_ptr;
+
+  // If this node is aliasing another one, then return the destination
+  // index
+  if (!node.opt_aliased_entity_id.has_value()) {
+    return QModelIndex();
+  }
+
+  const auto &aliased_entity_id = node.opt_aliased_entity_id.value();
+
+  auto opt_aliased_node_id =
+      GetNodeIDFromEntityID(d->context, aliased_entity_id);
+
+  if (!opt_aliased_node_id.has_value()) {
+    return QModelIndex();
+  }
+
+  const auto &aliased_node_id = opt_aliased_node_id.value();
+  return GetModelIndexFromNodeID(d->context, aliased_node_id, 0);
 }
 
 QModelIndex TreeExplorerModel::index(int row, int column,
@@ -350,56 +248,94 @@ QModelIndex TreeExplorerModel::index(int row, int column,
     return QModelIndex();
   }
 
-  Node *entity = nullptr;
-  if (auto entity_key = d->NodeKeyFrom(parent)) {
-    entity = &(entity_key->second);  // Internal node.
-  } else {
-    entity = &(d->root_node);
+  // Get the Node ID for the parent. If the `parent` model index is not
+  // valid, then we'll use our internal root item
+  Context::Node::ID parent_node_id{kRootNodeID};
+  if (parent.isValid()) {
+    parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
   }
 
-  if (NodeState::kUnopened == entity->state || row >= entity->num_children) {
+  // Attempt to get the parent node
+  auto parent_node_ptr = GetNodeFromID(d->context, parent_node_id);
+  if (parent_node_ptr == nullptr) {
     return QModelIndex();
   }
 
-  NodeKey *child_key =
-      d->child_keys[entity->child_index + static_cast<unsigned>(row)];
-  return createIndex(row, column, static_cast<const void *>(child_key));
+  const auto &parent_node = *parent_node_ptr;
+
+  // Now look for the Nth item in the child_node_id_list vector
+  auto child_node_id_list =
+      std::next(parent_node.child_node_id_list.begin(), row);
+
+  if (child_node_id_list == parent_node.child_node_id_list.end()) {
+    return QModelIndex();
+  }
+
+  const auto &child_node_id = *child_node_id_list;
+  return GetModelIndexFromNodeID(d->context, child_node_id, column);
 }
 
 QModelIndex TreeExplorerModel::parent(const QModelIndex &child) const {
-  auto [entity_id, entity] = d->NodeFrom(child);
-  if (!entity) {
+  // Return an empty QModelIndex if `child` is already the Qt root
+  if (!child.isValid()) {
     return QModelIndex();
   }
 
-  return d->ToIndex(this, entity->parent_key);
+  // Attempt to get the node; node ID 0 is reserved for our internal
+  // root item
+  auto node_id = static_cast<Context::Node::ID>(child.internalId());
+  if (node_id == 0) {
+    return QModelIndex();
+  }
+
+  auto node_ptr = GetNodeFromID(d->context, node_id);
+  if (node_ptr == nullptr) {
+    return QModelIndex();
+  }
+
+  const auto &node = *node_ptr;
+
+  // Create a new QModelIndex for the parent
+  if (node.parent_node_id == kRootNodeID) {
+    return QModelIndex();
+  }
+
+  return GetModelIndexFromNodeID(d->context, node.parent_node_id, 0);
 }
 
 int TreeExplorerModel::rowCount(const QModelIndex &parent) const {
+  // Return no rows if the column is incorrect
   if (parent.column() > 0) {
     return 0;
   }
 
-  int row_count = d->root_node.num_children;
+  // Get the parent node id
+  Context::Node::ID parent_node_id{kRootNodeID};
   if (parent.isValid()) {
-    row_count = 0;
-    if (auto entity = d->NodeFrom(parent).second) {
-      row_count = entity->num_children;
-    }
+    parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
   }
 
-  return row_count;
+  // Get the parent node
+  auto parent_node_ptr = GetNodeFromID(d->context, parent_node_id);
+  if (parent_node_ptr == nullptr) {
+    return 0;
+  }
+
+  const auto &parent_node = *parent_node_ptr;
+
+  // Return the child count
+  return static_cast<int>(parent_node.child_node_id_list.size());
 }
 
 int TreeExplorerModel::columnCount(const QModelIndex &) const {
-  return d->num_columns;
+  return static_cast<int>(d->column_count);
 }
 
 QVariant TreeExplorerModel::headerData(int section, Qt::Orientation orientation,
                                        int role) const {
 
   if (orientation != Qt::Horizontal || role != Qt::DisplayRole || section < 0 ||
-      section >= d->num_columns) {
+      section >= static_cast<int>(d->column_count)) {
     return QVariant();
   }
 
@@ -407,318 +343,521 @@ QVariant TreeExplorerModel::headerData(int section, Qt::Orientation orientation,
 }
 
 QVariant TreeExplorerModel::data(const QModelIndex &index, int role) const {
-  QVariant value;
-
-  NodeKey *entity_key = d->NodeKeyFrom(index);
-  if (!entity_key) {
-    return value;
+  // The Qt root has no data
+  if (!index.isValid()) {
+    return QVariant();
   }
 
-  Node *entity = &(entity_key->second);
+  // Validate the column number
+  if (index.column() >= static_cast<int>(d->column_count)) {
+    return QVariant();
+  }
 
-  const NodeData &data =
-      d->node_data[entity->data_index + static_cast<unsigned>(index.column())];
+  // Attempt to get the node id
+  auto node_id = static_cast<Context::Node::ID>(index.internalId());
+  if (node_id == kRootNodeID) {
+    return QVariant();
+  }
 
-  if (role == Qt::DisplayRole) {
-    if (std::holds_alternative<QString>(data)) {
-      value.setValue(std::get<QString>(data));
+  // Attempt to get the node
+  auto node_ptr = GetNodeFromID(d->context, node_id);
+  if (node_ptr == nullptr) {
+    return QVariant();
+  }
 
-    } else if (std::holds_alternative<TextAndTokenRange>(data)) {
-      value.setValue(std::get<TextAndTokenRange>(data).first);
+  const auto &node = *node_ptr;
 
-    } else {
-      value = std::get<QVariant>(data);
-    }
+  // Locate the required column
+  auto column_value_list_it =
+      std::next(node.data.column_value_list.begin(), index.column());
 
-    // Tooltip used for hovering. Also, this is used for the copy details.
-  } else if (role == Qt::ToolTipRole) {
-    QString tooltip = tr("Entity id: ") + QString::number(entity_key->first);
+  if (column_value_list_it == node.data.column_value_list.end()) {
+    return QVariant();
+  }
 
-    for (int i = 0; i < d->num_columns; ++i) {
-      const NodeData &col_data =
-          d->node_data[entity->data_index + static_cast<unsigned>(i)];
-      if (std::holds_alternative<QVariant>(data)) {
-        continue;
+  const auto &column_value = *column_value_list_it;
+
+  // Return the requested data role
+  QVariant value;
+
+  switch (role) {
+    case Qt::DisplayRole: {
+      if (column_value.canConvert<QString>()) {
+        value = column_value;
+
+      } else if (column_value.canConvert<TokenRange>()) {
+        const auto &token_range = column_value.value<TokenRange>();
+
+        const auto &token_range_string_view = token_range.data();
+        auto token_range_string_view_size =
+            static_cast<qsizetype>(token_range_string_view.size());
+
+        auto as_string_value = QString::fromUtf8(token_range_string_view.data(),
+                                                 token_range_string_view_size);
+        value.setValue(as_string_value);
       }
 
-      tooltip += "\n" + d->generator->ColumnTitle(i) + ": ";
-      if (std::holds_alternative<QString>(col_data)) {
-        tooltip += std::get<QString>(col_data);
+      break;
+    }
 
-      } else if (std::holds_alternative<TextAndTokenRange>(col_data)) {
-        tooltip += std::get<TextAndTokenRange>(col_data).first;
+    case Qt::ToolTipRole: {
+      auto tooltip =
+          tr("Entity id: ") + QString::number(node.data.entity_id) + "\n";
+
+      for (std::size_t i{}; i < d->column_count; ++i) {
+        QString column_name;
+        if (auto column_name_var = headerData(static_cast<int>(i),
+                                              Qt::Horizontal, Qt::DisplayRole);
+            column_name_var.canConvert<QString>()) {
+          column_name = column_name_var.toString();
+        }
+
+        if (column_name.isEmpty()) {
+          column_name = tr("Column #") + QString::number(i);
+        }
+
+        QString column_display_role;
+        if (const auto &column_value_var = node.data.column_value_list[i];
+            column_value_var.canConvert<QString>()) {
+          column_display_role = column_value_var.toString();
+        }
+
+        if (column_display_role.isEmpty()) {
+          column_display_role = tr("<null>");
+        }
+
+        tooltip += column_name + ": " + column_display_role + "\n";
       }
-    }
-    value.setValue(tooltip);
 
-  } else if (role == ITreeExplorerModel::EntityIdRole) {
-    value.setValue(entity_key->first);
-
-  } else if (role == ITreeExplorerModel::TokenRangeRole) {
-    if (std::holds_alternative<TextAndTokenRange>(data)) {
-      value.setValue(std::get<TextAndTokenRange>(data).second);
+      value.setValue(tooltip);
+      break;
     }
 
-  } else if (role == ITreeExplorerModel::CanBeExpanded) {
-    value.setValue(NodeState::kUnopened == entity->state);
+    case ITreeExplorerModel::EntityIdRole:
+      value.setValue(node.data.entity_id);
+      break;
 
-  } else if (role == ITreeExplorerModel::IsDuplicate) {
-    value.setValue(NodeState::kDuplicate == entity->state);
+    case ITreeExplorerModel::TokenRangeRole: {
+      if (column_value.canConvert<TokenRange>()) {
+        value.setValue(column_value);
+      }
+
+      break;
+    }
+
+    case ITreeExplorerModel::CanBeExpanded: {
+      auto can_be_expanded = node.state == Context::Node::State::Unopened;
+      value.setValue(can_be_expanded);
+
+      break;
+    }
+
+    case ITreeExplorerModel::IsDuplicate: {
+      auto is_duplicate = node.opt_aliased_entity_id.has_value();
+      value.setValue(is_duplicate);
+
+      break;
+    }
+
+    default: break;
   }
 
   return value;
 }
 
-//! Called when the tree title has been resolved.
 void TreeExplorerModel::OnNameResolved(void) {
   if (d->tree_name_future.isCanceled()) {
     return;
   }
 
-  emit TreeNameChanged(d->tree_name_future.takeResult());
+  auto tree_name = d->tree_name_future.takeResult();
+  d->tree_name_future = {};
+
+  emit TreeNameChanged(tree_name);
 }
 
 void TreeExplorerModel::CancelRunningRequest() {
-  d->tree_name_future.cancel();
-  d->tree_name_future.waitForFinished();
-  d->tree_name_future = {};
-
-  if (!d->num_pending_requests && d->data_batch_queue.empty()) {
-    return;
+  if (d->tree_name_future.isRunning()) {
+    d->tree_name_future.cancel();
+    d->tree_name_future_watcher.waitForFinished();
+    d->tree_name_future = {};
   }
 
-  d->version_number->fetch_add(1u);
-  d->num_pending_requests = 0;
+  d->version_number.fetch_add(1u);
+  d->thread_pool.waitForDone();
+
   d->import_timer.stop();
-  d->data_batch_queue.clear();
+  d->context.incoming_subtree_list.clear();
+
   emit RequestFinished();
 }
 
-//! Notify us when there's a batch of new data to update.
 void TreeExplorerModel::OnNewTreeItems(
     uint64_t version_number, RawEntityId parent_entity_id,
     QList<std::shared_ptr<ITreeItem>> child_items, unsigned remaining_depth) {
 
-  if (version_number != d->version_number->load()) {
+  // Ensure this is coming from our current generator
+  if (version_number != d->version_number.load()) {
     return;
   }
 
-  d->num_pending_requests -= 1;
-  d->data_batch_queue.emplaceBack(d->NodeKeyFromId(parent_entity_id),
-                                  std::move(child_items), remaining_depth);
-}
+  // Determine where we have to insert our new nodes; if we get
+  // the magic number kInvalidEntityId, then insert at the
+  // internal tree root
+  Context::Node::ID parent_node_id{kRootNodeID};
 
-// Go get all of our data for this node.
-void TreeExplorerModel::PrivateData::ImportData(
-    Node *new_node, const std::shared_ptr<ITreeItem> &item) {
+  if (parent_entity_id != kInvalidEntityId) {
+    auto opt_parent_node_id =
+        GetNodeIDFromMxEntityID(d->context, parent_entity_id);
 
-  new_node->data_index = static_cast<unsigned>(node_data.size());
-
-  for (auto i = 0; i < num_columns; ++i) {
-    QVariant col_data = item->Data(i);
-    if (col_data.canConvert<QString>()) {
-      node_data.emplace_back(col_data.toString());
-
-    } else if (col_data.canConvert<TokenRange>()) {
-      TokenRange tok_range = col_data.value<TokenRange>();
-      auto char_data = tok_range.data();
-      node_data.emplace_back(TextAndTokenRange{
-          QString::fromUtf8(char_data.data(),
-                            static_cast<qsizetype>(char_data.size())),
-          std::move(tok_range)});
-
-    } else {
-      node_data.emplace_back(std::move(col_data));
+    if (!opt_parent_node_id.has_value()) {
+      return;
     }
+
+    parent_node_id = opt_parent_node_id.value();
   }
+
+  // Save this data into the incoming subtree list
+  Context::Subtree subtree;
+  subtree.parent_node_id = parent_node_id;
+  subtree.remaining_depth = static_cast<std::size_t>(remaining_depth);
+
+  subtree.tree_item_list.insert(subtree.tree_item_list.end(),
+                                std::make_move_iterator(child_items.begin()),
+                                std::make_move_iterator(child_items.end()));
+
+  d->context.incoming_subtree_list.push_back(std::move(subtree));
 }
 
 void TreeExplorerModel::ProcessDataBatchQueue() {
+  ImportIncomingSubtreeList(d->context, kMaxBatchSize);
+}
 
-  // Recursive requests for loading more items.
-  std::vector<std::pair<NodeKey *, unsigned>> load_keys;
+void TreeExplorerModel::InitializeContext(Context &context) {
+  // clang-format off
+  static const Context::Node kRootTreeNode{
+    // Node::node_id
+    kRootNodeID,
+    
+    // Node::parent_node_id
+    kRootNodeID,
 
-  // Count how many items we've imported so that we can batch them across
-  // timer events.
-  int num_imported = 0;
+    // Node::child_node_id_list
+    {},
 
-  Node *const root_entity = &(d->root_node);
+    // Node::row
+    0,
 
-  while (!d->data_batch_queue.empty()) {
-    DataBatch &batch = d->data_batch_queue.front();
+    // Node::opt_aliased_entity_id
+    std::nullopt,
 
-    // The parent for this batch already has children.
-    Node *parent_entity = batch.parent_key ? &(batch.parent_key->second) :
-                          root_entity;
+    // Node::state
+    Context::Node::State::Unopened,
 
-    // We've already loaded the children for this parent.
-    if (NodeState::kOpening != parent_entity->state) {
-      continue;
+    // Node::data
+    {
+      // Node::Data::entity_name
+      { tr("ROOT") },
+
+      // Node::Data::entity_id
+      kInvalidEntityId,
     }
+  };
+  // clang-format on
 
-    // No children were found; mark the parent as having no children.
-    if (batch.child_items.empty()) {
-      parent_entity->state = NodeState::kOpened;
-      d->data_batch_queue.pop_front();
-      continue;
-    }
+  context = {};
+  context.tree.insert({kRootNodeID, kRootTreeNode});
+}
 
-    // If we already have this pointer, then we're resuming adding children
-    // to `parent_entity` after we previous hit our batch size limit and
-    // deferred further adding until another timer interval.
-    if (!batch.index_ptr) {
-      batch.index_ptr = &(parent_entity->child_index);
-    }
+TreeExplorerModel::Context::Node::ID
+TreeExplorerModel::GenerateNodeID(TreeExplorerModel::Context &context) {
+  return ++context.node_id_generator;
+}
 
-    int num_imported_children = 0;
-    while (!batch.child_items.empty()) {
+TreeExplorerModel::Context::Node *TreeExplorerModel::GetNodeFromID(
+    TreeExplorerModel::Context &context,
+    const TreeExplorerModel::Context::Node::ID &node_id) {
 
-      auto item = std::move(batch.child_items.front());
-      batch.child_items.pop_front();
-
-      const RawEntityId eid = item->EntityId();
-      if (eid == kInvalidEntityId) {
-        continue;
-      }
-
-      // Now create the node key. If this is the first time we're seeing the
-      // node, then the node key is in our `entity_to_node` map; otherwise we
-      // make a redundant key in `redundant_keys`.
-      NodeKey *curr_key = nullptr;
-      auto [node_it, added] =
-          d->entity_to_node.try_emplace(eid, batch.parent_key);
-      NodeKey *load_key = &*node_it;
-      if (added) {
-        curr_key = load_key;
-
-        // Even though this is a new node, link it to a prior node. This is to
-        // allow us to reprepresent another form of equivalence to the
-        // deduplication mechanism, i.e. that one declaration may be a
-        // redeclaration of another one.
-        const RawEntityId aliased_eid = item->AliasedEntityId();
-        if (aliased_eid != kInvalidEntityId && aliased_eid != eid) {
-          NodeKey *&alias_key = d->aliased_entity_to_key[aliased_eid];
-
-          if (!alias_key) {
-            auto alias_it = d->entity_to_node.find(aliased_eid);
-            if (alias_it != d->entity_to_node.end()) {
-              load_key = &*alias_it;
-              alias_key = load_key;
-            } else {
-              alias_key = curr_key;  // Store for future dedup.
-            }
-          } else {
-            load_key = alias_key;
-          }
-
-          // An existing thing notifies us of this alias.
-        } else if (auto alias_it = d->aliased_entity_to_key.find(eid);
-                   alias_it != d->aliased_entity_to_key.end()) {
-          load_key = alias_it->second;
-        }
-
-      } else {
-        curr_key =
-            &(d->redundant_keys.emplace_back(eid, Node{batch.parent_key}));
-      }
-
-      Node *const new_node = &(curr_key->second);
-
-      if (load_key != curr_key) {
-        new_node->state = NodeState::kDuplicate;
-      }
-
-      // Queue up recursive load requests for children.
-      if (batch.remaining_depth &&
-          NodeState::kUnopened == load_key->second.state) {
-        load_keys.emplace_back(load_key, batch.remaining_depth);
-      }
-
-      // Make the node point to itself, and update the parent child index or
-      // previous sibling's next sibling index.
-      new_node->alias_index = static_cast<unsigned>(d->child_keys.size());
-
-      // Make the prior node's `sibling_index`, or the parent node's
-      // `child_index` point to this node key pointer in `d->child_keys`.
-      *(batch.index_ptr) = new_node->alias_index;
-
-      // Possibly make the node point to its alias.
-      new_node->alias_index = load_key->second.alias_index;
-
-      d->child_keys.emplace_back(curr_key);
-      batch.index_ptr = &(new_node->sibling_index);
-
-      // If this is a new node, then import the data, otherwise reference the
-      // existing data.
-      if (added) {
-        d->ImportData(new_node, item);
-      } else {
-        new_node->data_index = load_key->second.data_index;
-      }
-
-      ++num_imported_children;
-      ++num_imported;
-
-      if (kMaxBatchSize <= num_imported) {
-        break;
-      }
-    }
-
-    // End each list of children with a dummy node, so that we can use the
-    // sibling iterator to get a node's index.
-    *(batch.index_ptr) = static_cast<unsigned>(d->child_keys.size());
-
-    // We didn't end up importing anything.
-    if (!num_imported_children) {
-      parent_entity->state = NodeState::kOpened;
-      d->data_batch_queue.pop_front();
-      continue;
-    }
-
-    // Update the number of children of the parent.
-    emit beginInsertRows(
-        d->ToIndex(this, batch.parent_key),
-        parent_entity->num_children,
-        parent_entity->num_children + num_imported_children - 1);
-
-    parent_entity->num_children += num_imported_children;
-
-    emit endInsertRows();
-
-    if (batch.child_items.empty()) {
-      parent_entity->state = NodeState::kOpened;
-      d->data_batch_queue.pop_front();
-    }
-
-    if (kMaxBatchSize <= num_imported) {
-      break;
-    }
+  auto tree_it = context.tree.find(node_id);
+  if (tree_it == context.tree.end()) {
+    return nullptr;
   }
 
-  bool has_remaining = !d->data_batch_queue.empty() || !load_keys.empty() ||
-                       0 < d->num_pending_requests;
+  auto &node = tree_it->second;
+  return &node;
+}
 
-  // Queue up workers to go and recursively expand.
-  for (auto [new_parent, remaining_depth] : load_keys) {
-    if (NodeState::kUnopened == new_parent->second.state) {
-      new_parent->second.state = NodeState::kOpening;
-      RunExpansionThread(new ExpandTreeExplorerThread(
-          d->generator, d->version_number, new_parent->first, remaining_depth));
-    }
+std::optional<TreeExplorerModel::Context::Node::ID>
+TreeExplorerModel::GetNodeIDFromMxEntityID(
+    const TreeExplorerModel::Context &context, const RawEntityId &entity_id) {
+
+  auto mx_entity_id_to_node_id_it =
+      context.mx_entity_id_to_node_id.find(entity_id);
+
+  if (mx_entity_id_to_node_id_it == context.mx_entity_id_to_node_id.end()) {
+    return std::nullopt;
   }
 
-  // Restart the timer, so that the import procedure will fire again
-  // in kImportInterval msecs from the end of the previous batch.
-  if (has_remaining) {
-    if (!d->import_timer.isActive()) {
-      d->import_timer.start(kImportInterval);
-    }
+  return mx_entity_id_to_node_id_it->second;
+}
+
+QModelIndex TreeExplorerModel::GetModelIndexFromNodeID(
+    TreeExplorerModel::Context &context,
+    const TreeExplorerModel::Context::Node::ID &node_id,
+    const int &column) const {
+
+  auto node_ptr = GetNodeFromID(context, node_id);
+  if (node_ptr == nullptr) {
+    return QModelIndex();
+  }
+
+  const auto &node = *node_ptr;
+  return createIndex(node.row, column,
+                     static_cast<unsigned long long int>(node_id));
+}
+
+void TreeExplorerModel::ImportIncomingSubtreeList(
+    Context &context, const std::size_t &max_subtree_count) {
+
+  // Slice the exact amount of subtrees that we need to import
+  if (context.incoming_subtree_list.empty()) {
+    return;
+  }
+
+  Context::SubtreeList incoming_subtree_list;
+
+  if (max_subtree_count >= context.incoming_subtree_list.size()) {
+    incoming_subtree_list = std::move(context.incoming_subtree_list);
+    context.incoming_subtree_list.clear();
 
   } else {
-    d->import_timer.stop();
+    auto subtree_count = static_cast<int>(context.incoming_subtree_list.size() -
+                                          max_subtree_count);
+
+    auto start_it =
+        std::next(context.incoming_subtree_list.begin(), subtree_count);
+
+    auto end_it = context.incoming_subtree_list.end();
+
+    incoming_subtree_list.insert(incoming_subtree_list.end(),
+                                 std::make_move_iterator(start_it),
+                                 std::make_move_iterator(end_it));
+
+    context.incoming_subtree_list.erase(start_it, end_it);
+  }
+
+  // Go through each one of the subtrees that we need to import
+  for (auto subtree_it = incoming_subtree_list.rbegin();
+       subtree_it != incoming_subtree_list.rend(); ++subtree_it) {
+
+    auto &subtree = *subtree_it;
+
+    // Get the parent node
+    auto parent_node_ptr = GetNodeFromID(context, subtree.parent_node_id);
+    if (parent_node_ptr == nullptr) {
+      continue;
+    }
+
+    auto &parent_node = *parent_node_ptr;
+
+    // Ignore this subtree if we are already expanding it or if we know
+    // that it is a duplicate
+    if (parent_node.state != Context::Node::State::Opening ||
+        parent_node.opt_aliased_entity_id.has_value()) {
+      continue;
+    }
+
+    // This incoming parent node may be empty; if that is the case, there's
+    // not much else we need to do other than just updating its state
+    if (subtree.tree_item_list.empty()) {
+      parent_node.state = Context::Node::State::Opened;
+      continue;
+    }
+
+    // Clean up the item list
+    //! \todo Actually fix the data publisher and prevent it from emitting
+    //        invalid items. We have to do this work here because the model
+    //        verifier expects beginInsert/endInsert blocks as a transaction
+    for (auto tree_item_list_it = subtree.tree_item_list.begin();
+         tree_item_list_it != subtree.tree_item_list.end();) {
+
+      auto &tree_item = *tree_item_list_it;
+
+      if (tree_item->EntityId() == kInvalidEntityId) {
+        tree_item_list_it = subtree.tree_item_list.erase(tree_item_list_it);
+      } else {
+        ++tree_item_list_it;
+      }
+    }
+
+    // Get the model index for the parent node
+    QModelIndex parent_node_index;
+    if (parent_node.node_id != kRootNodeID) {
+      parent_node_index =
+          GetModelIndexFromNodeID(context, parent_node.node_id, 0);
+
+      if (!parent_node_index.isValid()) {
+        continue;
+      }
+    }
+
+    // Start publishing the tree changes before we change any of the nodes
+    auto first_added_row =
+        static_cast<int>(parent_node.child_node_id_list.size());
+
+    auto last_added_row = static_cast<int>(subtree.tree_item_list.size() - 1);
+
+    emit beginInsertRows(parent_node_index, first_added_row, last_added_row);
+
+    // Go through all the child nodes in the subtree, and actually import
+    // them into our model
+    std::vector<Context::Node::ID> processed_node_id_list;
+
+    for (auto &tree_item : subtree.tree_item_list) {
+      // Create a new node for this ITreeItem
+      auto node_id = GenerateNodeID(context);
+      processed_node_id_list.push_back(node_id);
+
+      Context::Node node{};
+      node.node_id = node_id;
+      node.parent_node_id = parent_node.node_id;
+      node.row = static_cast<int>(parent_node.child_node_id_list.size());
+      node.data.entity_id = tree_item->EntityId();
+      node.state = Context::Node::State::Unopened;
+
+      // Update the entity id -> node id index; if we already have a
+      // a mapping, then we should mark this node as an alias for the
+      // existing one
+      auto insert_status = context.mx_entity_id_to_node_id.insert(
+          {node.data.entity_id, node.node_id});
+
+      auto is_duplicate = !insert_status.second;
+      if (is_duplicate) {
+        node.opt_aliased_entity_id = node.data.entity_id;
+
+      } else {
+        auto aliased_entity_id = tree_item->AliasedEntityId();
+
+        if (aliased_entity_id != kInvalidEntityId &&
+            aliased_entity_id != node.data.entity_id) {
+
+          insert_status = context.mx_entity_id_to_node_id.insert(
+              {aliased_entity_id, node.node_id});
+
+          is_duplicate = !insert_status.second;
+          if (is_duplicate) {
+            node.opt_aliased_entity_id = aliased_entity_id;
+          }
+        }
+      }
+
+      if (node.opt_aliased_entity_id.has_value()) {
+        node.state = Context::Node::State::Opened;
+      }
+
+      // Save all the generated columns
+      for (std::size_t i{}; i < d->column_count; ++i) {
+        auto column_value = tree_item->Data(static_cast<int>(i));
+        node.data.column_value_list.push_back(std::move(column_value));
+      }
+
+      // Insert the new node into our tree, then update the parent
+      context.tree.insert({node_id, std::move(node)});
+      parent_node.child_node_id_list.push_back(node_id);
+    }
+
+    // Close the row insert transaction
+    emit endInsertRows();
+
+    // We may still have additional expansion tasks to queue
+    if (subtree.remaining_depth > 0) {
+      // Go through all the nodes we processed
+      for (auto processed_node_id : processed_node_id_list) {
+        // Get the node
+        auto opt_dereferenced_node_id =
+            DereferenceNodeID(context, processed_node_id);
+
+        if (!opt_dereferenced_node_id.has_value()) {
+          // This is a deduplicated node, but we can't access it yet
+          continue;
+        }
+
+        processed_node_id = opt_dereferenced_node_id.value();
+
+        auto node_ptr = GetNodeFromID(context, processed_node_id);
+        if (node_ptr == nullptr) {
+          continue;
+        }
+
+        // Start a new expansion thread for this node
+        auto &node = *node_ptr;
+        if (node.state != Context::Node::State::Unopened) {
+          continue;
+        }
+
+        if (node.data.entity_id == kInvalidEntityId) {
+          continue;
+        }
+
+        node.state = Context::Node::State::Opening;
+
+        RunExpansionThread(new ExpandTreeExplorerThread(
+            d->generator, d->version_number, node.data.entity_id,
+            static_cast<unsigned>(subtree.remaining_depth)));
+      }
+    }
+
+    processed_node_id_list.clear();
+  }
+
+  // Restart the timer, ensuring we wait kImportInterval msecs from
+  // the end of the last data import
+  d->import_timer.start(kImportInterval);
+
+  // Emit the RequestFinished signal, if applicable
+  if (d->thread_pool.activeThreadCount() == 0 &&
+      context.incoming_subtree_list.empty()) {
     emit RequestFinished();
   }
 }
 
+std::optional<TreeExplorerModel::Context::Node::ID>
+TreeExplorerModel::DereferenceNodeID(const Context &context,
+                                     Context::Node::ID node_id) {
+
+  for (;;) {
+    auto tree_it = context.tree.find(node_id);
+    if (tree_it == context.tree.end()) {
+      return node_id;
+    }
+
+    const auto &node = tree_it->second;
+    if (!node.opt_aliased_entity_id.has_value()) {
+      return node_id;
+    }
+
+    auto opt_node_id =
+        GetNodeIDFromEntityID(context, node.opt_aliased_entity_id.value());
+
+    if (!opt_node_id.has_value()) {
+      return std::nullopt;
+    }
+
+    node_id = opt_node_id.value();
+  }
+}
+
+std::optional<TreeExplorerModel::Context::Node::ID>
+TreeExplorerModel::GetNodeIDFromEntityID(
+    const TreeExplorerModel::Context &context, const RawEntityId &entity_id) {
+
+  auto node_id_it = context.mx_entity_id_to_node_id.find(entity_id);
+  if (node_id_it == context.mx_entity_id_to_node_id.end()) {
+    return std::nullopt;
+  }
+
+  const auto &node_id = node_id_it->second;
+  return node_id;
+}
 
 }  // namespace mx::gui

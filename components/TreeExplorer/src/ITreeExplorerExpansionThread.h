@@ -17,8 +17,6 @@
 
 namespace mx::gui {
 
-using VersionNumber = std::shared_ptr<std::atomic<uint64_t>>;
-
 class ITreeExplorerExpansionThread : public QObject, public QRunnable {
   Q_OBJECT
 
@@ -30,7 +28,7 @@ class ITreeExplorerExpansionThread : public QObject, public QRunnable {
   virtual ~ITreeExplorerExpansionThread(void);
   explicit ITreeExplorerExpansionThread(
       std::shared_ptr<ITreeGenerator> generator_,
-      const VersionNumber &version_number, RawEntityId parent_entity_id,
+      const std::atomic_uint64_t &version_number, RawEntityId parent_entity_id,
       unsigned depth);
 
  signals:
@@ -41,17 +39,17 @@ class ITreeExplorerExpansionThread : public QObject, public QRunnable {
 
 struct ITreeExplorerExpansionThread::ThreadData {
   const std::shared_ptr<ITreeGenerator> generator;
-  const VersionNumber version_number;
+  const std::atomic_uint64_t &version_number;
   const uint64_t captured_version_number;
   const RawEntityId parent_entity_id;
   const unsigned depth;
 
   inline ThreadData(std::shared_ptr<ITreeGenerator> generator_,
-                    const VersionNumber &version_number_,
+                    const std::atomic_uint64_t &version_number_,
                     RawEntityId parent_entity_id_, unsigned depth_)
       : generator(std::move(generator_)),
         version_number(version_number_),
-        captured_version_number(version_number->load()),
+        captured_version_number(version_number.load()),
         parent_entity_id(parent_entity_id_),
         depth(depth_) {}
 };
