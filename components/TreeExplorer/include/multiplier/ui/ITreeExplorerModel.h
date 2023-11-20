@@ -51,10 +51,10 @@ class ITreeExplorerModel : public QAbstractItemModel {
   virtual void InstallGenerator(std::shared_ptr<ITreeGenerator> generator_) = 0;
 
   //! Expand starting at the model index, going up to `depth` levels deep.
-  virtual void Expand(const QModelIndex &, unsigned depth) = 0;
+  virtual void Expand(const QModelIndex &index, const std::size_t &depth) = 0;
 
   //! Find the original version of an item.
-  virtual QModelIndex Deduplicate(const QModelIndex &) = 0;
+  virtual QModelIndex Deduplicate(const QModelIndex &index) = 0;
 
  public slots:
   //! Cancels any running request
