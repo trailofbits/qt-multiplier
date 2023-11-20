@@ -36,10 +36,18 @@ class ITreeExplorerModel : public QAbstractItemModel {
 
     //! Returns whether or not this row is a duplicate of another.
     IsDuplicate,
+
+    //! Returns the tree name
+    TreeNameRole,
   };
 
   //! Factory method.
   static ITreeExplorerModel *Create(QObject *parent = nullptr);
+
+  //! Creates a new model using the given one as a base, with `root_item`
+  //! as the new root
+  static ITreeExplorerModel *CreateFrom(const QModelIndex &root_item,
+                                        QObject *parent = nullptr);
 
   //! Constructor
   ITreeExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}
@@ -75,7 +83,7 @@ class ITreeExplorerModel : public QAbstractItemModel {
   void RequestFinished();
 
   //! Emitted when the tree's name has change.
-  void TreeNameChanged(const QString &new_name);
+  void TreeNameChanged();
 };
 
 }  // namespace mx::gui

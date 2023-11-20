@@ -16,4 +16,12 @@ ITreeExplorerModel *ITreeExplorerModel::Create(QObject *parent) {
   return new TreeExplorerModel(parent);
 }
 
+ITreeExplorerModel *ITreeExplorerModel::CreateFrom(const QModelIndex &root_item,
+                                                   QObject *parent) {
+  auto &internal_source_model =
+      *static_cast<const TreeExplorerModel *>(root_item.model());
+
+  return new TreeExplorerModel(internal_source_model, root_item, parent);
+}
+
 }  // namespace mx::gui

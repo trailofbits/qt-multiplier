@@ -172,8 +172,8 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   d->model = ITreeExplorerModel::Create(this);
 
-  connect(d->model, &ITreeExplorerModel::TreeNameChanged,
-          this, &QuickReferenceExplorer::OnTreeNameChanged);
+  connect(d->model, &ITreeExplorerModel::TreeNameChanged, this,
+          &QuickReferenceExplorer::OnTreeNameChanged);
 
   d->model->InstallGenerator(std::move(generator));
 
@@ -187,6 +187,9 @@ void QuickReferenceExplorer::InitializeWidgets(
 
   connect(d->reference_explorer, &PreviewableReferenceExplorer::ItemActivated,
           this, &QuickReferenceExplorer::ItemActivated);
+
+  connect(d->reference_explorer, &PreviewableReferenceExplorer::ExtractSubtree,
+          this, &QuickReferenceExplorer::ExtractSubtree);
 
   d->reference_explorer->setSizePolicy(QSizePolicy::Expanding,
                                        QSizePolicy::Expanding);
@@ -272,9 +275,20 @@ void QuickReferenceExplorer::SetBrowserMode(const bool &enabled) {
   d->reference_explorer->SetBrowserMode(enabled);
 }
 
-//! Called when the model resolves the new name of the tree.
-void QuickReferenceExplorer::OnTreeNameChanged(const QString &new_name) {
-  d->window_title->setText(new_name);
+void QuickReferenceExplorer::OnTreeNameChanged() {
+  QString tree_name;
+  if (auto tree_name_var =
+          d->model->data(QModelIndex(), ITreeExplorerModel::TreeNameRole);
+      tree_name_var.canConvert<QString>()) {
+
+    tree_name = tree_name_var.toString();
+  }
+
+  if (tree_name.isEmpty()) {
+    tree_name = tr("Unnamed Tree");
+  }
+
+  d->window_title->setText(tree_name);
 }
 
 }  // namespace mx::gui
