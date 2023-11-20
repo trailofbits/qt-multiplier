@@ -14,7 +14,7 @@ ITreeExplorerExpansionThread::~ITreeExplorerExpansionThread(void) {}
 
 ITreeExplorerExpansionThread::ITreeExplorerExpansionThread(
     std::shared_ptr<ITreeGenerator> generator_,
-    const VersionNumber &version_number, RawEntityId parent_entity_id,
+    const std::atomic_uint64_t &version_number, RawEntityId parent_entity_id,
     unsigned depth)
     : d(new ThreadData(std::move(generator_), version_number, parent_entity_id,
                        depth)) {
