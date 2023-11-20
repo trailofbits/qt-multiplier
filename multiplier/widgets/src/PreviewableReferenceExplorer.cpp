@@ -61,8 +61,16 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   connect(d->reference_explorer, &ITreeExplorer::ItemActivated, this,
           &PreviewableReferenceExplorer::ItemActivated);
 
+  connect(d->reference_explorer, &ITreeExplorer::ExtractSubtree, this,
+          &PreviewableReferenceExplorer::ExtractSubtree);
+
   connect(model, &QAbstractItemModel::rowsInserted, this,
           &PreviewableReferenceExplorer::OnRowsInserted);
+
+  connect(model, &ITreeExplorerModel::TreeNameChanged, this,
+          &PreviewableReferenceExplorer::OnTreeNameChanged);
+
+  OnTreeNameChanged();
 
   d->code_model =
       macro_explorer.CreateCodeModel(file_location_cache, index, true);
@@ -134,6 +142,25 @@ void PreviewableReferenceExplorer::OnRowsInserted() {
 
   auto first_item_index = Model()->index(0, 0);
   UpdateCodePreview(first_item_index);
+}
+
+
+void PreviewableReferenceExplorer::OnTreeNameChanged() {
+  auto model = d->reference_explorer->Model();
+
+  QString tree_name;
+  if (auto tree_name_var =
+          model->data(QModelIndex(), ITreeExplorerModel::TreeNameRole);
+      tree_name_var.canConvert<QString>()) {
+
+    tree_name = tree_name_var.toString();
+  }
+
+  if (tree_name.isEmpty()) {
+    tree_name = tr("Unnamed Tree");
+  }
+
+  setWindowTitle(tree_name);
 }
 
 void PreviewableReferenceExplorer::SetBrowserMode(const bool &enabled) {

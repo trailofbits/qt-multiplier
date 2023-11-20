@@ -17,12 +17,11 @@
 #include <QtConcurrent>
 #include <QDebug>
 
+#include <unordered_set>
+
 namespace mx::gui {
 
 namespace {
-
-//! The ID of the internal root item
-const TreeExplorerModel::Context::Node::ID kRootNodeID{1};
 
 //! Update timer used for first requests
 const int kFirstUpdateInterval{500};
@@ -41,9 +40,6 @@ struct TreeExplorerModel::PrivateData final {
 
   //! The active data generator.
   std::shared_ptr<ITreeGenerator> generator;
-
-  //! Column count, as returned by the generator
-  std::size_t column_count{};
 
   //! Version number of this model. This is incremented when we install a new
   //! generator.
@@ -65,10 +61,48 @@ struct TreeExplorerModel::PrivateData final {
   QThreadPool thread_pool;
 };
 
+const TreeExplorerModel::Context::Node::ID
+    TreeExplorerModel::Context::Node::kRootNodeID{1};
+
 TreeExplorerModel::TreeExplorerModel(QObject *parent)
     : ITreeExplorerModel(parent),
       d(new PrivateData) {
 
+  InitializeModel();
+}
+
+TreeExplorerModel::TreeExplorerModel(const TreeExplorerModel &source_model,
+                                     const QModelIndex &root_item,
+                                     QObject *parent)
+    : ITreeExplorerModel(parent),
+      d(new PrivateData) {
+
+  InitializeModel();
+
+  if (!root_item.isValid()) {
+    return;
+  }
+
+  auto root_node_id = static_cast<Context::Node::ID>(root_item.internalId());
+
+  const auto &source_context = source_model.d->context;
+  if (source_context.tree.count(root_node_id) == 0) {
+    return;
+  }
+
+  Context new_context;
+  if (ImportContextSubtree(new_context, source_context, root_node_id)) {
+    d->context = std::move(new_context);
+
+    d->generator = source_model.d->generator;
+    d->version_number = source_model.d->version_number.load();
+
+  } else {
+    InstallGenerator(d->generator);
+  }
+}
+
+void TreeExplorerModel::InitializeModel() {
   connect(&(d->tree_name_future_watcher),
           &QFutureWatcher<QFuture<QString>>::finished, this,
           &TreeExplorerModel::OnNameResolved);
@@ -109,10 +143,17 @@ void TreeExplorerModel::InstallGenerator(
   emit beginResetModel();
 
   d->generator = std::move(generator_);
-  d->column_count = static_cast<std::size_t>(d->generator->NumColumns());
   d->version_number.fetch_add(1u);
 
-  InitializeContext(d->context);
+  auto column_count = static_cast<std::size_t>(d->generator->NumColumns());
+
+  std::vector<QString> column_title_list;
+  for (auto i = 0; i < column_count; ++i) {
+    auto column_title = d->generator->ColumnTitle(i);
+    column_title_list.push_back(std::move(column_title));
+  }
+
+  InitializeContext(d->context, std::move(column_title_list));
 
   emit endResetModel();
 
@@ -124,7 +165,7 @@ void TreeExplorerModel::InstallGenerator(
 
   // Mark the internal root item as "opening", then start the
   // expansion task
-  auto root_node_ptr = GetNodeFromID(d->context, kRootNodeID);
+  auto root_node_ptr = GetNodeFromID(d->context, Context::Node::kRootNodeID);
   if (root_node_ptr == nullptr) {
     qDebug() << "The internal root node is missing";
     return;
@@ -139,7 +180,6 @@ void TreeExplorerModel::InstallGenerator(
 
 void TreeExplorerModel::Expand(const QModelIndex &index,
                                const std::size_t &depth) {
-
   // Skip if this is the root item or if we don't need to do
   // any expansion
   if (depth == 0 || !index.isValid()) {
@@ -199,7 +239,9 @@ void TreeExplorerModel::Expand(const QModelIndex &index,
       break;
     }
 
-    case Context::Node::State::Opening: break;
+    case Context::Node::State::Opening: {
+      break;
+    }
   }
 }
 
@@ -211,7 +253,7 @@ QModelIndex TreeExplorerModel::Deduplicate(const QModelIndex &index) {
   }
 
   auto node_id = static_cast<Context::Node::ID>(index.internalId());
-  if (node_id == kRootNodeID) {
+  if (node_id == Context::Node::kRootNodeID) {
     return QModelIndex();
   }
 
@@ -250,7 +292,7 @@ QModelIndex TreeExplorerModel::index(int row, int column,
 
   // Get the Node ID for the parent. If the `parent` model index is not
   // valid, then we'll use our internal root item
-  Context::Node::ID parent_node_id{kRootNodeID};
+  Context::Node::ID parent_node_id{Context::Node::kRootNodeID};
   if (parent.isValid()) {
     parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
   }
@@ -296,7 +338,7 @@ QModelIndex TreeExplorerModel::parent(const QModelIndex &child) const {
   const auto &node = *node_ptr;
 
   // Create a new QModelIndex for the parent
-  if (node.parent_node_id == kRootNodeID) {
+  if (node.parent_node_id == Context::Node::kRootNodeID) {
     return QModelIndex();
   }
 
@@ -310,7 +352,7 @@ int TreeExplorerModel::rowCount(const QModelIndex &parent) const {
   }
 
   // Get the parent node id
-  Context::Node::ID parent_node_id{kRootNodeID};
+  Context::Node::ID parent_node_id{Context::Node::kRootNodeID};
   if (parent.isValid()) {
     parent_node_id = static_cast<Context::Node::ID>(parent.internalId());
   }
@@ -328,34 +370,46 @@ int TreeExplorerModel::rowCount(const QModelIndex &parent) const {
 }
 
 int TreeExplorerModel::columnCount(const QModelIndex &) const {
-  return static_cast<int>(d->column_count);
+  return static_cast<int>(d->context.column_title_list.size());
 }
 
 QVariant TreeExplorerModel::headerData(int section, Qt::Orientation orientation,
                                        int role) const {
 
-  if (orientation != Qt::Horizontal || role != Qt::DisplayRole || section < 0 ||
-      section >= static_cast<int>(d->column_count)) {
+  if (orientation != Qt::Horizontal || role != Qt::DisplayRole || section < 0) {
     return QVariant();
   }
 
-  return d->generator->ColumnTitle(section);
+  QVariant column_title;
+
+  auto column_title_list_it =
+      std::next(d->context.column_title_list.begin(), section);
+  if (column_title_list_it != d->context.column_title_list.end()) {
+    column_title = *column_title_list_it;
+  }
+
+  return column_title;
 }
 
 QVariant TreeExplorerModel::data(const QModelIndex &index, int role) const {
+  // We don't really care what's `index` pointing to for this role
+  if (role == ITreeExplorerModel::TreeNameRole) {
+    return d->context.tree_name;
+  }
+
   // The Qt root has no data
   if (!index.isValid()) {
     return QVariant();
   }
 
   // Validate the column number
-  if (index.column() >= static_cast<int>(d->column_count)) {
+  if (index.column() >= static_cast<int>(d->context.column_title_list.size())) {
     return QVariant();
   }
 
   // Attempt to get the node id
   auto node_id = static_cast<Context::Node::ID>(index.internalId());
-  if (node_id == kRootNodeID) {
+  if (node_id == Context::Node::kRootNodeID) {
     return QVariant();
   }
 
@@ -404,7 +458,7 @@ QVariant TreeExplorerModel::data(const QModelIndex &index, int role) const {
       auto tooltip =
           tr("Entity id: ") + QString::number(node.data.entity_id) + "\n";
 
-      for (std::size_t i{}; i < d->column_count; ++i) {
+      for (std::size_t i{}; i < d->context.column_title_list.size(); ++i) {
         QString column_name;
         if (auto column_name_var = headerData(static_cast<int>(i),
                                               Qt::Horizontal, Qt::DisplayRole);
@@ -470,10 +524,10 @@ void TreeExplorerModel::OnNameResolved(void) {
     return;
   }
 
-  auto tree_name = d->tree_name_future.takeResult();
+  d->context.tree_name = d->tree_name_future.takeResult();
   d->tree_name_future = {};
 
-  emit TreeNameChanged(tree_name);
+  emit TreeNameChanged();
 }
 
 void TreeExplorerModel::CancelRunningRequest() {
@@ -504,7 +558,7 @@ void TreeExplorerModel::OnNewTreeItems(
   // Determine where we have to insert our new nodes; if we get
   // the magic number kInvalidEntityId, then insert at the
   // internal tree root
-  Context::Node::ID parent_node_id{kRootNodeID};
+  Context::Node::ID parent_node_id{Context::Node::kRootNodeID};
 
   if (parent_entity_id != kInvalidEntityId) {
     auto opt_parent_node_id =
@@ -533,14 +587,15 @@ void TreeExplorerModel::ProcessDataBatchQueue() {
   ImportIncomingSubtreeList(d->context, kMaxBatchSize);
 }
 
-void TreeExplorerModel::InitializeContext(Context &context) {
+void TreeExplorerModel::InitializeContext(
+    Context &context, const std::vector<QString> &column_title_list) {
   // clang-format off
   static const Context::Node kRootTreeNode{
     // Node::node_id
-    kRootNodeID,
+    Context::Node::kRootNodeID,
     
     // Node::parent_node_id
-    kRootNodeID,
+    Context::Node::kRootNodeID,
 
     // Node::child_node_id_list
     {},
@@ -566,7 +621,8 @@ void TreeExplorerModel::InitializeContext(Context &context) {
   // clang-format on
 
   context = {};
-  context.tree.insert({kRootNodeID, kRootTreeNode});
+  context.column_title_list = column_title_list;
+  context.tree.insert({Context::Node::kRootNodeID, kRootTreeNode});
 }
 
 TreeExplorerModel::Context::Node::ID
@@ -617,15 +673,17 @@ QModelIndex TreeExplorerModel::GetModelIndexFromNodeID(
 }
 
 void TreeExplorerModel::ImportIncomingSubtreeList(
-    Context &context, const std::size_t &max_subtree_count) {
+    Context &context, const std::optional<std::size_t> &opt_max_subtree_count) {
 
   // Slice the exact amount of subtrees that we need to import
   if (context.incoming_subtree_list.empty()) {
     return;
   }
 
-  Context::SubtreeList incoming_subtree_list;
+  auto max_subtree_count =
+      opt_max_subtree_count.value_or(context.incoming_subtree_list.size());
 
+  Context::SubtreeList incoming_subtree_list;
   if (max_subtree_count >= context.incoming_subtree_list.size()) {
     incoming_subtree_list = std::move(context.incoming_subtree_list);
     context.incoming_subtree_list.clear();
@@ -692,7 +750,7 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
 
     // Get the model index for the parent node
     QModelIndex parent_node_index;
-    if (parent_node.node_id != kRootNodeID) {
+    if (parent_node.node_id != Context::Node::kRootNodeID) {
       parent_node_index =
           GetModelIndexFromNodeID(context, parent_node.node_id, 0);
 
@@ -756,7 +814,7 @@ void TreeExplorerModel::ImportIncomingSubtreeList(
       }
 
       // Save all the generated columns
-      for (std::size_t i{}; i < d->column_count; ++i) {
+      for (std::size_t i{}; i < context.column_title_list.size(); ++i) {
         auto column_value = tree_item->Data(static_cast<int>(i));
         node.data.column_value_list.push_back(std::move(column_value));
       }
@@ -858,6 +916,95 @@ TreeExplorerModel::GetNodeIDFromEntityID(
 
   const auto &node_id = node_id_it->second;
   return node_id;
+}
+
+bool TreeExplorerModel::ImportContextSubtree(
+    Context &dest_context, const Context &source_context,
+    const Context::Node::ID &root_node_id) {
+
+  //
+  // User story: the user is browsing a potentially
+  // big tree explorer from start to finish, occasionally
+  // extracting subtress
+  //
+  // The reason we are copying nodes directly is:
+  // 1. When the user extracts a subtree, he expects to have
+  //    the same amount of nodes in the new model. We can't
+  //    easily guarantee that without a. counting the length
+  //    of each branch and b. scheduling all the needed requests
+  // 2. In this scenario, the user is potentially extracting
+  //    many subtrees, and it would not be a great UX to have
+  //    that many threads running
+  // 3. Given how we would have to copy things 1:1, in the worst
+  //    case scenario we'd have to descend one level at a time, and
+  //    wait for each request to come back. This would be really slow
+  //    for the user
+  //
+
+  // Initialize the context right now, since we need a valid
+  // internal root node to relocate `root_node_id`
+  InitializeContext(dest_context, source_context.column_title_list);
+
+  // Collect the nodes we need from the source context
+  std::vector<Context::Node::ID> next_node_id_queue{root_node_id};
+  Context::Node::ID highest_node_id{};
+
+  while (!next_node_id_queue.empty()) {
+    auto node_id_queue = std::move(next_node_id_queue);
+    next_node_id_queue.clear();
+
+    for (const auto &node_id : node_id_queue) {
+      // Search for the highest node id, so we can then use it as a
+      // starting point for the node id generator in `dest_context`
+      highest_node_id = std::max(node_id, highest_node_id);
+
+      // Look for the source node, and check its parent node id
+      auto node_it = source_context.tree.find(node_id);
+      if (node_it == source_context.tree.end()) {
+        qDebug()
+            << "The specified subtree contains node IDs that could not be found in the source context";
+
+        return false;
+      }
+
+      auto node = node_it->second;
+
+      // Relocate the root node to the correct position
+      if (node.node_id == root_node_id) {
+        node.parent_node_id = Context::Node::kRootNodeID;
+
+        dest_context.tree[node.parent_node_id].child_node_id_list.push_back(
+            node.node_id);
+      }
+
+      dest_context.mx_entity_id_to_node_id.insert(
+          {node.data.entity_id, node.node_id});
+
+      // Refill the queue
+      next_node_id_queue.insert(next_node_id_queue.end(),
+                                node.child_node_id_list.begin(),
+                                node.child_node_id_list.end());
+
+      // Before we insert this node, ensure that the parent node id
+      // is valid
+      if (dest_context.tree.count(node.parent_node_id) == 0) {
+        qDebug()
+            << "The specified subtree contains a node that references an invalid parent node";
+
+        return false;
+      }
+
+      dest_context.tree.insert({node.node_id, std::move(node)});
+    }
+  }
+
+  // Ensure we use a good initial value for the node id generator
+  dest_context.node_id_generator = highest_node_id + 1;
+
+  // Copy the tree name
+  dest_context.tree_name = source_context.tree_name;
+
+  return true;
 }
 
 }  // namespace mx::gui

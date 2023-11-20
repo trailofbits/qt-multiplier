@@ -48,12 +48,11 @@ class PreviewableReferenceExplorer final : public QWidget {
   std::unique_ptr<PrivateData> d;
 
   //! Initializes the internal widgets
-  void InitializeWidgets(mx::Index index,
-                         mx::FileLocationCache file_location_cache,
-                         ITreeExplorerModel *model,
-                         const bool &show_code_preview,
-                         IGlobalHighlighter &highlighter,
-                         IMacroExplorer &macro_explorer);
+  void
+  InitializeWidgets(mx::Index index, mx::FileLocationCache file_location_cache,
+                    ITreeExplorerModel *model, const bool &show_code_preview,
+                    IGlobalHighlighter &highlighter,
+                    IMacroExplorer &macro_explorer);
 
   //! Schedules a post-update scroll-to-line operation
   void SchedulePostUpdateLineScrollCommand(unsigned line_number);
@@ -71,6 +70,9 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Used to do the first time initialization of the code preview
   void OnRowsInserted();
 
+  //! Called when the model resolves the new name of the tree.
+  void OnTreeNameChanged();
+
  public slots:
   //! Enables or disables the browser mode of the inner code view
   void SetBrowserMode(const bool &enabled);
@@ -85,6 +87,9 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! The forwarded ICodeView::TokenTriggered
   void TokenTriggered(const ICodeView::TokenAction &token_action,
                       const QModelIndex &index);
+
+  //! The forwarded ITreeExplorer::ExtractSubtree signal
+  void ExtractSubtree(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

@@ -22,11 +22,13 @@ class QuickReferenceExplorer final : public QWidget {
 
  public:
   //! Constructor
-  QuickReferenceExplorer(
-      const Index &index, const FileLocationCache &file_location_cache,
-      std::shared_ptr<ITreeGenerator> generator, const bool &show_code_preview,
-      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
-      QWidget *parent = nullptr);
+  QuickReferenceExplorer(const Index &index,
+                         const FileLocationCache &file_location_cache,
+                         std::shared_ptr<ITreeGenerator> generator,
+                         const bool &show_code_preview,
+                         IGlobalHighlighter &highlighter,
+                         IMacroExplorer &macro_explorer,
+                         QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~QuickReferenceExplorer() override;
@@ -46,6 +48,9 @@ class QuickReferenceExplorer final : public QWidget {
 
   //! The forwarded PreviewableReferenceExplorer::ItemActivated signal
   void ItemActivated(const QModelIndex &index);
+
+  //! The forwarded PreviewableReferenceExplorer::ExtractSubtree signal
+  void ExtractSubtree(const QModelIndex &index);
 
  protected:
   //! Closes the widget when the escape key is pressed
@@ -68,10 +73,12 @@ class QuickReferenceExplorer final : public QWidget {
   std::unique_ptr<PrivateData> d;
 
   //! Initializes the internal widgets
-  void InitializeWidgets(
-      const Index &index, const FileLocationCache &file_location_cache,
-      std::shared_ptr<ITreeGenerator> generator, const bool &show_code_preview,
-      IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer);
+  void InitializeWidgets(const Index &index,
+                         const FileLocationCache &file_location_cache,
+                         std::shared_ptr<ITreeGenerator> generator,
+                         const bool &show_code_preview,
+                         IGlobalHighlighter &highlighter,
+                         IMacroExplorer &macro_explorer);
 
   //! Used to start window dragging
   void OnTitleFrameMousePress(QMouseEvent *event);
@@ -97,7 +104,7 @@ class QuickReferenceExplorer final : public QWidget {
                      const CodeViewTheme &code_view_theme);
 
   //! Called when the model resolves the new name of the tree.
-  void OnTreeNameChanged(const QString &new_name);
+  void OnTreeNameChanged();
 
  public slots:
   //! Enables or disables the browser mode of the inner code view
