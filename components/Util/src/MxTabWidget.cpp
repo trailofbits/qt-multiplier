@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "MxTabWidget.h"
+#include <multiplier/ui/MxTabWidget.h>
 
 #include <QWheelEvent>
 #include <QTabBar>
