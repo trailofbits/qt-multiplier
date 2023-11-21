@@ -4,8 +4,7 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "CodeWidget.h"
-
+#include <multiplier/ui/CodeWidget.h>
 #include <multiplier/ui/IDatabase.h>
 #include <multiplier/ui/Icons.h>
 #include <multiplier/ui/Util.h>

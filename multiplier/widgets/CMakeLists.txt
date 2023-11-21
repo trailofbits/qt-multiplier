@@ -21,9 +21,6 @@ add_library("mx_widgets" STATIC
 
   src/InformationExplorerWidget.h
   src/InformationExplorerWidget.cpp
-
-  src/CodeWidget.h
-  src/CodeWidget.cpp
 )
 
 target_include_directories("mx_widgets" SYSTEM INTERFACE
