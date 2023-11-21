@@ -7,8 +7,8 @@
 #include "MainWindow.h"
 #include "PreviewableReferenceExplorer.h"
 #include "QuickReferenceExplorer.h"
-#include "SimpleTextInputDialog.h"
 
+#include <multiplier/ui/SimpleTextInputDialog.h>
 #include <multiplier/ui/InformationExplorerWidget.h>
 #include <multiplier/ui/MxTabWidget.h>
 #include <multiplier/ui/CodeWidget.h>
