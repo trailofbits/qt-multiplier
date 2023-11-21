@@ -30,9 +30,6 @@ add_executable("Multiplier" ${executable_type}
   src/MainWindow.h
   src/MainWindow.cpp
 
-  src/CallHierarchyGenerator.h
-  src/CallHierarchyGenerator.cpp
-
   src/MetaTypes.h
   src/MetaTypes.cpp
   
@@ -46,6 +43,7 @@ target_sources("Multiplier" PRIVATE
   "${multiplier_icon_path}"
 )
 
+add_subdirectory("generators")
 add_subdirectory("widgets")
 
 target_link_libraries("Multiplier"
@@ -70,6 +68,7 @@ target_link_libraries("Multiplier"
     "mx_macroexplorer"
     "mx_codeviewtheme"
     "mx_thememanager"
+    "mx_generators"
 )
 
 enable_qt_properties("Multiplier")

@@ -5,7 +5,6 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MainWindow.h"
-#include "CallHierarchyGenerator.h"
 #include "PreviewableReferenceExplorer.h"
 #include "QuickReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
@@ -28,6 +27,7 @@
 #include <multiplier/ui/ITreeExplorerModel.h>
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/ITreeExplorer.h>
+#include <multiplier/ui/CallHierarchyGenerator.h>
 
 #include <multiplier/Entities/StmtKind.h>
 
