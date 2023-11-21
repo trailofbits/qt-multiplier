@@ -19,6 +19,9 @@ add_library("mx_util"
 
   include/multiplier/ui/DockWidgetContainer.h
   include/multiplier/ui/PopupWidgetContainer.h
+
+  include/multiplier/ui/MxTabWidget.h
+  src/MxTabWidget.cpp
 )
 
 target_link_libraries("mx_util"

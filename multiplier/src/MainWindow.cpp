@@ -8,9 +8,9 @@
 #include "PreviewableReferenceExplorer.h"
 #include "QuickReferenceExplorer.h"
 #include "SimpleTextInputDialog.h"
-#include "MxTabWidget.h"
 #include "InformationExplorerWidget.h"
 
+#include <multiplier/ui/MxTabWidget.h>
 #include <multiplier/ui/CodeWidget.h>
 #include <multiplier/ui/PopupWidgetContainer.h>
 #include <multiplier/ui/DockWidgetContainer.h>
