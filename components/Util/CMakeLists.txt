@@ -16,6 +16,9 @@ add_library("mx_util"
 
   include/multiplier/ui/Icons.h
   src/Icons.cpp
+
+  include/multiplier/ui/DockWidgetContainer.h
+  include/multiplier/ui/PopupWidgetContainer.h
 )
 
 target_link_libraries("mx_util"

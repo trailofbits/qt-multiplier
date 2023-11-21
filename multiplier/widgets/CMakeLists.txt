@@ -19,9 +19,6 @@ add_library("mx_widgets" STATIC
   src/MxTabWidget.h
   src/MxTabWidget.cpp
 
-  src/DockWidgetContainer.h
-  src/PopupWidgetContainer.h
-
   src/InformationExplorerWidget.h
   src/InformationExplorerWidget.cpp
 
