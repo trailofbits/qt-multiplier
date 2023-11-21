@@ -21,6 +21,9 @@ add_library("mx_codeview"
 
   src/GoToLineWidget.h
   src/GoToLineWidget.cpp
+
+  include/multiplier/ui/CodeWidget.h
+  src/CodeWidget.cpp
 )
 
 target_link_libraries("mx_codeview"
@@ -35,6 +38,8 @@ target_link_libraries("mx_codeview"
     "mx_database"
     "mx_searchwidget"
     "mx_codeviewtheme"
+    "mx_globalhighlighter"
+    "mx_macroexplorer"
 )
 
 target_include_directories("mx_codeview" PRIVATE
