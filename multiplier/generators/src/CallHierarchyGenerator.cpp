@@ -4,15 +4,16 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "CallHierarchyGenerator.h"
+#include <multiplier/ui/CallHierarchyGenerator.h>
+
+#include <multiplier/Entity.h>
+#include <multiplier/Token.h>
+#include <multiplier/ui/Util.h>
 
 #include <QDebug>
 #include <QObject>
 
 #include <filesystem>
-#include <multiplier/Entity.h>
-#include <multiplier/Token.h>
-#include <multiplier/ui/Util.h>
 
 Q_DECLARE_METATYPE(mx::TokenRange);
 
@@ -32,8 +33,7 @@ class CallHierarchyItem final : public ITreeItem {
 
   inline CallHierarchyItem(RawEntityId entity_id_,
                            RawEntityId aliased_entity_id_,
-                           TokenRange name_tokens_,
-                           QString location_,
+                           TokenRange name_tokens_, QString location_,
                            QString breadcrumbs_)
       : entity_id(entity_id_),
         aliased_entity_id(aliased_entity_id_),
@@ -41,10 +41,10 @@ class CallHierarchyItem final : public ITreeItem {
         location(std::move(location_)),
         breadcrumbs(std::move(breadcrumbs_)) {}
 
-  static std::shared_ptr<ITreeItem> Create(
-      const FileLocationCache &file_location_cache,
-      const VariantEntity &use, const VariantEntity &entity,
-      RawEntityId aliased_entity_id_=kInvalidEntityId);
+  static std::shared_ptr<ITreeItem>
+  Create(const FileLocationCache &file_location_cache, const VariantEntity &use,
+         const VariantEntity &entity,
+         RawEntityId aliased_entity_id_ = kInvalidEntityId);
 
   // NOTE(pag): This must be non-blocking.
   RawEntityId EntityId(void) const Q_DECL_FINAL {
@@ -59,34 +59,24 @@ class CallHierarchyItem final : public ITreeItem {
   QVariant Data(int col) const Q_DECL_FINAL {
     QVariant data;
     switch (col) {
-      case 0:
-        data.setValue(name_tokens);
-        break;
-      case 1:
-        data.setValue(location);
-        break;
-      case 2:
-        data.setValue(breadcrumbs);
-        break;
-      default:
-        break;
+      case 0: data.setValue(name_tokens); break;
+      case 1: data.setValue(location); break;
+      case 2: data.setValue(breadcrumbs); break;
+      default: break;
     }
     return data;
   }
 };
 
 // Given that `use` is a use of `entity`, get us information about it.
-std::shared_ptr<ITreeItem> CallHierarchyItem::Create(
-    const FileLocationCache &file_location_cache,
-    const VariantEntity &use, const VariantEntity &entity,
-    RawEntityId aliased_entity_id_) {
+std::shared_ptr<ITreeItem>
+CallHierarchyItem::Create(const FileLocationCache &file_location_cache,
+                          const VariantEntity &use, const VariantEntity &entity,
+                          RawEntityId aliased_entity_id_) {
 
   return std::make_shared<CallHierarchyItem>(
-      ::mx::EntityId(use).Pack(),
-      aliased_entity_id_,
-      NameOfEntity(entity),
-      LocationOfEntity(file_location_cache, use),
-      EntityBreadCrumbs(use));
+      ::mx::EntityId(use).Pack(), aliased_entity_id_, NameOfEntity(entity),
+      LocationOfEntity(file_location_cache, use), EntityBreadCrumbs(use));
 }
 
 }  // namespace
@@ -109,14 +99,13 @@ QString CallHierarchyGenerator::TreeName(
 
   if (auto name = NameOfEntityAsString(index.entity(root_entity_id))) {
     return QObject::tr("Call hierarchy of `%1`").arg(name.value());
-  
   } else {
     return QObject::tr("Call hierarchy of entity %1").arg(root_entity_id);
   }
 }
 
-gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Roots(
-    const std::shared_ptr<ITreeGenerator> &self) {
+gap::generator<std::shared_ptr<ITreeItem>>
+CallHierarchyGenerator::Roots(const std::shared_ptr<ITreeGenerator> &self) {
 
   VariantEntity entity = index.entity(root_entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
@@ -137,9 +126,7 @@ gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Roots(
   }
 }
 
-gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Children(
-    const std::shared_ptr<ITreeGenerator> &self,
-    RawEntityId parent_entity_id) {
+gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Children(const std::shared_ptr<ITreeGenerator> &self, RawEntityId parent_entity_id) {
 
   VariantEntity entity = index.entity(parent_entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
@@ -175,9 +162,9 @@ gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Children(
           std::get<Decl>(user).canonical_declaration().id().Pack();
     }
 
-    co_yield CallHierarchyItem::Create(
-        file_location_cache, use, user, aliased_entity_id);
+    co_yield CallHierarchyItem::Create(file_location_cache, use, user,
+                                       aliased_entity_id);
   }
 }
 
-}  // namespaxce mx::gui
+}  // namespace mx::gui

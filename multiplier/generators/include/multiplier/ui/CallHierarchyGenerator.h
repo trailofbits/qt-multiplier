@@ -7,6 +7,7 @@
 #pragma once
 
 #include <multiplier/ui/ITreeGenerator.h>
+
 #include <multiplier/File.h>
 #include <multiplier/Index.h>
 
@@ -32,9 +33,9 @@ class CallHierarchyGenerator final : public ITreeGenerator {
         file_location_cache(std::move(file_location_cache_)),
         root_entity_id(root_entity_id_) {}
 
-  inline static std::shared_ptr<ITreeGenerator> Create(
-      const Index &index, const FileLocationCache &cache,
-      RawEntityId entity_id) {
+  inline static std::shared_ptr<ITreeGenerator>
+  Create(const Index &index, const FileLocationCache &cache,
+         RawEntityId entity_id) {
     return std::make_shared<CallHierarchyGenerator>(index, cache, entity_id);
   }
 
@@ -42,15 +43,15 @@ class CallHierarchyGenerator final : public ITreeGenerator {
 
   QString ColumnTitle(int) const Q_DECL_FINAL;
 
-  QString TreeName(
-      const std::shared_ptr<ITreeGenerator> &self) const Q_DECL_FINAL;
+  QString
+  TreeName(const std::shared_ptr<ITreeGenerator> &self) const Q_DECL_FINAL;
 
-  gap::generator<std::shared_ptr<ITreeItem>> Roots(
-      const std::shared_ptr<ITreeGenerator> &self) Q_DECL_FINAL;
+  gap::generator<std::shared_ptr<ITreeItem>>
+  Roots(const std::shared_ptr<ITreeGenerator> &self) Q_DECL_FINAL;
 
-  gap::generator<std::shared_ptr<ITreeItem>> Children(
-      const std::shared_ptr<ITreeGenerator> &self,
-      RawEntityId parent_entity) Q_DECL_FINAL;
+  gap::generator<std::shared_ptr<ITreeItem>>
+  Children(const std::shared_ptr<ITreeGenerator> &self,
+           RawEntityId parent_entity) Q_DECL_FINAL;
 };
 
 }  // namespace gui
