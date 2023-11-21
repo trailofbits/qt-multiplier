@@ -6,9 +6,8 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "InformationExplorerWidget.h"
-
 #include <multiplier/ui/IInformationExplorer.h>
+#include <multiplier/ui/InformationExplorerWidget.h>
 
 #include <QVBoxLayout>
 
