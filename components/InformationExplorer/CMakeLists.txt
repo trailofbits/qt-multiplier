@@ -30,6 +30,9 @@ add_library("mx_informationexplorer"
 
   src/SortFilterProxyModel.h
   src/SortFilterProxyModel.cpp
+
+  include/multiplier/ui/InformationExplorerWidget.h
+  src/InformationExplorerWidget.cpp
 )
 
 target_link_libraries("mx_informationexplorer"

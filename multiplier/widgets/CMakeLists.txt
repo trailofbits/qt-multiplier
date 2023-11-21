@@ -15,9 +15,6 @@ add_library("mx_widgets" STATIC
 
   src/SimpleTextInputDialog.h
   src/SimpleTextInputDialog.cpp
-
-  src/InformationExplorerWidget.h
-  src/InformationExplorerWidget.cpp
 )
 
 target_include_directories("mx_widgets" SYSTEM INTERFACE
