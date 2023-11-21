@@ -11,9 +11,9 @@
 #include "CodeWidget.h"
 #include "MxTabWidget.h"
 #include "InformationExplorerWidget.h"
-#include "PopupWidgetContainer.h"
-#include "DockWidgetContainer.h"
 
+#include <multiplier/ui/PopupWidgetContainer.h>
+#include <multiplier/ui/DockWidgetContainer.h>
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/HistoryWidget.h>
