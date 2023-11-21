@@ -28,7 +28,7 @@ target_link_libraries("mx_thememanager"
   PRIVATE
     "qtmx_cxx_flags"
     "thirdparty_qt"
-    "mx_assert"
+    "mx_util"
 
   PUBLIC
     "mx_codeviewtheme"

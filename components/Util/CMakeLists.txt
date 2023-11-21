@@ -25,6 +25,9 @@ add_library("mx_util"
 
   include/multiplier/ui/SimpleTextInputDialog.h
   src/SimpleTextInputDialog.cpp
+
+  include/multiplier/ui/Assert.h
+  src/Assert.cpp
 )
 
 target_link_libraries("mx_util"

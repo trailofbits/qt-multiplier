@@ -26,7 +26,6 @@ target_link_libraries("mx_historywidget"
     "thirdparty_qt"
     "multiplier::mx-api"
     "mx_util"
-    "mx_assert"
 )
 
 target_include_directories("mx_historywidget" PRIVATE

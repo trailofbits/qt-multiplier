@@ -44,7 +44,6 @@ target_link_libraries("mx_database"
     "multiplier::mx-api"
     "multiplier::mx-analysis"
     "mx_util"
-    "mx_assert"
 )
 
 target_include_directories("mx_database" PRIVATE

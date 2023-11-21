@@ -21,7 +21,7 @@ target_link_libraries("mx_fontdatabase"
 
   PUBLIC
     "thirdparty_qt"
-    "mx_assert"
+    "mx_util"
 )
 
 target_include_directories("mx_fontdatabase" PRIVATE
