@@ -28,6 +28,7 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/ITreeExplorer.h>
 #include <multiplier/ui/CallHierarchyGenerator.h>
+#include <multiplier/ui/IGeneratorView.h>
 
 #include <multiplier/Entities/StmtKind.h>
 

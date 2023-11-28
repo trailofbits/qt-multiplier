@@ -23,6 +23,9 @@ add_library("mx_util"
   include/multiplier/ui/MxTabWidget.h
   src/MxTabWidget.cpp
 
+  include/multiplier/ui/MxTreeView.h
+  src/MxTreeView.cpp
+
   include/multiplier/ui/SimpleTextInputDialog.h
   src/SimpleTextInputDialog.cpp
 

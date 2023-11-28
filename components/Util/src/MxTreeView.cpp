@@ -6,20 +6,18 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "TreeExplorerTreeView.h"
+#include <multiplier/ui/MxTreeView.h>
 
 #include <QPainter>
 
 namespace mx::gui {
 
-TreeExplorerTreeView::TreeExplorerTreeView(QWidget *parent)
-    : QTreeView(parent) {}
+MxTreeView::MxTreeView(QWidget *parent) : QTreeView(parent) {}
 
-TreeExplorerTreeView::~TreeExplorerTreeView() {}
+MxTreeView::~MxTreeView() {}
 
-void TreeExplorerTreeView::drawRow(QPainter *painter,
-                                        const QStyleOptionViewItem &option,
-                                        const QModelIndex &index) const {
+void MxTreeView::drawRow(QPainter *painter, const QStyleOptionViewItem &option,
+                         const QModelIndex &index) const {
 
   auto background_role_var = index.data(Qt::BackgroundRole);
   if (background_role_var.isValid()) {

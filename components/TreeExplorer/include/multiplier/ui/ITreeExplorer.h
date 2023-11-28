@@ -8,13 +8,13 @@
 
 #pragma once
 
+#include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/ITreeExplorerModel.h>
+
 #include <QAbstractItemModel>
 #include <QWidget>
 
 namespace mx::gui {
-
-class IGlobalHighlighter;
-class ITreeExplorerModel;
 
 //! The tree explorer widget. This works for generic trees supporting
 //! incremental expansion.
@@ -23,18 +23,15 @@ class ITreeExplorer : public QWidget {
 
  public:
   //! Factory method
-  static ITreeExplorer *
-  Create(ITreeExplorerModel *model_, QWidget *parent = nullptr,
-         IGlobalHighlighter *global_highlighter = nullptr);
+  static ITreeExplorer *Create(ITreeExplorerModel *model,
+                               IGlobalHighlighter *global_highlighter,
+                               QWidget *parent = nullptr);
 
   //! Constructor
   inline ITreeExplorer(QWidget *parent) : QWidget(parent) {}
 
   //! Destructor
   virtual ~ITreeExplorer() override = default;
-
-  //! Returns the active model.
-  virtual ITreeExplorerModel *Model() const = 0;
 
   //! Disabled copy constructor
   ITreeExplorer(const ITreeExplorer &) = delete;

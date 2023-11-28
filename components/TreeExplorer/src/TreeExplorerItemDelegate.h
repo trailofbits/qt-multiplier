@@ -49,6 +49,11 @@ class TreeExplorerItemDelegate final : public QStyledItemDelegate {
   virtual QSize sizeHint(const QStyleOptionViewItem &option,
                          const QModelIndex &index) const override;
 
+ public slots:
+  //! Called by the theme manager when the theme is changed
+  void OnThemeChange(const QPalette &palette,
+                     const CodeViewTheme &code_view_theme);
+
  protected:
   //! Triggered when the user tries to edit the QTreeView item
   virtual bool editorEvent(QEvent *event, QAbstractItemModel *model,

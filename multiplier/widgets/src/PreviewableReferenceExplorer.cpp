@@ -25,7 +25,10 @@ struct PreviewableReferenceExplorer::PrivateData final {
   ICodeModel *code_model{nullptr};
   ICodeView *code_view{nullptr};
   std::optional<unsigned> opt_scroll_to_line;
+
+  ITreeExplorerModel *ref_explorer_model{nullptr};
   ITreeExplorer *reference_explorer{nullptr};
+
   QSplitter *splitter{nullptr};
 };
 
@@ -44,7 +47,7 @@ PreviewableReferenceExplorer::PreviewableReferenceExplorer(
 PreviewableReferenceExplorer::~PreviewableReferenceExplorer() {}
 
 ITreeExplorerModel *PreviewableReferenceExplorer::Model() {
-  return d->reference_explorer->Model();
+  return d->ref_explorer_model;
 }
 
 void PreviewableReferenceExplorer::InitializeWidgets(
@@ -52,7 +55,9 @@ void PreviewableReferenceExplorer::InitializeWidgets(
     ITreeExplorerModel *model, const bool &show_code_preview,
     IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer) {
 
-  d->reference_explorer = ITreeExplorer::Create(model, this, &highlighter);
+  d->ref_explorer_model = model;
+  d->reference_explorer =
+      ITreeExplorer::Create(d->ref_explorer_model, &highlighter, this);
 
   connect(
       d->reference_explorer, &ITreeExplorer::SelectedItemChanged, this,
@@ -140,17 +145,14 @@ void PreviewableReferenceExplorer::OnRowsInserted() {
     return;
   }
 
-  auto first_item_index = Model()->index(0, 0);
+  auto first_item_index = d->ref_explorer_model->index(0, 0);
   UpdateCodePreview(first_item_index);
 }
 
-
 void PreviewableReferenceExplorer::OnTreeNameChanged() {
-  auto model = d->reference_explorer->Model();
-
   QString tree_name;
-  if (auto tree_name_var =
-          model->data(QModelIndex(), ITreeExplorerModel::TreeNameRole);
+  if (auto tree_name_var = d->ref_explorer_model->data(
+          QModelIndex(), ITreeExplorerModel::TreeNameRole);
       tree_name_var.canConvert<QString>()) {
 
     tree_name = tree_name_var.toString();
