@@ -42,6 +42,9 @@ class TreeExplorer final : public ITreeExplorer {
   //! Called when an item needs to be opened in the main window
   void OnOpenAction();
 
+  //! Called when the user wants to extract the selected subtree
+  void OnExtractSubtreeAction();
+
   //! Called by the theme manager when the theme is changed
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);

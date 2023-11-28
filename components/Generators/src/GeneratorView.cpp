@@ -311,6 +311,7 @@ void GeneratorView::InitializeWidgets() {
     case Configuration::ViewType::Tree: {
       auto tree_view = new MxTreeView();
       tree_view->setModel(model_ptr);
+      tree_view->expandAll();
 
       model_view = tree_view;
       d->view_var = tree_view;
