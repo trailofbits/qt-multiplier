@@ -35,6 +35,9 @@ class GeneratorView : public IGeneratorView {
   //! Used to update the OSD buttons
   virtual void resizeEvent(QResizeEvent *event) override;
 
+  //! Used to hide the OSD buttons when focus is lost
+  virtual void focusOutEvent(QFocusEvent *event) override;
+
  private:
   Q_OBJECT
 

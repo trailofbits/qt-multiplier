@@ -86,31 +86,30 @@ std::optional<QModelIndex> GetModelIndexAtCurrentMousePos(
     const std::variant<std::monostate, MxTreeView *, QTableView *, QListView *>
         &view_var) {
 
+  QAbstractItemView *model_view{nullptr};
   if (std::holds_alternative<MxTreeView *>(view_var)) {
-    auto model_view = std::get<MxTreeView *>(view_var);
-
-    auto local_mouse_pos =
-        model_view->viewport()->mapFromGlobal(QCursor::pos());
-
-    return model_view->indexAt(local_mouse_pos);
+    model_view = std::get<MxTreeView *>(view_var);
 
   } else if (std::holds_alternative<QTableView *>(view_var)) {
-    auto model_view = std::get<QTableView *>(view_var);
-
-    auto local_mouse_pos =
-        model_view->viewport()->mapFromGlobal(QCursor::pos());
-    return model_view->indexAt(local_mouse_pos);
+    model_view = std::get<QTableView *>(view_var);
 
   } else if (std::holds_alternative<QListView *>(view_var)) {
-    auto model_view = std::get<QListView *>(view_var);
-
-    auto local_mouse_pos =
-        model_view->viewport()->mapFromGlobal(QCursor::pos());
-    return model_view->indexAt(local_mouse_pos);
+    model_view = std::get<QListView *>(view_var);
 
   } else {
     return std::nullopt;
   }
+
+  auto model_view_global_pos = model_view->mapToGlobal(QPoint(0, 0));
+  auto model_view_geometry =
+      model_view->rect().translated(model_view_global_pos);
+
+  if (!model_view_geometry.contains(QCursor::pos(), true)) {
+    return std::nullopt;
+  }
+
+  auto local_mouse_pos = model_view->mapFromGlobal(QCursor::pos());
+  return model_view->indexAt(local_mouse_pos);
 }
 
 }  // namespace
@@ -180,8 +179,9 @@ bool GeneratorView::eventFilter(QObject *obj, QEvent *event) {
     Other,
   } event_receiver;
 
+  QAbstractItemView *model_view{nullptr};
+
   {
-    QAbstractItemView *model_view{nullptr};
     QWidget *viewport{nullptr};
 
     switch (d->config.view_type) {
@@ -212,33 +212,41 @@ bool GeneratorView::eventFilter(QObject *obj, QEvent *event) {
     }
   }
 
-  if (event_receiver == EventReceiver::Viewport) {
-    if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
-      // It is important to double check the leave event; it is sent
-      // even if the mouse is still inside our treeview item but
-      // above the hovering button (which steals the focus)
-      d->opt_hovered_index = GetModelIndexAtCurrentMousePos(d->view_var);
-      UpdateOSDButtons();
-
-      return false;
-
-    } else {
-      return false;
-    }
-
-  } else if (event_receiver == EventReceiver::View) {
-    if (event->type() == QEvent::Leave) {
-      d->opt_hovered_index = std::nullopt;
-    }
-
-    return false;
-
-  } else {
+  if (event_receiver == EventReceiver::Other) {
     return false;
   }
+
+  if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
+    // It is important to also check for the Leave event, since
+    // the OSD buttons could cover the viewport and cause the
+    // widgets to emit it
+    d->opt_hovered_index = GetModelIndexAtCurrentMousePos(d->view_var);
+
+  } else if (event_receiver == EventReceiver::View &&
+             event->type() == QEvent::Wheel) {
+    // Disable the overlay buttons while scrolling. It is hard to keep
+    // them on screen due to how the scrolling event is propagated.
+    auto scrolling_enabled = (model_view->horizontalScrollBar()->isVisible() ||
+                              model_view->verticalScrollBar()->isVisible());
+
+    if (scrolling_enabled) {
+      d->opt_hovered_index = std::nullopt;
+    }
+  }
+
+  UpdateOSDButtons();
+  return false;
 }
 
-void GeneratorView::resizeEvent(QResizeEvent *event) {}
+void GeneratorView::resizeEvent(QResizeEvent *) {
+  d->opt_hovered_index = std::nullopt;
+  UpdateOSDButtons();
+}
+
+void GeneratorView::focusOutEvent(QFocusEvent *) {
+  d->opt_hovered_index = std::nullopt;
+  UpdateOSDButtons();
+}
 
 void GeneratorView::InitializeWidgets() {
   // Setup the sort and filter proxy
@@ -397,7 +405,7 @@ void GeneratorView::InitializeWidgets() {
 
 void GeneratorView::UpdateOSDButtons() {
   // Hide all the buttons if there's no item being hovered
-  if (!d->opt_hovered_index.has_value()) {
+  if (!d->opt_hovered_index.has_value() || d->osd_button_list.empty()) {
     for (auto &button : d->osd_button_list) {
       button->setVisible(false);
     }
@@ -434,12 +442,20 @@ void GeneratorView::UpdateOSDButtons() {
     auto &button = d->osd_button_list[i];
     button->setIcon(source_action->icon());
     button->setToolTip(source_action->toolTip());
-    button->setEnabled(source_action->isEnabled());
-    button->setVisible(source_action->isVisible());
 
-    if (source_action->isVisible() && source_action->isEnabled()) {
+    auto enable_button =
+        source_action->isEnabled() && source_action->isVisible();
+
+    button->setEnabled(enable_button);
+    button->setVisible(enable_button);
+
+    if (enable_button) {
       active_button_list.push_back(button);
     }
+  }
+
+  if (active_button_list.empty()) {
+    return;
   }
 
   // Get the boundaries of the hovered item, and redistribute the
