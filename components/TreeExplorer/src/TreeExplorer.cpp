@@ -25,6 +25,9 @@ struct OSDAndMenuActions final {
   QAction *expand{nullptr};
   QAction *go_to{nullptr};
   QAction *open{nullptr};
+
+  // this is only shown in the menu
+  QAction *extract_subtree{nullptr};
 };
 
 }  // namespace
@@ -88,6 +91,19 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
   };
 
   config.osd_actions = config.menu_actions;
+
+  // Keep this only in the menu
+  d->osd_and_menu_actions.extract_subtree =
+      new QAction("Extract subtree", this);
+
+  d->osd_and_menu_actions.extract_subtree->setToolTip(
+      tr("Extracts the selected subtree"));
+
+  connect(d->osd_and_menu_actions.extract_subtree, &QAction::triggered, this,
+          &TreeExplorer::OnExtractSubtreeAction);
+
+  config.menu_actions.action_list.push_back(
+      d->osd_and_menu_actions.extract_subtree);
 
   // Create the view
   d->generator_view =
@@ -170,7 +186,8 @@ void TreeExplorer::UpdateAction(QAction *action) {
       enable_action = variant.toBool();
     }
 
-  } else if (action == d->osd_and_menu_actions.open) {
+  } else if (action == d->osd_and_menu_actions.open ||
+             action == d->osd_and_menu_actions.extract_subtree) {
     enable_action = true;
   }
 
@@ -190,7 +207,7 @@ void TreeExplorer::OnExpandAction() {
 }
 
 void TreeExplorer::OnGoToAction() {
-  // The the view model index
+  // Take the view model index
   auto model_index_var = d->osd_and_menu_actions.go_to->data();
   if (!model_index_var.isValid() ||
       !model_index_var.canConvert<QModelIndex>()) {
@@ -219,6 +236,7 @@ void TreeExplorer::OnGoToAction() {
 }
 
 void TreeExplorer::OnOpenAction() {
+  // Take the view model index
   auto model_index_var = d->osd_and_menu_actions.open->data();
   if (!model_index_var.isValid() ||
       !model_index_var.canConvert<QModelIndex>()) {
@@ -227,6 +245,27 @@ void TreeExplorer::OnOpenAction() {
 
   auto model_index = model_index_var.toModelIndex();
   emit ItemActivated(model_index);
+}
+
+void TreeExplorer::OnExtractSubtreeAction() {
+  // Take the view model index
+  auto model_index_var = d->osd_and_menu_actions.extract_subtree->data();
+  if (!model_index_var.isValid() ||
+      !model_index_var.canConvert<QModelIndex>()) {
+    return;
+  }
+
+  auto model_index = model_index_var.toModelIndex();
+
+  // The view is using the global highlighter proxy model
+  // but we need to access the original model now. Do the
+  // mapping
+  model_index = d->highlighter_model_proxy->mapToSource(model_index);
+  if (!model_index.isValid()) {
+    return;
+  }
+
+  emit ExtractSubtree(model_index);
 }
 
 void TreeExplorer::OnThemeChange(const QPalette &,
@@ -260,6 +299,16 @@ void TreeExplorer::OnThemeChange(const QPalette &,
       QIcon::Disabled, QIcon::On);
 
   d->osd_and_menu_actions.go_to->setIcon(goto_item_icon);
+
+  QIcon extract_subtree_icon;
+  extract_subtree_icon.addPixmap(GetPixmap(":/TreeExplorer/extract_subtree"),
+                                 QIcon::Normal, QIcon::On);
+
+  extract_subtree_icon.addPixmap(
+      GetPixmap(":/TreeExplorer/extract_subtree", IconStyle::Disabled),
+      QIcon::Disabled, QIcon::On);
+
+  d->osd_and_menu_actions.extract_subtree->setIcon(extract_subtree_icon);
 }
 
 void TreeExplorer::OnModelRequestStarted() {

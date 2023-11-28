@@ -5,3 +5,4 @@ Vectors and icons by <a href="https://github.com/la-moore/scarlab-icons?ref=svgr
  - activate_ref_item.png
  - expand_ref_item.png
  - goto_ref_item.png
+ - extract_subtree.png

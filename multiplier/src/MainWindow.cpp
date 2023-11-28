@@ -1156,6 +1156,15 @@ void MainWindow::OnExtractTreeExplorerSubtree(const QModelIndex &index) {
 
   dest_model->setParent(tree_explorer);
 
+  connect(tree_explorer, &PreviewableReferenceExplorer::ExtractSubtree, this,
+          &MainWindow::OnExtractTreeExplorerSubtree);
+
+  connect(tree_explorer, &PreviewableReferenceExplorer::ItemActivated, this,
+          &MainWindow::OnReferenceExplorerItemActivated);
+
+  connect(this, &MainWindow::BrowserModeToggled, tree_explorer,
+          &PreviewableReferenceExplorer::SetBrowserMode);
+
   SaveReferenceExplorer(tree_explorer);
 }
 
