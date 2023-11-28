@@ -46,6 +46,12 @@ class TreeExplorer final : public ITreeExplorer {
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);
 
+  //! Called when a generator request starts
+  void OnModelRequestStarted();
+
+  //! Called when a generator request ends
+  void OnModelRequestFinished();
+
   friend class ITreeExplorer;
 };
 
