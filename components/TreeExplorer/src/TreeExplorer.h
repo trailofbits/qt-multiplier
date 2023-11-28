@@ -45,6 +45,12 @@ class TreeExplorer final : public ITreeExplorer {
   //! Called when the user wants to extract the selected subtree
   void OnExtractSubtreeAction();
 
+  //! Called when the user wants to expand three levels deep
+  void OnExpandThreeLevelsAction();
+
+  //! Called when the user wants to expand five levels deep
+  void OnExpandFiveLevelsAction();
+
   //! Called by the theme manager when the theme is changed
   void OnThemeChange(const QPalette &palette,
                      const CodeViewTheme &code_view_theme);

@@ -108,7 +108,7 @@ std::optional<QModelIndex> GetModelIndexAtCurrentMousePos(
     return std::nullopt;
   }
 
-  auto local_mouse_pos = model_view->mapFromGlobal(QCursor::pos());
+  auto local_mouse_pos = model_view->viewport()->mapFromGlobal(QCursor::pos());
   return model_view->indexAt(local_mouse_pos);
 }
 

@@ -2,6 +2,8 @@
     <qresource prefix="/TreeExplorer">
         <file alias="activate_ref_item">Icons/activate_ref_item.png</file>
         <file alias="expand_ref_item">Icons/expand_ref_item.png</file>
+        <file alias="expand_3_ref_item">Icons/expand_3_ref_item.png</file>
+        <file alias="expand_5_ref_item">Icons/expand_5_ref_item.png</file>
         <file alias="goto_ref_item">Icons/goto_ref_item.png</file>
         <file alias="extract_subtree">Icons/extract_subtree.png</file>
     </qresource>
