@@ -12,14 +12,21 @@
 
 namespace mx::gui {
 
+//! A QTabWidget that supports touchpad scrolling
 class MxTabWidget final : public QTabWidget {
   Q_OBJECT
 
  public:
+  //! Constructor
   MxTabWidget(QWidget *parent = nullptr);
+
+  //! Destructor
   virtual ~MxTabWidget() override;
 
+  //! Disabled copy constructor
   MxTabWidget(MxTabWidget &) = delete;
+
+  //! Disabled copy assignment operator
   MxTabWidget &operator=(const MxTabWidget &) = delete;
 };
 

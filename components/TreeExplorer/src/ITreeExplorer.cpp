@@ -12,11 +12,11 @@
 
 namespace mx::gui {
 
-ITreeExplorer *
-ITreeExplorer::Create(ITreeExplorerModel *model,
-                      QWidget *parent, IGlobalHighlighter *global_highlighter) {
+ITreeExplorer *ITreeExplorer::Create(ITreeExplorerModel *model,
+                                     IGlobalHighlighter *global_highlighter,
+                                     QWidget *parent) {
 
-  return new TreeExplorer(model, parent, global_highlighter);
+  return new TreeExplorer(model, global_highlighter, parent);
 }
 
 }  // namespace mx::gui

@@ -8,10 +8,6 @@
 
 #include "SearchFilterModelProxy.h"
 
-#include <multiplier/ui/ITreeExplorerModel.h>
-
-#include <QDebug>
-
 #include <algorithm>
 #include <vector>
 
@@ -78,8 +74,8 @@ bool SearchFilterModelProxy::filterAcceptsRow(
       continue;
     }
 
-    auto index = source_model->index(source_row, static_cast<int>(col),
-                                     source_parent);
+    auto index =
+        source_model->index(source_row, static_cast<int>(col), source_parent);
     auto filter_role_value_var = index.data(filter_role);
     if (!filter_role_value_var.isValid()) {
       continue;

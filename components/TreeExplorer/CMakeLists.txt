@@ -22,15 +22,6 @@ add_library("mx_treeexplorer"
   src/TreeExplorerItemDelegate.h
   src/TreeExplorerItemDelegate.cpp
 
-  src/TreeExplorerTreeView.h
-  src/TreeExplorerTreeView.cpp
-
-  src/FilterSettingsWidget.h
-  src/FilterSettingsWidget.cpp
-
-  src/SearchFilterModelProxy.h
-  src/SearchFilterModelProxy.cpp
-
   src/TreeExplorer.h
   src/TreeExplorer.cpp
 
@@ -64,6 +55,7 @@ target_link_libraries("mx_treeexplorer"
     "mx_codeview"
     "mx_globalhighlighter"
     "mx_thememanager"
+    "mx_generators"
 )
 
 target_include_directories("mx_treeexplorer" PRIVATE

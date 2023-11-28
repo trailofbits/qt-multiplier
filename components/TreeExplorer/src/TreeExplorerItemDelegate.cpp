@@ -34,8 +34,8 @@ struct TreeExplorerItemDelegate::PrivateData final {
   std::unique_ptr<TokenPainter> token_painter;
 };
 
-TreeExplorerItemDelegate::TreeExplorerItemDelegate(
-    const CodeViewTheme &theme, QObject *parent)
+TreeExplorerItemDelegate::TreeExplorerItemDelegate(const CodeViewTheme &theme,
+                                                   QObject *parent)
     : QStyledItemDelegate(parent),
       d(new PrivateData) {
   SetTheme(theme);
@@ -126,7 +126,7 @@ void TreeExplorerItemDelegate::paint(QPainter *painter,
 }
 
 QSize TreeExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
-                                           const QModelIndex &index) const {
+                                         const QModelIndex &index) const {
   if (!index.isValid()) {
     return this->QStyledItemDelegate::sizeHint(option, index);
   }
@@ -142,13 +142,25 @@ QSize TreeExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
   QStyleOptionViewItem opt(option);
   initStyleOption(&opt, index);
   QStyle *style = opt.widget ? opt.widget->style() : qApp->style();
-  return style->sizeFromContents(QStyle::ContentsType::CT_ItemViewItem, &opt,
-                                 contents_size, opt.widget);
+
+  QFontMetricsF font_metrics(option.font);
+  QMargins margins(0, 0, static_cast<int>(font_metrics.horizontalAdvance("x")),
+                   0);
+
+  return style
+      ->sizeFromContents(QStyle::ContentsType::CT_ItemViewItem, &opt,
+                         contents_size, opt.widget)
+      .grownBy(margins);
+}
+
+void TreeExplorerItemDelegate::OnThemeChange(
+    const QPalette &, const CodeViewTheme &code_view_theme) {
+  SetTheme(code_view_theme);
 }
 
 bool TreeExplorerItemDelegate::editorEvent(QEvent *, QAbstractItemModel *,
-                                             const QStyleOptionViewItem &,
-                                             const QModelIndex &) {
+                                           const QStyleOptionViewItem &,
+                                           const QModelIndex &) {
   return false;
 }
 

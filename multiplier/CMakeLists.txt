@@ -43,7 +43,7 @@ target_sources("Multiplier" PRIVATE
   "${multiplier_icon_path}"
 )
 
-add_subdirectory("generators")
+add_subdirectory("data_generators")
 add_subdirectory("widgets")
 
 target_link_libraries("Multiplier"
@@ -69,6 +69,7 @@ target_link_libraries("Multiplier"
     "mx_codeviewtheme"
     "mx_thememanager"
     "mx_generators"
+    "mx_data_generators"
 )
 
 enable_qt_properties("Multiplier")
