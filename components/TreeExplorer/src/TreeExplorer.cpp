@@ -27,6 +27,8 @@ struct OSDAndMenuActions final {
   QAction *open{nullptr};
 
   // this is only shown in the menu
+  QAction *expand_three_levels{nullptr};
+  QAction *expand_five_levels{nullptr};
   QAction *extract_subtree{nullptr};
 };
 
@@ -78,7 +80,7 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
   connect(d->osd_and_menu_actions.open, &QAction::triggered, this,
           &TreeExplorer::OnOpenAction);
 
-  d->osd_and_menu_actions.go_to = new QAction("Go to aliased entity", this);
+  d->osd_and_menu_actions.go_to = new QAction(tr("Go to aliased entity"), this);
   d->osd_and_menu_actions.go_to->setToolTip(tr("Go to this aliased entity"));
   connect(d->osd_and_menu_actions.go_to, &QAction::triggered, this,
           &TreeExplorer::OnGoToAction);
@@ -92,9 +94,33 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
 
   config.osd_actions = config.menu_actions;
 
-  // Keep this only in the menu
+  // Keep these only in the menu
+  d->osd_and_menu_actions.expand_three_levels =
+      new QAction(tr("Expand (3)"), this);
+
+  d->osd_and_menu_actions.expand_three_levels->setToolTip(
+      tr("Expands this entity for three levels"));
+
+  connect(d->osd_and_menu_actions.expand_three_levels, &QAction::triggered,
+          this, &TreeExplorer::OnExpandThreeLevelsAction);
+
+  config.menu_actions.action_list.push_back(
+      d->osd_and_menu_actions.expand_three_levels);
+
+  d->osd_and_menu_actions.expand_five_levels =
+      new QAction(tr("Expand (5)"), this);
+
+  d->osd_and_menu_actions.expand_five_levels->setToolTip(
+      tr("Expands this entity for five levels"));
+
+  connect(d->osd_and_menu_actions.expand_five_levels, &QAction::triggered, this,
+          &TreeExplorer::OnExpandFiveLevelsAction);
+
+  config.menu_actions.action_list.push_back(
+      d->osd_and_menu_actions.expand_five_levels);
+
   d->osd_and_menu_actions.extract_subtree =
-      new QAction("Extract subtree", this);
+      new QAction(tr("Extract subtree"), this);
 
   d->osd_and_menu_actions.extract_subtree->setToolTip(
       tr("Extracts the selected subtree"));
@@ -166,7 +192,9 @@ void TreeExplorer::UpdateAction(QAction *action) {
 
   auto enable_action{false};
 
-  if (action == d->osd_and_menu_actions.expand) {
+  if (action == d->osd_and_menu_actions.expand ||
+      action == d->osd_and_menu_actions.expand_three_levels ||
+      action == d->osd_and_menu_actions.expand_five_levels) {
     auto is_duplicate{false};
     if (auto variant = index.data(ITreeExplorerModel::IsDuplicate);
         variant.isValid() && variant.canConvert<bool>()) {
@@ -268,6 +296,28 @@ void TreeExplorer::OnExtractSubtreeAction() {
   emit ExtractSubtree(model_index);
 }
 
+void TreeExplorer::OnExpandThreeLevelsAction() {
+  auto model_index_var = d->osd_and_menu_actions.expand_three_levels->data();
+  if (!model_index_var.isValid() ||
+      !model_index_var.canConvert<QModelIndex>()) {
+    return;
+  }
+
+  auto model_index = model_index_var.toModelIndex();
+  d->model->Expand(model_index, 3);
+}
+
+void TreeExplorer::OnExpandFiveLevelsAction() {
+  auto model_index_var = d->osd_and_menu_actions.expand_five_levels->data();
+  if (!model_index_var.isValid() ||
+      !model_index_var.canConvert<QModelIndex>()) {
+    return;
+  }
+
+  auto model_index = model_index_var.toModelIndex();
+  d->model->Expand(model_index, 5);
+}
+
 void TreeExplorer::OnThemeChange(const QPalette &,
                                  const CodeViewTheme &code_view_theme) {
   QIcon open_item_icon;
@@ -309,6 +359,26 @@ void TreeExplorer::OnThemeChange(const QPalette &,
       QIcon::Disabled, QIcon::On);
 
   d->osd_and_menu_actions.extract_subtree->setIcon(extract_subtree_icon);
+
+  QIcon expand_3_item_icon;
+  expand_3_item_icon.addPixmap(GetPixmap(":/TreeExplorer/expand_3_ref_item"),
+                               QIcon::Normal, QIcon::On);
+
+  expand_3_item_icon.addPixmap(
+      GetPixmap(":/TreeExplorer/expand_3_ref_item", IconStyle::Disabled),
+      QIcon::Disabled, QIcon::On);
+
+  d->osd_and_menu_actions.expand_three_levels->setIcon(expand_3_item_icon);
+
+  QIcon expand_5_item_icon;
+  expand_5_item_icon.addPixmap(GetPixmap(":/TreeExplorer/expand_5_ref_item"),
+                               QIcon::Normal, QIcon::On);
+
+  expand_5_item_icon.addPixmap(
+      GetPixmap(":/TreeExplorer/expand_5_ref_item", IconStyle::Disabled),
+      QIcon::Disabled, QIcon::On);
+
+  d->osd_and_menu_actions.expand_five_levels->setIcon(expand_5_item_icon);
 }
 
 void TreeExplorer::OnModelRequestStarted() {
