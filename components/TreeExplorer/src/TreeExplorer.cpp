@@ -14,6 +14,8 @@
 
 #include <QVBoxLayout>
 #include <QAction>
+#include <QLabel>
+#include <QPushButton>
 
 namespace mx::gui {
 
@@ -32,6 +34,7 @@ struct TreeExplorer::PrivateData final {
   QAbstractProxyModel *highlighter_model_proxy{nullptr};
 
   IGeneratorView *generator_view{nullptr};
+  QWidget *status_widget{nullptr};
   OSDAndMenuActions osd_and_menu_actions;
 };
 
@@ -86,18 +89,44 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
 
   config.osd_actions = config.menu_actions;
 
-  // Create the view and setup the layout
+  // Create the view
   d->generator_view =
       IGeneratorView::Create(d->highlighter_model_proxy, config);
 
   connect(d->generator_view, &IGeneratorView::SelectedItemChanged, this,
           &ITreeExplorer::SelectedItemChanged);
 
+  // Create the status widget, which is used to cancel updates
+  d->status_widget = new QWidget();
+  d->status_widget->setVisible(false);
+
+  auto status_widget_layout = new QHBoxLayout();
+  status_widget_layout->setContentsMargins(0, 0, 0, 0);
+
+  status_widget_layout->addWidget(new QLabel(tr("Updating..."), this));
+  status_widget_layout->addStretch();
+
+  auto cancel_button = new QPushButton(tr("Cancel"), this);
+  status_widget_layout->addWidget(cancel_button);
+
+  connect(cancel_button, &QPushButton::pressed, d->model,
+          &ITreeExplorerModel::CancelRunningRequest);
+
+  connect(d->model, &ITreeExplorerModel::RequestStarted, this,
+          &TreeExplorer::OnModelRequestStarted);
+
+  connect(d->model, &ITreeExplorerModel::RequestFinished, this,
+          &TreeExplorer::OnModelRequestFinished);
+
+  d->status_widget->setLayout(status_widget_layout);
+
+  // Setup the layout
   setContentsMargins(0, 0, 0, 0);
 
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->generator_view);
+  layout->addWidget(d->status_widget);
   setLayout(layout);
 
   // Ensure that we receive theme updates so that we can update the icons
@@ -231,6 +260,14 @@ void TreeExplorer::OnThemeChange(const QPalette &,
       QIcon::Disabled, QIcon::On);
 
   d->osd_and_menu_actions.go_to->setIcon(goto_item_icon);
+}
+
+void TreeExplorer::OnModelRequestStarted() {
+  d->status_widget->setVisible(true);
+}
+
+void TreeExplorer::OnModelRequestFinished() {
+  d->status_widget->setVisible(false);
 }
 
 }  // namespace mx::gui
