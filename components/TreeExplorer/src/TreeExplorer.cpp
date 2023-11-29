@@ -260,6 +260,12 @@ void TreeExplorer::OnGoToAction() {
     return;
   }
 
+  // Map this back to the model used by the view
+  model_index = d->highlighter_model_proxy->mapFromSource(model_index);
+  if (!model_index.isValid()) {
+    return;
+  }
+
   d->generator_view->SetSelection(model_index);
 }
 

@@ -167,7 +167,10 @@ void GeneratorView::SetSelection(const QModelIndex &index) {
     mapped_index = d->sort_filter_proxy_model->mapFromSource(mapped_index);
   }
 
-  selection_model->setCurrentIndex(mapped_index, QItemSelectionModel::Select);
+  selection_model->setCurrentIndex(
+      mapped_index,
+      QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+
   model_view->scrollTo(mapped_index);
 }
 
