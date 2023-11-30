@@ -22,6 +22,7 @@
 #include <QSortFilterProxyModel>
 #include <QHeaderView>
 #include <QScrollbar>
+#include <QKeyEvent>
 
 #include <variant>
 #include <optional>
@@ -160,7 +161,6 @@ void GeneratorView::SetSelection(const QModelIndex &index) {
   }
 
   auto selection_model = model_view->selectionModel();
-  selection_model->clearSelection();
 
   QModelIndex mapped_index{index};
   if (d->config.enable_sort_and_filtering) {
@@ -219,11 +219,59 @@ bool GeneratorView::eventFilter(QObject *obj, QEvent *event) {
     return false;
   }
 
-  if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
+  auto update_osd_buttons{false};
+  if (event_receiver == EventReceiver::View &&
+      event->type() == QEvent::KeyPress) {
+
+    // Forward the key press event to actions that registered a matching
+    // key sequence
+    auto selection_model = model_view->selectionModel();
+    auto selected_index_list = selection_model->selectedIndexes();
+    if (!selected_index_list.isEmpty()) {
+      auto mapped_index = selected_index_list[0];
+      if (d->config.enable_sort_and_filtering) {
+        mapped_index = d->sort_filter_proxy_model->mapToSource(mapped_index);
+      }
+
+      auto key_event = static_cast<QKeyEvent *>(event);
+      auto pressed_key_sequence = QKeySequence(key_event->keyCombination());
+
+      for (const auto &configured_actions :
+           {d->config.menu_actions, d->config.osd_actions}) {
+
+        for (const auto &action : configured_actions.action_list) {
+          auto trigger_action{false};
+          for (const auto &action_key_sequence : action->shortcuts()) {
+            trigger_action = action_key_sequence == pressed_key_sequence;
+            if (trigger_action) {
+              break;
+            }
+          }
+
+          if (trigger_action) {
+            action->setData(mapped_index);
+
+            if (configured_actions.update_action_callback != nullptr) {
+              configured_actions.update_action_callback(action);
+            }
+
+            if (action->isEnabled()) {
+              action->trigger();
+            }
+          }
+        }
+      }
+      emit KeyPressedOnItem(selected_index_list[0],
+                            static_cast<Qt::Key>(key_event->key()));
+    }
+
+  } else if (event->type() == QEvent::Leave ||
+             event->type() == QEvent::MouseMove) {
     // It is important to also check for the Leave event, since
     // the OSD buttons could cover the viewport and cause the
     // widgets to emit it
     d->opt_hovered_index = GetModelIndexAtCurrentMousePos(d->view_var);
+    update_osd_buttons = true;
 
   } else if (event_receiver == EventReceiver::View &&
              event->type() == QEvent::Wheel) {
@@ -235,9 +283,14 @@ bool GeneratorView::eventFilter(QObject *obj, QEvent *event) {
     if (scrolling_enabled) {
       d->opt_hovered_index = std::nullopt;
     }
+
+    update_osd_buttons = true;
   }
 
-  UpdateOSDButtons();
+  if (update_osd_buttons) {
+    UpdateOSDButtons();
+  }
+
   return false;
 }
 
