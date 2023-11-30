@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "PreviewableReferenceExplorer.h"
+#include <multiplier/ui/PreviewableTreeExplorerView.h>
 
 #include <QWidget>
 
@@ -17,39 +17,39 @@ class IMacroExplorer;
 class ITreeGenerator;
 
 //! A reference explorer for context menus
-class QuickReferenceExplorer final : public QWidget {
+class QuickTreeExplorerWidget final : public QWidget {
   Q_OBJECT
 
  public:
   //! Constructor
-  QuickReferenceExplorer(const Index &index,
-                         const FileLocationCache &file_location_cache,
-                         std::shared_ptr<ITreeGenerator> generator,
-                         const bool &show_code_preview,
-                         IGlobalHighlighter &highlighter,
-                         IMacroExplorer &macro_explorer,
-                         QWidget *parent = nullptr);
+  QuickTreeExplorerWidget(const Index &index,
+                          const FileLocationCache &file_location_cache,
+                          std::shared_ptr<ITreeGenerator> generator,
+                          const bool &show_code_preview,
+                          IGlobalHighlighter &highlighter,
+                          IMacroExplorer &macro_explorer,
+                          QWidget *parent = nullptr);
 
   //! Destructor
-  virtual ~QuickReferenceExplorer() override;
+  virtual ~QuickTreeExplorerWidget() override;
 
   //! Disabled copy constructor
-  QuickReferenceExplorer(const QuickReferenceExplorer &) = delete;
+  QuickTreeExplorerWidget(const QuickTreeExplorerWidget &) = delete;
 
   //! Disabled copy assignment operator
-  QuickReferenceExplorer &operator=(const QuickReferenceExplorer &) = delete;
+  QuickTreeExplorerWidget &operator=(const QuickTreeExplorerWidget &) = delete;
 
  signals:
   //! Emitted when the user asks to dock this window
-  void SaveReferenceExplorer(PreviewableReferenceExplorer *reference_explorer);
+  void SaveTreeExplorer(PreviewableTreeExplorerView *reference_explorer);
 
-  //! The forwarded PreviewableReferenceExplorer::SelectedItemChanged signal
+  //! The forwarded PreviewableTreeExplorerView::SelectedItemChanged signal
   void SelectedItemChanged(const QModelIndex &index);
 
-  //! The forwarded PreviewableReferenceExplorer::ItemActivated signal
+  //! The forwarded PreviewableTreeExplorerView::ItemActivated signal
   void ItemActivated(const QModelIndex &index);
 
-  //! The forwarded PreviewableReferenceExplorer::ExtractSubtree signal
+  //! The forwarded PreviewableTreeExplorerView::ExtractSubtree signal
   void ExtractSubtree(const QModelIndex &index);
 
  protected:
@@ -97,7 +97,7 @@ class QuickReferenceExplorer final : public QWidget {
   void OnApplicationStateChange(Qt::ApplicationState state);
 
   //! Called when the save to new tab button is pressed
-  void OnSaveReferenceExplorer();
+  void OnSaveTreeExplorer();
 
   //! Called by the theme manager
   void OnThemeChange(const QPalette &palette,

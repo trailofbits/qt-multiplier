@@ -31,7 +31,7 @@ class FileTreeModel final : public IFileTreeModel {
   //! \copybrief IFileTreeModel::SetRoot
   virtual void SetRoot(const QModelIndex &index) override;
 
-  //! \copybrief IReferenceExplorerModel::SetDefaultRoot
+  //! \copybrief ITreeExplorerModel::SetDefaultRoot
   virtual void SetDefaultRoot() override;
 
   //! Creates a new Qt model index

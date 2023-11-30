@@ -15,6 +15,12 @@ add_library("mx_treeexplorer"
 
   src/TreeExplorer.h
   src/TreeExplorer.cpp
+
+  include/multiplier/ui/PreviewableTreeExplorerView.h
+  src/PreviewableTreeExplorerView.cpp
+
+  include/multiplier/ui/QuickTreeExplorerWidget.h
+  src/QuickTreeExplorerWidget.cpp
 )
 
 target_sources("mx_treeexplorer" INTERFACE

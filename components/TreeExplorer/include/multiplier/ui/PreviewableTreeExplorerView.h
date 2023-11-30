@@ -16,43 +16,43 @@ class IGlobalHighlighter;
 class IMacroExplorer;
 class IGeneratorModel;
 
-//! A container for a ReferenceExplorer and the linked ICodeView
-class PreviewableReferenceExplorer final : public QWidget {
+//! A container for a TreeExplorer and the linked ICodeView
+class PreviewableTreeExplorerView final : public QWidget {
   Q_OBJECT
 
  public:
   //! Constructor
-  PreviewableReferenceExplorer(const Index &index,
-                               const FileLocationCache &file_location_cache,
-                               IGeneratorModel *model,
-                               const bool &show_code_preview,
-                               IGlobalHighlighter &highlighter,
-                               IMacroExplorer &macro_explorer,
-                               QWidget *parent = nullptr);
+  PreviewableTreeExplorerView(const Index &index,
+                              const FileLocationCache &file_location_cache,
+                              IGeneratorModel *model,
+                              const bool &show_code_preview,
+                              IGlobalHighlighter &highlighter,
+                              IMacroExplorer &macro_explorer,
+                              QWidget *parent = nullptr);
 
   //! Destructor
-  virtual ~PreviewableReferenceExplorer() override;
+  virtual ~PreviewableTreeExplorerView() override;
 
   //! Returns the active model
   IGeneratorModel *Model();
 
   //! Disabled copy constructor
-  PreviewableReferenceExplorer(const PreviewableReferenceExplorer &) = delete;
+  PreviewableTreeExplorerView(const PreviewableTreeExplorerView &) = delete;
 
   //! Disabled copy assignment operator
-  PreviewableReferenceExplorer &
-  operator=(const PreviewableReferenceExplorer &) = delete;
+  PreviewableTreeExplorerView &
+  operator=(const PreviewableTreeExplorerView &) = delete;
 
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
   //! Initializes the internal widgets
-  void
-  InitializeWidgets(mx::Index index, mx::FileLocationCache file_location_cache,
-                    IGeneratorModel *model, const bool &show_code_preview,
-                    IGlobalHighlighter &highlighter,
-                    IMacroExplorer &macro_explorer);
+  void InitializeWidgets(mx::Index index,
+                         mx::FileLocationCache file_location_cache,
+                         IGeneratorModel *model, const bool &show_code_preview,
+                         IGlobalHighlighter &highlighter,
+                         IMacroExplorer &macro_explorer);
 
   //! Schedules a post-update scroll-to-line operation
   void SchedulePostUpdateLineScrollCommand(unsigned line_number);
@@ -65,7 +65,7 @@ class PreviewableReferenceExplorer final : public QWidget {
 
  private slots:
   //! Schedules a code model update whenever a reference is clicked
-  void OnReferenceExplorerSelectedItemChanged(const QModelIndex &index);
+  void OnTreeExplorerSelectedItemChanged(const QModelIndex &index);
 
   //! Used to do the first time initialization of the code preview
   void OnRowsInserted();
@@ -78,10 +78,10 @@ class PreviewableReferenceExplorer final : public QWidget {
   void SetBrowserMode(const bool &enabled);
 
  signals:
-  //! The forwarded IReferenceExplorer::SelectedItemChanged signal
+  //! The forwarded ITreeExplorer::SelectedItemChanged signal
   void SelectedItemChanged(const QModelIndex &index);
 
-  //! The forwarded IReferenceExplorer::ItemActivated signal
+  //! The forwarded ITreeExplorer::ItemActivated signal
   void ItemActivated(const QModelIndex &index);
 
   //! The forwarded ICodeView::TokenTriggered

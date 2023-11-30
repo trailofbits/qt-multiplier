@@ -20,7 +20,7 @@
 
 namespace mx::gui {
 
-//! Implements the IReferenceExplorerModel interface
+//! Implements the ITreeExplorerModel interface
 class GeneratorModel final : public IGeneratorModel {
   Q_OBJECT
 
@@ -37,7 +37,7 @@ class GeneratorModel final : public IGeneratorModel {
   //! This constructor creates a new model, using `source_model` as a base
   //! and `root_item` as the new root item
   GeneratorModel(const GeneratorModel &source_model,
-                    const QModelIndex &root_item, QObject *parent);
+                 const QModelIndex &root_item, QObject *parent);
 
   //! Common code for all constructors
   void InitializeModel();
