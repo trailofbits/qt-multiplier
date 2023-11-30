@@ -44,7 +44,6 @@ target_sources("Multiplier" PRIVATE
 )
 
 add_subdirectory("data_generators")
-add_subdirectory("widgets")
 
 target_link_libraries("Multiplier"
   PRIVATE
@@ -62,7 +61,6 @@ target_link_libraries("Multiplier"
     "mx_treeexplorer"
     "mx_entityexplorer"
     "mx_historywidget"
-    "mx_widgets"
     "mx_informationexplorer"
     "mx_globalhighlighter"
     "mx_macroexplorer"

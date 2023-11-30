@@ -3,15 +3,6 @@
         <file alias="Multiplier">Icons/Multiplier.icns</file>
     </qresource>
 
-    <qresource prefix="/Icons/QuickReferenceExplorer">
-        <file alias="SaveToNewTab">Icons/quick_ref_explorer_as_new_tab.png</file>
-        <file alias="Close">Icons/quick_ref_explorer_close.png</file>
-    </qresource>
-
-    <qresource prefix="/Icons/QuickCodeView">
-        <file alias="Close">Icons/quick_code_view_close.png</file>
-    </qresource>
-
     <qresource prefix="/Icons/ToolBar">
         <file alias="BrowserMode">Icons/browser_mode.png</file>
     </qresource>
