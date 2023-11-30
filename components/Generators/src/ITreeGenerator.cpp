@@ -24,8 +24,8 @@ RawEntityId ITreeItem::AliasedEntityId(void) const {
 // NOTE(pag): These are `shared_ptr`s so that implementations have the
 //            flexibility of having tree items extend the lifetime of
 //            tree generator itself.
-gap::generator<std::shared_ptr<ITreeItem>> ITreeGenerator::Roots(
-    const std::shared_ptr<ITreeGenerator> &self) {
+gap::generator<std::shared_ptr<ITreeItem>>
+ITreeGenerator::Roots(const std::shared_ptr<ITreeGenerator> &self) {
   return Children(self, kInvalidEntityId);
 }
 

@@ -18,6 +18,27 @@ add_library("mx_generators"
 
   src/FilterSettingsWidget.h
   src/FilterSettingsWidget.cpp
+
+  include/multiplier/ui/ITreeExplorerModel.h
+  src/ITreeExplorerModel.cpp
+
+  include/multiplier/ui/ITreeGenerator.h
+  src/ITreeGenerator.cpp
+
+  src/ITreeExplorerExpansionThread.h
+  src/ITreeExplorerExpansionThread.cpp
+
+  src/InitTreeExplorerThread.h
+  src/InitTreeExplorerThread.cpp
+
+  src/InitTreeExplorerThread.h
+  src/InitTreeExplorerThread.cpp
+
+  src/ExpandTreeExplorerThread.h
+  src/ExpandTreeExplorerThread.cpp
+
+  src/TreeExplorerModel.h
+  src/TreeExplorerModel.cpp
 )
 
 target_link_libraries("mx_generators"
