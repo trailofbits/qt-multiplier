@@ -9,33 +9,12 @@
 add_library("mx_treeexplorer"
   include/multiplier/ui/ITreeExplorer.h
   src/ITreeExplorer.cpp
-
-  include/multiplier/ui/ITreeExplorerModel.h
-  src/ITreeExplorerModel.cpp
-
-  include/multiplier/ui/ITreeGenerator.h
-  src/ITreeGenerator.cpp
   
-  src/TreeExplorerModel.h
-  src/TreeExplorerModel.cpp
-
   src/TreeExplorerItemDelegate.h
   src/TreeExplorerItemDelegate.cpp
 
   src/TreeExplorer.h
   src/TreeExplorer.cpp
-
-  src/ITreeExplorerExpansionThread.h
-  src/ITreeExplorerExpansionThread.cpp
-
-  src/InitTreeExplorerThread.h
-  src/InitTreeExplorerThread.cpp
-
-  src/InitTreeExplorerThread.h
-  src/InitTreeExplorerThread.cpp
-
-  src/ExpandTreeExplorerThread.h
-  src/ExpandTreeExplorerThread.cpp
 )
 
 target_sources("mx_treeexplorer" INTERFACE
@@ -67,7 +46,3 @@ target_include_directories("mx_treeexplorer" SYSTEM INTERFACE
 )
 
 enable_qt_properties("mx_treeexplorer")
-
-if(MXQT_ENABLE_TESTS)
-  add_subdirectory("tests")
-endif()
