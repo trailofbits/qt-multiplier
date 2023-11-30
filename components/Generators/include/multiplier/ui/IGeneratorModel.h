@@ -19,7 +19,7 @@ namespace mx::gui {
 class ITreeGenerator;
 
 //! A model for the reference explorer widget
-class ITreeExplorerModel : public QAbstractItemModel {
+class IGeneratorModel : public QAbstractItemModel {
   Q_OBJECT
 
  public:
@@ -43,18 +43,18 @@ class ITreeExplorerModel : public QAbstractItemModel {
   };
 
   //! Factory method.
-  static ITreeExplorerModel *Create(QObject *parent = nullptr);
+  static IGeneratorModel *Create(QObject *parent = nullptr);
 
   //! Creates a new model using the given one as a base, with `root_item`
   //! as the new root
-  static ITreeExplorerModel *CreateFrom(const QModelIndex &root_item,
+  static IGeneratorModel *CreateFrom(const QModelIndex &root_item,
                                         QObject *parent = nullptr);
 
   //! Constructor
-  ITreeExplorerModel(QObject *parent) : QAbstractItemModel(parent) {}
+  IGeneratorModel(QObject *parent) : QAbstractItemModel(parent) {}
 
   //! Destructor
-  virtual ~ITreeExplorerModel();
+  virtual ~IGeneratorModel();
 
   //! Install a new generator to back the data of this model.
   virtual void InstallGenerator(std::shared_ptr<ITreeGenerator> generator_) = 0;
@@ -71,10 +71,10 @@ class ITreeExplorerModel : public QAbstractItemModel {
 
  private:
   //! Disabled copy constructor
-  ITreeExplorerModel(const ITreeExplorerModel &) = delete;
+  IGeneratorModel(const IGeneratorModel &) = delete;
 
   //! Disabled copy assignment operator
-  ITreeExplorerModel &operator=(const ITreeExplorerModel &) = delete;
+  IGeneratorModel &operator=(const IGeneratorModel &) = delete;
 
  signals:
   //! Emitted when a new request is started

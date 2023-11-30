@@ -9,7 +9,7 @@
 #include "TreeExplorerItemDelegate.h"
 
 #include <multiplier/ui/CodeViewTheme.h>
-#include <multiplier/ui/ITreeExplorerModel.h>
+#include <multiplier/ui/IGeneratorModel.h>
 #include <multiplier/ui/TokenPainter.h>
 
 #include <multiplier/Token.h>
@@ -95,7 +95,7 @@ void TreeExplorerItemDelegate::paint(QPainter *painter,
     return;
   }
 
-  QVariant val = index.data(ITreeExplorerModel::TokenRangeRole);
+  QVariant val = index.data(IGeneratorModel::TokenRangeRole);
   if (!val.isValid()) {
     this->QStyledItemDelegate::paint(painter, option, index);
     return;
@@ -131,7 +131,7 @@ QSize TreeExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
     return this->QStyledItemDelegate::sizeHint(option, index);
   }
 
-  QVariant val = index.data(ITreeExplorerModel::TokenRangeRole);
+  QVariant val = index.data(IGeneratorModel::TokenRangeRole);
   if (!val.isValid()) {
     return QStyledItemDelegate::sizeHint(option, index);
   }

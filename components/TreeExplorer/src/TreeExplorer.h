@@ -26,7 +26,7 @@ class TreeExplorer final : public ITreeExplorer {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  TreeExplorer(ITreeExplorerModel *model,
+  TreeExplorer(IGeneratorModel *model,
                IGlobalHighlighter *global_highlighter, QWidget *parent);
 
   //! Called when a menu or osd action is about to be shown to screen

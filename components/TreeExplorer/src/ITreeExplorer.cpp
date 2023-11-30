@@ -12,7 +12,7 @@
 
 namespace mx::gui {
 
-ITreeExplorer *ITreeExplorer::Create(ITreeExplorerModel *model,
+ITreeExplorer *ITreeExplorer::Create(IGeneratorModel *model,
                                      IGlobalHighlighter *global_highlighter,
                                      QWidget *parent) {
 
