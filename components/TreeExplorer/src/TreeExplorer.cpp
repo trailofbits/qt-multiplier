@@ -96,8 +96,11 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
 
   // Keep these only in the menu
   d->osd_and_menu_actions.expand_three_levels =
-      new QAction(tr("Expand (3)"), this);
+      new QAction(tr("Expand &3 levels"), this);
 
+  //! \todo There's a Qt 6.x bug that prevents the &3 from working correctly, so
+  //!       for now we have to set the shortcut explicitly
+  d->osd_and_menu_actions.expand_three_levels->setShortcut(Qt::Key_3);
   d->osd_and_menu_actions.expand_three_levels->setToolTip(
       tr("Expands this entity for three levels"));
 
@@ -108,8 +111,11 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
       d->osd_and_menu_actions.expand_three_levels);
 
   d->osd_and_menu_actions.expand_five_levels =
-      new QAction(tr("Expand (5)"), this);
+      new QAction(tr("Expand &5 levels"), this);
 
+  //! \todo There's a Qt 6.x bug that prevents the &3 from working correctly, so
+  //!       for now we have to set the shortcut explicitly
+  d->osd_and_menu_actions.expand_five_levels->setShortcut(Qt::Key_5);
   d->osd_and_menu_actions.expand_five_levels->setToolTip(
       tr("Expands this entity for five levels"));
 

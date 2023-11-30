@@ -74,8 +74,12 @@ class IGeneratorView : public QWidget {
   IGeneratorView &operator=(const IGeneratorView &) = delete;
 
  signals:
-  //! Emitted when an item is clicked or selected
+  //! Emitted when an item is selected
+  //! \todo Change this to just click notfication
   void SelectedItemChanged(const QModelIndex &index);
+
+  //! Emitted when a key is pressed on a selected item
+  void KeyPressedOnItem(const QModelIndex &index, const Qt::Key &key);
 };
 
 }  // namespace mx::gui
