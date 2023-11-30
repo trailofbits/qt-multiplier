@@ -24,7 +24,7 @@
 #include <multiplier/ui/IMacroExplorer.h>
 #include <multiplier/ui/IProjectExplorer.h>
 #include <multiplier/ui/IThemeManager.h>
-#include <multiplier/ui/ITreeExplorerModel.h>
+#include <multiplier/ui/IGeneratorModel.h>
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/ITreeExplorer.h>
 #include <multiplier/ui/CallHierarchyGenerator.h>
@@ -940,7 +940,7 @@ void MainWindow::OnInformationExplorerSelectionChange(
 }
 
 void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
-  auto entity_id_role = index.data(ITreeExplorerModel::EntityIdRole);
+  auto entity_id_role = index.data(IGeneratorModel::EntityIdRole);
   if (!entity_id_role.isValid()) {
     return;
   }
@@ -1148,7 +1148,7 @@ void MainWindow::OnBrowserModeToggled() {
 }
 
 void MainWindow::OnExtractTreeExplorerSubtree(const QModelIndex &index) {
-  auto dest_model = ITreeExplorerModel::CreateFrom(index);
+  auto dest_model = IGeneratorModel::CreateFrom(index);
 
   auto tree_explorer = new PreviewableReferenceExplorer(
       d->index, d->file_location_cache, dest_model, false,

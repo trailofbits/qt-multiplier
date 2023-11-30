@@ -35,7 +35,7 @@ struct OSDAndMenuActions final {
 }  // namespace
 
 struct TreeExplorer::PrivateData final {
-  ITreeExplorerModel *model{nullptr};
+  IGeneratorModel *model{nullptr};
   QAbstractProxyModel *highlighter_model_proxy{nullptr};
 
   IGeneratorView *generator_view{nullptr};
@@ -45,7 +45,7 @@ struct TreeExplorer::PrivateData final {
 
 TreeExplorer::~TreeExplorer() {}
 
-TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
+TreeExplorer::TreeExplorer(IGeneratorModel *model,
                            IGlobalHighlighter *global_highlighter,
                            QWidget *parent)
     : ITreeExplorer(parent),
@@ -55,7 +55,7 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
   d->model = model;
 
   d->highlighter_model_proxy = global_highlighter->CreateModelProxy(
-      d->model, ITreeExplorerModel::EntityIdRole);
+      d->model, IGeneratorModel::EntityIdRole);
 
   // Initialize the item delegate
   auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
@@ -158,12 +158,12 @@ TreeExplorer::TreeExplorer(ITreeExplorerModel *model,
   status_widget_layout->addWidget(cancel_button);
 
   connect(cancel_button, &QPushButton::pressed, d->model,
-          &ITreeExplorerModel::CancelRunningRequest);
+          &IGeneratorModel::CancelRunningRequest);
 
-  connect(d->model, &ITreeExplorerModel::RequestStarted, this,
+  connect(d->model, &IGeneratorModel::RequestStarted, this,
           &TreeExplorer::OnModelRequestStarted);
 
-  connect(d->model, &ITreeExplorerModel::RequestFinished, this,
+  connect(d->model, &IGeneratorModel::RequestFinished, this,
           &TreeExplorer::OnModelRequestFinished);
 
   d->status_widget->setLayout(status_widget_layout);
@@ -202,20 +202,20 @@ void TreeExplorer::UpdateAction(QAction *action) {
       action == d->osd_and_menu_actions.expand_three_levels ||
       action == d->osd_and_menu_actions.expand_five_levels) {
     auto is_duplicate{false};
-    if (auto variant = index.data(ITreeExplorerModel::IsDuplicate);
+    if (auto variant = index.data(IGeneratorModel::IsDuplicate);
         variant.isValid() && variant.canConvert<bool>()) {
       is_duplicate = variant.toBool();
     }
 
     if (!is_duplicate) {
-      if (auto variant = index.data(ITreeExplorerModel::CanBeExpanded);
+      if (auto variant = index.data(IGeneratorModel::CanBeExpanded);
           variant.isValid() && variant.canConvert<bool>()) {
         enable_action = variant.toBool();
       }
     }
 
   } else if (action == d->osd_and_menu_actions.go_to) {
-    if (auto variant = index.data(ITreeExplorerModel::IsDuplicate);
+    if (auto variant = index.data(IGeneratorModel::IsDuplicate);
         variant.isValid() && variant.canConvert<bool>()) {
       enable_action = variant.toBool();
     }

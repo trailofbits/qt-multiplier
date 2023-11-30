@@ -14,7 +14,7 @@ namespace mx::gui {
 
 class IGlobalHighlighter;
 class IMacroExplorer;
-class ITreeExplorerModel;
+class IGeneratorModel;
 
 //! A container for a ReferenceExplorer and the linked ICodeView
 class PreviewableReferenceExplorer final : public QWidget {
@@ -24,7 +24,7 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Constructor
   PreviewableReferenceExplorer(const Index &index,
                                const FileLocationCache &file_location_cache,
-                               ITreeExplorerModel *model,
+                               IGeneratorModel *model,
                                const bool &show_code_preview,
                                IGlobalHighlighter &highlighter,
                                IMacroExplorer &macro_explorer,
@@ -34,7 +34,7 @@ class PreviewableReferenceExplorer final : public QWidget {
   virtual ~PreviewableReferenceExplorer() override;
 
   //! Returns the active model
-  ITreeExplorerModel *Model();
+  IGeneratorModel *Model();
 
   //! Disabled copy constructor
   PreviewableReferenceExplorer(const PreviewableReferenceExplorer &) = delete;
@@ -50,7 +50,7 @@ class PreviewableReferenceExplorer final : public QWidget {
   //! Initializes the internal widgets
   void
   InitializeWidgets(mx::Index index, mx::FileLocationCache file_location_cache,
-                    ITreeExplorerModel *model, const bool &show_code_preview,
+                    IGeneratorModel *model, const bool &show_code_preview,
                     IGlobalHighlighter &highlighter,
                     IMacroExplorer &macro_explorer);
 

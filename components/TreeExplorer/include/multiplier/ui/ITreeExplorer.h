@@ -9,7 +9,7 @@
 #pragma once
 
 #include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/ITreeExplorerModel.h>
+#include <multiplier/ui/IGeneratorModel.h>
 
 #include <QAbstractItemModel>
 #include <QWidget>
@@ -23,7 +23,7 @@ class ITreeExplorer : public QWidget {
 
  public:
   //! Factory method
-  static ITreeExplorer *Create(ITreeExplorerModel *model,
+  static ITreeExplorer *Create(IGeneratorModel *model,
                                IGlobalHighlighter *global_highlighter,
                                QWidget *parent = nullptr);
 

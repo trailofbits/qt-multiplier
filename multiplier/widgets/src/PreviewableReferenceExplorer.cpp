@@ -10,7 +10,7 @@
 #include <multiplier/ui/IGlobalHighlighter.h>
 #include <multiplier/ui/IMacroExplorer.h>
 #include <multiplier/ui/ITreeExplorer.h>
-#include <multiplier/ui/ITreeExplorerModel.h>
+#include <multiplier/ui/IGeneratorModel.h>
 
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -26,7 +26,7 @@ struct PreviewableReferenceExplorer::PrivateData final {
   ICodeView *code_view{nullptr};
   std::optional<unsigned> opt_scroll_to_line;
 
-  ITreeExplorerModel *ref_explorer_model{nullptr};
+  IGeneratorModel *ref_explorer_model{nullptr};
   ITreeExplorer *reference_explorer{nullptr};
 
   QSplitter *splitter{nullptr};
@@ -34,7 +34,7 @@ struct PreviewableReferenceExplorer::PrivateData final {
 
 PreviewableReferenceExplorer::PreviewableReferenceExplorer(
     const Index &index, const FileLocationCache &file_location_cache,
-    ITreeExplorerModel *model, const bool &show_code_preview,
+    IGeneratorModel *model, const bool &show_code_preview,
     IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer,
     QWidget *parent)
     : QWidget(parent),
@@ -46,13 +46,13 @@ PreviewableReferenceExplorer::PreviewableReferenceExplorer(
 
 PreviewableReferenceExplorer::~PreviewableReferenceExplorer() {}
 
-ITreeExplorerModel *PreviewableReferenceExplorer::Model() {
+IGeneratorModel *PreviewableReferenceExplorer::Model() {
   return d->ref_explorer_model;
 }
 
 void PreviewableReferenceExplorer::InitializeWidgets(
     mx::Index index, mx::FileLocationCache file_location_cache,
-    ITreeExplorerModel *model, const bool &show_code_preview,
+    IGeneratorModel *model, const bool &show_code_preview,
     IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer) {
 
   d->ref_explorer_model = model;
@@ -72,7 +72,7 @@ void PreviewableReferenceExplorer::InitializeWidgets(
   connect(model, &QAbstractItemModel::rowsInserted, this,
           &PreviewableReferenceExplorer::OnRowsInserted);
 
-  connect(model, &ITreeExplorerModel::TreeNameChanged, this,
+  connect(model, &IGeneratorModel::TreeNameChanged, this,
           &PreviewableReferenceExplorer::OnTreeNameChanged);
 
   OnTreeNameChanged();
@@ -121,7 +121,7 @@ PreviewableReferenceExplorer::GetScheduledPostUpdateLineScrollCommand() {
 }
 
 void PreviewableReferenceExplorer::UpdateCodePreview(const QModelIndex &index) {
-  auto file_raw_entity_id_var = index.data(ITreeExplorerModel::EntityIdRole);
+  auto file_raw_entity_id_var = index.data(IGeneratorModel::EntityIdRole);
   if (!file_raw_entity_id_var.isValid()) {
     return;
   }
@@ -152,7 +152,7 @@ void PreviewableReferenceExplorer::OnRowsInserted() {
 void PreviewableReferenceExplorer::OnTreeNameChanged() {
   QString tree_name;
   if (auto tree_name_var = d->ref_explorer_model->data(
-          QModelIndex(), ITreeExplorerModel::TreeNameRole);
+          QModelIndex(), IGeneratorModel::TreeNameRole);
       tree_name_var.canConvert<QString>()) {
 
     tree_name = tree_name_var.toString();

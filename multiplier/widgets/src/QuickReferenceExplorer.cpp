@@ -10,7 +10,7 @@
 #include <multiplier/ui/IDatabase.h>
 #include <multiplier/ui/Icons.h>
 #include <multiplier/ui/IThemeManager.h>
-#include <multiplier/ui/ITreeExplorerModel.h>
+#include <multiplier/ui/IGeneratorModel.h>
 #include <multiplier/ui/ITreeGenerator.h>
 
 #include <QVBoxLayout>
@@ -32,7 +32,7 @@
 namespace mx::gui {
 
 struct QuickReferenceExplorer::PrivateData final {
-  ITreeExplorerModel *model{nullptr};
+  IGeneratorModel *model{nullptr};
   bool closed{false};
 
   QPushButton *close_button{nullptr};
@@ -170,9 +170,9 @@ void QuickReferenceExplorer::InitializeWidgets(
   // Contents
   //
 
-  d->model = ITreeExplorerModel::Create(this);
+  d->model = IGeneratorModel::Create(this);
 
-  connect(d->model, &ITreeExplorerModel::TreeNameChanged, this,
+  connect(d->model, &IGeneratorModel::TreeNameChanged, this,
           &QuickReferenceExplorer::OnTreeNameChanged);
 
   d->model->InstallGenerator(std::move(generator));
@@ -278,7 +278,7 @@ void QuickReferenceExplorer::SetBrowserMode(const bool &enabled) {
 void QuickReferenceExplorer::OnTreeNameChanged() {
   QString tree_name;
   if (auto tree_name_var =
-          d->model->data(QModelIndex(), ITreeExplorerModel::TreeNameRole);
+          d->model->data(QModelIndex(), IGeneratorModel::TreeNameRole);
       tree_name_var.canConvert<QString>()) {
 
     tree_name = tree_name_var.toString();

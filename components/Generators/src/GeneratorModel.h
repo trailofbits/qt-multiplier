@@ -10,7 +10,7 @@
 
 #include "ITreeExplorerExpansionThread.h"
 
-#include <multiplier/ui/ITreeExplorerModel.h>
+#include <multiplier/ui/IGeneratorModel.h>
 
 #include <multiplier/Types.h>
 
@@ -21,7 +21,7 @@
 namespace mx::gui {
 
 //! Implements the IReferenceExplorerModel interface
-class TreeExplorerModel final : public ITreeExplorerModel {
+class GeneratorModel final : public IGeneratorModel {
   Q_OBJECT
 
   //! Private data
@@ -32,18 +32,18 @@ class TreeExplorerModel final : public ITreeExplorerModel {
 
  public:
   //! Constructor
-  TreeExplorerModel(QObject *parent);
+  GeneratorModel(QObject *parent);
 
   //! This constructor creates a new model, using `source_model` as a base
   //! and `root_item` as the new root item
-  TreeExplorerModel(const TreeExplorerModel &source_model,
+  GeneratorModel(const GeneratorModel &source_model,
                     const QModelIndex &root_item, QObject *parent);
 
   //! Common code for all constructors
   void InitializeModel();
 
   //! Destructor
-  virtual ~TreeExplorerModel(void);
+  virtual ~GeneratorModel(void);
 
   //! Install a new generator to back the data of this model.
   void
