@@ -6,8 +6,7 @@
 
 #include "MainWindow.h"
 
-#include <multiplier/ui/QuickTreeExplorerWidget.h>
-#include <multiplier/ui/PreviewableTreeExplorerView.h>
+#include <multiplier/ui/ReferenceExplorer.h>
 #include <multiplier/ui/SimpleTextInputDialog.h>
 #include <multiplier/ui/InformationExplorerWidget.h>
 #include <multiplier/ui/MxTabWidget.h>
@@ -28,6 +27,7 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/CallHierarchyGenerator.h>
 #include <multiplier/ui/IGeneratorView.h>
+#include <multiplier/ui/IActionRegistry.h>
 
 #include <multiplier/Entities/StmtKind.h>
 
@@ -51,12 +51,11 @@ namespace mx::gui {
 
 namespace {
 
-using DockableInformationExplorer =
-    DockWidgetContainer<InformationExplorerWidget>;
-
 using CodeWidgetPopup = PopupWidgetContainer<CodeWidget>;
 
 using DockableCodeWidget = DockWidgetContainer<CodeWidget>;
+using DockableInformationExplorer =
+    DockWidgetContainer<InformationExplorerWidget>;
 
 const std::size_t kMaxHistorySize{30};
 
@@ -83,39 +82,26 @@ struct ToolBar final {
   QAction *browser_mode{nullptr};
 };
 
-std::optional<QRect> GetRestoredPopupPlacement(const QWidget *widget) {
-  if (widget == nullptr) {
-    return std::nullopt;
-  }
-
-  auto widget_rect = widget->rect().translated(widget->pos());
-  if (!widget_rect.contains(QCursor::pos())) {
-    return std::nullopt;
-  }
-
-  return widget_rect;
-}
-
 }  // namespace
 
 struct MainWindow::PrivateData final {
   mx::Index index;
   mx::FileLocationCache file_location_cache;
 
+  IActionRegistry::Ptr action_registry{nullptr};
+
   IProjectExplorer *project_explorer{nullptr};
   IEntityExplorer *entity_explorer{nullptr};
   IMacroExplorer *macro_explorer{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
-  std::unique_ptr<QuickTreeExplorerWidget> quick_ref_explorer;
-
+  std::vector<QWidget *> popup_widget_list;
   QAction *enable_code_preview_action{nullptr};
-  std::unique_ptr<CodeWidgetPopup> code_widget_popup;
 
   QShortcut *close_active_ref_explorer_tab_shortcut{nullptr};
   QShortcut *close_active_code_tab_shortcut{nullptr};
 
-  bool enable_quick_ref_explorer_code_preview{false};
+  bool enable_ref_explorer_code_preview{false};
   QTabWidget *ref_explorer_tab_widget{nullptr};
   QDockWidget *reference_explorer_dock{nullptr};
 
@@ -133,7 +119,6 @@ struct MainWindow::PrivateData final {
 };
 
 MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
-
   setWindowTitle("Multiplier");
   setWindowIcon(QIcon(":/Icons/Multiplier"));
 
@@ -152,6 +137,11 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
         mx::Index::from_database(database_path.toStdString()));
   }
 
+  d->action_registry =
+      IActionRegistry::Create(d->index, d->file_location_cache);
+
+  RegisterReferenceExplorerActions();
+
   InitializeWidgets();
   InitializeToolBar();
 
@@ -162,6 +152,80 @@ MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
 }
 
 MainWindow::~MainWindow() {}
+
+void MainWindow::RegisterReferenceExplorerActions() {
+  static const auto L_entityIdFromVariant =
+      [](Index index, const QVariant &variant) -> std::optional<RawEntityId> {
+    if (!variant.isValid()) {
+      return std::nullopt;
+    }
+
+    RawEntityId entity_id{kInvalidEntityId};
+    if (variant.canConvert<std::uint64_t>()) {
+      entity_id = static_cast<RawEntityId>(variant.toULongLong());
+
+    } else if (variant.canConvert<RawEntityId>()) {
+      entity_id = qvariant_cast<RawEntityId>(variant);
+
+    } else if (variant.canConvert<QString>()) {
+      auto string_value = variant.toString().trimmed();
+
+      bool succeeded{false};
+      entity_id =
+          static_cast<RawEntityId>(string_value.toULongLong(&succeeded));
+
+      if (!succeeded) {
+        return std::nullopt;
+      }
+    }
+
+    auto entity = index.entity(entity_id);
+    if (std::holds_alternative<NotAnEntity>(entity)) {
+      return std::nullopt;
+    }
+
+    return entity_id;
+  };
+
+  static const IActionRegistry::Action reference_explorer_action{
+      tr("Call Hierarchy"),
+      "OpenCallHierarchy",
+
+      {IActionRegistry::Action::InputType::Integer,
+       IActionRegistry::Action::InputType::String,
+       IActionRegistry::Action::InputType::EntityIdentifier},
+
+      [](Index index, const QVariant &input) -> bool {
+        auto opt_entity_id = L_entityIdFromVariant(index, input);
+        return opt_entity_id.has_value();
+      },
+
+      [this](Index index, const QVariant &input, QWidget *parent) -> bool {
+        auto opt_entity_id = L_entityIdFromVariant(index, input);
+        if (!opt_entity_id.has_value()) {
+          return false;
+        }
+
+        auto generator = CallHierarchyGenerator::Create(
+            index, d->file_location_cache, opt_entity_id.value());
+
+        auto ref_explorer = new PopupReferenceExplorer(
+            index, d->file_location_cache, std::move(generator),
+            d->enable_ref_explorer_code_preview, *d->global_highlighter,
+            *d->macro_explorer, parent);
+
+        d->popup_widget_list.push_back(ref_explorer);
+
+        ref_explorer->GetWrappedWidget()->SetBrowserMode(
+            d->toolbar.browser_mode->isChecked());
+
+        ref_explorer->show();
+        return true;
+      },
+  };
+
+  d->action_registry->Register(reference_explorer_action);
+}
 
 void MainWindow::InitializeWidgets() {
   d->view_menu = new QMenu(tr("View"));
@@ -195,12 +259,12 @@ void MainWindow::InitializeWidgets() {
 
   CreateGlobalHighlighter();
   CreateMacroExplorerDock();
-  CreateTreeExplorerMenuOptions();
+  CreateReferenceExplorerMenuOptions();
   CreateProjectExplorerDock();
   CreateEntityExplorerDock();
   CreateInfoExplorerDock();
   CreateCodeView();
-  CreateTreeExplorerDock();
+  CreateReferenceExplorerDock();
 
   tabifyDockWidget(d->project_explorer_dock, d->entity_explorer_dock);
   tabifyDockWidget(d->entity_explorer_dock, d->macro_explorer_dock);
@@ -297,21 +361,21 @@ void MainWindow::CreateMacroExplorerDock() {
   addDockWidget(Qt::LeftDockWidgetArea, d->macro_explorer_dock);
 }
 
-void MainWindow::CreateTreeExplorerDock() {
+void MainWindow::CreateReferenceExplorerDock() {
   d->ref_explorer_tab_widget = new MxTabWidget(this);
   d->ref_explorer_tab_widget->setDocumentMode(true);
   d->ref_explorer_tab_widget->setTabsClosable(true);
 
   d->close_active_ref_explorer_tab_shortcut =
       new QShortcut(QKeySequence::Close, d->ref_explorer_tab_widget, this,
-                    &MainWindow::OnCloseActiveTreeExplorerTab,
+                    &MainWindow::OnCloseActiveReferenceExplorerTab,
                     Qt::WidgetWithChildrenShortcut);
 
   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabCloseRequested,
-          this, &MainWindow::OnTreeExplorerTabBarClose);
+          this, &MainWindow::OnReferenceExplorerTabBarClose);
 
   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
-          this, &MainWindow::OnTreeExplorerTabBarDoubleClick);
+          this, &MainWindow::OnReferenceExplorerTabBarDoubleClick);
 
   d->reference_explorer_dock = new QDockWidget(tr("Tree Explorer"), this);
   d->view_menu->addAction(d->reference_explorer_dock->toggleViewAction());
@@ -433,74 +497,10 @@ void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
   d->code_view_context_menu.menu->exec(QCursor::pos());
 }
 
-void MainWindow::OpenTreeExplorer(std::shared_ptr<ITreeGenerator> generator) {
-
-  QPoint dialog_pos;
-  if (d->quick_ref_explorer != nullptr) {
-    dialog_pos = d->quick_ref_explorer->pos();
-
-  } else {
-    auto cursor_pos{QCursor::pos()};
-    dialog_pos = {cursor_pos.x() - 20, cursor_pos.y() - 20};
-  }
-
-  auto opt_popup_placement = GetPopupPlacement();
-  CloseAllPopups();
-
-  d->quick_ref_explorer = std::make_unique<QuickTreeExplorerWidget>(
-      d->index, d->file_location_cache, std::move(generator),
-      d->enable_quick_ref_explorer_code_preview, *d->global_highlighter,
-      *d->macro_explorer, this);
-
-  d->quick_ref_explorer->SetBrowserMode(d->toolbar.browser_mode->isChecked());
-
-  connect(d->quick_ref_explorer.get(),
-          &QuickTreeExplorerWidget::SaveTreeExplorer, this,
-          &MainWindow::SaveTreeExplorer);
-
-  connect(d->quick_ref_explorer.get(), &QuickTreeExplorerWidget::ExtractSubtree,
-          this, &MainWindow::OnExtractTreeExplorerSubtree);
-
-  connect(d->quick_ref_explorer.get(), &QuickTreeExplorerWidget::ItemActivated,
-          this, &MainWindow::OnTreeExplorerItemActivated);
-
-  connect(this, &MainWindow::BrowserModeToggled, d->quick_ref_explorer.get(),
-          &QuickTreeExplorerWidget::SetBrowserMode);
-
-  if (opt_popup_placement.has_value()) {
-    const auto &popup_placement = opt_popup_placement.value();
-
-    d->quick_ref_explorer->move(popup_placement.x(), popup_placement.y());
-    d->quick_ref_explorer->resize(popup_placement.width(),
-                                  popup_placement.height());
-
-  } else {
-    auto cursor_pos{QCursor::pos()};
-    d->quick_ref_explorer->move(cursor_pos.x() - 20, cursor_pos.y() - 20);
-
-    auto margin = fontMetrics().height();
-    auto max_width = margin + (width() / 3);
-    auto max_height = margin + (height() / 4);
-
-    d->quick_ref_explorer->resize(max_width, max_height);
-  }
-
-  d->quick_ref_explorer->show();
-}
-
 void MainWindow::OpenCallHierarchy(const QModelIndex &index) {
-
-  QVariant related_entity_id_var =
-      index.data(ICodeModel::RealRelatedEntityIdRole);
-
-  if (!related_entity_id_var.isValid()) {
-    CloseAllPopups();
-    return;
-  }
-
-  OpenTreeExplorer(CallHierarchyGenerator::Create(
-      d->index, d->file_location_cache,
-      qvariant_cast<RawEntityId>(related_entity_id_var)));
+  d->action_registry->Execute("OpenCallHierarchy",
+                              index.data(ICodeModel::RealRelatedEntityIdRole),
+                              this);
 }
 
 void MainWindow::OpenTokenEntityInfo(const QModelIndex &index,
@@ -541,18 +541,6 @@ void MainWindow::ExpandMacro(const QModelIndex &index) {
   }
 }
 
-std::optional<QRect> MainWindow::GetPopupPlacement() {
-  auto opt_popup_placement =
-      GetRestoredPopupPlacement(d->code_widget_popup.get());
-
-  if (!opt_popup_placement.has_value()) {
-    opt_popup_placement =
-        GetRestoredPopupPlacement(d->quick_ref_explorer.get());
-  }
-
-  return opt_popup_placement;
-}
-
 void MainWindow::OpenCodePreview(const QModelIndex &index,
                                  const bool &as_new_window) {
   QVariant related_entity_id_var =
@@ -567,34 +555,24 @@ void MainWindow::OpenCodePreview(const QModelIndex &index,
   CodeWidget *code_widget{nullptr};
 
   if (!as_new_window) {
-    auto opt_popup_placement = GetPopupPlacement();
-    CloseAllPopups();
+    auto code_widget_popup =
+        new CodeWidgetPopup(d->index, d->file_location_cache, related_entity_id,
+                            *d->global_highlighter, *d->macro_explorer, this);
 
-    d->code_widget_popup = std::make_unique<CodeWidgetPopup>(
-        d->index, d->file_location_cache, related_entity_id,
-        *d->global_highlighter, *d->macro_explorer, this);
+    d->popup_widget_list.push_back(code_widget_popup);
 
-    if (opt_popup_placement.has_value()) {
-      const auto &popup_placement = opt_popup_placement.value();
+    auto cursor_pos{QCursor::pos()};
+    code_widget_popup->move(cursor_pos.x() - 20, cursor_pos.y() - 20);
 
-      d->code_widget_popup->move(popup_placement.x(), popup_placement.y());
-      d->code_widget_popup->resize(popup_placement.width(),
-                                   popup_placement.height());
+    auto margin = fontMetrics().height();
+    auto max_width = margin + (width() / 3);
+    auto max_height = margin + (height() / 4);
 
-    } else {
-      auto cursor_pos{QCursor::pos()};
-      d->code_widget_popup->move(cursor_pos.x() - 20, cursor_pos.y() - 20);
+    code_widget_popup->resize(max_width, max_height);
 
-      auto margin = fontMetrics().height();
-      auto max_width = margin + (width() / 3);
-      auto max_height = margin + (height() / 4);
+    code_widget_popup->show();
 
-      d->code_widget_popup->resize(max_width, max_height);
-    }
-
-    d->code_widget_popup->show();
-
-    code_widget = d->code_widget_popup->GetWrappedWidget();
+    code_widget = code_widget_popup->GetWrappedWidget();
 
   } else {
     auto code_widget_dock = new DockableCodeWidget(
@@ -616,42 +594,26 @@ void MainWindow::OpenCodePreview(const QModelIndex &index,
           &CodeWidget::SetBrowserMode);
 }
 
-void MainWindow::CloseQuickTreeExplorerPopup() {
-  if (d->quick_ref_explorer == nullptr) {
-    return;
-  }
-
-  d->quick_ref_explorer->close();
-  d->quick_ref_explorer->deleteLater();
-  d->quick_ref_explorer.release();
-}
-
-void MainWindow::CloseCodePreviewPopup() {
-  if (d->code_widget_popup == nullptr) {
-    return;
-  }
-
-  d->code_widget_popup->close();
-  d->code_widget_popup->deleteLater();
-  d->code_widget_popup.release();
-}
-
 void MainWindow::CloseAllPopups() {
-  CloseQuickTreeExplorerPopup();
-  CloseCodePreviewPopup();
+  for (auto &popup_widget : d->popup_widget_list) {
+    popup_widget->close();
+    popup_widget->deleteLater();
+  }
+
+  d->popup_widget_list.clear();
 }
 
-void MainWindow::CreateTreeExplorerMenuOptions() {
+void MainWindow::CreateReferenceExplorerMenuOptions() {
   auto main_menu = new QMenu(tr("Tree Explorer"));
   d->view_menu->addMenu(main_menu);
 
   auto code_preview_action = new QAction(tr("Enable code preview"));
   code_preview_action->setCheckable(true);
-  code_preview_action->setChecked(d->enable_quick_ref_explorer_code_preview);
+  code_preview_action->setChecked(d->enable_ref_explorer_code_preview);
   main_menu->addAction(code_preview_action);
 
   connect(code_preview_action, &QAction::toggled, this,
-          &MainWindow::OnTreeExplorerCodePreviewToggled);
+          &MainWindow::OnReferenceExplorerCodePreviewToggled);
 }
 
 ICodeView *
@@ -921,7 +883,6 @@ void MainWindow::OnOpenEntity(RawEntityId entity_id) {
 void MainWindow::OnHistoryNavigationEntitySelected(RawEntityId,
                                                    RawEntityId canonical_id) {
   CloseAllPopups();
-  // OpenEntityInfo(canonical_id);
   OpenEntityCode(canonical_id);
 }
 
@@ -938,7 +899,7 @@ void MainWindow::OnInformationExplorerSelectionChange(
   OpenEntityCode(entity_id, false /* don't canonicalize entity IDs */);
 }
 
-void MainWindow::OnTreeExplorerItemActivated(const QModelIndex &index) {
+void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
   auto entity_id_role = index.data(IGeneratorModel::EntityIdRole);
   if (!entity_id_role.isValid()) {
     return;
@@ -996,9 +957,8 @@ void MainWindow::OnToggleWordWrap(bool checked) {
   code_view.SetWordWrapping(checked);
 }
 
-void MainWindow::SaveTreeExplorer(
-    PreviewableTreeExplorerView *reference_explorer) {
-  d->quick_ref_explorer.release();
+void MainWindow::SaveReferenceExplorer(ReferenceExplorer *reference_explorer) {
+  /*d->popup_reference_explorer.release();
 
   auto new_tab_index = d->ref_explorer_tab_widget->count();
 
@@ -1006,24 +966,24 @@ void MainWindow::SaveTreeExplorer(
   reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
   reference_explorer->SetBrowserMode(d->toolbar.browser_mode->isChecked());
 
-  connect(reference_explorer, &PreviewableTreeExplorerView::ItemActivated, this,
-          &MainWindow::OnTreeExplorerItemActivated);
+  connect(reference_explorer, &ReferenceExplorer::ItemActivated, this,
+          &MainWindow::OnReferenceExplorerItemActivated);
 
-  connect(reference_explorer, &PreviewableTreeExplorerView::TokenTriggered,
-          this, &MainWindow::OnTokenTriggered);
+  connect(reference_explorer, &ReferenceExplorer::TokenTriggered, this,
+          &MainWindow::OnTokenTriggered);
 
   connect(this, &MainWindow::BrowserModeToggled, reference_explorer,
-          &PreviewableTreeExplorerView::SetBrowserMode);
+          &ReferenceExplorer::SetBrowserMode);
 
   d->ref_explorer_tab_widget->addTab(reference_explorer,
                                      reference_explorer->windowTitle());
   d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
 
   d->reference_explorer_dock->toggleViewAction()->setEnabled(true);
-  d->reference_explorer_dock->show();
+  d->reference_explorer_dock->show();*/
 }
 
-void MainWindow::OnTreeExplorerTabBarClose(int index) {
+void MainWindow::OnReferenceExplorerTabBarClose(int index) {
   auto widget = d->ref_explorer_tab_widget->widget(index);
   d->ref_explorer_tab_widget->removeTab(index);
 
@@ -1034,7 +994,7 @@ void MainWindow::OnTreeExplorerTabBarClose(int index) {
   d->reference_explorer_dock->toggleViewAction()->setEnabled(widget_visible);
 }
 
-void MainWindow::OnTreeExplorerTabBarDoubleClick(int index) {
+void MainWindow::OnReferenceExplorerTabBarDoubleClick(int index) {
   auto current_tab_name = d->ref_explorer_tab_widget->tabText(index);
 
   SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,
@@ -1105,13 +1065,13 @@ void MainWindow::OnCodeViewTabClicked(int index) {
   }
 }
 
-void MainWindow::OnCloseActiveTreeExplorerTab() {
+void MainWindow::OnCloseActiveReferenceExplorerTab() {
   if (d->ref_explorer_tab_widget->count() == 0) {
     return;
   }
 
   auto current_index = d->ref_explorer_tab_widget->currentIndex();
-  OnTreeExplorerTabBarClose(current_index);
+  OnReferenceExplorerTabBarClose(current_index);
 
   d->ref_explorer_tab_widget->setFocus();
 }
@@ -1124,8 +1084,8 @@ void MainWindow::OnSetLightTheme() {
   mx::gui::IThemeManager::Get().SetTheme(false);
 }
 
-void MainWindow::OnTreeExplorerCodePreviewToggled(const bool &checked) {
-  d->enable_quick_ref_explorer_code_preview = checked;
+void MainWindow::OnReferenceExplorerCodePreviewToggled(const bool &checked) {
+  d->enable_ref_explorer_code_preview = checked;
 }
 
 void MainWindow::OnThemeChange(const QPalette &, const CodeViewTheme &) {
@@ -1144,27 +1104,6 @@ void MainWindow::UpdateIcons() {
 void MainWindow::OnBrowserModeToggled() {
   UpdateIcons();
   emit BrowserModeToggled(d->toolbar.browser_mode->isChecked());
-}
-
-void MainWindow::OnExtractTreeExplorerSubtree(const QModelIndex &index) {
-  auto dest_model = IGeneratorModel::CreateFrom(index);
-
-  auto tree_explorer = new PreviewableTreeExplorerView(
-      d->index, d->file_location_cache, dest_model, false,
-      *d->global_highlighter, *d->macro_explorer, this);
-
-  dest_model->setParent(tree_explorer);
-
-  connect(tree_explorer, &PreviewableTreeExplorerView::ExtractSubtree, this,
-          &MainWindow::OnExtractTreeExplorerSubtree);
-
-  connect(tree_explorer, &PreviewableTreeExplorerView::ItemActivated, this,
-          &MainWindow::OnTreeExplorerItemActivated);
-
-  connect(this, &MainWindow::BrowserModeToggled, tree_explorer,
-          &PreviewableTreeExplorerView::SetBrowserMode);
-
-  SaveTreeExplorer(tree_explorer);
 }
 
 }  // namespace mx::gui

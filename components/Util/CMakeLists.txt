@@ -33,6 +33,10 @@ add_library("mx_util"
   src/Assert.cpp
 )
 
+target_sources("mx_util" INTERFACE
+  Resources/Resources.qrc
+)
+
 target_link_libraries("mx_util"
   PRIVATE
     "qtmx_cxx_flags"

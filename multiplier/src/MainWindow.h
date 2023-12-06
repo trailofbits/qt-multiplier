@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/PreviewableTreeExplorerView.h>
+#include <multiplier/ui/ReferenceExplorer.h>
 #include <multiplier/ui/ICodeView.h>
 
 #include <multiplier/Index.h>
@@ -32,13 +32,14 @@ class MainWindow final : public QMainWindow {
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
+  void RegisterReferenceExplorerActions();
   void InitializeWidgets();
   void InitializeToolBar();
   void CreateProjectExplorerDock();
   void CreateEntityExplorerDock();
   void CreateInfoExplorerDock();
   void CreateMacroExplorerDock();
-  void CreateTreeExplorerDock();
+  void CreateReferenceExplorerDock();
   void CreateCodeView();
   void CreateGlobalHighlighter();
   void OpenEntityRelatedToToken(const QModelIndex &index);
@@ -48,15 +49,11 @@ class MainWindow final : public QMainWindow {
   void OpenCallHierarchy(const QModelIndex &index);
   void OpenTokenEntityInfo(const QModelIndex &index, const bool &new_window);
   void ExpandMacro(const QModelIndex &index);
-  void OpenTreeExplorer(std::shared_ptr<ITreeGenerator> generator);
-  std::optional<QRect> GetPopupPlacement();
   void OpenCodePreview(const QModelIndex &index, const bool &as_new_window);
-  void CloseQuickTreeExplorerPopup();
-  void CloseCodePreviewPopup();
   void CloseAllPopups();
 
   //! Creates the menus needed to configure the reference explorer
-  void CreateTreeExplorerMenuOptions();
+  void CreateReferenceExplorerMenuOptions();
 
   //! Tell the history back/forward button widget that our current location has
   //! changed.
@@ -89,13 +86,13 @@ class MainWindow final : public QMainWindow {
   //! into the history.
   void OnMainCodeViewCursorMoved(const QModelIndex &index);
 
-  void OnTreeExplorerItemActivated(const QModelIndex &index);
+  void OnReferenceExplorerItemActivated(const QModelIndex &index);
 
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
-  void SaveTreeExplorer(PreviewableTreeExplorerView *reference_explorer);
-  void OnTreeExplorerTabBarClose(int index);
-  void OnTreeExplorerTabBarDoubleClick(int index);
+  void SaveReferenceExplorer(ReferenceExplorer *reference_explorer);
+  void OnReferenceExplorerTabBarClose(int index);
+  void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
   void OnCodeViewTabClicked(int index);
 
@@ -109,7 +106,7 @@ class MainWindow final : public QMainWindow {
                                          RawEntityId canonical_id);
   void OnInformationExplorerSelectionChange(const QModelIndex &index);
   void OnCloseActiveCodeViewTab();
-  void OnCloseActiveTreeExplorerTab();
+  void OnCloseActiveReferenceExplorerTab();
 
   //! Called when the view->theme->dark action is selected
   void OnSetDarkTheme();
@@ -118,7 +115,7 @@ class MainWindow final : public QMainWindow {
   void OnSetLightTheme();
 
   //! Called when toggling the code preview setting of the ref explorer
-  void OnTreeExplorerCodePreviewToggled(const bool &checked);
+  void OnReferenceExplorerCodePreviewToggled(const bool &checked);
 
   //! Called by theme manager
   void OnThemeChange(const QPalette &, const CodeViewTheme &);
@@ -128,10 +125,6 @@ class MainWindow final : public QMainWindow {
 
   //! Called when the browser mode action is interacted with
   void OnBrowserModeToggled();
-
-  //! Called when one of the tree explorers wants to extract a subtree
-  //! in a new window
-  void OnExtractTreeExplorerSubtree(const QModelIndex &index);
 
  signals:
   //! Emitted when the browse mode is toggled

@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/Icons/PopupWidgetContainer">
+    <file alias="close">Icons/close.png</file>
+  </qresource>
+</RCC>

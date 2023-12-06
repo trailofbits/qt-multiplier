@@ -7,6 +7,8 @@
 #pragma once
 
 #include <multiplier/ui/ICodeView.h>
+#include <multiplier/ui/ITreeGenerator.h>
+#include <multiplier/ui/PopupWidgetContainer.h>
 
 #include <QWidget>
 
@@ -16,32 +18,30 @@ class IGlobalHighlighter;
 class IMacroExplorer;
 class IGeneratorModel;
 
-//! A container for a TreeExplorerView and the linked ICodeView
-class PreviewableTreeExplorerView final : public QWidget {
+//! A container for a ReferenceExplorerView and the linked ICodeView
+class ReferenceExplorer final : public QWidget {
   Q_OBJECT
 
  public:
   //! Constructor
-  PreviewableTreeExplorerView(const Index &index,
-                              const FileLocationCache &file_location_cache,
-                              IGeneratorModel *model,
-                              const bool &show_code_preview,
-                              IGlobalHighlighter &highlighter,
-                              IMacroExplorer &macro_explorer,
-                              QWidget *parent = nullptr);
+  ReferenceExplorer(const Index &index,
+                    const FileLocationCache &file_location_cache,
+                    std::shared_ptr<ITreeGenerator> generator,
+                    const bool &show_code_preview,
+                    IGlobalHighlighter &highlighter,
+                    IMacroExplorer &macro_explorer, QWidget *parent = nullptr);
 
   //! Destructor
-  virtual ~PreviewableTreeExplorerView() override;
+  virtual ~ReferenceExplorer() override;
 
   //! Returns the active model
   IGeneratorModel *Model();
 
   //! Disabled copy constructor
-  PreviewableTreeExplorerView(const PreviewableTreeExplorerView &) = delete;
+  ReferenceExplorer(const ReferenceExplorer &) = delete;
 
   //! Disabled copy assignment operator
-  PreviewableTreeExplorerView &
-  operator=(const PreviewableTreeExplorerView &) = delete;
+  ReferenceExplorer &operator=(const ReferenceExplorer &) = delete;
 
  private:
   struct PrivateData;
@@ -50,7 +50,8 @@ class PreviewableTreeExplorerView final : public QWidget {
   //! Initializes the internal widgets
   void InitializeWidgets(mx::Index index,
                          mx::FileLocationCache file_location_cache,
-                         IGeneratorModel *model, const bool &show_code_preview,
+                         std::shared_ptr<ITreeGenerator> generator,
+                         const bool &show_code_preview,
                          IGlobalHighlighter &highlighter,
                          IMacroExplorer &macro_explorer);
 
@@ -65,7 +66,7 @@ class PreviewableTreeExplorerView final : public QWidget {
 
  private slots:
   //! Schedules a code model update whenever a reference is clicked
-  void OnTreeExplorerSelectedItemChanged(const QModelIndex &index);
+  void OnReferenceExplorerSelectedItemChanged(const QModelIndex &index);
 
   //! Used to do the first time initialization of the code preview
   void OnRowsInserted();
@@ -78,18 +79,18 @@ class PreviewableTreeExplorerView final : public QWidget {
   void SetBrowserMode(const bool &enabled);
 
  signals:
-  //! The forwarded ITreeExplorerView::SelectedItemChanged signal
+  //! The forwarded IReferenceExplorerView::SelectedItemChanged signal
   void SelectedItemChanged(const QModelIndex &index);
 
-  //! The forwarded ITreeExplorerView::ItemActivated signal
+  //! The forwarded IReferenceExplorerView::ItemActivated signal
   void ItemActivated(const QModelIndex &index);
 
   //! The forwarded ICodeView::TokenTriggered
   void TokenTriggered(const ICodeView::TokenAction &token_action,
                       const QModelIndex &index);
-
-  //! The forwarded ITreeExplorerView::ExtractSubtree signal
-  void ExtractSubtree(const QModelIndex &index);
 };
+
+//! A popup version of the ReferenceExplorer
+using PopupReferenceExplorer = PopupWidgetContainer<ReferenceExplorer>;
 
 }  // namespace mx::gui

@@ -19,7 +19,6 @@ target_link_libraries("mx_data_generators"
 
   PUBLIC
     "multiplier::mx-api"
-    "mx_treeexplorer"
     "mx_generators"
 )
 
