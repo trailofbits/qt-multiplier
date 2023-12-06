@@ -222,6 +222,7 @@ jobs:
           path: ${{ steps.deb_package.outputs.PATH }}
 
       - name: Generate the sample database file
+        if: false
         run: |
           git clone "https://github.com/iovisor/ubpf"
           ( cd ubpf && git checkout -b sample_branch 0262957 )
@@ -241,6 +242,7 @@ jobs:
             .
 
       - name: Upload the sample database
+        if: false
         uses: actions/upload-artifact@v3
         with:
           name: iovisor_ubpf.mx
