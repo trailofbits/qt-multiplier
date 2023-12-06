@@ -140,8 +140,8 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_C_COMPILER=$(which clang-17) \
-            -DCMAKE_CXX_COMPILER=$(which clang++-17) \
+            -DCMAKE_C_COMPILER="${{ env.LLVM_PATH }}/bin/clang" \
+            -DCMAKE_CXX_COMPILER="${{ env.LLVM_PATH }}/bin/clang++" \
             -DMXQT_ENABLE_TESTS=true \
             -Dmultiplier_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier" \
             -Dgap_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/gap" \
