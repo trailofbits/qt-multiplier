@@ -16,7 +16,7 @@
 
 namespace mx::gui {
 
-//! An item delegate used to paint tokens in the TreeExplorer
+//! An item delegate used to paint tokens in the TreeExplorerView
 class TreeExplorerItemDelegate final : public QStyledItemDelegate {
   Q_OBJECT
 

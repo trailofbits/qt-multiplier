@@ -141,7 +141,8 @@ void QuickTreeExplorerWidget::InitializeWidgets(
           &QuickTreeExplorerWidget::OnSaveTreeExplorer);
 
   // Close button
-  d->close_button = new QPushButton(GetIcon(":/TreeExplorer/close"), "", this);
+  d->close_button =
+      new QPushButton(GetIcon(":/TreeExplorerView/close"), "", this);
 
   d->close_button->setToolTip(tr("Close"));
   d->close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
@@ -259,9 +260,9 @@ void QuickTreeExplorerWidget::OnSaveTreeExplorer() {
 
 void QuickTreeExplorerWidget::UpdateIcons() {
   d->save_to_new_ref_explorer_button->setIcon(
-      GetIcon(":/TreeExplorer/save_to_new_tab"));
+      GetIcon(":/TreeExplorerView/save_to_new_tab"));
 
-  d->close_button->setIcon(GetIcon(":/TreeExplorer/close"));
+  d->close_button->setIcon(GetIcon(":/TreeExplorerView/close"));
 }
 
 void QuickTreeExplorerWidget::OnThemeChange(const QPalette &,

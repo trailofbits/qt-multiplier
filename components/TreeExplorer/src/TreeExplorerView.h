@@ -8,26 +8,26 @@
 
 #pragma once
 
-#include <multiplier/ui/ITreeExplorer.h>
+#include <multiplier/ui/ITreeExplorerView.h>
 #include <multiplier/ui/IThemeManager.h>
 
 namespace mx::gui {
 
-//! A treeview-based implementation for the ITreeExplorer interface
-class TreeExplorer final : public ITreeExplorer {
+//! A treeview-based implementation for the ITreeExplorerView interface
+class TreeExplorerView final : public ITreeExplorerView {
   Q_OBJECT
 
  public:
   //! Destructor
-  virtual ~TreeExplorer() override;
+  virtual ~TreeExplorerView() override;
 
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  TreeExplorer(IGeneratorModel *model,
-               IGlobalHighlighter *global_highlighter, QWidget *parent);
+  TreeExplorerView(IGeneratorModel *model,
+                   IGlobalHighlighter *global_highlighter, QWidget *parent);
 
   //! Called when a menu or osd action is about to be shown to screen
   void UpdateAction(QAction *action);
@@ -61,7 +61,7 @@ class TreeExplorer final : public ITreeExplorer {
   //! Called when a generator request ends
   void OnModelRequestFinished();
 
-  friend class ITreeExplorer;
+  friend class ITreeExplorerView;
 };
 
 }  // namespace mx::gui

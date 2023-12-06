@@ -26,7 +26,6 @@
 #include <multiplier/ui/IThemeManager.h>
 #include <multiplier/ui/IGeneratorModel.h>
 #include <multiplier/ui/Util.h>
-#include <multiplier/ui/ITreeExplorer.h>
 #include <multiplier/ui/CallHierarchyGenerator.h>
 #include <multiplier/ui/IGeneratorView.h>
 

@@ -7,7 +7,7 @@
 #include <multiplier/ui/PreviewableTreeExplorerView.h>
 #include <multiplier/ui/IGlobalHighlighter.h>
 #include <multiplier/ui/IMacroExplorer.h>
-#include <multiplier/ui/ITreeExplorer.h>
+#include <multiplier/ui/ITreeExplorerView.h>
 #include <multiplier/ui/IGeneratorModel.h>
 
 #include <multiplier/Index.h>
@@ -27,7 +27,7 @@ struct PreviewableTreeExplorerView::PrivateData final {
   std::optional<unsigned> opt_scroll_to_line;
 
   IGeneratorModel *ref_explorer_model{nullptr};
-  ITreeExplorer *reference_explorer{nullptr};
+  ITreeExplorerView *reference_explorer{nullptr};
 
   QSplitter *splitter{nullptr};
 };
@@ -57,15 +57,15 @@ void PreviewableTreeExplorerView::InitializeWidgets(
 
   d->ref_explorer_model = model;
   d->reference_explorer =
-      ITreeExplorer::Create(d->ref_explorer_model, &highlighter, this);
+      ITreeExplorerView::Create(d->ref_explorer_model, &highlighter, this);
 
-  connect(d->reference_explorer, &ITreeExplorer::SelectedItemChanged, this,
+  connect(d->reference_explorer, &ITreeExplorerView::SelectedItemChanged, this,
           &PreviewableTreeExplorerView::OnTreeExplorerSelectedItemChanged);
 
-  connect(d->reference_explorer, &ITreeExplorer::ItemActivated, this,
+  connect(d->reference_explorer, &ITreeExplorerView::ItemActivated, this,
           &PreviewableTreeExplorerView::ItemActivated);
 
-  connect(d->reference_explorer, &ITreeExplorer::ExtractSubtree, this,
+  connect(d->reference_explorer, &ITreeExplorerView::ExtractSubtree, this,
           &PreviewableTreeExplorerView::ExtractSubtree);
 
   connect(model, &QAbstractItemModel::rowsInserted, this,
