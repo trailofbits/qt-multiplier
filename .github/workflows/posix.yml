@@ -110,6 +110,7 @@ jobs:
 
           curl \
             -H "Authorization: token ${TOKEN}" \
+            -H "Accept: application/vnd.github.v3.raw" \
             -L \
             "${multiplier_url}" \
             -o \
