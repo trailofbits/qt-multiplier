@@ -107,14 +107,9 @@ jobs:
         run: |
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
-
           gh release download ${{ inputs.multiplier_release }} --repo trailofbits/multiplier
-
-          tar xf \
-            "${archive_name}"
-
+          tar xf "${archive_name}"
           rm "${archive_name}"
-
           echo "MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/${folder_name}" >> $GITHUB_ENV
 
       - name: Setup the build folders for the vendored libraries
@@ -135,6 +130,11 @@ jobs:
 
       - name: Build qt-multiplier
         run: |
+          ls ${MULTIPLIER_INSTALL_DIRECTORY}
+          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib
+          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake
+          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier
+
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
