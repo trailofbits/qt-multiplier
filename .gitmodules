@@ -4,9 +4,6 @@
 [submodule "libraries/vendored/gap"]
 	path = libraries/vendored/gap
 	url = https://github.com/lifting-bits/gap
-[submodule "libraries/vendored/weggli-native"]
-	path = libraries/vendored/weggli-native
-	url = https://github.com/trailofbits/weggli-native
 [submodule "libraries/vendored/pasta"]
 	path = libraries/vendored/pasta
 	url = https://github.com/trailofbits/pasta
