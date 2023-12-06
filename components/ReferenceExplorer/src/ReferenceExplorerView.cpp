@@ -6,8 +6,8 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "TreeExplorerView.h"
-#include "TreeExplorerItemDelegate.h"
+#include "ReferenceExplorerView.h"
+#include "ReferenceExplorerItemDelegate.h"
 
 #include <multiplier/ui/IGeneratorView.h>
 #include <multiplier/ui/Icons.h>
@@ -29,12 +29,11 @@ struct OSDAndMenuActions final {
   // this is only shown in the menu
   QAction *expand_three_levels{nullptr};
   QAction *expand_five_levels{nullptr};
-  QAction *extract_subtree{nullptr};
 };
 
 }  // namespace
 
-struct TreeExplorerView::PrivateData final {
+struct ReferenceExplorerView::PrivateData final {
   IGeneratorModel *model{nullptr};
   QAbstractProxyModel *highlighter_model_proxy{nullptr};
 
@@ -43,12 +42,12 @@ struct TreeExplorerView::PrivateData final {
   OSDAndMenuActions osd_and_menu_actions;
 };
 
-TreeExplorerView::~TreeExplorerView() {}
+ReferenceExplorerView::~ReferenceExplorerView() {}
 
-TreeExplorerView::TreeExplorerView(IGeneratorModel *model,
-                                   IGlobalHighlighter *global_highlighter,
-                                   QWidget *parent)
-    : ITreeExplorerView(parent),
+ReferenceExplorerView::ReferenceExplorerView(
+    IGeneratorModel *model, IGlobalHighlighter *global_highlighter,
+    QWidget *parent)
+    : QWidget(parent),
       d(new PrivateData) {
 
   // Install the global highlighter proxy
@@ -59,9 +58,9 @@ TreeExplorerView::TreeExplorerView(IGeneratorModel *model,
 
   // Initialize the item delegate
   auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
-  auto item_delegate = new TreeExplorerItemDelegate(code_view_theme);
+  auto item_delegate = new ReferenceExplorerItemDelegate(code_view_theme);
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, item_delegate,
-          &TreeExplorerItemDelegate::OnThemeChange);
+          &ReferenceExplorerItemDelegate::OnThemeChange);
 
   IGeneratorView::Configuration config;
   config.view_type = mx::gui::IGeneratorView::Configuration::ViewType::Tree;
@@ -72,18 +71,18 @@ TreeExplorerView::TreeExplorerView(IGeneratorModel *model,
   d->osd_and_menu_actions.expand = new QAction(tr("Expand"), this);
   d->osd_and_menu_actions.expand->setToolTip(tr("Expand this entity"));
   connect(d->osd_and_menu_actions.expand, &QAction::triggered, this,
-          &TreeExplorerView::OnExpandAction);
+          &ReferenceExplorerView::OnExpandAction);
 
   d->osd_and_menu_actions.open = new QAction(tr("Open in main window"), this);
   d->osd_and_menu_actions.open->setToolTip(
       tr("Open this entity in the main window"));
   connect(d->osd_and_menu_actions.open, &QAction::triggered, this,
-          &TreeExplorerView::OnOpenAction);
+          &ReferenceExplorerView::OnOpenAction);
 
   d->osd_and_menu_actions.go_to = new QAction(tr("Go to aliased entity"), this);
   d->osd_and_menu_actions.go_to->setToolTip(tr("Go to this aliased entity"));
   connect(d->osd_and_menu_actions.go_to, &QAction::triggered, this,
-          &TreeExplorerView::OnGoToAction);
+          &ReferenceExplorerView::OnGoToAction);
 
   config.menu_actions.action_list.push_back(d->osd_and_menu_actions.go_to);
   config.menu_actions.action_list.push_back(d->osd_and_menu_actions.expand);
@@ -105,7 +104,7 @@ TreeExplorerView::TreeExplorerView(IGeneratorModel *model,
       tr("Expands this entity for three levels"));
 
   connect(d->osd_and_menu_actions.expand_three_levels, &QAction::triggered,
-          this, &TreeExplorerView::OnExpandThreeLevelsAction);
+          this, &ReferenceExplorerView::OnExpandThreeLevelsAction);
 
   config.menu_actions.action_list.push_back(
       d->osd_and_menu_actions.expand_three_levels);
@@ -120,29 +119,17 @@ TreeExplorerView::TreeExplorerView(IGeneratorModel *model,
       tr("Expands this entity for five levels"));
 
   connect(d->osd_and_menu_actions.expand_five_levels, &QAction::triggered, this,
-          &TreeExplorerView::OnExpandFiveLevelsAction);
+          &ReferenceExplorerView::OnExpandFiveLevelsAction);
 
   config.menu_actions.action_list.push_back(
       d->osd_and_menu_actions.expand_five_levels);
-
-  d->osd_and_menu_actions.extract_subtree =
-      new QAction(tr("Extract subtree"), this);
-
-  d->osd_and_menu_actions.extract_subtree->setToolTip(
-      tr("Extracts the selected subtree"));
-
-  connect(d->osd_and_menu_actions.extract_subtree, &QAction::triggered, this,
-          &TreeExplorerView::OnExtractSubtreeAction);
-
-  config.menu_actions.action_list.push_back(
-      d->osd_and_menu_actions.extract_subtree);
 
   // Create the view
   d->generator_view =
       IGeneratorView::Create(d->highlighter_model_proxy, config);
 
   connect(d->generator_view, &IGeneratorView::SelectedItemChanged, this,
-          &ITreeExplorerView::SelectedItemChanged);
+          &ReferenceExplorerView::SelectedItemChanged);
 
   // Create the status widget, which is used to cancel updates
   d->status_widget = new QWidget();
@@ -161,10 +148,10 @@ TreeExplorerView::TreeExplorerView(IGeneratorModel *model,
           &IGeneratorModel::CancelRunningRequest);
 
   connect(d->model, &IGeneratorModel::RequestStarted, this,
-          &TreeExplorerView::OnModelRequestStarted);
+          &ReferenceExplorerView::OnModelRequestStarted);
 
   connect(d->model, &IGeneratorModel::RequestFinished, this,
-          &TreeExplorerView::OnModelRequestFinished);
+          &ReferenceExplorerView::OnModelRequestFinished);
 
   d->status_widget->setLayout(status_widget_layout);
 
@@ -180,12 +167,12 @@ TreeExplorerView::TreeExplorerView(IGeneratorModel *model,
   // Ensure that we receive theme updates so that we can update the icons
   auto &theme_manager = IThemeManager::Get();
   connect(&theme_manager, &IThemeManager::ThemeChanged, this,
-          &TreeExplorerView::OnThemeChange);
+          &ReferenceExplorerView::OnThemeChange);
 
   OnThemeChange(theme_manager.GetPalette(), theme_manager.GetCodeViewTheme());
 }
 
-void TreeExplorerView::UpdateAction(QAction *action) {
+void ReferenceExplorerView::UpdateAction(QAction *action) {
   QModelIndex index;
   if (auto variant = action->data();
       variant.isValid() && variant.canConvert<QModelIndex>()) {
@@ -220,8 +207,7 @@ void TreeExplorerView::UpdateAction(QAction *action) {
       enable_action = variant.toBool();
     }
 
-  } else if (action == d->osd_and_menu_actions.open ||
-             action == d->osd_and_menu_actions.extract_subtree) {
+  } else if (action == d->osd_and_menu_actions.open) {
     enable_action = true;
   }
 
@@ -229,7 +215,7 @@ void TreeExplorerView::UpdateAction(QAction *action) {
   action->setVisible(enable_action);
 }
 
-void TreeExplorerView::OnExpandAction() {
+void ReferenceExplorerView::OnExpandAction() {
   auto model_index_var = d->osd_and_menu_actions.expand->data();
   if (!model_index_var.isValid() ||
       !model_index_var.canConvert<QModelIndex>()) {
@@ -240,7 +226,7 @@ void TreeExplorerView::OnExpandAction() {
   d->model->Expand(model_index, 1);
 }
 
-void TreeExplorerView::OnGoToAction() {
+void ReferenceExplorerView::OnGoToAction() {
   // Take the view model index
   auto model_index_var = d->osd_and_menu_actions.go_to->data();
   if (!model_index_var.isValid() ||
@@ -275,7 +261,7 @@ void TreeExplorerView::OnGoToAction() {
   d->generator_view->SetSelection(model_index);
 }
 
-void TreeExplorerView::OnOpenAction() {
+void ReferenceExplorerView::OnOpenAction() {
   // Take the view model index
   auto model_index_var = d->osd_and_menu_actions.open->data();
   if (!model_index_var.isValid() ||
@@ -287,28 +273,7 @@ void TreeExplorerView::OnOpenAction() {
   emit ItemActivated(model_index);
 }
 
-void TreeExplorerView::OnExtractSubtreeAction() {
-  // Take the view model index
-  auto model_index_var = d->osd_and_menu_actions.extract_subtree->data();
-  if (!model_index_var.isValid() ||
-      !model_index_var.canConvert<QModelIndex>()) {
-    return;
-  }
-
-  auto model_index = model_index_var.toModelIndex();
-
-  // The view is using the global highlighter proxy model
-  // but we need to access the original model now. Do the
-  // mapping
-  model_index = d->highlighter_model_proxy->mapToSource(model_index);
-  if (!model_index.isValid()) {
-    return;
-  }
-
-  emit ExtractSubtree(model_index);
-}
-
-void TreeExplorerView::OnExpandThreeLevelsAction() {
+void ReferenceExplorerView::OnExpandThreeLevelsAction() {
   auto model_index_var = d->osd_and_menu_actions.expand_three_levels->data();
   if (!model_index_var.isValid() ||
       !model_index_var.canConvert<QModelIndex>()) {
@@ -319,7 +284,7 @@ void TreeExplorerView::OnExpandThreeLevelsAction() {
   d->model->Expand(model_index, 3);
 }
 
-void TreeExplorerView::OnExpandFiveLevelsAction() {
+void ReferenceExplorerView::OnExpandFiveLevelsAction() {
   auto model_index_var = d->osd_and_menu_actions.expand_five_levels->data();
   if (!model_index_var.isValid() ||
       !model_index_var.canConvert<QModelIndex>()) {
@@ -330,77 +295,66 @@ void TreeExplorerView::OnExpandFiveLevelsAction() {
   d->model->Expand(model_index, 5);
 }
 
-void TreeExplorerView::OnThemeChange(const QPalette &,
-                                     const CodeViewTheme &code_view_theme) {
+void ReferenceExplorerView::OnThemeChange(
+    const QPalette &, const CodeViewTheme &code_view_theme) {
   QIcon open_item_icon;
-  open_item_icon.addPixmap(GetPixmap(":/TreeExplorerView/activate_ref_item"),
+  open_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/activate_ref_item"),
                            QIcon::Normal, QIcon::On);
 
   open_item_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/activate_ref_item", IconStyle::Disabled),
+      GetPixmap(":/ReferenceExplorer/activate_ref_item", IconStyle::Disabled),
       QIcon::Disabled, QIcon::On);
 
   d->osd_and_menu_actions.open->setIcon(open_item_icon);
 
   QIcon expand_item_icon;
-  expand_item_icon.addPixmap(GetPixmap(":/TreeExplorerView/expand_ref_item"),
+  expand_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/expand_ref_item"),
                              QIcon::Normal, QIcon::On);
 
   expand_item_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/expand_ref_item", IconStyle::Disabled),
+      GetPixmap(":/ReferenceExplorer/expand_ref_item", IconStyle::Disabled),
       QIcon::Disabled, QIcon::On);
 
   d->osd_and_menu_actions.expand->setIcon(expand_item_icon);
 
   QIcon goto_item_icon;
-  goto_item_icon.addPixmap(GetPixmap(":/TreeExplorerView/goto_ref_item"),
+  goto_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/goto_ref_item"),
                            QIcon::Normal, QIcon::On);
 
   goto_item_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/goto_ref_item", IconStyle::Disabled),
+      GetPixmap(":/ReferenceExplorer/goto_ref_item", IconStyle::Disabled),
       QIcon::Disabled, QIcon::On);
 
   d->osd_and_menu_actions.go_to->setIcon(goto_item_icon);
 
-  QIcon extract_subtree_icon;
-  extract_subtree_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/extract_subtree"), QIcon::Normal,
-      QIcon::On);
-
-  extract_subtree_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/extract_subtree", IconStyle::Disabled),
-      QIcon::Disabled, QIcon::On);
-
-  d->osd_and_menu_actions.extract_subtree->setIcon(extract_subtree_icon);
-
   QIcon expand_3_item_icon;
   expand_3_item_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/expand_3_ref_item"), QIcon::Normal,
+      GetPixmap(":/ReferenceExplorer/expand_3_ref_item"), QIcon::Normal,
       QIcon::On);
 
   expand_3_item_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/expand_3_ref_item", IconStyle::Disabled),
+      GetPixmap(":/ReferenceExplorer/expand_3_ref_item", IconStyle::Disabled),
       QIcon::Disabled, QIcon::On);
 
   d->osd_and_menu_actions.expand_three_levels->setIcon(expand_3_item_icon);
 
   QIcon expand_5_item_icon;
   expand_5_item_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/expand_5_ref_item"), QIcon::Normal,
+      GetPixmap(":/ReferenceExplorer/expand_5_ref_item"), QIcon::Normal,
       QIcon::On);
 
   expand_5_item_icon.addPixmap(
-      GetPixmap(":/TreeExplorerView/expand_5_ref_item", IconStyle::Disabled),
+      GetPixmap(":/ReferenceExplorer/expand_5_ref_item", IconStyle::Disabled),
       QIcon::Disabled, QIcon::On);
 
   d->osd_and_menu_actions.expand_five_levels->setIcon(expand_5_item_icon);
 }
 
-void TreeExplorerView::OnModelRequestStarted() {
+void ReferenceExplorerView::OnModelRequestStarted() {
   d->status_widget->setVisible(true);
 }
 
-void TreeExplorerView::OnModelRequestFinished() {
+void ReferenceExplorerView::OnModelRequestFinished() {
   d->status_widget->setVisible(false);
 }
 

@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "TreeExplorerItemDelegate.h"
+#include "ReferenceExplorerItemDelegate.h"
 
 #include <multiplier/ui/CodeViewTheme.h>
 #include <multiplier/ui/IGeneratorModel.h>
@@ -29,21 +29,21 @@
 
 namespace mx::gui {
 
-struct TreeExplorerItemDelegate::PrivateData final {
+struct ReferenceExplorerItemDelegate::PrivateData final {
   QFont font;
   std::unique_ptr<TokenPainter> token_painter;
 };
 
-TreeExplorerItemDelegate::TreeExplorerItemDelegate(const CodeViewTheme &theme,
-                                                   QObject *parent)
+ReferenceExplorerItemDelegate::ReferenceExplorerItemDelegate(
+    const CodeViewTheme &theme, QObject *parent)
     : QStyledItemDelegate(parent),
       d(new PrivateData) {
   SetTheme(theme);
 }
 
-TreeExplorerItemDelegate::~TreeExplorerItemDelegate(void) {}
+ReferenceExplorerItemDelegate::~ReferenceExplorerItemDelegate(void) {}
 
-void TreeExplorerItemDelegate::SetTheme(const CodeViewTheme &theme) {
+void ReferenceExplorerItemDelegate::SetTheme(const CodeViewTheme &theme) {
   d->font = QFont(theme.font_name);
 
   TokenPainterConfiguration token_painter_config({});
@@ -56,30 +56,30 @@ void TreeExplorerItemDelegate::SetTheme(const CodeViewTheme &theme) {
   d->token_painter = std::make_unique<TokenPainter>(token_painter_config);
 }
 
-void TreeExplorerItemDelegate::SetTabWidth(std::size_t width) {
+void ReferenceExplorerItemDelegate::SetTabWidth(std::size_t width) {
   auto token_painter_config = d->token_painter->Configuration();
   token_painter_config.tab_width = width;
 
   d->token_painter = std::make_unique<TokenPainter>(token_painter_config);
 }
 
-void TreeExplorerItemDelegate::SetWhitespaceReplacement(QString data) {
+void ReferenceExplorerItemDelegate::SetWhitespaceReplacement(QString data) {
   auto token_painter_config = d->token_painter->Configuration();
   token_painter_config.whitespace_replacement = data;
 
   d->token_painter = std::make_unique<TokenPainter>(token_painter_config);
 }
 
-void TreeExplorerItemDelegate::ClearWhitespaceReplacement(void) {
+void ReferenceExplorerItemDelegate::ClearWhitespaceReplacement(void) {
   auto token_painter_config = d->token_painter->Configuration();
   token_painter_config.whitespace_replacement.reset();
 
   d->token_painter = std::make_unique<TokenPainter>(token_painter_config);
 }
 
-void TreeExplorerItemDelegate::paint(QPainter *painter,
-                                     const QStyleOptionViewItem &option,
-                                     const QModelIndex &index) const {
+void ReferenceExplorerItemDelegate::paint(QPainter *painter,
+                                          const QStyleOptionViewItem &option,
+                                          const QModelIndex &index) const {
 
   if (!index.isValid()) {
     this->QStyledItemDelegate::paint(painter, option, index);
@@ -125,8 +125,8 @@ void TreeExplorerItemDelegate::paint(QPainter *painter,
   }
 }
 
-QSize TreeExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
-                                         const QModelIndex &index) const {
+QSize ReferenceExplorerItemDelegate::sizeHint(
+    const QStyleOptionViewItem &option, const QModelIndex &index) const {
   if (!index.isValid()) {
     return this->QStyledItemDelegate::sizeHint(option, index);
   }
@@ -153,14 +153,14 @@ QSize TreeExplorerItemDelegate::sizeHint(const QStyleOptionViewItem &option,
       .grownBy(margins);
 }
 
-void TreeExplorerItemDelegate::OnThemeChange(
+void ReferenceExplorerItemDelegate::OnThemeChange(
     const QPalette &, const CodeViewTheme &code_view_theme) {
   SetTheme(code_view_theme);
 }
 
-bool TreeExplorerItemDelegate::editorEvent(QEvent *, QAbstractItemModel *,
-                                           const QStyleOptionViewItem &,
-                                           const QModelIndex &) {
+bool ReferenceExplorerItemDelegate::editorEvent(QEvent *, QAbstractItemModel *,
+                                                const QStyleOptionViewItem &,
+                                                const QModelIndex &) {
   return false;
 }
 

@@ -16,17 +16,17 @@
 
 namespace mx::gui {
 
-//! An item delegate used to paint tokens in the TreeExplorerView
-class TreeExplorerItemDelegate final : public QStyledItemDelegate {
+//! An item delegate used to paint tokens in the ReferenceExplorerView
+class ReferenceExplorerItemDelegate final : public QStyledItemDelegate {
   Q_OBJECT
 
  public:
   //! Constructor
-  explicit TreeExplorerItemDelegate(const CodeViewTheme &theme,
-                                    QObject *parent = nullptr);
+  explicit ReferenceExplorerItemDelegate(const CodeViewTheme &theme,
+                                         QObject *parent = nullptr);
 
   //! Destructor
-  virtual ~TreeExplorerItemDelegate(void) override;
+  virtual ~ReferenceExplorerItemDelegate(void) override;
 
   //! Sets the specified theme, refreshing the view
   void SetTheme(const CodeViewTheme &theme);

@@ -211,7 +211,7 @@ class PopupWidgetContainer final : public QWidget {
 
   //! Updates the widget icons to match the active theme
   void UpdateIcons() {
-    d->close_button->setIcon(GetIcon(":/Icons/QuickCodeView/Close"));
+    d->close_button->setIcon(GetIcon(":/Icons/PopupWidgetContainer/close"));
   }
 
  private slots:

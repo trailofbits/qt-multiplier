@@ -58,7 +58,7 @@ target_link_libraries("Multiplier"
     "mx_database"
     "mx_fontdatabase"
     "mx_projectexplorer"
-    "mx_treeexplorer"
+    "mx_referenceexplorer"
     "mx_entityexplorer"
     "mx_historywidget"
     "mx_informationexplorer"
@@ -68,6 +68,7 @@ target_link_libraries("Multiplier"
     "mx_thememanager"
     "mx_generators"
     "mx_data_generators"
+    "mx_actionregistry"
 )
 
 enable_qt_properties("Multiplier")

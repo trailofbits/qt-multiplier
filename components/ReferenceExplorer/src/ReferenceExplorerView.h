@@ -8,26 +8,37 @@
 
 #pragma once
 
-#include <multiplier/ui/ITreeExplorerView.h>
 #include <multiplier/ui/IThemeManager.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/ui/IGeneratorModel.h>
+
+#include <QAbstractItemModel>
+#include <QWidget>
 
 namespace mx::gui {
 
-//! A treeview-based implementation for the ITreeExplorerView interface
-class TreeExplorerView final : public ITreeExplorerView {
+//! An IGeneratorView view of type `ReferenceExplorer`
+class ReferenceExplorerView final : public QWidget {
   Q_OBJECT
 
  public:
+  //! Constructor
+  ReferenceExplorerView(IGeneratorModel *model,
+                        IGlobalHighlighter *global_highlighter,
+                        QWidget *parent = nullptr);
+
   //! Destructor
-  virtual ~TreeExplorerView() override;
+  virtual ~ReferenceExplorerView() override;
+
+  //! Disabled copy constructor
+  ReferenceExplorerView(const ReferenceExplorerView &) = delete;
+
+  //! Disabled copy assignment operator
+  ReferenceExplorerView &operator=(const ReferenceExplorerView &) = delete;
 
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
-
-  //! Constructor
-  TreeExplorerView(IGeneratorModel *model,
-                   IGlobalHighlighter *global_highlighter, QWidget *parent);
 
   //! Called when a menu or osd action is about to be shown to screen
   void UpdateAction(QAction *action);
@@ -41,9 +52,6 @@ class TreeExplorerView final : public ITreeExplorerView {
 
   //! Called when an item needs to be opened in the main window
   void OnOpenAction();
-
-  //! Called when the user wants to extract the selected subtree
-  void OnExtractSubtreeAction();
 
   //! Called when the user wants to expand three levels deep
   void OnExpandThreeLevelsAction();
@@ -61,7 +69,14 @@ class TreeExplorerView final : public ITreeExplorerView {
   //! Called when a generator request ends
   void OnModelRequestFinished();
 
-  friend class ITreeExplorerView;
+ signals:
+  //! Emitted when the selected item has changed
+  void SelectedItemChanged(const QModelIndex &index);
+
+  //! Emitted when an item has been activated using the dedicated button
+  void ItemActivated(const QModelIndex &index);
+
+  friend class IReferenceExplorerView;
 };
 
 }  // namespace mx::gui
