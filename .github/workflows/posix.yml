@@ -108,8 +108,12 @@ jobs:
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
           gh release download ${{ inputs.multiplier_release }} --repo trailofbits/multiplier
-          tar xf "${archive_name}" -C "${folder_name}"
+          tar xf "${archive_name}"
           rm "${archive_name}"
+          echo "---" >>/dev/stderr
+          ls -la ./lib
+          echo "---" >>/dev/stderr
+          ls -la "${folder_name}" >>/dev/stderr
           echo "MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/${folder_name}" >> $GITHUB_ENV
 
       - name: Setup the build folders for the vendored libraries
