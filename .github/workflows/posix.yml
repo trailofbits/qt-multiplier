@@ -97,24 +97,18 @@ jobs:
               libglvnd-dev \
               python${{ inputs.python_version }} \
               python${{ inputs.python_version }}-dev \
-              cbindgen
+              cbindgen \
+              gh
           fi
 
       - name: Install multiplier
         env:
-          TOKEN: ${{ secrets.MULTIPLIER_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MULTIPLIER_TOKEN }}
         run: |
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
-          multiplier_url="https://github.com/trailofbits/multiplier/releases/download/${{ inputs.multiplier_release }}/${archive_name}"
 
-          curl \
-            -H "Authorization: token ${TOKEN}" \
-            -H "Accept: application/vnd.github.v3.raw" \
-            -L \
-            "${multiplier_url}" \
-            -o \
-            "${archive_name}"
+          gh release download ${{ inputs.multiplier_release }} --repo trailofbits/multiplier
 
           tar xf \
             "${archive_name}"
