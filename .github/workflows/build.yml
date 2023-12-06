@@ -44,10 +44,6 @@ jobs:
       python_version: 3.11
 
   linux:
-    # Disable for now, we can no longer build the multiplier library
-    # like this
-    if: false
-
     strategy:
       matrix:
         build_type: [Release]
