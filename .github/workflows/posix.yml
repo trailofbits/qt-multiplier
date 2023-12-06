@@ -142,7 +142,7 @@ jobs:
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DMXQT_ENABLE_TESTS=true \
-            -DCMAKE_PREFIX_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
+            -Dmultiplier_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier" \
             -S . \
             -B build_qtmultiplier
 
