@@ -12,7 +12,7 @@
 #include <multiplier/ui/IGeneratorModel.h>
 #include <multiplier/ui/TokenPainter.h>
 
-#include <multiplier/Token.h>
+#include <multiplier/Frontend/Token.h>
 
 #include <QApplication>
 #include <QFont>

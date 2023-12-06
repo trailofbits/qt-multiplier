@@ -4,22 +4,22 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <multiplier/Compilation.h>
-#include <multiplier/Entities/Attr.h>
-#include <multiplier/Entities/CallExpr.h>
-#include <multiplier/Entities/CXXBaseSpecifier.h>
-#include <multiplier/Entities/DefineMacroDirective.h>
-#include <multiplier/Entities/Designator.h>
-#include <multiplier/Entities/File.h>
-#include <multiplier/Entities/Fragment.h>
-#include <multiplier/Entities/FunctionDecl.h>
-#include <multiplier/Entities/IncludeLikeMacroDirective.h>
-#include <multiplier/Entities/MacroExpansion.h>
-#include <multiplier/Entities/Stmt.h>
-#include <multiplier/Entities/TemplateArgument.h>
-#include <multiplier/Entities/TemplateParameterList.h>
-#include <multiplier/Entities/Token.h>
-#include <multiplier/Entities/Type.h>
+#include <multiplier/AST/Attr.h>
+#include <multiplier/AST/CallExpr.h>
+#include <multiplier/AST/CXXBaseSpecifier.h>
+#include <multiplier/AST/Designator.h>
+#include <multiplier/AST/FunctionDecl.h>
+#include <multiplier/AST/Stmt.h>
+#include <multiplier/AST/TemplateArgument.h>
+#include <multiplier/AST/TemplateParameterList.h>
+#include <multiplier/AST/Type.h>
+#include <multiplier/Fragment.h>
+#include <multiplier/Frontend/Compilation.h>
+#include <multiplier/Frontend/DefineMacroDirective.h>
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Frontend/IncludeLikeMacroDirective.h>
+#include <multiplier/Frontend/MacroExpansion.h>
+#include <multiplier/Frontend/Token.h>
 #include <multiplier/Entity.h>
 
 #include <QString>

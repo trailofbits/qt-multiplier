@@ -9,11 +9,11 @@
 #include "MacroExplorer.h"
 #include "MacroExplorerItem.h"
 
-#include <multiplier/Entities/DefineMacroDirective.h>
-#include <multiplier/Entities/MacroExpansion.h>
-#include <multiplier/File.h>
+#include <multiplier/Frontend/DefineMacroDirective.h>
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Frontend/MacroExpansion.h>
+#include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/Index.h>
-#include <multiplier/TokenTree.h>
 #include <multiplier/ui/ICodeModel.h>
 
 #include <QDebug>

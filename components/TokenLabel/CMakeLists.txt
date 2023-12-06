@@ -20,7 +20,7 @@ target_link_libraries("mx_tokenlabel"
     "thirdparty_qt"
 
   PUBLIC
-    "multiplier::mx-api"
+    "multiplier::multiplier"
     "mx_util"
     "mx_thememanager"
 )

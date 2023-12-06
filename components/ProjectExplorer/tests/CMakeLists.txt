@@ -15,7 +15,7 @@ target_link_libraries("mx_projectexplorer_tests" PRIVATE
   "qtmx_cxx_flags"
   "thirdparty_qt"
   "thirdparty_doctest"
-  "multiplier::mx-api"
+  "multiplier::multiplier"
   "mx_projectexplorer"
 )
 

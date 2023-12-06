@@ -32,8 +32,7 @@ target_link_libraries("mx_codeview"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::mx-api"
-    "multiplier::mx-analysis"
+    "multiplier::multiplier"
     "mx_util"
     "mx_database"
     "mx_searchwidget"

@@ -9,7 +9,7 @@
 #include <multiplier/ui/CodeViewTheme.h>
 
 #include <memory>
-#include <multiplier/Token.h>
+#include <multiplier/Frontend/Token.h>
 #include <optional>
 #include <QPainter>
 #include <QRect>

@@ -40,7 +40,8 @@ jobs:
     with:
       platform: macos-12
       build_type: ${{ matrix.build_type }}
-      cxx_common_tag: v0.4.2
+      multiplier_release: a64bd7b
+      python_version: 3.11
 
   linux:
     # Disable for now, we can no longer build the multiplier library
@@ -57,4 +58,5 @@ jobs:
     with:
       platform: ubuntu-22.04
       build_type: ${{ matrix.build_type }}
-      cxx_common_tag: v0.4.2
+      multiplier_release: a64bd7b
+      python_version: 3.11

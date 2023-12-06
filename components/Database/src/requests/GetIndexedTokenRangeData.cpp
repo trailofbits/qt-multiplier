@@ -15,11 +15,11 @@
 #include <unordered_map>
 #include <iostream>
 
-#include <multiplier/Entities/Stmt.h>
-#include <multiplier/Entities/Token.h>
+#include <multiplier/AST/Stmt.h>
+#include <multiplier/Frontend/Token.h>
+#include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/Util.h>
-#include <multiplier/TokenTree.h>
 
 namespace mx::gui {
 namespace {

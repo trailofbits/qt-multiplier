@@ -27,7 +27,7 @@ target_link_libraries("mx_macroexplorer"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::mx-api"
+    "multiplier::multiplier"
     "mx_codeview"
 )
 

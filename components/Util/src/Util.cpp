@@ -12,7 +12,7 @@
 #include <multiplier/Fragment.h>
 #include <multiplier/Index.h>
 #include <multiplier/Iterator.h>
-#include <multiplier/Token.h>
+#include <multiplier/Frontend.h>
 
 #include <iostream>
 
@@ -744,7 +744,7 @@ TokenRange InjectWhitespace(const TokenRange &toks) {
 
     if (add_leading_ws || (!is_first && AddLeadingWhitespace(tk))) {
       if (!SuppressLeadingWhitespace(tk)) {
-        SimpleToken st;
+        UserToken st;
         st.kind = TokenKind::WHITESPACE;
         st.category = TokenCategory::WHITESPACE;
         st.data = " ";
@@ -880,7 +880,7 @@ TokenRange NameOfEntity(const VariantEntity &ent) {
 
       [](const File &file) -> TokenRange {
         for (std::filesystem::path path : file.paths()) {
-          SimpleToken tk;
+          UserToken tk;
           tk.data = path.generic_string();
           tk.category = TokenCategory::FILE_NAME;
           tk.kind = TokenKind::HEADER_NAME;

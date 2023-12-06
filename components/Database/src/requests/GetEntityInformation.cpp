@@ -11,33 +11,35 @@
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/Util.h>
 
-#include <multiplier/Entities/ArraySubscriptExpr.h>
-#include <multiplier/Entities/BinaryOperator.h>
-#include <multiplier/Entities/CallExpr.h>
-#include <multiplier/Entities/CastExpr.h>
-#include <multiplier/Entities/ConditionalOperator.h>
-#include <multiplier/Entities/DefineMacroDirective.h>
-#include <multiplier/Entities/DoStmt.h>
-#include <multiplier/Entities/EnumConstantDecl.h>
-#include <multiplier/Entities/EnumDecl.h>
-#include <multiplier/Entities/File.h>
-#include <multiplier/Entities/ForStmt.h>
-#include <multiplier/Entities/Fragment.h>
-#include <multiplier/Entities/FunctionDecl.h>
-#include <multiplier/Entities/IfStmt.h>
-#include <multiplier/Entities/IncludeLikeMacroDirective.h>
-#include <multiplier/Entities/MacroExpansion.h>
-#include <multiplier/Entities/MacroParameter.h>
-#include <multiplier/Entities/MemberExpr.h>
-#include <multiplier/Entities/NamedDecl.h>
-#include <multiplier/Entities/RecordDecl.h>
-#include <multiplier/Entities/SwitchStmt.h>
-#include <multiplier/Entities/StorageDuration.h>
-#include <multiplier/Entities/ThreadStorageClassSpecifier.h>
-#include <multiplier/Entities/TypeTraitExpr.h>
-#include <multiplier/Entities/UnaryOperator.h>
-#include <multiplier/Entities/UnaryExprOrTypeTraitExpr.h>
-#include <multiplier/Entities/WhileStmt.h>
+#include <multiplier/AST/ArraySubscriptExpr.h>
+#include <multiplier/AST/BinaryOperator.h>
+#include <multiplier/AST/CallExpr.h>
+#include <multiplier/AST/CastExpr.h>
+#include <multiplier/AST/ConditionalOperator.h>
+#include <multiplier/AST/DoStmt.h>
+#include <multiplier/AST/EnumConstantDecl.h>
+#include <multiplier/AST/EnumDecl.h>
+#include <multiplier/AST/ForStmt.h>
+#include <multiplier/AST/FunctionDecl.h>
+#include <multiplier/AST/IfStmt.h>
+#include <multiplier/AST/MemberExpr.h>
+#include <multiplier/AST/NamedDecl.h>
+#include <multiplier/AST/RecordDecl.h>
+#include <multiplier/AST/SwitchStmt.h>
+#include <multiplier/AST/StorageDuration.h>
+#include <multiplier/AST/ThreadStorageClassSpecifier.h>
+#include <multiplier/AST/TypeTraitExpr.h>
+#include <multiplier/AST/UnaryOperator.h>
+#include <multiplier/AST/UnaryExprOrTypeTraitExpr.h>
+#include <multiplier/AST/WhileStmt.h>
+
+#include <multiplier/Frontend/DefineMacroDirective.h>
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Frontend/IncludeLikeMacroDirective.h>
+#include <multiplier/Frontend/MacroExpansion.h>
+#include <multiplier/Frontend/MacroParameter.h>
+
+#include <multiplier/Fragment.h>
 
 #include <filesystem>
 #include <iomanip>
@@ -770,7 +772,7 @@ FillRecordInformation(QPromise<bool> &result_promise,
 
         std::vector<CustomToken> toks;
 
-        SimpleToken tok;
+        UserToken tok;
         tok.category = TokenCategory::LITERAL;
         tok.kind = TokenKind::NUMERIC_CONSTANT;
         tok.data = ss.str();
@@ -837,7 +839,7 @@ GetFileInformation(QPromise<bool> &result_promise,
           continue;
         }
 
-        SimpleToken path;
+        UserToken path;
         path.category = TokenCategory::FILE_NAME;
         path.kind = TokenKind::HEADER_NAME;
         path.related_entity = file.value();
@@ -847,17 +849,17 @@ GetFileInformation(QPromise<bool> &result_promise,
           break;
         }
 
-        SimpleToken colon;
+        UserToken colon;
         colon.category = TokenCategory::PUNCTUATION;
         colon.kind = TokenKind::COLON;
         colon.data = ":";
 
-        SimpleToken line;
+        UserToken line;
         line.category = TokenCategory::LINE_NUMBER;
         line.kind = TokenKind::NUMERIC_CONSTANT;
         line.data = std::to_string(loc->line);
 
-        SimpleToken col;
+        UserToken col;
         col.category = TokenCategory::LINE_NUMBER;
         col.kind = TokenKind::NUMERIC_CONSTANT;
         col.data = std::to_string(loc->column);
@@ -977,7 +979,7 @@ GetMacroInformation(QPromise<bool> &result_promise,
       }
 
     } else if (entity.is_variadic()) {
-      SimpleToken tok;
+      UserToken tok;
       tok.category = TokenCategory::MACRO_PARAMETER_NAME;
       tok.data = "__VA_ARGS__";
       tok.kind = TokenKind::IDENTIFIER;

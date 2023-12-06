@@ -12,7 +12,7 @@
 #include <multiplier/ui/ISearchWidget.h>
 #include <multiplier/ui/IThemeManager.h>
 
-#include <multiplier/Token.h>
+#include <multiplier/Frontend/Token.h>
 
 #include <QTextCursor>
 #include <QTextDocument>

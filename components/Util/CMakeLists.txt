@@ -42,7 +42,7 @@ target_link_libraries("mx_util"
     "qtmx_cxx_flags"
     "mx_codeviewtheme"
     "thirdparty_qt"
-    "multiplier::mx-api"
+    "multiplier::multiplier"
 
   PUBLIC
     "mx_thememanager"

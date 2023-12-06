@@ -10,7 +10,7 @@
 
 #include <multiplier/ui/Util.h>
 
-#include <multiplier/Entities/Decl.h>
+#include <multiplier/AST/Decl.h>
 
 namespace mx::gui {
 

@@ -27,7 +27,7 @@ target_link_libraries("mx_referenceexplorer"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::mx-api"
+    "multiplier::multiplier"
     "gap::gap"
     "mx_searchwidget"
     "mx_util"

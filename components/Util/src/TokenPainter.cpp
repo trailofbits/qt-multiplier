@@ -8,7 +8,7 @@
 
 #include <multiplier/ui/TokenPainter.h>
 
-#include <multiplier/Entities/TokenKind.h>
+#include <multiplier/Frontend/TokenKind.h>
 #include <QApplication>
 #include <QBrush>
 #include <QColor>

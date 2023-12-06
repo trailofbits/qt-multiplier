@@ -8,7 +8,7 @@
 
 #include "CodeModel.h"
 
-#include <multiplier/Entities/MacroKind.h>
+#include <multiplier/Frontend/MacroKind.h>
 #include <multiplier/ui/ICodeModel.h>
 
 #include <QModelIndex>

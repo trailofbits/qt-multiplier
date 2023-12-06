@@ -13,22 +13,23 @@
 #include <multiplier/Entity.h>
 // clang-format on
 
-#include <multiplier/Compilation.h>
-#include <multiplier/Entities/Attr.h>
-#include <multiplier/Entities/CXXBaseSpecifier.h>
-#include <multiplier/Entities/DefineMacroDirective.h>
-#include <multiplier/Entities/Designator.h>
-#include <multiplier/Entities/FieldDecl.h>
-#include <multiplier/Entities/File.h>
-#include <multiplier/Entities/Fragment.h>
-#include <multiplier/Entities/FunctionDecl.h>
-#include <multiplier/Entities/IncludeLikeMacroDirective.h>
-#include <multiplier/Entities/Stmt.h>
-#include <multiplier/Entities/TemplateArgument.h>
-#include <multiplier/Entities/TemplateParameterList.h>
-#include <multiplier/Entities/Type.h>
-#include <multiplier/Entities/TypeDecl.h>
-#include <multiplier/Entities/VarDecl.h>
+#include <multiplier/AST/Attr.h>
+#include <multiplier/AST/CXXBaseSpecifier.h>
+#include <multiplier/AST/Designator.h>
+#include <multiplier/AST/FieldDecl.h>
+#include <multiplier/AST/FunctionDecl.h>
+#include <multiplier/AST/Stmt.h>
+#include <multiplier/AST/TemplateArgument.h>
+#include <multiplier/AST/TemplateParameterList.h>
+#include <multiplier/AST/Type.h>
+#include <multiplier/AST/TypeDecl.h>
+#include <multiplier/AST/VarDecl.h>
+
+#include <multiplier/Fragment.h>
+#include <multiplier/Frontend/Compilation.h>
+#include <multiplier/Frontend/DefineMacroDirective.h>
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Frontend/IncludeLikeMacroDirective.h>
 
 #include <QString>
 #include <QColor>
