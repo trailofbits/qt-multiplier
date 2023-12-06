@@ -108,7 +108,7 @@ jobs:
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
           gh release download ${{ inputs.multiplier_release }} --repo trailofbits/multiplier
-          tar xf "${archive_name}"
+          tar -xf "${archive_name}" --directory "${folder_name}"
           rm "${archive_name}"
           echo "---" >>/dev/stderr
           ls -la ./lib
