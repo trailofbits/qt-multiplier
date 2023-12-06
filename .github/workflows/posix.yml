@@ -83,6 +83,9 @@ jobs:
             brew link qt@6
 
           else
+            curl -sSL https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+            echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | tee -a /etc/apt/sources.list > /dev/null
+            echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | tee -a /etc/apt/sources.list > /dev/null
             sudo apt update
 
             sudo apt install -y \
