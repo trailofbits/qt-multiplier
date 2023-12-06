@@ -109,7 +109,7 @@ jobs:
           multiplier_url="https://github.com/trailofbits/multiplier/releases/download/${{ inputs.multiplier_release }}/${archive_name}"
 
           curl \
-            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Authorization: token ${TOKEN}" \
             -L \
             "${multiplier_url}" \
             -o \
