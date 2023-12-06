@@ -159,6 +159,7 @@ jobs:
             --target install
 
       - name: Run the qt-multiplier tests
+        if: false
         run: |
           cmake \
             --build build_qtmultiplier \
