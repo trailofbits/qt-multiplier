@@ -65,6 +65,16 @@ jobs:
           mkdir -p \
             "${CCACHE_DIR}"
 
+      - name: Install Python
+        uses: trail-of-forks/setup-python@main
+        with:
+          python-version: "${{ inputs.python_version }}-dev"
+
+      - name: Install Clang 17
+        uses: trail-of-forks/install-llvm-action@master
+        with:
+          version: "17.0"
+
       - name: Install system dependencies
         run: |
           if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -76,21 +86,15 @@ jobs:
               flex \
               bison \
               qt@6 \
-              python@${{ inputs.python_version }} \
               curl
 
             brew unlink qt@6
             brew link qt@6
 
           else
-            curl -sSL https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-            echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | tee -a /etc/apt/sources.list > /dev/null
-            echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | tee -a /etc/apt/sources.list > /dev/null
             sudo apt update
 
             sudo apt install -y \
-              clang-17 \
-              clang++-17 \
               ccache \
               cmake \
               flex \
@@ -99,8 +103,6 @@ jobs:
               libqt6core5compat6-dev \
               libgl1-mesa-dev \
               libglvnd-dev \
-              python${{ inputs.python_version }} \
-              python${{ inputs.python_version }}-dev \
               cbindgen \
               gh
           fi
