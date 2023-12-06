@@ -16,7 +16,7 @@ class IGlobalHighlighter;
 class IMacroExplorer;
 class IGeneratorModel;
 
-//! A container for a TreeExplorer and the linked ICodeView
+//! A container for a TreeExplorerView and the linked ICodeView
 class PreviewableTreeExplorerView final : public QWidget {
   Q_OBJECT
 
@@ -78,17 +78,17 @@ class PreviewableTreeExplorerView final : public QWidget {
   void SetBrowserMode(const bool &enabled);
 
  signals:
-  //! The forwarded ITreeExplorer::SelectedItemChanged signal
+  //! The forwarded ITreeExplorerView::SelectedItemChanged signal
   void SelectedItemChanged(const QModelIndex &index);
 
-  //! The forwarded ITreeExplorer::ItemActivated signal
+  //! The forwarded ITreeExplorerView::ItemActivated signal
   void ItemActivated(const QModelIndex &index);
 
   //! The forwarded ICodeView::TokenTriggered
   void TokenTriggered(const ICodeView::TokenAction &token_action,
                       const QModelIndex &index);
 
-  //! The forwarded ITreeExplorer::ExtractSubtree signal
+  //! The forwarded ITreeExplorerView::ExtractSubtree signal
   void ExtractSubtree(const QModelIndex &index);
 };
 

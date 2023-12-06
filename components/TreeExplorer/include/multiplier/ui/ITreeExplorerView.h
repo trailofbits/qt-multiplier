@@ -18,26 +18,26 @@ namespace mx::gui {
 
 //! The tree explorer widget. This works for generic trees supporting
 //! incremental expansion.
-class ITreeExplorer : public QWidget {
+class ITreeExplorerView : public QWidget {
   Q_OBJECT
 
  public:
   //! Factory method
-  static ITreeExplorer *Create(IGeneratorModel *model,
-                               IGlobalHighlighter *global_highlighter,
-                               QWidget *parent = nullptr);
+  static ITreeExplorerView *Create(IGeneratorModel *model,
+                                   IGlobalHighlighter *global_highlighter,
+                                   QWidget *parent = nullptr);
 
   //! Constructor
-  inline ITreeExplorer(QWidget *parent) : QWidget(parent) {}
+  inline ITreeExplorerView(QWidget *parent) : QWidget(parent) {}
 
   //! Destructor
-  virtual ~ITreeExplorer() override = default;
+  virtual ~ITreeExplorerView() override = default;
 
   //! Disabled copy constructor
-  ITreeExplorer(const ITreeExplorer &) = delete;
+  ITreeExplorerView(const ITreeExplorerView &) = delete;
 
   //! Disabled copy assignment operator
-  ITreeExplorer &operator=(const ITreeExplorer &) = delete;
+  ITreeExplorerView &operator=(const ITreeExplorerView &) = delete;
 
  signals:
   //! Emitted when the selected item has changed

@@ -7,14 +7,14 @@
 #
 
 add_library("mx_treeexplorer"
-  include/multiplier/ui/ITreeExplorer.h
-  src/ITreeExplorer.cpp
+  include/multiplier/ui/ITreeExplorerView.h
+  src/ITreeExplorerView.cpp
   
   src/TreeExplorerItemDelegate.h
   src/TreeExplorerItemDelegate.cpp
 
-  src/TreeExplorer.h
-  src/TreeExplorer.cpp
+  src/TreeExplorerView.h
+  src/TreeExplorerView.cpp
 
   include/multiplier/ui/PreviewableTreeExplorerView.h
   src/PreviewableTreeExplorerView.cpp
