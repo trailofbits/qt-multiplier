@@ -130,10 +130,10 @@ jobs:
 
       - name: Build qt-multiplier
         run: |
-          ls ${MULTIPLIER_INSTALL_DIRECTORY}
-          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib
-          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake
-          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier
+          ls ${MULTIPLIER_INSTALL_DIRECTORY} >>/dev/stderr
+          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib >>/dev/stderr
+          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake >>/dev/stderr
+          ls ${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier >>/dev/stderr
 
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
