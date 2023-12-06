@@ -101,12 +101,15 @@ jobs:
           fi
 
       - name: Install multiplier
+        env:
+          TOKEN: ${{ secrets.repo_token }}
         run: |
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
           multiplier_url="https://github.com/trailofbits/multiplier/releases/download/${{ inputs.multiplier_release }}/${archive_name}"
 
           curl \
+            -H "Authorization: token ${TOKEN}" \
             -L \
             "${multiplier_url}" \
             -o \
@@ -141,7 +144,6 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DCMAKE_C_COMPILER=$(which clang) \
             -DCMAKE_CXX_COMPILER=$(which clang++) \
             -DMXQT_ENABLE_TESTS=true \
