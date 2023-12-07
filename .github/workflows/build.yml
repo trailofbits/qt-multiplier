@@ -18,10 +18,10 @@ on:
 
   push:
     branches:
-      - 'next'
+      - 'main'
 
 concurrency:
-  group: next-${{ github.event.pull_request.number || github.sha }}
+  group: main-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -40,8 +40,9 @@ jobs:
     with:
       platform: macos-12
       build_type: ${{ matrix.build_type }}
-      multiplier_release: a64bd7b
+      multiplier_release: b3b1027
       python_version: 3.11
+      llvm_version: 17
 
   linux:
     strategy:
@@ -54,5 +55,6 @@ jobs:
     with:
       platform: ubuntu-22.04
       build_type: ${{ matrix.build_type }}
-      multiplier_release: a64bd7b
+      multiplier_release: b3b1027
       python_version: 3.11
+      llvm_version: 17

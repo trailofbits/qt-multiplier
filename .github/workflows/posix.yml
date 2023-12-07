@@ -27,6 +27,10 @@ on:
         required: true
         type: string
 
+      llvm_version:
+        required: true
+        type: string
+
 jobs:
   build:
     runs-on: ${{ inputs.platform }}
@@ -70,10 +74,10 @@ jobs:
         with:
           python-version: "${{ inputs.python_version }}-dev"
 
-      - name: Install Clang 17
+      - name: Install Clang and LLVM
         uses: trail-of-forks/install-llvm-action@master
         with:
-          version: "17.0"
+          version: "${{ inputs.llvm_version }}.0"
 
       - name: Install system dependencies
         run: |
@@ -107,7 +111,7 @@ jobs:
               gh
           fi
 
-      - name: Install multiplier
+      - name: Download multiplier
         env:
           GITHUB_TOKEN: ${{ secrets.MULTIPLIER_TOKEN }}
         run: |
