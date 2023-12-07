@@ -52,6 +52,7 @@ jobs:
           git submodule update --init --recursive libraries/doctest/src
           git submodule update --init --recursive libraries/phantomstyle/src
           git submodule update --init --recursive libraries/xxhash/src
+          git submodule update --init libraries/vendored/multiplier
 
       - name: Set the CCACHE_DIR environment variable
         run: |
@@ -81,62 +82,57 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            sudo chown -R $(whoami) $(brew --prefix)/*
+          sudo apt update
 
-            brew install \
-              ccache \
-              cmake \
-              flex \
-              bison \
-              qt@6 \
-              curl
-
-            brew unlink qt@6
-            brew link qt@6
-
-          else
-            sudo apt update
-
-            sudo apt install -y \
-              ccache \
-              cmake \
-              flex \
-              bison \
-              qt6-base-dev \
-              libqt6core5compat6-dev \
-              libgl1-mesa-dev \
-              libglvnd-dev \
-              cbindgen \
-              gh
-          fi
+          sudo apt install -y \
+            ccache \
+            cmake \
+            flex \
+            bison \
+            qt6-base-dev \
+            libqt6core5compat6-dev \
+            libgl1-mesa-dev \
+            libglvnd-dev \
+            cbindgen \
+            gh
 
       - name: Download multiplier
         env:
           GITHUB_TOKEN: ${{ secrets.MULTIPLIER_TOKEN }}
         run: |
+          submodule_version="$( cd libraries/vendored/multiplier && git rev-parse --short=7 HEAD )"
+          if [[ $? != 0 ]] ; then
+            echo "Failed to determine which version of multiplier is being vendored"
+            exit 1
+          fi
+
+          echo "Multiplier submodule version: ${submodule_version}"
+          echo "Multiplier version in build.yml: ${{ inputs.multiplier_release }}"
+
+          if [[ "${submodule_version}" != "${{ inputs.multiplier_release }}" ]] ; then
+            echo "The multiplier version in 'libraries/vendored/multiplier' does not match the release in build.yml. Please ensure they are matching"
+            exit 1
+          fi
+
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
           gh release download ${{ inputs.multiplier_release }} --repo trailofbits/multiplier
+
           mkdir "${folder_name}"
           tar -xf "${archive_name}" --directory "${folder_name}"
           rm "${archive_name}"
+
           echo "MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/${folder_name}" >> $GITHUB_ENV
 
       - name: Setup the build folders for the vendored libraries
         run: |
-          mkdir build_vendored
           mkdir qt_multiplier_install
           echo "QT_MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/qt_multiplier_install" >> $GITHUB_ENV
 
       - name: Determine job count
         id: job_count
         run: |
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            echo "VALUE=$(sysctl -n hw.ncpu)" >> $GITHUB_OUTPUT
-          else
-            echo "VALUE=$(nproc)" >> $GITHUB_OUTPUT
-          fi
+          echo "VALUE=$(nproc)" >> $GITHUB_OUTPUT
 
       - name: Build qt-multiplier
         run: |
@@ -147,6 +143,7 @@ jobs:
             -DCMAKE_C_COMPILER="${{ env.LLVM_PATH }}/bin/clang" \
             -DCMAKE_CXX_COMPILER="${{ env.LLVM_PATH }}/bin/clang++" \
             -DMXQT_ENABLE_TESTS=true \
+            -DMXQT_MULTIPLIER_VERSION=${{ inputs.multiplier_release }} \
             -Dmultiplier_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier" \
             -Dgap_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/gap" \
             -S . \
@@ -169,36 +166,7 @@ jobs:
             --build build_qtmultiplier \
             --target test
 
-      - name: Create the DMG package
-        if: inputs.platform == 'macos-12'
-        id: dmg_package
-        run: |
-          cmake \
-            -S package \
-            -B package-build \
-            -DQT_MULTIPLIER_DATA_PATH="${QT_MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DMULTIPLIER_DATA_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DCPACK_GENERATOR=DragNDrop
-
-          cmake \
-            --build package-build \
-            --target package
-
-          rel_package_path="$(ls package-build/*.dmg)"
-          package_name="$(basename ${rel_package_path})"
-
-          echo "PATH=${rel_package_path}" >> $GITHUB_OUTPUT
-          echo "NAME=${package_name}" >> $GITHUB_OUTPUT
-
-      - name: Upload the DMG package
-        if: inputs.platform == 'macos-12'
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ steps.dmg_package.outputs.NAME }}
-          path: ${{ steps.dmg_package.outputs.PATH }}
-
       - name: Create the DEB package
-        if: inputs.platform == 'ubuntu-22.04'
         id: deb_package
         run: |
           cmake \
@@ -219,7 +187,6 @@ jobs:
           echo "NAME=${package_name}" >> $GITHUB_OUTPUT
 
       - name: Upload the DEB package
-        if: inputs.platform == 'ubuntu-22.04'
         uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.deb_package.outputs.NAME }}
