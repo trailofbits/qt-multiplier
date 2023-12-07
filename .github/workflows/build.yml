@@ -25,25 +25,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  macos:
-    # Disable for now, we can no longer build the multiplier library
-    # like this
-    if: false
-
-    strategy:
-      matrix:
-        build_type: [Release]
-
-    uses: ./.github/workflows/posix.yml
-    secrets: inherit
-
-    with:
-      platform: macos-12
-      build_type: ${{ matrix.build_type }}
-      multiplier_release: b3b1027
-      python_version: 3.11
-      llvm_version: 17
-
   linux:
     strategy:
       matrix:
@@ -55,6 +36,7 @@ jobs:
     with:
       platform: ubuntu-22.04
       build_type: ${{ matrix.build_type }}
+      # git rev-parse --short=7
       multiplier_release: b3b1027
       python_version: 3.11
       llvm_version: 17
