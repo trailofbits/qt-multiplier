@@ -21,7 +21,7 @@
 #include <QMenu>
 #include <QSortFilterProxyModel>
 #include <QHeaderView>
-#include <QScrollbar>
+#include <QScrollBar>
 #include <QKeyEvent>
 
 #include <variant>

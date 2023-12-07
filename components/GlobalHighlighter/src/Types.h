@@ -9,7 +9,7 @@
 #pragma once
 
 #include <multiplier/Types.h>
-#include <multiplier/Token.h>
+#include <multiplier/Frontend/Token.h>
 
 #include <QColor>
 

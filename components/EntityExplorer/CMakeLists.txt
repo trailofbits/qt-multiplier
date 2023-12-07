@@ -32,7 +32,7 @@ target_link_libraries("mx_entityexplorer"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::mx-api"
+    "multiplier::multiplier"
     "mx_util"
     "mx_searchwidget"
     "mx_database"

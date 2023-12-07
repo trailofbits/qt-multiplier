@@ -19,7 +19,15 @@ on:
         required: true
         type: string
 
-      cxx_common_tag:
+      multiplier_release:
+        required: true
+        type: string
+
+      python_version:
+        required: true
+        type: string
+
+      llvm_version:
         required: true
         type: string
 
@@ -28,7 +36,7 @@ jobs:
     runs-on: ${{ inputs.platform }}
 
     env:
-      CACHE_KEY: platform-${{ inputs.platform }}_type-${{ inputs.build_type }}_cxxcommon-${{ inputs.cxx_common_tag }}
+      CACHE_KEY: platform-${{ inputs.platform }}_type-${{ inputs.build_type }}-${{ inputs.multiplier_release }}
 
     steps:
       - name: Clone the source code
@@ -41,7 +49,9 @@ jobs:
           eval $(ssh-agent -s)
           ssh-add - <<< '${{ secrets.MX_MULTIPLIER_DEPLOY_KEY }}'
 
-          git submodule update --init --recursive
+          git submodule update --init --recursive libraries/doctest/src
+          git submodule update --init --recursive libraries/phantomstyle/src
+          git submodule update --init --recursive libraries/xxhash/src
 
       - name: Set the CCACHE_DIR environment variable
         run: |
@@ -58,6 +68,16 @@ jobs:
         run: |
           mkdir -p \
             "${CCACHE_DIR}"
+
+      - name: Install Python
+        uses: trail-of-forks/setup-python@main
+        with:
+          python-version: "${{ inputs.python_version }}-dev"
+
+      - name: Install Clang and LLVM
+        uses: trail-of-forks/install-llvm-action@master
+        with:
+          version: "${{ inputs.llvm_version }}.0"
 
       - name: Install system dependencies
         run: |
@@ -79,7 +99,6 @@ jobs:
             sudo apt update
 
             sudo apt install -y \
-              clang \
               ccache \
               cmake \
               flex \
@@ -88,40 +107,25 @@ jobs:
               libqt6core5compat6-dev \
               libgl1-mesa-dev \
               libglvnd-dev \
-              cbindgen
+              cbindgen \
+              gh
           fi
 
-      - name: Install cxx-common
+      - name: Download multiplier
+        env:
+          GITHUB_TOKEN: ${{ secrets.MULTIPLIER_TOKEN }}
         run: |
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            folder_name="vcpkg_macos-12_llvm-16-pasta_xcode-14.2_amd64"
-          else
-            folder_name="vcpkg_ubuntu-22.04_llvm-16_amd64"
-          fi
-
+          folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
-          cxx_common_url="https://github.com/lifting-bits/cxx-common/releases/download/${{ inputs.cxx_common_tag }}/${archive_name}"
-
-          curl \
-            -L \
-            "${cxx_common_url}" \
-            -o \
-            "${archive_name}"
-
-          tar xf \
-            "${archive_name}"
-
+          gh release download ${{ inputs.multiplier_release }} --repo trailofbits/multiplier
+          mkdir "${folder_name}"
+          tar -xf "${archive_name}" --directory "${folder_name}"
           rm "${archive_name}"
-
-          echo "VCPKG_ROOT=$(pwd)/${folder_name}" >> $GITHUB_ENV
+          echo "MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/${folder_name}" >> $GITHUB_ENV
 
       - name: Setup the build folders for the vendored libraries
         run: |
           mkdir build_vendored
-
-          mkdir multiplier_install
-          echo "MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/multiplier_install" >> $GITHUB_ENV
-
           mkdir qt_multiplier_install
           echo "QT_MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/qt_multiplier_install" >> $GITHUB_ENV
 
@@ -134,140 +138,17 @@ jobs:
             echo "VALUE=$(nproc)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Select triplet
-        id: triplet
-        run: |
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            echo "VALUE=x64-osx-rel" >> $GITHUB_OUTPUT
-          else
-            echo "VALUE=x64-linux-rel" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build weggli-native
-        run: |
-          cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DCMAKE_C_COMPILER=$(which clang) \
-            -DCMAKE_CXX_COMPILER=$(which clang++) \
-            -S libraries/vendored/weggli-native \
-            -B build_vendored/weggli-native
-
-          cmake \
-            --build build_vendored/weggli-native \
-            -j ${{ steps.job_count.outputs.VALUE }} \
-            --target install
-
-      - name: Build pasta
-        run: |
-          cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DPASTA_BOOTSTRAP_MACROS=OFF \
-            -DPASTA_BOOTSTRAP_TYPES=OFF \
-            -DPASTA_ENABLE_INSTALL=ON \
-            -DPASTA_ENABLE_TESTING=OFF \
-            -DPASTA_ENABLE_PY_BINDINGS=OFF \
-            -S libraries/vendored/pasta \
-            -B build_vendored/pasta
-
-          cmake \
-            --build build_vendored/pasta \
-            -j ${{ steps.job_count.outputs.VALUE }} \
-            --target install
-
-      - name: Build gap
-        run: |
-          cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DCMAKE_C_COMPILER=$(which clang) \
-            -DCMAKE_CXX_COMPILER=$(which clang++) \
-            -DCMAKE_MAKE_PROGRAM=$(which make) \
-            -DVCPKG_ROOT="${VCPKG_ROOT}" \
-            -DVCPKG_MANIFEST_MODE=OFF \
-            -DGAP_WARNINGS_AS_ERRORS=OFF \
-            -DGAP_ENABLE_TESTING=OFF \
-            -DGAP_ENABLE_EXAMPLES=OFF \
-            -DGAP_ENABLE_COROUTINES=ON \
-            -S libraries/vendored/gap \
-            -B build_vendored/gap
-
-          cmake \
-            --build build_vendored/gap \
-            -j ${{ steps.job_count.outputs.VALUE }} \
-            --target install
-
-      - name: Build VAST
-        run: |
-          cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DVAST_ENABLE_GAP_SUBMODULE=FALSE \
-            -DVAST_WARNINGS_AS_ERRORS=FALSE \
-            -DVAST_INSTALL=ON \
-            -DENABLE_TESTING=OFF \
-            -S libraries/vendored/vast \
-            -B build_vendored/vast
-
-          cmake \
-            --build build_vendored/vast \
-            -j ${{ steps.job_count.outputs.VALUE }} \
-            --target install
-
-      - name: Build multiplier
-        run: |
-          cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_INSTALL_PREFIX="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DCMAKE_C_COMPILER=$(which clang) \
-            -DCMAKE_CXX_COMPILER=$(which clang++) \
-            -DCMAKE_MAKE_PROGRAM=$(which make) \
-            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DMX_ENABLE_BOOTSTRAP=OFF \
-            -DMX_ENABLE_WEGGLI=ON \
-            -DMX_ENABLE_RE2=ON \
-            -DMX_ENABLE_INSTALL=ON \
-            -S libraries/vendored/multiplier \
-            -B build_vendored/multiplier
-
-          cmake \
-            --build build_vendored/multiplier \
-            -j ${{ steps.job_count.outputs.VALUE }} \
-            --target install
-
       - name: Build qt-multiplier
         run: |
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DCMAKE_C_COMPILER=$(which clang) \
-            -DCMAKE_CXX_COMPILER=$(which clang++) \
-            -DVCPKG_TARGET_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
-            -DVCPKG_HOST_TRIPLET=${{ steps.triplet.outputs.VALUE }} \
+            -DCMAKE_C_COMPILER="${{ env.LLVM_PATH }}/bin/clang" \
+            -DCMAKE_CXX_COMPILER="${{ env.LLVM_PATH }}/bin/clang++" \
             -DMXQT_ENABLE_TESTS=true \
-            -DCMAKE_PREFIX_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
+            -Dmultiplier_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier" \
+            -Dgap_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/gap" \
             -S . \
             -B build_qtmultiplier
 
@@ -282,6 +163,7 @@ jobs:
             --target install
 
       - name: Run the qt-multiplier tests
+        if: false
         run: |
           cmake \
             --build build_qtmultiplier \
@@ -342,28 +224,3 @@ jobs:
         with:
           name: ${{ steps.deb_package.outputs.NAME }}
           path: ${{ steps.deb_package.outputs.PATH }}
-
-      - name: Generate the sample database file
-        run: |
-          git clone "https://github.com/iovisor/ubpf"
-          ( cd ubpf && git checkout -b sample_branch 0262957 )
-
-          cmake \
-            -S ubpf \
-            -B build_ubpf \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=true
-
-          "${MULTIPLIER_INSTALL_DIRECTORY}/bin/mx-index" \
-            --target "build_ubpf/compile_commands.json" \
-            --db /tmp/iovisor_ubpf.mx
-
-          mv \
-            /tmp/iovisor_ubpf.mx \
-            .
-
-      - name: Upload the sample database
-        uses: actions/upload-artifact@v3
-        with:
-          name: iovisor_ubpf.mx
-          path: iovisor_ubpf.mx

@@ -1,25 +1,12 @@
 [submodule "libraries/doctest/src"]
 	path = libraries/doctest/src
 	url = https://github.com/doctest/doctest
-[submodule "libraries/vendored/gap"]
-	path = libraries/vendored/gap
-	url = https://github.com/lifting-bits/gap
-[submodule "libraries/vendored/weggli-native"]
-	path = libraries/vendored/weggli-native
-	url = https://github.com/trailofbits/weggli-native
-[submodule "libraries/vendored/pasta"]
-	path = libraries/vendored/pasta
-	url = https://github.com/trailofbits/pasta
 [submodule "libraries/vendored/multiplier"]
 	path = libraries/vendored/multiplier
 	url = git@github.com:trailofbits/multiplier
 [submodule "libraries/phantomstyle/src"]
 	path = libraries/phantomstyle/src
 	url = https://github.com/randrew/phantomstyle
-[submodule "libraries/vendored/vast"]
-	path = libraries/vendored/vast
-	url = https://github.com/trailofbits/vast.git
-	branch = vspell-future
 [submodule "libraries/xxhash/src"]
 	path = libraries/xxhash/src
 	url = https://github.com/Cyan4973/xxHash

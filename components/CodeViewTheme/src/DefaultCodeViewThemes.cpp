@@ -8,7 +8,7 @@
 
 #include "DefaultCodeViewThemes.h"
 
-#include <multiplier/Entities/TokenCategory.h>
+#include <multiplier/Frontend/TokenCategory.h>
 
 namespace mx::gui {
 

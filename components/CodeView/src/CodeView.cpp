@@ -11,7 +11,7 @@
 
 #include <multiplier/ui/Assert.h>
 
-#include <multiplier/Entities/TokenCategory.h>
+#include <multiplier/Frontend/TokenCategory.h>
 
 #include <QAbstractProxyModel>
 #include <QFont>

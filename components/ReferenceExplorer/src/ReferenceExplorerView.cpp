@@ -296,7 +296,7 @@ void ReferenceExplorerView::OnExpandFiveLevelsAction() {
 }
 
 void ReferenceExplorerView::OnThemeChange(
-    const QPalette &, const CodeViewTheme &code_view_theme) {
+    const QPalette &, const CodeViewTheme &) {
   QIcon open_item_icon;
   open_item_icon.addPixmap(GetPixmap(":/ReferenceExplorer/activate_ref_item"),
                            QIcon::Normal, QIcon::On);

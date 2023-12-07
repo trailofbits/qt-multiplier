@@ -29,7 +29,7 @@
 #include <multiplier/ui/IGeneratorView.h>
 #include <multiplier/ui/IActionRegistry.h>
 
-#include <multiplier/Entities/StmtKind.h>
+#include <multiplier/AST/StmtKind.h>
 
 #include <QDockWidget>
 #include <QFileDialog>
@@ -957,7 +957,7 @@ void MainWindow::OnToggleWordWrap(bool checked) {
   code_view.SetWordWrapping(checked);
 }
 
-void MainWindow::SaveReferenceExplorer(ReferenceExplorer *reference_explorer) {
+void MainWindow::SaveReferenceExplorer(ReferenceExplorer *) {
   /*d->popup_reference_explorer.release();
 
   auto new_tab_index = d->ref_explorer_tab_widget->count();

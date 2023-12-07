@@ -18,7 +18,7 @@ target_link_libraries("mx_data_generators"
     "qtmx_cxx_flags"
 
   PUBLIC
-    "multiplier::mx-api"
+    "multiplier::multiplier"
     "mx_generators"
 )
 

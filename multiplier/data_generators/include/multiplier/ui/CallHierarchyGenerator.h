@@ -8,7 +8,7 @@
 
 #include <multiplier/ui/ITreeGenerator.h>
 
-#include <multiplier/File.h>
+#include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>
 
 namespace mx {

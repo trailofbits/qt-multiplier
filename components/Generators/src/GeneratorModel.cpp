@@ -12,7 +12,7 @@
 #include "ExpandTreeExplorerThread.h"
 
 #include <gap/core/coroutine.hpp>
-#include <multiplier/Token.h>
+#include <multiplier/Frontend/Token.h>
 #include <multiplier/ui/ITreeGenerator.h>
 
 #include <QColor>
@@ -154,8 +154,8 @@ void GeneratorModel::InstallGenerator(
   auto column_count = static_cast<std::size_t>(d->generator->NumColumns());
 
   std::vector<QString> column_title_list;
-  for (auto i = 0; i < column_count; ++i) {
-    auto column_title = d->generator->ColumnTitle(i);
+  for (size_t i = 0; i < column_count; ++i) {
+    auto column_title = d->generator->ColumnTitle(static_cast<int>(i));
     column_title_list.push_back(std::move(column_title));
   }
 

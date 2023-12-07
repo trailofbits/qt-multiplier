@@ -8,7 +8,7 @@
 
 #include <multiplier/ui/CodeViewTheme.h>
 
-#include <multiplier/Entities/TokenCategory.h>
+#include <multiplier/Frontend/TokenCategory.h>
 
 #include "DefaultCodeViewThemes.h"
 

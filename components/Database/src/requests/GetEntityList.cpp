@@ -10,8 +10,8 @@
 
 #include <multiplier/ui/Util.h>
 
-#include <multiplier/Entities/Token.h>
-#include <multiplier/Entities/TokenKind.h>
+#include <multiplier/Frontend/Token.h>
+#include <multiplier/Frontend/TokenKind.h>
 
 namespace mx::gui {
 
@@ -98,7 +98,7 @@ void GetEntityList(QPromise<bool> &result_promise, const Index &index,
           continue;
         }
 
-        SimpleToken path_tok;
+        UserToken path_tok;
         path_tok.category = TokenCategory::FILE_NAME;
         path_tok.kind = TokenKind::HEADER_NAME;
         path_tok.related_entity = file;

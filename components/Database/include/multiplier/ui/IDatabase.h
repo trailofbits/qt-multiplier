@@ -12,7 +12,7 @@
 #include <multiplier/ui/RPCErrorCode.h>
 
 #include <multiplier/Index.h>
-#include <multiplier/Token.h>
+#include <multiplier/Frontend/Token.h>
 
 #include <QString>
 #include <QFuture>

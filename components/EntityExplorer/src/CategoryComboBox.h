@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/Entities/TokenCategory.h>
+#include <multiplier/Frontend/TokenCategory.h>
 
 #include <QWidget>
 

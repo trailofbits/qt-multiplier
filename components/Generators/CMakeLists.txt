@@ -47,7 +47,7 @@ target_link_libraries("mx_generators"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::mx-api"
+    "multiplier::multiplier"
     "mx_util"
     "mx_searchwidget"
     "mx_thememanager"

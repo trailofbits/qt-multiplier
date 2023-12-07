@@ -7,7 +7,7 @@
 #include <multiplier/ui/CallHierarchyGenerator.h>
 
 #include <multiplier/Entity.h>
-#include <multiplier/Token.h>
+#include <multiplier/Frontend/Token.h>
 #include <multiplier/ui/Util.h>
 
 #include <QDebug>
