@@ -24,6 +24,7 @@ set_target_properties("qtmx_common_flags" PROPERTIES
 
 target_compile_definitions("qtmx_common_flags" INTERFACE
   QTMULTIPLIER_VERSION="${QTMULTIPLIER_VERSION}"
+  MULTIPLIER_VERSION="${MXQT_MULTIPLIER_VERSION}"
 )
 
 add_library("qtmx_cxx_flags" INTERFACE)
