@@ -46,6 +46,7 @@
 #include <QColorDialog>
 #include <QActionGroup>
 #include <QTextEdit>
+#include <QMessageBox>
 
 namespace mx::gui {
 
@@ -250,6 +251,18 @@ void MainWindow::InitializeWidgets() {
   d->enable_code_preview_action->setCheckable(true);
   d->enable_code_preview_action->setChecked(false);
   d->view_menu->addAction(d->enable_code_preview_action);
+
+  auto help_menu = new QMenu(tr("Help"));
+  menuBar()->addMenu(help_menu);
+
+  auto about_action = new QAction(tr("About"));
+  help_menu->addAction(about_action);
+
+  connect(about_action, &QAction::triggered, this, [this](const bool &) {
+    QMessageBox::about(this, windowTitle(),
+                       QString("User interface: ") + QTMULTIPLIER_VERSION +
+                           "\n" + "Library: " + MULTIPLIER_VERSION);
+  });
 
   setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
