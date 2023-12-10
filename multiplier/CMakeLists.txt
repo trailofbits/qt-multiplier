@@ -69,6 +69,7 @@ target_link_libraries("Multiplier"
     "mx_generators"
     "mx_data_generators"
     "mx_actionregistry"
+    "$<$<BOOL:MX_ENABLE_PYTHON_BINDINGS>:mx_pythonconsole>"
 )
 
 enable_qt_properties("Multiplier")
