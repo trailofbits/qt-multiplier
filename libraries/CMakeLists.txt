@@ -7,7 +7,6 @@
 #
 
 add_subdirectory("doctest")
-add_subdirectory("multiplier")
 add_subdirectory("qt")
 add_subdirectory("phantomstyle")
 add_subdirectory("vendored")

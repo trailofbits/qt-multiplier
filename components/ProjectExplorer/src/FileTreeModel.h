@@ -8,9 +8,11 @@
 
 #pragma once
 
+#include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
 
+#include <multiplier/Types.h>
 #include <multiplier/ui/IFileTreeModel.h>
 
 namespace mx::gui {
@@ -107,7 +109,7 @@ class FileTreeModel final : public IFileTreeModel {
   std::unique_ptr<PrivateData> d;
 
   //! Constructor
-  FileTreeModel(mx::Index index, QObject *parent);
+  FileTreeModel(const mx::Index &index, QObject *parent);
 
   friend class IFileTreeModel;
 };

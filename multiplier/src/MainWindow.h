@@ -40,6 +40,7 @@ class MainWindow final : public QMainWindow {
   void CreateInfoExplorerDock();
   void CreateMacroExplorerDock();
   void CreateReferenceExplorerDock();
+  void CreatePythonConsoleDock();
   void CreateCodeView();
   void CreateGlobalHighlighter();
   void OpenEntityRelatedToToken(const QModelIndex &index);
@@ -51,6 +52,9 @@ class MainWindow final : public QMainWindow {
   void ExpandMacro(const QModelIndex &index);
   void OpenCodePreview(const QModelIndex &index, const bool &as_new_window);
   void CloseAllPopups();
+
+  void SetHere(RawEntityId eid);
+  void SetHere(const QModelIndex &index);
 
   //! Creates the menus needed to configure the reference explorer
   void CreateReferenceExplorerMenuOptions();

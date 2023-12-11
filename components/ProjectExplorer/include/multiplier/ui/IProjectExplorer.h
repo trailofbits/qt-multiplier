@@ -10,6 +10,8 @@
 
 #include <multiplier/ui/IFileTreeModel.h>
 
+#include <multiplier/Types.h>
+
 #include <QWidget>
 
 namespace mx::gui {

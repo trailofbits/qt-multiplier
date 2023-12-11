@@ -29,6 +29,10 @@
 #include <multiplier/ui/IGeneratorView.h>
 #include <multiplier/ui/IActionRegistry.h>
 
+#ifndef MX_DISABLE_PYTHON_BINDINGS
+# include <multiplier/ui/PythonConsoleWidget.h>
+#endif
+
 #include <multiplier/AST/StmtKind.h>
 
 #include <QDockWidget>
@@ -49,6 +53,8 @@
 #include <QMessageBox>
 
 namespace mx::gui {
+
+class PythonConsoleWidget;
 
 namespace {
 
@@ -94,6 +100,7 @@ struct MainWindow::PrivateData final {
   IProjectExplorer *project_explorer{nullptr};
   IEntityExplorer *entity_explorer{nullptr};
   IMacroExplorer *macro_explorer{nullptr};
+  PythonConsoleWidget *python_console{nullptr};
   CodeViewContextMenu code_view_context_menu;
 
   std::vector<QWidget *> popup_widget_list;
@@ -110,6 +117,7 @@ struct MainWindow::PrivateData final {
   QDockWidget *entity_explorer_dock{nullptr};
   QDockWidget *macro_explorer_dock{nullptr};
   QDockWidget *highlight_explorer_dock{nullptr};
+  QDockWidget *python_console_dock{nullptr};
 
   DockableInformationExplorer *info_explorer_dock{nullptr};
 
@@ -278,6 +286,7 @@ void MainWindow::InitializeWidgets() {
   CreateInfoExplorerDock();
   CreateCodeView();
   CreateReferenceExplorerDock();
+  CreatePythonConsoleDock();
 
   tabifyDockWidget(d->project_explorer_dock, d->entity_explorer_dock);
   tabifyDockWidget(d->entity_explorer_dock, d->macro_explorer_dock);
@@ -328,6 +337,22 @@ void MainWindow::CreateProjectExplorerDock() {
   d->view_menu->addAction(d->project_explorer_dock->toggleViewAction());
   d->project_explorer_dock->setWidget(d->project_explorer);
   addDockWidget(Qt::LeftDockWidgetArea, d->project_explorer_dock);
+}
+
+void MainWindow::CreatePythonConsoleDock(void) {
+#ifndef MX_DISABLE_PYTHON_BINDINGS
+  d->python_console = new PythonConsoleWidget(d->index, this);
+
+  d->python_console_dock = new QDockWidget(tr("Python Console"), this);
+  d->python_console_dock->setAllowedAreas(Qt::TopDockWidgetArea |
+                                          Qt::BottomDockWidgetArea);
+  d->view_menu->addAction(d->python_console_dock->toggleViewAction());
+  d->python_console_dock->setWidget(d->python_console);
+  addDockWidget(Qt::BottomDockWidgetArea, d->python_console_dock);
+
+  // Default is hidden until we ask to see the console.
+  d->python_console_dock->hide();
+#endif
 }
 
 void MainWindow::CreateEntityExplorerDock() {
@@ -708,6 +733,34 @@ ICodeView *MainWindow::GetOrCreateFileCodeView(
   return nullptr;
 }
 
+void MainWindow::SetHere(RawEntityId eid) {
+#ifndef MX_DISABLE_PYTHON_BINDINGS
+  if (d->python_console) {
+    d->python_console->SetHere(d->index.entity(eid));
+  }
+#endif
+}
+
+void MainWindow::SetHere(const QModelIndex &index) {
+  auto entity_id_var = index.data(ICodeModel::RelatedEntityIdRole);
+  if (entity_id_var.isValid()) {
+    SetHere(qvariant_cast<RawEntityId>(entity_id_var));
+    return;
+  }
+
+  entity_id_var = index.data(ICodeModel::TokenIdRole);
+  if (entity_id_var.isValid()) {
+    SetHere(qvariant_cast<RawEntityId>(entity_id_var));
+    return;
+  }
+
+  // TODO(pag): Should have a way of getting a `Token` from a `QModelIndex`
+  //            because stuff from the `TokenTree` might not have IDs but are
+  //            live/living objects.
+
+  SetHere(kInvalidEntityId);
+}
+
 void MainWindow::OpenEntityRelatedToToken(const QModelIndex &index) {
   auto entity_id_var = index.data(ICodeModel::RelatedEntityIdRole);
   if (!entity_id_var.isValid()) {
@@ -787,6 +840,8 @@ void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
     auto [line, col] = maybe_loc.value();
     code_view->ScrollToLineNumber(line);
   }
+
+  SetHere(entity_id);
 }
 
 void MainWindow::OnProjectExplorerFileClicked(RawEntityId file_id,
@@ -835,6 +890,8 @@ void MainWindow::OnMainCodeViewCursorMoved(const QModelIndex &index) {
   if (QWidget *code_tab = tab_widget->currentWidget()) {
     code_tab->setProperty(kLastLocationProperty, entity_id_var);
   }
+
+  SetHere(index);
 }
 
 void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,

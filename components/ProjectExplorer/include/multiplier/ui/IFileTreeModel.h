@@ -8,10 +8,11 @@
 
 #pragma once
 
-#include <multiplier/Index.h>
-
 #include <QAbstractItemModel>
 
+namespace mx {
+class Index;
+}  // namespace mx
 namespace mx::gui {
 
 //! A file tree model based on mx::Index that collapses empty folders
@@ -32,7 +33,7 @@ class IFileTreeModel : public QAbstractItemModel {
   };
 
   //! Factory method
-  static IFileTreeModel *Create(mx::Index index, QObject *parent = nullptr);
+  static IFileTreeModel *Create(const mx::Index &index, QObject *parent = nullptr);
 
   //! Resets the model by querying the stored mx::Index from scratch
   virtual void Update() = 0;
