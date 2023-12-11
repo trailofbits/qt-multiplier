@@ -8,6 +8,7 @@
 
 #include "ProjectExplorer.h"
 
+#include <filesystem>
 #include <multiplier/ui/Assert.h>
 
 #include <QTreeView>

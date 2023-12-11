@@ -14,6 +14,8 @@
 
 #include <iostream>
 
+#include <multiplier/Index.h>
+
 namespace mx::gui {
 
 namespace {
@@ -477,7 +479,7 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
   }
 }
 
-FileTreeModel::FileTreeModel(mx::Index index, QObject *parent)
+FileTreeModel::FileTreeModel(const mx::Index &index, QObject *parent)
     : IFileTreeModel(parent),
       d(new PrivateData()) {
   d->index = index;

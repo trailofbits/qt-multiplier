@@ -31,6 +31,9 @@ if(MXQT_ENABLE_TESTS)
 endif()
 
 add_subdirectory("libraries")
+
+find_package("multiplier" REQUIRED GLOBAL)
+
 add_subdirectory("components")
 add_subdirectory("multiplier")
 

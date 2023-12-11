@@ -24,3 +24,7 @@ add_subdirectory("TokenLabel")
 add_subdirectory("ReferenceExplorer")
 add_subdirectory("Generators")
 add_subdirectory("ActionRegistry")
+
+if(MX_ENABLE_PYTHON_BINDINGS)
+  add_subdirectory("PythonConsoleWidget")
+endif()

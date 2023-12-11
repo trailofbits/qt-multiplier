@@ -12,7 +12,7 @@
 
 namespace mx::gui {
 
-IFileTreeModel *IFileTreeModel::Create(mx::Index index, QObject *parent) {
+IFileTreeModel *IFileTreeModel::Create(const mx::Index &index, QObject *parent) {
   return new FileTreeModel(index, parent);
 }
 
