@@ -33,22 +33,13 @@ static PyMethodDef gMethods[] = {
   {}
 };
 
-static PyTypeObject gType = {
-  PyVarObject_HEAD_INIT(NULL, 0)
-  .tp_name = "MultiplierPythonOutputAdapter",
-  .tp_doc = PyDoc_STR("Output wrapper for the Multiplier GUI's Python console."),
-  .tp_basicsize = sizeof(PythonOutputAdapterWrapper),
-  .tp_itemsize = 0,
-  .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION,
-  .tp_members = nullptr,
-  .tp_methods = gMethods,
-};
+static PyTypeObject gType = {};
 
 }  // namespace
 
 PyObject *PythonOutputAdapterWrapper::DoWrite(
     BorrowedPyObject *self, BorrowedPyObject * const *args, int num_args) {
-  
+
   if (!num_args || num_args > 1) {
     PyErr_Format(PyExc_TypeError, "Invalid number of arguments to 'write'");
     return nullptr;
@@ -91,6 +82,13 @@ struct PythonOutputAdapter::PrivateData {
 
 PythonOutputAdapter::PrivateData::PrivateData(PythonOutputAdapter *adapter) {
   if (!gTypeInitialized) {
+    gType.tp_name = "MultiplierPythonOutputAdapter";
+    gType.tp_doc = PyDoc_STR("Output wrapper for the Multiplier GUI's Python console.");
+    gType.tp_basicsize = sizeof(PythonOutputAdapterWrapper);
+    gType.tp_itemsize = 0;
+    gType.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION;
+    gType.tp_members = nullptr;
+    gType.tp_methods = gMethods;
     (void) PyType_Ready(&gType);
     
     obj = reinterpret_cast<PythonOutputAdapterWrapper *>(
