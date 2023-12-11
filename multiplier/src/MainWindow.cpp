@@ -349,6 +349,9 @@ void MainWindow::CreatePythonConsoleDock(void) {
   d->view_menu->addAction(d->python_console_dock->toggleViewAction());
   d->python_console_dock->setWidget(d->python_console);
   addDockWidget(Qt::BottomDockWidgetArea, d->python_console_dock);
+
+  // Default is hidden until we ask to see the console.
+  d->python_console_dock->hide();
 #endif
 }
 
