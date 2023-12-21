@@ -13,6 +13,7 @@
 #include <multiplier/AST/TemplateArgument.h>
 #include <multiplier/AST/TemplateParameterList.h>
 #include <multiplier/AST/Type.h>
+#include <multiplier/Entity.h>
 #include <multiplier/Fragment.h>
 #include <multiplier/Frontend/Compilation.h>
 #include <multiplier/Frontend/DefineMacroDirective.h>
@@ -20,7 +21,7 @@
 #include <multiplier/Frontend/IncludeLikeMacroDirective.h>
 #include <multiplier/Frontend/MacroExpansion.h>
 #include <multiplier/Frontend/Token.h>
-#include <multiplier/Entity.h>
+#include <multiplier/IR/Operation.h>
 
 #include <QString>
 #include <QVariant>

@@ -24,7 +24,7 @@ target_link_libraries("mx_historywidget"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::multiplier"
+    "thirdparty_multiplier"
     "mx_util"
 )
 

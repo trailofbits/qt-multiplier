@@ -50,7 +50,7 @@ target_link_libraries("Multiplier"
     "qtmx_cxx_flags"
 
   PUBLIC
-    "multiplier::multiplier"
+    "thirdparty_multiplier"
     "thirdparty_qt"
     "thirdparty_phantomstyle"
     "mx_codeview"

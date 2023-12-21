@@ -21,16 +21,13 @@ add_library("mx_pythonconsole"
   src/PythonOutputAdapter.h
 )
 
-find_dependency(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
-
 target_link_libraries("mx_pythonconsole"
   PRIVATE
     "qtmx_cxx_flags"
-    Python3::Python
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::multiplier"
+    "thirdparty_multiplier"
     "mx_thememanager"
 )
 

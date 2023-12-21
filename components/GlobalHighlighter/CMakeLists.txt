@@ -30,7 +30,7 @@ target_link_libraries("mx_globalhighlighter"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::multiplier"
+    "thirdparty_multiplier"
     "mx_database"
     "mx_util"
     "mx_tokenlabel"

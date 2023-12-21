@@ -34,6 +34,22 @@ add_subdirectory("libraries")
 
 find_package("multiplier" REQUIRED GLOBAL)
 
+add_library("thirdparty_multiplier" INTERFACE)
+
+if(MX_ENABLE_PYTHON_BINDINGS)
+  find_dependency(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
+  target_link_libraries("thirdparty_multiplier"
+    INTERFACE
+      Python3::Python
+      "multiplier::mx-python"
+  )
+else()
+  target_link_libraries("thirdparty_multiplier"
+    INTERFACE
+      "multiplier::multiplier"
+  )
+endif(MX_ENABLE_PYTHON_BINDINGS)
+
 add_subdirectory("components")
 add_subdirectory("multiplier")
 
