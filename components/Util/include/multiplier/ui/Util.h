@@ -24,12 +24,12 @@
 #include <multiplier/AST/Type.h>
 #include <multiplier/AST/TypeDecl.h>
 #include <multiplier/AST/VarDecl.h>
-
 #include <multiplier/Fragment.h>
 #include <multiplier/Frontend/Compilation.h>
 #include <multiplier/Frontend/DefineMacroDirective.h>
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Frontend/IncludeLikeMacroDirective.h>
+#include <multiplier/IR/Operation.h>
 
 #include <QString>
 #include <QColor>

@@ -40,8 +40,8 @@ target_link_libraries("mx_database"
 
   PUBLIC
     "thirdparty_qt"
+    "thirdparty_multiplier"
     "xxhash::xxhash"
-    "multiplier::multiplier"
     "mx_util"
 )
 

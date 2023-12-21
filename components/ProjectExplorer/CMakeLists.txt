@@ -26,7 +26,7 @@ target_link_libraries("mx_projectexplorer"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::multiplier"
+    "thirdparty_multiplier"
     "mx_searchwidget"
 )
 

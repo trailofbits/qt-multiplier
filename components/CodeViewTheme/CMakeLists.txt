@@ -20,7 +20,7 @@ target_link_libraries("mx_codeviewtheme"
 
   PUBLIC
     "thirdparty_qt"
-    "multiplier::multiplier"
+    "thirdparty_multiplier"
 )
 
 target_include_directories("mx_codeviewtheme" PRIVATE

@@ -11,16 +11,18 @@ add_executable("mx_projectexplorer_tests"
   src/FileTreeModel.cpp
 )
 
-target_link_libraries("mx_projectexplorer_tests" PRIVATE
-  "qtmx_cxx_flags"
-  "thirdparty_qt"
-  "thirdparty_doctest"
-  "multiplier::multiplier"
-  "mx_projectexplorer"
+target_link_libraries("mx_projectexplorer_tests"
+  PRIVATE
+    "qtmx_cxx_flags"
+    "thirdparty_qt"
+    "thirdparty_doctest"
+    "thirdparty_multiplier"
+    "mx_projectexplorer"
 )
 
-target_include_directories("mx_projectexplorer_tests" PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/../src"
+target_include_directories("mx_projectexplorer_tests"
+  PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src"
 )
 
 enable_qt_properties("mx_projectexplorer_tests")
