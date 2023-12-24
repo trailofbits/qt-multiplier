@@ -72,7 +72,7 @@ class ReferenceExplorer final : public QWidget {
   void OnRowsInserted();
 
   //! Called when the model resolves the new name of the tree.
-  void OnTreeNameChanged();
+  void OnTreeNameChanged(QString new_name);
 
  public slots:
   //! Enables or disables the browser mode of the inner code view

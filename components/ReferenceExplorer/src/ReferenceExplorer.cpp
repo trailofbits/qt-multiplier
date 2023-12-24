@@ -56,6 +56,8 @@ void ReferenceExplorer::InitializeWidgets(
     std::shared_ptr<ITreeGenerator> generator, const bool &show_code_preview,
     IGlobalHighlighter &highlighter, IMacroExplorer &macro_explorer) {
 
+  setWindowTitle(tr("Reference Explorer"));
+
   d->ref_explorer_model = IGeneratorModel::Create(this);
   d->ref_explorer_model->InstallGenerator(generator);
 
@@ -74,7 +76,7 @@ void ReferenceExplorer::InitializeWidgets(
   connect(d->ref_explorer_model, &IGeneratorModel::TreeNameChanged, this,
           &ReferenceExplorer::OnTreeNameChanged);
 
-  OnTreeNameChanged();
+  OnTreeNameChanged(tr("Unnamed Tree"));
 
   d->code_model =
       macro_explorer.CreateCodeModel(file_location_cache, index, true);
@@ -148,19 +150,10 @@ void ReferenceExplorer::OnRowsInserted() {
   UpdateCodePreview(first_item_index);
 }
 
-void ReferenceExplorer::OnTreeNameChanged() {
-  QString tree_name;
-  if (auto tree_name_var = d->ref_explorer_model->data(
-          QModelIndex(), IGeneratorModel::TreeNameRole);
-      tree_name_var.canConvert<QString>()) {
-
-    tree_name = tree_name_var.toString();
-  }
-
+void ReferenceExplorer::OnTreeNameChanged(QString tree_name) {
   if (tree_name.isEmpty()) {
-    tree_name = tr("Unnamed Tree");
+    tree_name = tr("Unnamed tree");
   }
-
   setWindowTitle(tree_name);
 }
 

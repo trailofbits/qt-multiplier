@@ -415,7 +415,7 @@ void MainWindow::CreateReferenceExplorerDock() {
   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
           this, &MainWindow::OnReferenceExplorerTabBarDoubleClick);
 
-  d->reference_explorer_dock = new QDockWidget(tr("Tree Explorer"), this);
+  d->reference_explorer_dock = new QDockWidget(tr("Reference Explorer"), this);
   d->view_menu->addAction(d->reference_explorer_dock->toggleViewAction());
   d->reference_explorer_dock->toggleViewAction()->setEnabled(false);
   d->reference_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
@@ -642,7 +642,7 @@ void MainWindow::CloseAllPopups() {
 }
 
 void MainWindow::CreateReferenceExplorerMenuOptions() {
-  auto main_menu = new QMenu(tr("Tree Explorer"));
+  auto main_menu = new QMenu(tr("Reference Explorer"));
   d->view_menu->addMenu(main_menu);
 
   auto code_preview_action = new QAction(tr("Enable code preview"));

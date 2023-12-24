@@ -65,6 +65,7 @@ void InitializeModelViewCommonSettings(
   model_view->setSelectionMode(QAbstractItemView::SingleSelection);
 
   model_view->setTextElideMode(Qt::TextElideMode::ElideRight);
+  model_view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 template <typename ModelView>
@@ -425,6 +426,7 @@ void GeneratorView::InitializeWidgets() {
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(model_view);
+  layout->addStretch();
 
   if (d->config.enable_sort_and_filtering) {
     layout->addWidget(filter_settings_widget);

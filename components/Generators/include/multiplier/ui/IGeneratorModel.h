@@ -45,11 +45,6 @@ class IGeneratorModel : public QAbstractItemModel {
   //! Factory method.
   static IGeneratorModel *Create(QObject *parent = nullptr);
 
-  //! Creates a new model using the given one as a base, with `root_item`
-  //! as the new root
-  static IGeneratorModel *CreateFrom(const QModelIndex &root_item,
-                                        QObject *parent = nullptr);
-
   //! Constructor
   IGeneratorModel(QObject *parent) : QAbstractItemModel(parent) {}
 
@@ -60,7 +55,7 @@ class IGeneratorModel : public QAbstractItemModel {
   virtual void InstallGenerator(std::shared_ptr<ITreeGenerator> generator_) = 0;
 
   //! Expand starting at the model index, going up to `depth` levels deep.
-  virtual void Expand(const QModelIndex &index, const std::size_t &depth) = 0;
+  virtual void Expand(const QModelIndex &index, unsigned depth) = 0;
 
   //! Find the original version of an item.
   virtual QModelIndex Deduplicate(const QModelIndex &index) = 0;
@@ -84,7 +79,7 @@ class IGeneratorModel : public QAbstractItemModel {
   void RequestFinished();
 
   //! Emitted when the tree's name has change.
-  void TreeNameChanged();
+  void TreeNameChanged(QString new_name);
 };
 
 }  // namespace mx::gui

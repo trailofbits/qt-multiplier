@@ -18,12 +18,4 @@ IGeneratorModel *IGeneratorModel::Create(QObject *parent) {
   return new GeneratorModel(parent);
 }
 
-IGeneratorModel *IGeneratorModel::CreateFrom(const QModelIndex &root_item,
-                                                   QObject *parent) {
-  auto &internal_source_model =
-      *static_cast<const GeneratorModel *>(root_item.model());
-
-  return new GeneratorModel(internal_source_model, root_item, parent);
-}
-
 }  // namespace mx::gui

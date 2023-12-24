@@ -43,7 +43,7 @@ target_sources("Multiplier" PRIVATE
   "${multiplier_icon_path}"
 )
 
-add_subdirectory("data_generators")
+add_subdirectory("DataGenerators")
 
 target_link_libraries("Multiplier"
   PRIVATE

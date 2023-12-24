@@ -53,11 +53,8 @@ class ReferenceExplorerView final : public QWidget {
   //! Called when an item needs to be opened in the main window
   void OnOpenAction();
 
-  //! Called when the user wants to expand three levels deep
-  void OnExpandThreeLevelsAction();
-
-  //! Called when the user wants to expand five levels deep
-  void OnExpandFiveLevelsAction();
+  //! Called when the user wants to expand N levels deep
+  void OnExpandNLevelsAction(unsigned n);
 
   //! Called by the theme manager when the theme is changed
   void OnThemeChange(const QPalette &palette,

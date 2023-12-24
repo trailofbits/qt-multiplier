@@ -41,7 +41,6 @@ class PopupWidgetContainer final : public QWidget {
     connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
             &PopupWidgetContainer<Widget>::OnThemeChange);
 
-
     OnUpdateTitle();
     connect(&d->title_update_timer, &QTimer::timeout, this,
             &PopupWidgetContainer<Widget>::OnUpdateTitle);
@@ -173,11 +172,13 @@ class PopupWidgetContainer final : public QWidget {
     auto contents_layout = new QVBoxLayout();
     contents_layout->setContentsMargins(0, 0, 0, 0);
     contents_layout->addWidget(d->wrapped_widget);
+    contents_layout->addStretch();
 
     auto main_layout = new QVBoxLayout();
     main_layout->setContentsMargins(0, 0, 0, 0);
     main_layout->addWidget(title_frame);
     main_layout->addLayout(contents_layout);
+    main_layout->addStretch();
 
     setLayout(main_layout);
 

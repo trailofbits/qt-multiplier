@@ -21,14 +21,15 @@ namespace mx::gui {
 
 namespace {
 
+static constexpr unsigned kMaxExpansionLevel = 9u;
+
 struct OSDAndMenuActions final {
   QAction *expand{nullptr};
   QAction *go_to{nullptr};
   QAction *open{nullptr};
 
   // this is only shown in the menu
-  QAction *expand_three_levels{nullptr};
-  QAction *expand_five_levels{nullptr};
+  QAction *expand_n_levels[kMaxExpansionLevel];
 };
 
 }  // namespace
@@ -93,36 +94,23 @@ ReferenceExplorerView::ReferenceExplorerView(
 
   config.osd_actions = config.menu_actions;
 
-  // Keep these only in the menu
-  d->osd_and_menu_actions.expand_three_levels =
-      new QAction(tr("Expand &3 levels"), this);
+  for (auto i = 1u; i <= kMaxExpansionLevel; ++i) {
+    QAction *&action = d->osd_and_menu_actions.expand_n_levels[i - 1u];
+    action = new QAction(tr("Expand &%1 levels").arg(i), this);
 
-  //! \todo There's a Qt 6.x bug that prevents the &3 from working correctly, so
-  //!       for now we have to set the shortcut explicitly
-  d->osd_and_menu_actions.expand_three_levels->setShortcut(Qt::Key_3);
-  d->osd_and_menu_actions.expand_three_levels->setToolTip(
-      tr("Expands this entity for three levels"));
+    //! \todo There's a Qt 6.x bug that prevents the &3 from working correctly, so
+    //!       for now we have to set the shortcut explicitly
+    action->setShortcut(static_cast<Qt::Key>(Qt::Key_0 + i));
+    action->setToolTip(tr("Expands this entity for three levels"));
 
-  connect(d->osd_and_menu_actions.expand_three_levels, &QAction::triggered,
-          this, &ReferenceExplorerView::OnExpandThreeLevelsAction);
+    connect(action, &QAction::triggered,
+            [i, this](void) {
+              OnExpandNLevelsAction(i);
+            });
 
-  config.menu_actions.action_list.push_back(
-      d->osd_and_menu_actions.expand_three_levels);
-
-  d->osd_and_menu_actions.expand_five_levels =
-      new QAction(tr("Expand &5 levels"), this);
-
-  //! \todo There's a Qt 6.x bug that prevents the &3 from working correctly, so
-  //!       for now we have to set the shortcut explicitly
-  d->osd_and_menu_actions.expand_five_levels->setShortcut(Qt::Key_5);
-  d->osd_and_menu_actions.expand_five_levels->setToolTip(
-      tr("Expands this entity for five levels"));
-
-  connect(d->osd_and_menu_actions.expand_five_levels, &QAction::triggered, this,
-          &ReferenceExplorerView::OnExpandFiveLevelsAction);
-
-  config.menu_actions.action_list.push_back(
-      d->osd_and_menu_actions.expand_five_levels);
+    // Keep these only in the menu
+    config.menu_actions.action_list.push_back(action);
+  }
 
   // Create the view
   d->generator_view =
@@ -160,7 +148,12 @@ ReferenceExplorerView::ReferenceExplorerView(
 
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
+
+  d->generator_view->setSizePolicy(QSizePolicy::Expanding,
+                                   QSizePolicy::Expanding);
+
   layout->addWidget(d->generator_view);
+  layout->addStretch();
   layout->addWidget(d->status_widget);
   setLayout(layout);
 
@@ -183,36 +176,57 @@ void ReferenceExplorerView::UpdateAction(QAction *action) {
     return;
   }
 
-  auto enable_action{false};
-
-  if (action == d->osd_and_menu_actions.expand ||
-      action == d->osd_and_menu_actions.expand_three_levels ||
-      action == d->osd_and_menu_actions.expand_five_levels) {
-    auto is_duplicate{false};
-    if (auto variant = index.data(IGeneratorModel::IsDuplicate);
-        variant.isValid() && variant.canConvert<bool>()) {
-      is_duplicate = variant.toBool();
-    }
-
-    if (!is_duplicate) {
-      if (auto variant = index.data(IGeneratorModel::CanBeExpanded);
-          variant.isValid() && variant.canConvert<bool>()) {
-        enable_action = variant.toBool();
-      }
-    }
-
-  } else if (action == d->osd_and_menu_actions.go_to) {
-    if (auto variant = index.data(IGeneratorModel::IsDuplicate);
-        variant.isValid() && variant.canConvert<bool>()) {
-      enable_action = variant.toBool();
-    }
-
-  } else if (action == d->osd_and_menu_actions.open) {
-    enable_action = true;
+  if (action == d->osd_and_menu_actions.open) {
+    action->setEnabled(true);
+    action->setVisible(true);
+    return;
   }
 
-  action->setEnabled(enable_action);
-  action->setVisible(enable_action);
+  auto is_duplicate{false};
+  if (auto variant = index.data(IGeneratorModel::IsDuplicate);
+      variant.isValid() && variant.canConvert<bool>()) {
+    is_duplicate = variant.toBool();
+  }
+
+  if (action == d->osd_and_menu_actions.go_to) {
+    action->setEnabled(is_duplicate);
+    action->setVisible(is_duplicate);
+    return;
+  }
+
+  // All other actions are expansion actions.
+
+  // If this is a duplicate, then disable the expand action.
+  if (is_duplicate) {
+    action->setEnabled(false);
+    action->setVisible(false);
+    return;
+  }
+
+  auto can_expand{false};
+  if (auto variant = index.data(IGeneratorModel::CanBeExpanded);
+      variant.isValid() && variant.canConvert<bool>()) {
+    can_expand = variant.toBool();
+  }
+
+  for (auto expand_action : d->osd_and_menu_actions.expand_n_levels) {
+    if (action == expand_action) {
+      action->setEnabled(true);
+      action->setVisible(true);
+    }
+  }
+
+  if (can_expand) {
+    return;
+  }
+
+
+  // If this has already been expanded, then disable the expand action
+  // for depth 1.
+  auto disable = action == d->osd_and_menu_actions.expand ||
+                 action == d->osd_and_menu_actions.expand_n_levels[0];
+  action->setEnabled(!disable);
+  action->setVisible(!disable);
 }
 
 void ReferenceExplorerView::OnExpandAction() {
@@ -273,26 +287,15 @@ void ReferenceExplorerView::OnOpenAction() {
   emit ItemActivated(model_index);
 }
 
-void ReferenceExplorerView::OnExpandThreeLevelsAction() {
-  auto model_index_var = d->osd_and_menu_actions.expand_three_levels->data();
+void ReferenceExplorerView::OnExpandNLevelsAction(unsigned n) {
+  auto model_index_var = d->osd_and_menu_actions.expand_n_levels[n - 1u]->data();
   if (!model_index_var.isValid() ||
       !model_index_var.canConvert<QModelIndex>()) {
     return;
   }
 
   auto model_index = model_index_var.toModelIndex();
-  d->model->Expand(model_index, 3);
-}
-
-void ReferenceExplorerView::OnExpandFiveLevelsAction() {
-  auto model_index_var = d->osd_and_menu_actions.expand_five_levels->data();
-  if (!model_index_var.isValid() ||
-      !model_index_var.canConvert<QModelIndex>()) {
-    return;
-  }
-
-  auto model_index = model_index_var.toModelIndex();
-  d->model->Expand(model_index, 5);
+  d->model->Expand(model_index, n);
 }
 
 void ReferenceExplorerView::OnThemeChange(
@@ -327,27 +330,16 @@ void ReferenceExplorerView::OnThemeChange(
 
   d->osd_and_menu_actions.go_to->setIcon(goto_item_icon);
 
-  QIcon expand_3_item_icon;
-  expand_3_item_icon.addPixmap(
-      GetPixmap(":/ReferenceExplorer/expand_3_ref_item"), QIcon::Normal,
-      QIcon::On);
+  for (auto i = 1u; i <= kMaxExpansionLevel; ++i) {
+    QString icon_path = QString(":/ReferenceExplorer/expand_%1_ref_item").arg(i);
 
-  expand_3_item_icon.addPixmap(
-      GetPixmap(":/ReferenceExplorer/expand_3_ref_item", IconStyle::Disabled),
-      QIcon::Disabled, QIcon::On);
+    QIcon expand_icon;
+    expand_icon.addPixmap(GetPixmap(icon_path), QIcon::Normal, QIcon::On);
+    expand_icon.addPixmap(GetPixmap(icon_path, IconStyle::Disabled),
+                          QIcon::Disabled, QIcon::On);
 
-  d->osd_and_menu_actions.expand_three_levels->setIcon(expand_3_item_icon);
-
-  QIcon expand_5_item_icon;
-  expand_5_item_icon.addPixmap(
-      GetPixmap(":/ReferenceExplorer/expand_5_ref_item"), QIcon::Normal,
-      QIcon::On);
-
-  expand_5_item_icon.addPixmap(
-      GetPixmap(":/ReferenceExplorer/expand_5_ref_item", IconStyle::Disabled),
-      QIcon::Disabled, QIcon::On);
-
-  d->osd_and_menu_actions.expand_five_levels->setIcon(expand_5_item_icon);
+    d->osd_and_menu_actions.expand_n_levels[i - 1u]->setIcon(expand_icon);
+  }
 }
 
 void ReferenceExplorerView::OnModelRequestStarted() {
