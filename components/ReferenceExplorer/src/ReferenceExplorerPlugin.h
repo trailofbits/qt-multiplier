@@ -34,7 +34,8 @@ class ReferenceExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
         // call_hierarchy_action(
         //     context.Action()) {}
 
-  void ActOnSecondaryClick(QMenu *menu, const QModelIndex &index) Q_DECL_FINAL;
+  std::optional<NamedAction> ActOnSecondaryClick(
+      const QModelIndex &index) Q_DECL_FINAL;
 
   QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
 

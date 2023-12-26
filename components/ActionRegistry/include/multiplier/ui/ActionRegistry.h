@@ -55,6 +55,7 @@ class TriggerHandle {
   void Trigger(const QVariant &data) const noexcept;
 };
 
+// An action that can wrap over a lambda.
 template <typename Lambda>
 class LambdaAction Q_DECL_FINAL : public IAction {
   const QString verb;
@@ -77,6 +78,31 @@ class LambdaAction Q_DECL_FINAL : public IAction {
   }
 };
 
+// An action that can wrap over a lambda.
+template <typename Class>
+class MethodPointerAction Q_DECL_FINAL : public IAction {
+  const QString verb;
+  void (Class::*method)(const QVariant &);
+
+ public:
+  virtual ~MethodPointerAction(void) = default;
+
+  inline MethodPointerAction(const QString &verb_,
+                             void (Class::*method_)(const QVariant &),
+                             Class *parent)
+      : IAction(parent),
+        verb(verb_),
+        method(method_) {}
+
+  QString Verb(void) const noexcept Q_DECL_FINAL {
+    return verb;
+  }
+
+  void Run(const QVariant &input) noexcept Q_DECL_FINAL {
+    (dynamic_cast<Class *>(parent())->*method)(input);
+  }
+};
+
 // Registry for actions.
 class ActionRegistry {
  private:
@@ -95,9 +121,16 @@ class ActionRegistry {
   // Register an action with the action registry.
   TriggerHandle Register(IAction &action);
 
+  template <typename Class>
+  TriggerHandle Register(Class *parent, const QString &verb,
+                         void (Class::*method)(const QVariant &)) {
+    auto action = new MethodPointerAction<Class>(verb, method, parent);
+    return Register(*action);
+  }
+
   template <typename Lambda>
   TriggerHandle Register(QObject *parent, const QString &verb, Lambda lambda) {
-    auto action = new LambdaAction(verb, std::move(lambda), parent);
+    auto action = new LambdaAction<Lambda>(verb, std::move(lambda), parent);
     return Register(*action);
   }
 };

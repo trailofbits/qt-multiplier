@@ -26,16 +26,23 @@ CreateReferenceExplorerMainWindowPlugin(
 
 ReferenceExplorerPlugin::~ReferenceExplorerPlugin(void) {}
 
-void ReferenceExplorerPlugin::ActOnSecondaryClick(
-    QMenu *menu, const QModelIndex &index) {
+std::optional<IMainWindowPlugin::NamedAction>
+ReferenceExplorerPlugin::ActOnSecondaryClick(const QModelIndex &index) {
+  (void) index;
+  
+  return std::nullopt;
+  // auto entity = IModel::EntitySkipThroughTokens(index);
+  // if (std::holds_alternative<NotAnEntity>(entity)) {
+  //   return;
+  // }
 
-  auto entity = IModel::EntitySkipThroughTokens(index);
-  if (std::holds_alternative<NotAnEntity>(entity)) {
-    return;
-  }
+  // auto action = new QAction(tr("Show Call Hierarchy"), menu);
+  // menu->addAction(action);
 
-  auto action = new QAction(tr("Show Call Hierarchy"), menu);
-  menu->addAction(action);
+  // return NamedAction{
+  //   .name = tr("Show callers of ''"),
+  //   .action = 
+  // };
 }
 
 QWidget *ReferenceExplorerPlugin::CreateDockWidget(QWidget *parent) {

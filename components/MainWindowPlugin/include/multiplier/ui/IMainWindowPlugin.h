@@ -6,11 +6,15 @@
 
 #pragma once
 
+#include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
 #include <QModelIndex>
 #include <QPalette>
 #include <QString>
+#include <multiplier/ui/ActionRegistry.h>
+#include <optional>
+#include <vector>
 
 namespace mx {
 class FileLocationCache;
@@ -18,7 +22,6 @@ class Index;
 }  // namespace mx
 namespace mx::gui {
 
-class ActionRegistry;
 class CodeViewTheme;
 class Context;
 class IGlobalHighlighter;
@@ -29,6 +32,12 @@ class IMainWindowPlugin : public QObject {
  public:
   virtual ~IMainWindowPlugin(void);
 
+  struct NamedAction {
+    QString name;
+    TriggerHandle action;
+    QVariant data;
+  };
+
   IMainWindowPlugin(const Context &context, QMainWindow *parent = nullptr);
 
   // Act on a primary click. For example, if browse mode is enabled, then this
@@ -36,11 +45,29 @@ class IMainWindowPlugin : public QObject {
   // click.
   virtual void ActOnPrimaryClick(const QModelIndex &index);
 
+  // Allow a main window to add an a named action to a context menu.
+  virtual std::optional<NamedAction> ActOnSecondaryClick(
+      const QModelIndex &index);
+
+  // Allow a main window to add an arbitrary number of named actions to a
+  // context menu.
+  virtual std::vector<NamedAction> ActOnSecondaryClickEx(
+      const QModelIndex &index);
+
   // Allow a main window plugin to act on, e.g. modify, a context menu.
-  virtual void ActOnSecondaryClick(QMenu *menu, const QModelIndex &index);
+  virtual void ActOnContextMenu(QMenu *menu, const QModelIndex &index);
 
   // Allow a main window plugin to act on a long hover over something.
   virtual void ActOnLongHover(const QModelIndex &index);
+
+  // Allow a main window plugin to act on a key sequence.
+  virtual std::optional<NamedAction> ActOnKeyPress(
+      const QKeySequence &keys, const QModelIndex &index);
+
+  // Allow a main window plugin to provide one of several actions to be
+  // performed on a key press.
+  virtual std::vector<NamedAction> ActOnKeyPressEx(
+      const QKeySequence &keys, const QModelIndex &index);
 
   // Allow a main window plugin to know when the theme is changed.
   virtual void ActOnThemeChange(const QPalette &new_palette,

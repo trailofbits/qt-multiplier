@@ -38,6 +38,7 @@
 
 #include <multiplier/AST/StmtKind.h>
 
+#include <QKeyCombination>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QDir>
@@ -552,16 +553,9 @@ void MainWindow::CreateGlobalHighlighter() {
 }
 
 void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
-  QMenu token_menu(tr("Token menu"));
-
+  (void) index;
   // connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
   //         &MainWindow::OnCodeViewContextMenuActionTriggered);
-
-  for (const auto &plugin : d->plugins) {
-    plugin->ActOnSecondaryClick(&token_menu, index);
-  }
-
-  token_menu.exec(QCursor::pos());
 
   // QVariant action_data;
   // action_data.setValue(index);
@@ -830,9 +824,7 @@ void MainWindow::OpenEntityRelatedToToken(const QModelIndex &index) {
   // the last thing in history for the current view.
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
 
-  for (const auto &plugin : d->plugins) {
-    plugin->ActOnPrimaryClick(index);
-  }
+  
 
   OpenEntityInfo(entity_id);
   OpenEntityCode(entity_id);
@@ -954,15 +946,25 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
                                   const QModelIndex &index) {
 
   if (token_action.type == ICodeView::TokenAction::Type::Primary) {
-    OpenEntityRelatedToToken(index);
+    for (const auto &plugin : d->plugins) {
+      plugin->ActOnPrimaryClick(index);
+    }
 
   } else if (token_action.type == ICodeView::TokenAction::Type::Secondary) {
-    OpenTokenContextMenu(index);
+    QMenu token_menu(tr("Token menu"));
+    for (const auto &plugin : d->plugins) {
+      plugin->ActOnContextMenu(&token_menu, index);
+    }
+    token_menu.exec(QCursor::pos());
 
   } else if (token_action.type == ICodeView::TokenAction::Type::Hover) {
-    if (d->enable_code_preview_action->isChecked()) {
-      OpenCodePreview(index, false /* as_new_window */);
+    for (const auto &plugin : d->plugins) {
+      plugin->ActOnLongHover(index);
     }
+
+    // if (d->enable_code_preview_action->isChecked()) {
+    //   OpenCodePreview(index, false /* as_new_window */);
+    // }
 
   } else if (token_action.type == ICodeView::TokenAction::Type::Keyboard) {
     // Here to test keyboard events; Before we add more buttons, we should
@@ -975,27 +977,68 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       return;
     }
 
-    if (keyboard_button.key == Qt::Key_X) {
-      // Like in IDA Pro, pressing X while the cursor is on an entity shows us
-      // its cross-references.
-      OpenCallHierarchy(index);
-
-    } else if (keyboard_button.key == Qt::Key_P) {
-      const auto &as_new_window{keyboard_button.shift_modifier};
-      OpenCodePreview(index, as_new_window);
-
-    } else if (keyboard_button.key == Qt::Key_I) {
-      const auto &as_new_window{keyboard_button.shift_modifier};
-      OpenTokenEntityInfo(index, as_new_window);
-
-    } else if (keyboard_button.key == Qt::Key_E) {
-      ExpandMacro(index);
-
-    } else if (keyboard_button.key == Qt::Key_Enter) {
-      // Like in IDA Pro, pressing Enter while the cursor is on a use of that
-      // entity will bring us to that entity.
-      OpenEntityRelatedToToken(index);
+    if (!keyboard_button.key) {
+      return;
     }
+
+    QKeyCombination key_comb(
+        keyboard_button.shift_modifier ? Qt::ShiftModifier : Qt::NoModifier,
+        static_cast<Qt::Key>(keyboard_button.key));
+
+    QKeySequence key_seq(key_comb);
+
+    std::vector<IMainWindowPlugin::NamedAction> actions;
+
+    for (const auto &plugin : d->plugins) {
+      auto plugin_actions = plugin->ActOnKeyPressEx(key_seq, index);
+      actions.insert(actions.end(),
+                     std::make_move_iterator(plugin_actions.begin()),
+                     std::make_move_iterator(plugin_actions.end()));
+    }
+
+    if (actions.empty()) {
+      return;
+    }
+
+    if (actions.size() == 1u) {
+      actions[0].action.Trigger(actions[0].data);
+      return;
+    }
+
+    QMenu token_menu(tr("Token menu"));
+    for (auto &plugin_action : actions) {
+      auto action = new QAction(plugin_action.name, &token_menu);
+      connect(
+          action, &QAction::triggered,
+          [trigger = std::move(plugin_action.action),
+           data = std::move(plugin_action.data)] (void) {
+            trigger.Trigger(data);
+          });
+      token_menu.addAction(action);
+    }
+    token_menu.exec(QCursor::pos());
+
+    // if (keyboard_button.key == Qt::Key_X) {
+    //   // Like in IDA Pro, pressing X while the cursor is on an entity shows us
+    //   // its cross-references.
+    //   OpenCallHierarchy(index);
+
+    // } else if (keyboard_button.key == Qt::Key_P) {
+    //   const auto &as_new_window{keyboard_button.shift_modifier};
+    //   OpenCodePreview(index, as_new_window);
+
+    // } else if (keyboard_button.key == Qt::Key_I) {
+    //   const auto &as_new_window{keyboard_button.shift_modifier};
+    //   OpenTokenEntityInfo(index, as_new_window);
+
+    // } else if (keyboard_button.key == Qt::Key_E) {
+    //   ExpandMacro(index);
+
+    // } else if (keyboard_button.key == Qt::Key_Enter) {
+    //   // Like in IDA Pro, pressing Enter while the cursor is on a use of that
+    //   // entity will bring us to that entity.
+    //   OpenEntityRelatedToToken(index);
+    // }
   }
 }
 

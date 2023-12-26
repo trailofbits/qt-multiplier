@@ -32,6 +32,10 @@ class InformationExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
   // primary widget.
   const TriggerHandle update_primary_trigger;
 
+  // Triggered when we want to launch a new, pinned (secondary) information
+  // browser.
+  const TriggerHandle open_secondary_trigger;
+
   // Action for opening an entity when the selection is changed.
   const TriggerHandle open_entity_trigger;
 
@@ -40,9 +44,18 @@ class InformationExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
 
   InformationExplorerPlugin(const Context &context_, QMainWindow *parent);
 
-  void ActOnSecondaryClick(QMenu *menu, const QModelIndex &index) Q_DECL_FINAL;
+  std::optional<NamedAction> ActOnSecondaryClick(
+      const QModelIndex &index) Q_DECL_FINAL;
+
+  std::optional<NamedAction> ActOnKeyPress(
+      const QKeySequence &keys, const QModelIndex &index) Q_DECL_FINAL;
 
   QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
+
+ private:
+  void UpdatePrimary(const QVariant &data);
+  void OpenSecondary(const QVariant &data);
+  void InitializeSignals(InformationExplorerWidget *widget);
 };
 
 }  // namespace mx::gui
