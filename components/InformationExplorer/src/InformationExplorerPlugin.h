@@ -22,6 +22,8 @@ class UpdateInformationExplorerAction Q_DECL_FINAL : public IAction {
  public:
   using IAction::IAction;
 
+  InformationExplorerWidget *widget{nullptr};
+
   virtual ~UpdateInformationExplorerAction(void) = default;
 
   QString Verb(void) const noexcept Q_DECL_FINAL;
@@ -35,8 +37,10 @@ class InformationExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
 
   QMainWindow * const main_window;
 
-  InformationExplorerWidget *widget{nullptr};
-
+  // Action for controlling the "primary" information explorer. This is the
+  // information explorer that is menu-controlled and docked. The contents of
+  // the primary info explorer changes as things are clicked on. Secondary,
+  // fixed information explorers can be added with `Shift-I`. 
   UpdateInformationExplorerAction update_primary;
   const TriggerHandle update_primary_trigger;
 

@@ -14,6 +14,7 @@
 
 #include <multiplier/ui/Assert.h>
 #include <multiplier/ui/HistoryWidget.h>
+#include <multiplier/ui/IGlobalHighlighter.h>
 
 #include <QVBoxLayout>
 #include <QToolBar>
@@ -28,7 +29,7 @@ const std::size_t kMaxHistorySize{30};
 }  // namespace
 
 struct InformationExplorer::PrivateData final {
-  IInformationExplorerModel *model{nullptr};
+  InformationExplorerModel *model{nullptr};
   QAbstractItemModel *top_model{nullptr};
   InformationExplorerTreeView *tree_view{nullptr};
 
@@ -41,18 +42,18 @@ struct InformationExplorer::PrivateData final {
 
 InformationExplorer::~InformationExplorer() {}
 
-InformationExplorer::InformationExplorer(IInformationExplorerModel *model,
+InformationExplorer::InformationExplorer(InformationExplorerModel *model,
                                          QWidget *parent,
                                          IGlobalHighlighter *global_highlighter,
                                          const bool &enable_history)
-    : IInformationExplorer(parent),
+    : QWidget(parent),
       d(new PrivateData) {
 
   InitializeWidgets(model, enable_history);
   InstallModel(model, global_highlighter);
 }
 
-void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model,
+void InformationExplorer::InitializeWidgets(InformationExplorerModel *model,
                                             const bool &enable_history) {
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
@@ -98,15 +99,15 @@ void InformationExplorer::InitializeWidgets(IInformationExplorerModel *model,
           &InformationExplorer::OnThemeChange);
 }
 
-void InformationExplorer::InstallModel(IInformationExplorerModel *model,
+void InformationExplorer::InstallModel(InformationExplorerModel *model,
                                        IGlobalHighlighter *global_highlighter) {
 
   d->model = model;
   d->top_model = model;
 
-  if (global_highlighter != nullptr) {
+  if (global_highlighter) {
     d->top_model = global_highlighter->CreateModelProxy(
-        d->top_model, IInformationExplorerModel::EntityIdRole);
+        d->top_model, InformationExplorerModel::EntityIdRole);
   }
 
   d->model_proxy = new SortFilterProxyModel(this);

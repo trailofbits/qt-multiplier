@@ -31,11 +31,12 @@ QString UpdateInformationExplorerAction::Verb(void) const noexcept {
 }
 
 void UpdateInformationExplorerAction::Run(const QVariant &input) noexcept {
-  if (!input.canConvert<VariantEntity>()) {
+  if (!widget || !input.canConvert<VariantEntity>()) {
     return;
   }
 
-  qDebug() << "Triggered on entity!";
+  VariantEntity entity = input.value<VariantEntity>();
+  widget->DisplayEntity(EntityId(entity).Pack());
 }
 
 InformationExplorerPlugin::InformationExplorerPlugin(
@@ -43,6 +44,7 @@ InformationExplorerPlugin::InformationExplorerPlugin(
     : IMainWindowPlugin(context_, parent),
       context(context_),
       main_window(parent),
+      update_primary(this),
       update_primary_trigger(context.RegisterAction(update_primary)) {}
 
 InformationExplorerPlugin::~InformationExplorerPlugin(void) {}
@@ -72,15 +74,15 @@ void InformationExplorerPlugin::ActOnSecondaryClick(
 }
 
 QWidget *InformationExplorerPlugin::CreateDockWidget(QWidget *parent) {
-  if (widget) {
-    return widget;
+  if (update_primary.widget) {
+    return update_primary.widget;
   }
 
-  widget = new InformationExplorerWidget(
+  update_primary.widget = new InformationExplorerWidget(
       context.Index(), context.FileLocationCache(), nullptr, true, parent);
-  widget->setWindowTitle(tr("Information Explorer"));
+  update_primary.widget->setWindowTitle(tr("Information Explorer"));
 
-  return widget;
+  return update_primary.widget;
 }
 
 }  // namespace mx::gui

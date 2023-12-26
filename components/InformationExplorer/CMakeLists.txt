@@ -9,12 +9,6 @@
 add_library("mx_informationexplorer"
   include/multiplier/ui/InformationExplorer.h
 
-  src/IInformationExplorerModel.h
-  src/IInformationExplorerModel.cpp
-
-  src/IInformationExplorer.h
-  src/IInformationExplorer.cpp
-
   src/InformationExplorerModel.h
   src/InformationExplorerModel.cpp
 
@@ -52,7 +46,7 @@ target_link_libraries("mx_informationexplorer"
     "thirdparty_multiplier"
 
     "mx_mainwindowplugin"
-    
+
     "mx_database"
     "mx_searchwidget"
     "mx_codeviewtheme"

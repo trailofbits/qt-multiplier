@@ -10,7 +10,7 @@
 #include "InformationExplorerModel.h"
 #include "InformationExplorerItemDelegate.h"
 
-#include "IInformationExplorerModel.h"
+#include "InformationExplorerModel.h"
 
 #include <QPainter>
 

@@ -8,41 +8,40 @@
 
 #pragma once
 
-#include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/IThemeManager.h>
-
-#include <multiplier/Index.h>
-
 #include <memory>
+#include <multiplier/Types.h>
 
 #include <QDockWidget>
+#include <QPalette>
 
+namespace mx {
+class Index;
+class FileLocationCache;
+}  // namespace mx
 namespace mx::gui {
+
+class CodeViewTheme;
+class IGlobalHighlighter;
+class InformationExplorerModel;
+class InformationExplorer;
 
 //! A component that wraps an InformationExplorer widget with its model
 class InformationExplorerWidget final : public QWidget {
   Q_OBJECT
 
+  // TODO(pag): Should either of these be `std::unique_ptr`?
+  InformationExplorerModel * const model;
+  InformationExplorer * const info_explorer;
+
  public:
   //! Constructor
-  InformationExplorerWidget(Index index, FileLocationCache file_location_cache,
+  InformationExplorerWidget(const Index &index,
+                            const FileLocationCache &file_location_cache,
                             IGlobalHighlighter *global_highlighter,
                             bool enable_history, QWidget *parent);
 
   //! Destructor
-  virtual ~InformationExplorerWidget() override;
-
-  //! Disabled copy constructor
-  InformationExplorerWidget(const InformationExplorerWidget &) = delete;
-
-  //! Disabled copy assignment operator
-  InformationExplorerWidget &
-  operator=(const InformationExplorerWidget &) = delete;
-
- private:
-  //! Private widget data
-  struct PrivateData;
-  std::unique_ptr<PrivateData> d;
+  virtual ~InformationExplorerWidget(void);
 
  public slots:
   //! Requests the internal model to display the specified entity

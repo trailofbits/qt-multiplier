@@ -20,11 +20,8 @@ class ActionRegistry;
 class IAction : public QObject {
   Q_OBJECT
 
-  using QObject::QObject;
-
  public:
-  IAction(void)
-      : QObject(nullptr) {}
+  using QObject::QObject;
 
   virtual ~IAction(void);
 

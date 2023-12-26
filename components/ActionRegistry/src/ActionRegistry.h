@@ -17,7 +17,6 @@
 #include <vector>
 
 #include <QMap>
-#include <QThread>
 
 namespace mx::gui {
 
@@ -27,15 +26,10 @@ class TriggerHandleImpl final : public QObject {
   Q_OBJECT
 
  public:
-  QThread runner_thread;
-
   virtual ~TriggerHandleImpl(void);
 
   inline explicit TriggerHandleImpl(QObject *parent)
-      : QObject(parent),
-        runner_thread(this) {
-    runner_thread.start();        
-  }
+      : QObject(parent) {}
 
   inline void Trigger(const QVariant &input) {
     emit Triggered(input);

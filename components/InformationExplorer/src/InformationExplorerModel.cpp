@@ -398,7 +398,7 @@ QVariant InformationExplorerModel::data(const QModelIndex &index,
 
   } else if (role == EntityIdRole) {
     if (EntityData *ed = std::get_if<EntityData>(&(node->data))) {
-      ret.setValue(EntityId(ed->entity).Pack());
+      ret.setValue(mx::EntityId(ed->entity).Pack());
     }
 
   } else if (role == ForceTextPaintRole) {
@@ -454,8 +454,9 @@ void InformationExplorerModel::NameFutureResultStateChanged(void) {
 }
 
 InformationExplorerModel::InformationExplorerModel(
-    Index index, FileLocationCache file_location_cache, QObject *parent)
-    : IInformationExplorerModel(parent),
+    const Index &index, const FileLocationCache &file_location_cache,
+    QObject *parent)
+    : IModel(parent),
       d(new PrivateData) {
 
   d->database = IDatabase::Create(index, file_location_cache);
@@ -580,7 +581,7 @@ found_category:
                                   false /* path_only */);
     if (key_loc.isEmpty()) {
       key_loc = QString::number(
-          EntityId(std::get<EntityData>(key->data).entity).Pack());
+          mx::EntityId(std::get<EntityData>(key->data).entity).Pack());
     }
 
     key->display = key_loc;
@@ -604,7 +605,7 @@ found_category:
     // Add in the new data.
     QString key_loc = GetFileName(ei.location, false /* path_only */);
     if (key_loc.isEmpty()) {
-      key_loc = QString::number(EntityId(ei.entity_role).Pack());
+      key_loc = QString::number(mx::EntityId(ei.entity_role).Pack());
     }
 
     EntityData ed;

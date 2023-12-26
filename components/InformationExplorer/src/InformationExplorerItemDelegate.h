@@ -12,7 +12,7 @@
 
 namespace mx::gui {
 
-//! A delegate used by the IInformationExplorer widget to draw nodes
+//! A delegate used by the InformationExplorer widget to draw nodes
 class InformationExplorerItemDelegate final : public QStyledItemDelegate {
   Q_OBJECT
 

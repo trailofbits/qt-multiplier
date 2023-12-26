@@ -6,43 +6,38 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "IInformationExplorer.h"
 #include "InformationExplorerWidget.h"
 
 #include <QVBoxLayout>
+#include <memory>
+#include <multiplier/ui/IThemeManager.h>
+
+#include "InformationExplorer.h"
+#include "InformationExplorerModel.h"
 
 namespace mx::gui {
 
-struct InformationExplorerWidget::PrivateData final {
-  IInformationExplorerModel *model{nullptr};
-  IInformationExplorer *info_explorer{nullptr};
-};
-
-InformationExplorerWidget::~InformationExplorerWidget() {}
+InformationExplorerWidget::~InformationExplorerWidget(void) {}
 
 InformationExplorerWidget::InformationExplorerWidget(
-    Index index, FileLocationCache file_location_cache,
+    const Index &index, const FileLocationCache &file_location_cache,
     IGlobalHighlighter *global_highlighter, bool enable_history,
     QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData) {
+      model(new InformationExplorerModel(index, file_location_cache, this)),
+      info_explorer(new InformationExplorer(
+          model, this, global_highlighter, enable_history)) {
 
-  d->model =
-      IInformationExplorerModel::Create(index, file_location_cache, this);
-
-  connect(d->model, &QAbstractItemModel::modelReset, this,
+  connect(model, &QAbstractItemModel::modelReset, this,
           &InformationExplorerWidget::OnModelReset);
-
-  d->info_explorer = IInformationExplorer::Create(
-      d->model, this, global_highlighter, enable_history);
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
 
-  layout->addWidget(d->info_explorer);
+  layout->addWidget(info_explorer);
   setLayout(layout);
 
-  connect(d->info_explorer, &IInformationExplorer::SelectedItemChanged, this,
+  connect(info_explorer, &InformationExplorer::SelectedItemChanged, this,
           &InformationExplorerWidget::SelectedItemChanged);
 
   connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
@@ -57,18 +52,18 @@ InformationExplorerWidget::InformationExplorerWidget(
 }
 
 void InformationExplorerWidget::DisplayEntity(const RawEntityId &entity_id) {
-  d->model->RequestEntityInformation(entity_id);
+  model->RequestEntityInformation(entity_id);
 }
 
-void InformationExplorerWidget::OnModelReset() {
+void InformationExplorerWidget::OnModelReset(void) {
   QString window_title;
 
-  auto opt_entity_name = d->model->GetCurrentEntityName();
+  auto opt_entity_name = model->GetCurrentEntityName();
   if (opt_entity_name.has_value()) {
     window_title = tr("Entity info: '") + opt_entity_name.value() + "'";
 
   } else {
-    auto entity_id = d->model->GetCurrentEntityID();
+    auto entity_id = model->GetCurrentEntityID();
     if (entity_id != kInvalidEntityId) {
       window_title = tr("Entity info: #") + QString::number(entity_id);
 

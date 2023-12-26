@@ -12,10 +12,7 @@
 
 namespace mx::gui {
 
-TriggerHandleImpl::~TriggerHandleImpl(void) {
-  runner_thread.quit();
-  runner_thread.wait();
-}
+TriggerHandleImpl::~TriggerHandleImpl(void) {}
 
 void TriggerHandle::Trigger(const QVariant &data) const noexcept {
   d->Trigger(data);
@@ -49,8 +46,6 @@ TriggerHandle ActionRegistry::Find(const QString &verb) const {
 // Register an action with the action registry.
 TriggerHandle ActionRegistry::Register(IAction &action) {
   TriggerHandleImpl *trigger = d->TriggerFor(action.Verb());
-
-  action.moveToThread(&(trigger->runner_thread));
 
   QObject::connect(trigger, &TriggerHandleImpl::Triggered,
                    &action, &IAction::Run);

@@ -10,36 +10,39 @@
 
 #include <multiplier/ui/ISearchWidget.h>
 #include <multiplier/ui/IThemeManager.h>
+#include <multiplier/Types.h>
 
 #include <QWidget>
 
-#include "IInformationExplorer.h"
-
 namespace mx::gui {
 
+class IGlobalHighlighter;
+class InformationExplorerModel;
+
 //! A widget that displays entity information
-class InformationExplorer final : public IInformationExplorer {
+class InformationExplorer final : public QWidget {
   Q_OBJECT
+
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
 
  public:
   //! Destructor
   virtual ~InformationExplorer() override;
 
- private:
-  struct PrivateData;
-  std::unique_ptr<PrivateData> d;
-
   //! Constructor
-  InformationExplorer(IInformationExplorerModel *model, QWidget *parent,
+  InformationExplorer(InformationExplorerModel *model, QWidget *parent,
                       IGlobalHighlighter *global_highlighter,
                       const bool &enable_history);
 
+ private:
+
   //! Initializes the internal widgets
-  void InitializeWidgets(IInformationExplorerModel *model,
+  void InitializeWidgets(InformationExplorerModel *model,
                          const bool &enable_history);
 
   //! Installs the specified model
-  void InstallModel(IInformationExplorerModel *model,
+  void InstallModel(InformationExplorerModel *model,
                     IGlobalHighlighter *global_highlighter);
 
  private slots:
@@ -72,7 +75,9 @@ class InformationExplorer final : public IInformationExplorer {
   //! Called by the theme manager
   void OnThemeChange(const QPalette &, const CodeViewTheme &code_view_theme);
 
-  friend class IInformationExplorer;
+ signals:
+  //! Emitted whenever the selected item changes
+  void SelectedItemChanged(const QModelIndex &current_index);
 };
 
 }  // namespace mx::gui
