@@ -26,7 +26,7 @@ endif()
 
 target_link_libraries("mx_thememanager"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
     "thirdparty_qt"
     "mx_util"
 

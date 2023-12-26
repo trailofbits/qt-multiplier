@@ -23,7 +23,7 @@ target_sources("mx_macroexplorer" INTERFACE
 
 target_link_libraries("mx_macroexplorer"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_qt"

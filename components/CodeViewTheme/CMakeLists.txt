@@ -16,7 +16,7 @@ add_library("mx_codeviewtheme"
 
 target_link_libraries("mx_codeviewtheme"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_qt"

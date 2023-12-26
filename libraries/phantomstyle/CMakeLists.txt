@@ -26,7 +26,7 @@ target_compile_definitions("thirdparty_phantomstyle" PUBLIC
 
 target_link_libraries("thirdparty_phantomstyle"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_qt"

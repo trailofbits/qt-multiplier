@@ -6,13 +6,17 @@
 
 #pragma once
 
-#include <multiplier/ui/IMainWindowPlugin.h>
+#include <QString>
+
+#include <memory>
 
 namespace mx::gui {
 
-class Context;
-
-std::unique_ptr<IMainWindowPlugin> CreateReferenceExplorerMainWindowPlugin(
-    const Context &context, QObject *parent);
+class IReferenceExplorerPlugin {
+ public:
+  virtual ~IReferenceExplorerPlugin(void);
+};
 
 }  // namespace mx::gui
+
+Q_DECLARE_INTERFACE(mx::gui::IReferenceExplorerPlugin, "com.trailofbits.IReferenceExplorerPlugin")

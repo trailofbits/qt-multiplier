@@ -6,7 +6,10 @@
 
 #include "MainWindow.h"
 
+#include <multiplier/ui/Context.h>
+#include <multiplier/ui/IMainWindowPlugin.h>
 #include <multiplier/ui/ReferenceExplorer.h>
+
 #include <multiplier/ui/SimpleTextInputDialog.h>
 #include <multiplier/ui/InformationExplorerWidget.h>
 #include <multiplier/ui/MxTabWidget.h>
@@ -27,7 +30,10 @@
 #include <multiplier/ui/Util.h>
 #include <multiplier/ui/CallHierarchyGenerator.h>
 #include <multiplier/ui/IGeneratorView.h>
-#include <multiplier/ui/IActionRegistry.h>
+
+
+#include <multiplier/ui/IAction.h>
+#include <multiplier/ui/ActionRegistry.h>
 
 #ifndef MX_DISABLE_PYTHON_BINDINGS
 # include <multiplier/ui/PythonConsoleWidget.h>
@@ -92,10 +98,14 @@ struct ToolBar final {
 }  // namespace
 
 struct MainWindow::PrivateData final {
-  mx::Index index;
-  mx::FileLocationCache file_location_cache;
+  const Context &context;
 
-  IActionRegistry::Ptr action_registry{nullptr};
+  const mx::Index index;  // TODO(pag): Remove.
+  const mx::FileLocationCache file_location_cache;  // TODO(pag): Remove.
+
+  IAction &open_call_hierarchy;
+
+  std::vector<std::unique_ptr<IMainWindowPlugin>> plugins;
 
   IProjectExplorer *project_explorer{nullptr};
   IEntityExplorer *entity_explorer{nullptr};
@@ -109,9 +119,9 @@ struct MainWindow::PrivateData final {
   QShortcut *close_active_ref_explorer_tab_shortcut{nullptr};
   QShortcut *close_active_code_tab_shortcut{nullptr};
 
-  bool enable_ref_explorer_code_preview{false};
-  QTabWidget *ref_explorer_tab_widget{nullptr};
-  QDockWidget *reference_explorer_dock{nullptr};
+  // bool enable_ref_explorer_code_preview{false};
+  // QTabWidget *ref_explorer_tab_widget{nullptr};
+  // QDockWidget *reference_explorer_dock{nullptr};
 
   QDockWidget *project_explorer_dock{nullptr};
   QDockWidget *entity_explorer_dock{nullptr};
@@ -125,116 +135,109 @@ struct MainWindow::PrivateData final {
 
   QMenu *view_menu{nullptr};
   ToolBar toolbar;
+
+  inline PrivateData(const Context &context_)
+      : context(context_),
+        index(context.Index()),
+        file_location_cache(context.FileLocationCache()),
+        open_call_hierarchy(
+            context.Action("com.trailofbits.ReferenceExplorer.OpenCallHierarchy")) {}
 };
 
-MainWindow::MainWindow() : QMainWindow(nullptr), d(new PrivateData) {
+MainWindow::MainWindow(const Context &context)
+    : QMainWindow(nullptr),
+      d(new PrivateData(context)) {
+
   setWindowTitle("Multiplier");
   setWindowIcon(QIcon(":/Icons/Multiplier"));
 
-  QString database_path;
-  const auto &arg_list = qApp->arguments();
-  if (arg_list.size() == 2) {
-    database_path = arg_list[1];
-
-  } else {
-    database_path = QFileDialog::getOpenFileName(
-        this, tr("Select a Multiplier database"), QDir::homePath());
-  }
-
-  if (database_path.size()) {
-    d->index = mx::Index::in_memory_cache(
-        mx::Index::from_database(database_path.toStdString()));
-  }
-
-  d->action_registry =
-      IActionRegistry::Create(d->index, d->file_location_cache);
-
-  RegisterReferenceExplorerActions();
+  // RegisterReferenceExplorerActions();
 
   InitializeWidgets();
   InitializeToolBar();
+  InitializePlugins();
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
-          &MainWindow::OnThemeChange);
+  connect(&(context.ThemeManager()), &IThemeManager::ThemeChanged,
+          this, &MainWindow::OnThemeChange);
 
   resize(1280, 800);
 }
 
 MainWindow::~MainWindow() {}
 
-void MainWindow::RegisterReferenceExplorerActions() {
-  static const auto L_entityIdFromVariant =
-      [](Index index, const QVariant &variant) -> std::optional<RawEntityId> {
-    if (!variant.isValid()) {
-      return std::nullopt;
-    }
+// void MainWindow::RegisterReferenceExplorerActions() {
+//   static const auto L_entityIdFromVariant =
+//       [](Index index, const QVariant &variant) -> std::optional<RawEntityId> {
+//     if (!variant.isValid()) {
+//       return std::nullopt;
+//     }
 
-    RawEntityId entity_id{kInvalidEntityId};
-    if (variant.canConvert<std::uint64_t>()) {
-      entity_id = static_cast<RawEntityId>(variant.toULongLong());
+//     RawEntityId entity_id{kInvalidEntityId};
+//     if (variant.canConvert<std::uint64_t>()) {
+//       entity_id = static_cast<RawEntityId>(variant.toULongLong());
 
-    } else if (variant.canConvert<RawEntityId>()) {
-      entity_id = qvariant_cast<RawEntityId>(variant);
+//     } else if (variant.canConvert<RawEntityId>()) {
+//       entity_id = qvariant_cast<RawEntityId>(variant);
 
-    } else if (variant.canConvert<QString>()) {
-      auto string_value = variant.toString().trimmed();
+//     } else if (variant.canConvert<QString>()) {
+//       auto string_value = variant.toString().trimmed();
 
-      bool succeeded{false};
-      entity_id =
-          static_cast<RawEntityId>(string_value.toULongLong(&succeeded));
+//       bool succeeded{false};
+//       entity_id =
+//           static_cast<RawEntityId>(string_value.toULongLong(&succeeded));
 
-      if (!succeeded) {
-        return std::nullopt;
-      }
-    }
+//       if (!succeeded) {
+//         return std::nullopt;
+//       }
+//     }
 
-    auto entity = index.entity(entity_id);
-    if (std::holds_alternative<NotAnEntity>(entity)) {
-      return std::nullopt;
-    }
+//     auto entity = index.entity(entity_id);
+//     if (std::holds_alternative<NotAnEntity>(entity)) {
+//       return std::nullopt;
+//     }
 
-    return entity_id;
-  };
+//     return entity_id;
+//   };
 
-  static const IActionRegistry::Action reference_explorer_action{
-      tr("Call Hierarchy"),
-      "OpenCallHierarchy",
+//   static const IActionRegistry::Action reference_explorer_action{
+//       tr("Call Hierarchy"),
+//       "OpenCallHierarchy",
 
-      {IActionRegistry::Action::InputType::Integer,
-       IActionRegistry::Action::InputType::String,
-       IActionRegistry::Action::InputType::EntityIdentifier},
+//       {IActionRegistry::Action::InputType::Integer,
+//        IActionRegistry::Action::InputType::String,
+//        IActionRegistry::Action::InputType::EntityIdentifier},
 
-      [](Index index, const QVariant &input) -> bool {
-        auto opt_entity_id = L_entityIdFromVariant(index, input);
-        return opt_entity_id.has_value();
-      },
+//       [](Index index, const QVariant &input) -> bool {
+//         auto opt_entity_id = L_entityIdFromVariant(index, input);
+//         return opt_entity_id.has_value();
+//       },
 
-      [this](Index index, const QVariant &input, QWidget *parent) -> bool {
-        auto opt_entity_id = L_entityIdFromVariant(index, input);
-        if (!opt_entity_id.has_value()) {
-          return false;
-        }
+//       [this](Index index, const QVariant &input, QWidget *parent) -> bool {
+//         auto opt_entity_id = L_entityIdFromVariant(index, input);
+//         if (!opt_entity_id.has_value()) {
+//           return false;
+//         }
 
-        auto generator = CallHierarchyGenerator::Create(
-            index, d->file_location_cache, opt_entity_id.value());
+//         auto generator = CallHierarchyGenerator::Create(
+//             index, d->file_location_cache, opt_entity_id.value());
 
-        auto ref_explorer = new PopupReferenceExplorer(
-            index, d->file_location_cache, std::move(generator),
-            d->enable_ref_explorer_code_preview, *d->global_highlighter,
-            *d->macro_explorer, parent);
+//         auto ref_explorer = new PopupReferenceExplorer(
+//             index, d->file_location_cache, std::move(generator),
+//             d->enable_ref_explorer_code_preview, *d->global_highlighter,
+//             *d->macro_explorer, parent);
 
-        d->popup_widget_list.push_back(ref_explorer);
+//         d->popup_widget_list.push_back(ref_explorer);
 
-        ref_explorer->GetWrappedWidget()->SetBrowserMode(
-            d->toolbar.browser_mode->isChecked());
+//         ref_explorer->GetWrappedWidget()->SetBrowserMode(
+//             d->toolbar.browser_mode->isChecked());
 
-        ref_explorer->show();
-        return true;
-      },
-  };
+//         ref_explorer->show();
+//         return true;
+//       },
+//   };
 
-  d->action_registry->Register(reference_explorer_action);
-}
+//   d->action_registry->Register(reference_explorer_action);
+// }
 
 void MainWindow::InitializeWidgets() {
   d->view_menu = new QMenu(tr("View"));
@@ -280,12 +283,12 @@ void MainWindow::InitializeWidgets() {
 
   CreateGlobalHighlighter();
   CreateMacroExplorerDock();
-  CreateReferenceExplorerMenuOptions();
+  // CreateReferenceExplorerMenuOptions();
   CreateProjectExplorerDock();
   CreateEntityExplorerDock();
   CreateInfoExplorerDock();
   CreateCodeView();
-  CreateReferenceExplorerDock();
+  // CreateReferenceExplorerDock();
   CreatePythonConsoleDock();
 
   tabifyDockWidget(d->project_explorer_dock, d->entity_explorer_dock);
@@ -323,6 +326,37 @@ void MainWindow::InitializeToolBar() {
 
   addToolBar(toolbar);
   UpdateIcons();
+}
+
+void MainWindow::InitializePlugins(void) {
+  d->plugins.emplace_back(CreateReferenceExplorerMainWindowPlugin(
+      d->context, this));
+
+  for (const auto &plugin : d->plugins) {
+    QWidget *dockable_widget = plugin->CreateDockWidget(this);
+    if (!dockable_widget) {
+      continue;
+    }
+
+    auto dock = new QDockWidget(dockable_widget->windowTitle(), this);
+    dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    dock->setWidget(dockable_widget);
+
+    d->view_menu->addAction(dock->toggleViewAction());
+    addDockWidget(Qt::LeftDockWidgetArea, dock);
+
+    connect(
+        plugin.get(), &IMainWindowPlugin::ShowDockWidget,
+        [=] (void) {
+          dock->show();
+        });
+
+    connect(
+        plugin.get(), &IMainWindowPlugin::HideDockWidget,
+        [=] (void) {
+          dock->hide();
+        });
+  }
 }
 
 void MainWindow::CreateProjectExplorerDock() {
@@ -399,32 +433,32 @@ void MainWindow::CreateMacroExplorerDock() {
   addDockWidget(Qt::LeftDockWidgetArea, d->macro_explorer_dock);
 }
 
-void MainWindow::CreateReferenceExplorerDock() {
-  d->ref_explorer_tab_widget = new MxTabWidget(this);
-  d->ref_explorer_tab_widget->setDocumentMode(true);
-  d->ref_explorer_tab_widget->setTabsClosable(true);
+// void MainWindow::CreateReferenceExplorerDock() {
+//   d->ref_explorer_tab_widget = new MxTabWidget(this);
+//   d->ref_explorer_tab_widget->setDocumentMode(true);
+//   d->ref_explorer_tab_widget->setTabsClosable(true);
 
-  d->close_active_ref_explorer_tab_shortcut =
-      new QShortcut(QKeySequence::Close, d->ref_explorer_tab_widget, this,
-                    &MainWindow::OnCloseActiveReferenceExplorerTab,
-                    Qt::WidgetWithChildrenShortcut);
+//   d->close_active_ref_explorer_tab_shortcut =
+//       new QShortcut(QKeySequence::Close, d->ref_explorer_tab_widget, this,
+//                     &MainWindow::OnCloseActiveReferenceExplorerTab,
+//                     Qt::WidgetWithChildrenShortcut);
 
-  connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabCloseRequested,
-          this, &MainWindow::OnReferenceExplorerTabBarClose);
+//   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabCloseRequested,
+//           this, &MainWindow::OnReferenceExplorerTabBarClose);
 
-  connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
-          this, &MainWindow::OnReferenceExplorerTabBarDoubleClick);
+//   connect(d->ref_explorer_tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
+//           this, &MainWindow::OnReferenceExplorerTabBarDoubleClick);
 
-  d->reference_explorer_dock = new QDockWidget(tr("Reference Explorer"), this);
-  d->view_menu->addAction(d->reference_explorer_dock->toggleViewAction());
-  d->reference_explorer_dock->toggleViewAction()->setEnabled(false);
-  d->reference_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-  d->reference_explorer_dock->setWidget(d->ref_explorer_tab_widget);
-  addDockWidget(Qt::BottomDockWidgetArea, d->reference_explorer_dock);
+//   d->reference_explorer_dock = new QDockWidget(tr("Reference Explorer"), this);
+//   d->view_menu->addAction(d->reference_explorer_dock->toggleViewAction());
+//   d->reference_explorer_dock->toggleViewAction()->setEnabled(false);
+//   d->reference_explorer_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+//   d->reference_explorer_dock->setWidget(d->ref_explorer_tab_widget);
+//   addDockWidget(Qt::BottomDockWidgetArea, d->reference_explorer_dock);
 
-  // Default is hidden until we ask to see the references to something.
-  d->reference_explorer_dock->hide();
-}
+//   // Default is hidden until we ask to see the references to something.
+//   d->reference_explorer_dock->hide();
+// }
 
 void MainWindow::OnCloseActiveCodeViewTab() {
   auto &tab_widget = *static_cast<QTabWidget *>(centralWidget());
@@ -465,36 +499,36 @@ void MainWindow::CreateCodeView() {
 
   d->view_menu->addAction(toggle_word_wrap_action);
 
-  // Also create the custom context menu
-  d->code_view_context_menu.menu = new QMenu(tr("Token menu"));
+  // // Also create the custom context menu
+  // d->code_view_context_menu.menu = new QMenu(tr("Token menu"));
 
-  connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
-          &MainWindow::OnCodeViewContextMenuActionTriggered);
+  // connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
+  //         &MainWindow::OnCodeViewContextMenuActionTriggered);
 
-  d->code_view_context_menu.show_call_hierarchy =
-      new QAction(tr("Show Call Hierarchy"));
+  // d->code_view_context_menu.show_call_hierarchy =
+  //     new QAction(tr("Show Call Hierarchy"));
 
-  d->code_view_context_menu.menu->addAction(
-      d->code_view_context_menu.show_call_hierarchy);
+  // d->code_view_context_menu.menu->addAction(
+  //     d->code_view_context_menu.show_call_hierarchy);
 
-  d->code_view_context_menu.highlight_menu = new QMenu(tr("Highlights"));
-  d->code_view_context_menu.menu->addMenu(
-      d->code_view_context_menu.highlight_menu);
+  // d->code_view_context_menu.highlight_menu = new QMenu(tr("Highlights"));
+  // d->code_view_context_menu.menu->addMenu(
+  //     d->code_view_context_menu.highlight_menu);
 
-  d->code_view_context_menu.set_entity_highlight = new QAction(tr("Set color"));
+  // d->code_view_context_menu.set_entity_highlight = new QAction(tr("Set color"));
 
-  d->code_view_context_menu.highlight_menu->addAction(
-      d->code_view_context_menu.set_entity_highlight);
+  // d->code_view_context_menu.highlight_menu->addAction(
+  //     d->code_view_context_menu.set_entity_highlight);
 
-  d->code_view_context_menu.remove_entity_highlight = new QAction(tr("Remove"));
+  // d->code_view_context_menu.remove_entity_highlight = new QAction(tr("Remove"));
 
-  d->code_view_context_menu.highlight_menu->addAction(
-      d->code_view_context_menu.remove_entity_highlight);
+  // d->code_view_context_menu.highlight_menu->addAction(
+  //     d->code_view_context_menu.remove_entity_highlight);
 
-  d->code_view_context_menu.reset_entity_highlights = new QAction(tr("Reset"));
+  // d->code_view_context_menu.reset_entity_highlights = new QAction(tr("Reset"));
 
-  d->code_view_context_menu.highlight_menu->addAction(
-      d->code_view_context_menu.reset_entity_highlights);
+  // d->code_view_context_menu.highlight_menu->addAction(
+  //     d->code_view_context_menu.reset_entity_highlights);
 }
 
 void MainWindow::CreateGlobalHighlighter() {
@@ -513,32 +547,45 @@ void MainWindow::CreateGlobalHighlighter() {
 }
 
 void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
-  QVariant action_data;
-  action_data.setValue(index);
+  QMenu token_menu(tr("Token menu"));
 
-  std::vector<QAction *> action_list{
-      d->code_view_context_menu.show_call_hierarchy,
-      d->code_view_context_menu.set_entity_highlight,
-      d->code_view_context_menu.remove_entity_highlight,
-      d->code_view_context_menu.reset_entity_highlights};
+  // connect(d->code_view_context_menu.menu, &QMenu::triggered, this,
+  //         &MainWindow::OnCodeViewContextMenuActionTriggered);
 
-  for (auto &action : action_list) {
-    action->setData(action_data);
+  for (const auto &plugin : d->plugins) {
+    plugin->ActOnSecondaryClick(&token_menu, index);
   }
 
-  QVariant related_entity_id_var = index.data(ICodeModel::RelatedEntityIdRole);
+  token_menu.exec(QCursor::pos());
 
-  // Only enable the references browser if the token is related to an entity.
-  d->code_view_context_menu.show_call_hierarchy->setEnabled(
-      related_entity_id_var.isValid());
+  // QVariant action_data;
+  // action_data.setValue(index);
 
-  d->code_view_context_menu.menu->exec(QCursor::pos());
+  // std::vector<QAction *> action_list{
+  //     d->code_view_context_menu.show_call_hierarchy,
+  //     d->code_view_context_menu.set_entity_highlight,
+  //     d->code_view_context_menu.remove_entity_highlight,
+  //     d->code_view_context_menu.reset_entity_highlights};
+
+  // for (auto &action : action_list) {
+  //   action->setData(action_data);
+  // }
+
+  // QVariant related_entity_id_var = index.data(ICodeModel::RelatedEntityIdRole);
+
+  // // Only enable the references browser if the token is related to an entity.
+  // d->code_view_context_menu.show_call_hierarchy->setEnabled(
+  //     related_entity_id_var.isValid());
+
+  // d->code_view_context_menu.menu->exec(QCursor::pos());
 }
 
 void MainWindow::OpenCallHierarchy(const QModelIndex &index) {
-  d->action_registry->Execute("OpenCallHierarchy",
-                              index.data(ICodeModel::RealRelatedEntityIdRole),
-                              this);
+  d->open_call_hierarchy.Trigger(index.data(ICodeModel::RealRelatedEntityIdRole));
+
+  // d->action_registry->Execute("OpenCallHierarchy",
+  //                             index.data(ICodeModel::RealRelatedEntityIdRole),
+  //                             this);
 }
 
 void MainWindow::OpenTokenEntityInfo(const QModelIndex &index,
@@ -641,18 +688,18 @@ void MainWindow::CloseAllPopups() {
   d->popup_widget_list.clear();
 }
 
-void MainWindow::CreateReferenceExplorerMenuOptions() {
-  auto main_menu = new QMenu(tr("Reference Explorer"));
-  d->view_menu->addMenu(main_menu);
+// void MainWindow::CreateReferenceExplorerMenuOptions() {
+//   auto main_menu = new QMenu(tr("Reference Explorer"));
+//   d->view_menu->addMenu(main_menu);
 
-  auto code_preview_action = new QAction(tr("Enable code preview"));
-  code_preview_action->setCheckable(true);
-  code_preview_action->setChecked(d->enable_ref_explorer_code_preview);
-  main_menu->addAction(code_preview_action);
+//   auto code_preview_action = new QAction(tr("Enable code preview"));
+//   code_preview_action->setCheckable(true);
+//   code_preview_action->setChecked(d->enable_ref_explorer_code_preview);
+//   main_menu->addAction(code_preview_action);
 
-  connect(code_preview_action, &QAction::toggled, this,
-          &MainWindow::OnReferenceExplorerCodePreviewToggled);
-}
+//   connect(code_preview_action, &QAction::toggled, this,
+//           &MainWindow::OnReferenceExplorerCodePreviewToggled);
+// }
 
 ICodeView *
 MainWindow::CreateNewCodeView(RawEntityId file_entity_id, QString tab_name,
@@ -778,6 +825,10 @@ void MainWindow::OpenEntityRelatedToToken(const QModelIndex &index) {
   // reference browser code preview. Save wherever we were taken away from as
   // the last thing in history for the current view.
   d->toolbar.back_forward->CommitCurrentLocationToHistory();
+
+  for (const auto &plugin : d->plugins) {
+    plugin->ActOnPrimaryClick(index);
+  }
 
   OpenEntityInfo(entity_id);
   OpenEntityCode(entity_id);
@@ -969,56 +1020,57 @@ void MainWindow::OnInformationExplorerSelectionChange(
   OpenEntityCode(entity_id, false /* don't canonicalize entity IDs */);
 }
 
-void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
-  auto entity_id_role = index.data(IGeneratorModel::EntityIdRole);
-  if (!entity_id_role.isValid()) {
-    return;
-  }
+// void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {
+//   auto entity_id_role = index.data(IGeneratorModel::EntityIdRole);
+//   if (!entity_id_role.isValid()) {
+//     return;
+//   }
 
-  auto entity_id = qvariant_cast<RawEntityId>(entity_id_role);
-  d->toolbar.back_forward->CommitCurrentLocationToHistory();
+//   auto entity_id = qvariant_cast<RawEntityId>(entity_id_role);
+//   d->toolbar.back_forward->CommitCurrentLocationToHistory();
 
-  OpenEntityCode(entity_id);
-}
+//   OpenEntityCode(entity_id);
+// }
 
 void MainWindow::OnCodeViewContextMenuActionTriggered(QAction *action) {
-  QVariant code_model_index_var = action->data();
-  if (!code_model_index_var.isValid()) {
-    return;
-  }
+  (void) action;
+  // QVariant code_model_index_var = action->data();
+  // if (!code_model_index_var.isValid()) {
+  //   return;
+  // }
 
-  QModelIndex code_model_index =
-      qvariant_cast<QModelIndex>(code_model_index_var);
+  // QModelIndex code_model_index =
+  //     qvariant_cast<QModelIndex>(code_model_index_var);
 
-  if (action == d->code_view_context_menu.show_call_hierarchy) {
-    OpenCallHierarchy(code_model_index);
+  // if (action == d->code_view_context_menu.show_call_hierarchy) {
+  //   OpenCallHierarchy(code_model_index);
 
-  } else if (action == d->code_view_context_menu.set_entity_highlight) {
-    QVariant entity_id_var = code_model_index.data(kHighlightEntityIdRole);
-    if (!entity_id_var.isValid()) {
-      return;
-    }
+  // } else if (action == d->code_view_context_menu.set_entity_highlight) {
+  //   QVariant entity_id_var = code_model_index.data(kHighlightEntityIdRole);
+  //   if (!entity_id_var.isValid()) {
+  //     return;
+  //   }
 
-    RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
-    QColor color = QColorDialog::getColor();
-    if (!color.isValid()) {
-      return;
-    }
+  //   RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  //   QColor color = QColorDialog::getColor();
+  //   if (!color.isValid()) {
+  //     return;
+  //   }
 
-    d->global_highlighter->SetEntityColor(entity_id, color);
+  //   d->global_highlighter->SetEntityColor(entity_id, color);
 
-  } else if (action == d->code_view_context_menu.remove_entity_highlight) {
-    QVariant entity_id_var = code_model_index.data(kHighlightEntityIdRole);
-    if (!entity_id_var.isValid()) {
-      return;
-    }
+  // } else if (action == d->code_view_context_menu.remove_entity_highlight) {
+  //   QVariant entity_id_var = code_model_index.data(kHighlightEntityIdRole);
+  //   if (!entity_id_var.isValid()) {
+  //     return;
+  //   }
 
-    RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
-    d->global_highlighter->RemoveEntity(entity_id);
+  //   RawEntityId entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  //   d->global_highlighter->RemoveEntity(entity_id);
 
-  } else if (action == d->code_view_context_menu.reset_entity_highlights) {
-    d->global_highlighter->Clear();
-  }
+  // } else if (action == d->code_view_context_menu.reset_entity_highlights) {
+  //   d->global_highlighter->Clear();
+  // }
 }
 
 void MainWindow::OnToggleWordWrap(bool checked) {
@@ -1027,63 +1079,31 @@ void MainWindow::OnToggleWordWrap(bool checked) {
   code_view.SetWordWrapping(checked);
 }
 
-void MainWindow::SaveReferenceExplorer(ReferenceExplorer *) {
-  /*d->popup_reference_explorer.release();
+// void MainWindow::SaveReferenceExplorer(ReferenceExplorer *) {
+//   /*d->popup_reference_explorer.release();
 
-  auto new_tab_index = d->ref_explorer_tab_widget->count();
+//   auto new_tab_index = d->ref_explorer_tab_widget->count();
 
-  reference_explorer->setParent(this);
-  reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
-  reference_explorer->SetBrowserMode(d->toolbar.browser_mode->isChecked());
+//   reference_explorer->setParent(this);
+//   reference_explorer->setAttribute(Qt::WA_DeleteOnClose);
+//   reference_explorer->SetBrowserMode(d->toolbar.browser_mode->isChecked());
 
-  connect(reference_explorer, &ReferenceExplorer::ItemActivated, this,
-          &MainWindow::OnReferenceExplorerItemActivated);
+//   connect(reference_explorer, &ReferenceExplorer::ItemActivated, this,
+//           &MainWindow::OnReferenceExplorerItemActivated);
 
-  connect(reference_explorer, &ReferenceExplorer::TokenTriggered, this,
-          &MainWindow::OnTokenTriggered);
+//   connect(reference_explorer, &ReferenceExplorer::TokenTriggered, this,
+//           &MainWindow::OnTokenTriggered);
 
-  connect(this, &MainWindow::BrowserModeToggled, reference_explorer,
-          &ReferenceExplorer::SetBrowserMode);
+//   connect(this, &MainWindow::BrowserModeToggled, reference_explorer,
+//           &ReferenceExplorer::SetBrowserMode);
 
-  d->ref_explorer_tab_widget->addTab(reference_explorer,
-                                     reference_explorer->windowTitle());
-  d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
+//   d->ref_explorer_tab_widget->addTab(reference_explorer,
+//                                      reference_explorer->windowTitle());
+//   d->ref_explorer_tab_widget->setCurrentIndex(new_tab_index);
 
-  d->reference_explorer_dock->toggleViewAction()->setEnabled(true);
-  d->reference_explorer_dock->show();*/
-}
-
-void MainWindow::OnReferenceExplorerTabBarClose(int index) {
-  auto widget = d->ref_explorer_tab_widget->widget(index);
-  d->ref_explorer_tab_widget->removeTab(index);
-
-  widget->close();
-
-  auto widget_visible = d->ref_explorer_tab_widget->count() != 0;
-  d->reference_explorer_dock->setVisible(widget_visible);
-  d->reference_explorer_dock->toggleViewAction()->setEnabled(widget_visible);
-}
-
-void MainWindow::OnReferenceExplorerTabBarDoubleClick(int index) {
-  auto current_tab_name = d->ref_explorer_tab_widget->tabText(index);
-
-  SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,
-                               this);
-  if (dialog.exec() != QDialog::Accepted) {
-    return;
-  }
-
-  const auto &opt_tab_name = dialog.GetTextInput();
-
-  QString new_tab_name;
-  if (opt_tab_name.has_value()) {
-    new_tab_name = opt_tab_name.value();
-  } else {
-    new_tab_name = tr("Reference browser #") + QString::number(index);
-  }
-
-  d->ref_explorer_tab_widget->setTabText(index, new_tab_name);
-}
+//   d->reference_explorer_dock->toggleViewAction()->setEnabled(true);
+//   d->reference_explorer_dock->show();*/
+// }
 
 void MainWindow::UpdateLocatiomFromWidget(QWidget *widget) {
   if (!widget) {
@@ -1135,16 +1155,16 @@ void MainWindow::OnCodeViewTabClicked(int index) {
   }
 }
 
-void MainWindow::OnCloseActiveReferenceExplorerTab() {
-  if (d->ref_explorer_tab_widget->count() == 0) {
-    return;
-  }
+// void MainWindow::OnCloseActiveReferenceExplorerTab() {
+//   if (d->ref_explorer_tab_widget->count() == 0) {
+//     return;
+//   }
 
-  auto current_index = d->ref_explorer_tab_widget->currentIndex();
-  OnReferenceExplorerTabBarClose(current_index);
+//   auto current_index = d->ref_explorer_tab_widget->currentIndex();
+//   OnReferenceExplorerTabBarClose(current_index);
 
-  d->ref_explorer_tab_widget->setFocus();
-}
+//   d->ref_explorer_tab_widget->setFocus();
+// }
 
 void MainWindow::OnSetDarkTheme() {
   mx::gui::IThemeManager::Get().SetTheme(true);
@@ -1154,9 +1174,9 @@ void MainWindow::OnSetLightTheme() {
   mx::gui::IThemeManager::Get().SetTheme(false);
 }
 
-void MainWindow::OnReferenceExplorerCodePreviewToggled(const bool &checked) {
-  d->enable_ref_explorer_code_preview = checked;
-}
+// void MainWindow::OnReferenceExplorerCodePreviewToggled(const bool &checked) {
+//   d->enable_ref_explorer_code_preview = checked;
+// }
 
 void MainWindow::OnThemeChange(const QPalette &, const CodeViewTheme &) {
   UpdateIcons();

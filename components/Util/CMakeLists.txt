@@ -7,6 +7,9 @@
 #
 
 add_library("mx_util"
+  include/multiplier/ui/IModel.h
+  src/IModel.cpp
+
   include/multiplier/ui/Util.h
   src/Util.h
   src/Util.cpp
@@ -39,7 +42,7 @@ target_sources("mx_util" INTERFACE
 
 target_link_libraries("mx_util"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
     "mx_codeviewtheme"
     "thirdparty_qt"
     "thirdparty_multiplier"

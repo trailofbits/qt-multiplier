@@ -8,63 +8,74 @@
 
 #include "ActionRegistry.h"
 
+#include <vector>
+
 namespace mx::gui {
 
-struct ActionRegistry::PrivateData final {
-  Index index;
-  FileLocationCache file_location_cache;
-  QMap<QString, Action> registered_action_map;
-};
+RootAction::~RootAction(void) {}
 
-ActionRegistry::ActionRegistry(Index index,
-                               FileLocationCache file_location_cache)
-    : d(new PrivateData) {
-
-  d->index = index;
-  d->file_location_cache = file_location_cache;
+// Globally unique verb name associated with this signal. 
+QString RootAction::Verb(void) const noexcept {
+  return verb;
 }
 
-ActionRegistry::~ActionRegistry() {}
+// Apply the action. This never executes on the main GUI thread, so it's safe
+// for it to do blocking operations.
+void RootAction::Run(const QVariant &input) noexcept {
+  std::unique_lock<std::mutex> locker(actions_lock);
+  for (const auto &action_ptr : async_actions) {
+    if (auto action = action_ptr.load()) {
+      action->Run(input);
+    }
+  }
+}
 
-bool ActionRegistry::Register(const Action &action) {
-  if (d->registered_action_map.contains(action.verb)) {
-    return false;
+ActionRegistry::PrivateData::PrivateData(void) {}
+ActionRegistry::PrivateData::~PrivateData(void) {}
+
+RootAction &ActionRegistry::PrivateData::RootActionFor(const QString &verb) {
+  std::unique_lock<std::mutex> locker(named_actions_lock);
+
+  auto action_it = named_actions.find(verb);
+  if (action_it == named_actions.end()) {
+    auto action = new RootAction(verb, runner);
+    owned_actions.emplace_back(action);
+    action_it = named_actions.insert(verb, action);
   }
 
-  d->registered_action_map.insert(action.verb, action);
-  return true;
+  return **action_it;
 }
 
-bool ActionRegistry::Unregister(const QString &verb) {
-  if (!d->registered_action_map.contains(verb)) {
-    return false;
+ActionRegistry::ActionRegistry(void)
+    : d(std::make_shared<PrivateData>()) {}
+
+ActionRegistry::~ActionRegistry(void) {}
+
+// We always return the `RootAction`. 
+IAction &ActionRegistry::LookUp(const QString &verb) const {
+  return d->RootActionFor(verb);
+}
+
+// Register an action with the action registry.
+ActionHandle ActionRegistry::Register(IAction &action) {
+  if (dynamic_cast<RootAction *>(&action)) {
+    return {};
   }
 
-  d->registered_action_map.remove(verb);
-  return true;
-}
+  auto &root_action = d->RootActionFor(action.Verb());
 
-std::unordered_map<QString, QString>
-ActionRegistry::GetCompatibleActions(const QVariant &input) const {
-  std::unordered_map<QString, QString> action_list;
+  std::atomic<IAction *> *action_ptr = nullptr;
+  {
+    std::unique_lock<std::mutex> locker(root_action.actions_lock);
+    if (dynamic_cast<IAsyncAction *>(&action)) {
+      action_ptr = &(root_action.async_actions.emplace_back(&action));
 
-  for (const auto &action : d->registered_action_map) {
-    if (action.check_input(d->index, input)) {
-      action_list.insert({action.name, action.verb});
+    } else if (dynamic_cast<ISyncAction *>(&action)) {
+      action_ptr = &(root_action.sync_actions.emplace_back(&action));
     }
   }
 
-  return action_list;
-}
-
-bool ActionRegistry::Execute(const QString &verb, const QVariant &input,
-                             QWidget *parent) const {
-  if (!d->registered_action_map.contains(verb)) {
-    return false;
-  }
-
-  const auto &action = d->registered_action_map[verb];
-  return action.invoke(d->index, input, parent);
+  return ActionHandle(ActionHandle::IActionPtr(d, action_ptr));
 }
 
 }  // namespace mx::gui

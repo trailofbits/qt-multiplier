@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <multiplier/ui/ReferenceExplorer.h>
 #include <multiplier/ui/ICodeView.h>
 
 #include <multiplier/Index.h>
@@ -15,6 +14,7 @@
 
 namespace mx::gui {
 
+class Context;
 class ICodeView;
 class ITreeGenerator;
 
@@ -22,8 +22,8 @@ class MainWindow final : public QMainWindow {
   Q_OBJECT
 
  public:
-  MainWindow();
-  virtual ~MainWindow() override;
+  MainWindow(const Context &context);
+  virtual ~MainWindow(void) override;
 
   MainWindow(const MainWindow &) = delete;
   MainWindow &operator=(const MainWindow &) = delete;
@@ -32,17 +32,16 @@ class MainWindow final : public QMainWindow {
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
-  void RegisterReferenceExplorerActions();
-  void InitializeWidgets();
-  void InitializeToolBar();
-  void CreateProjectExplorerDock();
-  void CreateEntityExplorerDock();
-  void CreateInfoExplorerDock();
-  void CreateMacroExplorerDock();
-  void CreateReferenceExplorerDock();
-  void CreatePythonConsoleDock();
-  void CreateCodeView();
-  void CreateGlobalHighlighter();
+  void InitializeWidgets(void);
+  void InitializeToolBar(void);
+  void InitializePlugins(void);
+  void CreateProjectExplorerDock(void);
+  void CreateEntityExplorerDock(void);
+  void CreateInfoExplorerDock(void);
+  void CreateMacroExplorerDock(void);
+  void CreatePythonConsoleDock(void);
+  void CreateCodeView(void);
+  void CreateGlobalHighlighter(void);
   void OpenEntityRelatedToToken(const QModelIndex &index);
   void OpenEntityCode(RawEntityId entity_id, bool canonicalize = true);
   void OpenEntityInfo(RawEntityId entity_id);
@@ -51,13 +50,10 @@ class MainWindow final : public QMainWindow {
   void OpenTokenEntityInfo(const QModelIndex &index, const bool &new_window);
   void ExpandMacro(const QModelIndex &index);
   void OpenCodePreview(const QModelIndex &index, const bool &as_new_window);
-  void CloseAllPopups();
+  void CloseAllPopups(void);
 
   void SetHere(RawEntityId eid);
   void SetHere(const QModelIndex &index);
-
-  //! Creates the menus needed to configure the reference explorer
-  void CreateReferenceExplorerMenuOptions();
 
   //! Tell the history back/forward button widget that our current location has
   //! changed.
@@ -90,13 +86,8 @@ class MainWindow final : public QMainWindow {
   //! into the history.
   void OnMainCodeViewCursorMoved(const QModelIndex &index);
 
-  void OnReferenceExplorerItemActivated(const QModelIndex &index);
-
   void OnCodeViewContextMenuActionTriggered(QAction *action);
   void OnToggleWordWrap(bool checked);
-  void SaveReferenceExplorer(ReferenceExplorer *reference_explorer);
-  void OnReferenceExplorerTabBarClose(int index);
-  void OnReferenceExplorerTabBarDoubleClick(int index);
   void OnCodeViewTabBarClose(int index);
   void OnCodeViewTabClicked(int index);
 
@@ -109,26 +100,22 @@ class MainWindow final : public QMainWindow {
   void OnHistoryNavigationEntitySelected(RawEntityId original_id,
                                          RawEntityId canonical_id);
   void OnInformationExplorerSelectionChange(const QModelIndex &index);
-  void OnCloseActiveCodeViewTab();
-  void OnCloseActiveReferenceExplorerTab();
+  void OnCloseActiveCodeViewTab(void);
 
   //! Called when the view->theme->dark action is selected
-  void OnSetDarkTheme();
+  void OnSetDarkTheme(void);
 
   //! Called when the view->theme->light action is selected
-  void OnSetLightTheme();
-
-  //! Called when toggling the code preview setting of the ref explorer
-  void OnReferenceExplorerCodePreviewToggled(const bool &checked);
+  void OnSetLightTheme(void);
 
   //! Called by theme manager
   void OnThemeChange(const QPalette &, const CodeViewTheme &);
 
   //! Updates the icons according to the current theme
-  void UpdateIcons();
+  void UpdateIcons(void);
 
   //! Called when the browser mode action is interacted with
-  void OnBrowserModeToggled();
+  void OnBrowserModeToggled(void);
 
  signals:
   //! Emitted when the browse mode is toggled

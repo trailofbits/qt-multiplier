@@ -47,14 +47,13 @@ add_subdirectory("DataGenerators")
 
 target_link_libraries("Multiplier"
   PRIVATE
-    "qtmx_cxx_flags"
-
-  PUBLIC
+    "mx_cxxflags"
     "thirdparty_multiplier"
     "thirdparty_qt"
     "thirdparty_phantomstyle"
     "mx_codeview"
     "mx_util"
+    "mx_context"
     "mx_database"
     "mx_fontdatabase"
     "mx_projectexplorer"
@@ -69,14 +68,16 @@ target_link_libraries("Multiplier"
     "mx_generators"
     "mx_data_generators"
     "mx_actionregistry"
+    "mx_mainwindowplugin"
     "$<$<BOOL:MX_ENABLE_PYTHON_BINDINGS>:mx_pythonconsole>"
 )
 
 enable_qt_properties("Multiplier")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  set_target_properties("Multiplier" PROPERTIES
-    OUTPUT_NAME "multiplier"
+  set_target_properties("Multiplier"
+    PROPERTIES
+      OUTPUT_NAME "multiplier"
   )
 
 else()

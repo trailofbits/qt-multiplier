@@ -4,9 +4,8 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "ReferenceExplorerView.h"
+#include "ReferenceExplorer.h"
 
-#include <multiplier/ui/ReferenceExplorer.h>
 #include <multiplier/ui/IGlobalHighlighter.h>
 #include <multiplier/ui/IMacroExplorer.h>
 #include <multiplier/ui/IGeneratorModel.h>
@@ -19,6 +18,8 @@
 #include <QScreen>
 
 #include <optional>
+
+#include "ReferenceExplorerView.h"
 
 namespace mx::gui {
 

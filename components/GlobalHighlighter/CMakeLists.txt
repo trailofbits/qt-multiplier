@@ -26,7 +26,7 @@ target_sources("mx_globalhighlighter" INTERFACE
 
 target_link_libraries("mx_globalhighlighter"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_qt"

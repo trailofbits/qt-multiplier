@@ -9,8 +9,7 @@
 #pragma once
 
 #include <multiplier/Types.h>
-
-#include <QAbstractItemModel>
+#include <multiplier/ui/IModel.h>
 
 #include <utility>
 
@@ -25,7 +24,7 @@ class TokenTreeVisitor;
 namespace mx::gui {
 
 //! An item-based model for the ICodeView widget
-class ICodeModel : public QAbstractItemModel {
+class ICodeModel : public IModel {
   Q_OBJECT
 
  public:
@@ -40,7 +39,7 @@ class ICodeModel : public QAbstractItemModel {
   //! Custom data roles
   enum {
     //! Token category, used for syntax coloring
-    TokenCategoryRole = Qt::UserRole + 1,
+    TokenCategoryRole = MultiplierUserRole,
 
     //! Tells us the `ModelState` of the model.
     ModelStateRole,
@@ -80,7 +79,7 @@ class ICodeModel : public QAbstractItemModel {
   virtual bool IsReady() const = 0;
 
   //! Constructor
-  ICodeModel(QObject *parent) : QAbstractItemModel(parent) {}
+  using IModel::IModel;
 
   //! Destructor
   virtual ~ICodeModel() override = default;

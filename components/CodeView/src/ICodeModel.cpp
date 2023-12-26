@@ -33,7 +33,7 @@ ICodeModel::MacroExpansionPoint(const QModelIndex &index) {
   }
 
   RawEntityId macro_eid = qvariant_cast<RawEntityId>(related_entity_id_var);
-  VariantId macro_vid = EntityId(macro_eid).Unpack();
+  VariantId macro_vid = mx::EntityId(macro_eid).Unpack();
   if (!std::holds_alternative<MacroId>(macro_vid)) {
     return std::nullopt;
   }
@@ -50,7 +50,7 @@ ICodeModel::MacroExpansionPoint(const QModelIndex &index) {
   }
 
   RawEntityId token_eid = qvariant_cast<RawEntityId>(token_id_var);
-  VariantId token_vid = EntityId(token_eid).Unpack();
+  VariantId token_vid = mx::EntityId(token_eid).Unpack();
   if (!std::holds_alternative<MacroTokenId>(token_vid)) {
     return std::nullopt;
   }

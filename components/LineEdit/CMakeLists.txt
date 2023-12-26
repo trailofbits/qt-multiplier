@@ -16,7 +16,7 @@ add_library("mx_lineedit"
 
 target_link_libraries("mx_lineedit"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_qt"

@@ -13,7 +13,7 @@ add_executable("mx_projectexplorer_tests"
 
 target_link_libraries("mx_projectexplorer_tests"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
     "thirdparty_qt"
     "thirdparty_doctest"
     "thirdparty_multiplier"

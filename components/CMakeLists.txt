@@ -6,11 +6,16 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
+add_subdirectory("Util")
+add_subdirectory("ActionRegistry")
+add_subdirectory("ThemeManager")
+add_subdirectory("Context")
+add_subdirectory("MainWindowPlugin")
+
 add_subdirectory("CodeView")
 add_subdirectory("CodeViewTheme")
 add_subdirectory("Database")
 add_subdirectory("EntityExplorer")
-add_subdirectory("Util")
 add_subdirectory("FontDatabase")
 add_subdirectory("ProjectExplorer")
 add_subdirectory("SearchWidget")
@@ -19,11 +24,9 @@ add_subdirectory("InformationExplorer")
 add_subdirectory("LineEdit")
 add_subdirectory("GlobalHighlighter")
 add_subdirectory("MacroExplorer")
-add_subdirectory("ThemeManager")
 add_subdirectory("TokenLabel")
 add_subdirectory("ReferenceExplorer")
 add_subdirectory("Generators")
-add_subdirectory("ActionRegistry")
 
 if(MX_ENABLE_PYTHON_BINDINGS)
   add_subdirectory("PythonConsoleWidget")

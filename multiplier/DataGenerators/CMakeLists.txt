@@ -15,7 +15,7 @@ enable_qt_properties("mx_data_generators")
 
 target_link_libraries("mx_data_generators"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_multiplier"

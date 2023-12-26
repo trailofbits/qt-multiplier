@@ -6,15 +6,20 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_library("mx_referenceexplorer"
+add_library("mx_referenceexplorer" STATIC
+  include/multiplier/ui/ReferenceExplorer.h
+
   src/ReferenceExplorerItemDelegate.h
   src/ReferenceExplorerItemDelegate.cpp
 
   src/ReferenceExplorerView.h
   src/ReferenceExplorerView.cpp
 
-  include/multiplier/ui/ReferenceExplorer.h
+  src/ReferenceExplorer.h
   src/ReferenceExplorer.cpp
+
+  src/ReferenceExplorerPlugin.h
+  src/ReferenceExplorerPlugin.cpp
 )
 
 target_sources("mx_referenceexplorer" INTERFACE
@@ -23,15 +28,19 @@ target_sources("mx_referenceexplorer" INTERFACE
 
 target_link_libraries("mx_referenceexplorer"
   PRIVATE
-    "qtmx_cxx_flags"
-
-  PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
-    "gap::gap"
+    "mx_cxxflags"
+    "mx_codeview"
     "mx_searchwidget"
     "mx_util"
-    "mx_codeview"
+    "mx_actionregistry"
+    "mx_mainwindowplugin"
+
+    "thirdparty_qt"
+    "thirdparty_multiplier"
+
+    "gap::gap"
+
+  PUBLIC
     "mx_globalhighlighter"
     "mx_thememanager"
     "mx_generators"

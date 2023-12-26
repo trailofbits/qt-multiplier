@@ -37,7 +37,7 @@ add_library("mx_informationexplorer"
 
 target_link_libraries("mx_informationexplorer"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_qt"

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2022-present, Trail of Bits, Inc.
+  Copyright (c) 2023-present, Trail of Bits, Inc.
   All rights reserved.
 
   This source code is licensed in accordance with the terms specified in
@@ -8,30 +8,67 @@
 
 #pragma once
 
-#include <multiplier/ui/IActionRegistry.h>
+#include <multiplier/ui/ActionRegistry.h>
+#include <multiplier/ui/IAction.h>
+
+#include <atomic>
+#include <deque>
+#include <mutex>
+#include <vector>
+
+#include <QMap>
+#include <QThreadPool>
 
 namespace mx::gui {
 
-class ActionRegistry final : public IActionRegistry {
+// All actions have a root action. The root actions are responsible to executing
+// other actions. 
+class RootAction final : public IAction {
  public:
-  ActionRegistry(Index index, FileLocationCache file_location_cache);
-  virtual ~ActionRegistry() override;
+  const QString verb;
+  
+  // The list of actions for this root action.
+  std::deque<std::atomic<IAction *>> sync_actions;
+  std::deque<std::atomic<IAction *>> async_actions;
 
-  virtual bool Register(const Action &action) override;
-  virtual bool Unregister(const QString &verb) override;
+  // Lock on the actions.
+  std::mutex actions_lock;
 
-  virtual std::unordered_map<QString, QString>
-  GetCompatibleActions(const QVariant &input) const override;
+  QThreadPool &runner;
 
-  virtual bool Execute(const QString &verb, const QVariant &input,
-                       QWidget *parent) const override;
+  virtual ~RootAction(void);
 
-  ActionRegistry(const ActionRegistry &) = delete;
-  ActionRegistry &operator=(const ActionRegistry &) = delete;
+  inline RootAction(const QString &verb_, QThreadPool &runner_)
+      : verb(verb_),
+        runner(runner_) {}
 
- private:
-  struct PrivateData;
-  std::unique_ptr<PrivateData> d;
+  // Globally unique verb name associated with this signal. 
+  QString Verb(void) const noexcept Q_DECL_FINAL;
+
+  // Apply the action. This never executes on the main GUI thread, so it's safe
+  // for it to do blocking operations with `index`.
+  void Run(const QVariant &input) noexcept Q_DECL_FINAL;
+};
+
+struct ActionHandle::PrivateData {
+  std::shared_ptr<IAction> action;
+
+  inline PrivateData(std::shared_ptr<IAction> action_)
+      : action(std::move(action_)) {}
+};
+
+struct ActionRegistry::PrivateData {
+ public:
+
+  PrivateData(void);
+  ~PrivateData(void);
+
+  std::vector<std::unique_ptr<RootAction>> owned_actions;
+  QMap<QString, RootAction *> named_actions;
+  std::mutex named_actions_lock;
+  QThreadPool runner;
+
+  RootAction &RootActionFor(const QString &verb);
 };
 
 }  // namespace mx::gui

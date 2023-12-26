@@ -20,7 +20,7 @@ target_sources("mx_searchwidget" INTERFACE
 
 target_link_libraries("mx_searchwidget"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_qt"

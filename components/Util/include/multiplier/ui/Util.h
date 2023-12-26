@@ -31,8 +31,9 @@
 #include <multiplier/Frontend/IncludeLikeMacroDirective.h>
 #include <multiplier/IR/Operation.h>
 
-#include <QString>
 #include <QColor>
+#include <QModelIndex>
+#include <QString>
 
 #include <optional>
 #include <unordered_map>

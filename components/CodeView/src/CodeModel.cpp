@@ -220,11 +220,14 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
       }
     }
 
-    // We're dealing with a column of data. Specifically, a token, or a fragment
-    // of a token.
+  // We're dealing with a column of data. Specifically, a token, or a fragment
+  // of a token.
   } else if (auto col = d->ColumnPointerCast(index)) {
     switch (role) {
       case Qt::DisplayRole: value.setValue(col->data); break;
+      case IModel::EntityRole:
+        value.setValue(VariantEntity(d->tokens.tokens[col->token_index]));
+        break;
       case ICodeModel::TokenCategoryRole: value.setValue(col->category); break;
       case ICodeModel::TokenIdRole:
         value.setValue(d->tokens.tokens[col->token_index].id().Pack());
@@ -243,7 +246,7 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
 
       case ICodeModel::IsMacroExpansionRole:
         const auto &token = d->tokens.tokens[col->token_index];
-        const auto &variant = EntityId(token.derived_token().id()).Unpack();
+        const auto &variant = mx::EntityId(token.derived_token().id()).Unpack();
 
         auto is_macro_expansion =
             std::holds_alternative<mx::MacroTokenId>(variant);

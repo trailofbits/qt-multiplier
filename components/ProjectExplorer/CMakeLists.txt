@@ -22,7 +22,7 @@ add_library("mx_projectexplorer"
 
 target_link_libraries("mx_projectexplorer"
   PRIVATE
-    "qtmx_cxx_flags"
+    "mx_cxxflags"
 
   PUBLIC
     "thirdparty_qt"

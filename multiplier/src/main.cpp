@@ -8,35 +8,25 @@
 #include "MetaTypes.h"
 #include "Style.h"
 
+#include <multiplier/Index.h>
+#include <multiplier/ui/Context.h>
 #include <multiplier/ui/FontDatabase.h>
 #include <multiplier/ui/IThemeManager.h>
 
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QFileDialog>
 #include <QProxyStyle>
-#include <QTabBar>
-#include <QStringList>
 
 #include <phantom/phantomstyle.h>
 
 namespace {
 
-bool kDefaultToDarkTheme{true};
+static bool kDefaultToDarkTheme = true;
 
-bool ShouldUseDarkTheme(int argc, char *argv[]) {
-  QCommandLineOption theme_option("theme");
-  theme_option.setValueName("theme");
-
-  QCommandLineParser parser;
-  parser.addOption(theme_option);
-
-  QStringList argument_list;
-  for (int i = 0; i < argc; ++i) {
-    argument_list.push_back(QString::fromUtf8(argv[i]));
-  }
-
-  parser.process(argument_list);
+static bool ShouldUseDarkTheme(const QCommandLineParser &parser,
+                               const QCommandLineOption &theme_option) {
 
   bool use_dark_theme{kDefaultToDarkTheme};
   if (parser.isSet(theme_option)) {
@@ -52,9 +42,34 @@ bool ShouldUseDarkTheme(int argc, char *argv[]) {
   return use_dark_theme;
 }
 
+static mx::Index OpenDatabase(const QCommandLineParser &parser,
+                          const QCommandLineOption &db_option) {
+
+  QString db_path;
+  if (!parser.isSet(db_option)) {
+    db_path = QFileDialog::getOpenFileName(
+        nullptr, QObject::tr("Select a Multiplier database"), QDir::homePath());
+  } else {
+    db_path = parser.value(db_option);
+  }
+
+  return mx::Index::in_memory_cache(
+      mx::Index::from_database(db_path.toStdString()));
+}
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
+  QCommandLineOption theme_option("theme");
+  theme_option.setValueName("theme");
+
+  QCommandLineOption db_option("database");
+  db_option.setValueName("database");
+
+  QCommandLineParser parser;
+  parser.addOption(theme_option);
+  parser.addOption(db_option);
+
   // The PhantomStyle does not really work well on Linux
 #ifndef __linux__
   QStyle *phantom_style = new PhantomStyle;
@@ -65,15 +80,16 @@ int main(int argc, char *argv[]) {
   QApplication application(argc, argv);
   application.setApplicationName("Multiplier");
 
+  parser.process(application);
+
   mx::gui::IThemeManager::Initialize(application);
-
-  auto use_dark_theme = ShouldUseDarkTheme(argc, argv);
-  mx::gui::IThemeManager::Get().SetTheme(use_dark_theme);
-
   mx::gui::RegisterMetaTypes();
   mx::gui::InitializeFontDatabase();
 
-  mx::gui::MainWindow main_window;
+  mx::gui::Context context(OpenDatabase(parser, db_option));
+  context.ThemeManager().SetTheme(ShouldUseDarkTheme(parser, theme_option));
+
+  mx::gui::MainWindow main_window(context);
   main_window.show();
 
   return application.exec();

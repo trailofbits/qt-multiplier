@@ -115,7 +115,6 @@ class PopupWidgetContainer final : public QWidget {
   virtual void resizeEvent(QResizeEvent *event) override {
     QPoint size_grip_pos(width() - d->size_grip->width(),
                          height() - d->size_grip->height());
-
     d->size_grip->move(size_grip_pos);
     QWidget::resizeEvent(event);
   }
@@ -169,15 +168,13 @@ class PopupWidgetContainer final : public QWidget {
     title_frame->setContentsMargins(0, 0, 0, 0);
     title_frame->setLayout(title_frame_layout);
 
-    auto contents_layout = new QVBoxLayout();
-    contents_layout->setContentsMargins(0, 0, 0, 0);
-    contents_layout->addWidget(d->wrapped_widget);
-    contents_layout->addStretch();
+    d->wrapped_widget->setSizePolicy(QSizePolicy::Expanding,
+                                     QSizePolicy::Expanding);
 
     auto main_layout = new QVBoxLayout();
     main_layout->setContentsMargins(0, 0, 0, 0);
     main_layout->addWidget(title_frame);
-    main_layout->addLayout(contents_layout);
+    main_layout->addWidget(d->wrapped_widget);
     main_layout->addStretch();
 
     setLayout(main_layout);
