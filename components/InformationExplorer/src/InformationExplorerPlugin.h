@@ -9,26 +9,11 @@
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>
 #include <multiplier/ui/ActionRegistry.h>
-#include <multiplier/ui/IAction.h>
 #include <multiplier/ui/IMainWindowPlugin.h>
 
 namespace mx::gui {
 
 class InformationExplorerWidget;
-
-class UpdateInformationExplorerAction Q_DECL_FINAL : public IAction {
-  Q_OBJECT
-
- public:
-  using IAction::IAction;
-
-  InformationExplorerWidget *widget{nullptr};
-
-  virtual ~UpdateInformationExplorerAction(void) = default;
-
-  QString Verb(void) const noexcept Q_DECL_FINAL;
-  void Run(const QVariant &input) noexcept Q_DECL_FINAL;
-};
 
 class InformationExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
   Q_OBJECT
@@ -37,12 +22,18 @@ class InformationExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
 
   QMainWindow * const main_window;
 
-  // Action for controlling the "primary" information explorer. This is the
-  // information explorer that is menu-controlled and docked. The contents of
-  // the primary info explorer changes as things are clicked on. Secondary,
-  // fixed information explorers can be added with `Shift-I`. 
-  UpdateInformationExplorerAction update_primary;
+  // The "primary" information explorer. This is the information explorer that
+  // is menu-controlled and docked. The contents of the primary info explorer
+  // changes as things are clicked on. Secondary, fixed information explorers
+  // can be added with `Shift-I`. 
+  InformationExplorerWidget *primary_widget{nullptr};
+
+  // Triggered when we want to change the information displayed by the
+  // primary widget.
   const TriggerHandle update_primary_trigger;
+
+  // Action for opening an entity when the selection is changed.
+  const TriggerHandle open_entity_trigger;
 
  public:
   virtual ~InformationExplorerPlugin(void);

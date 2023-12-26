@@ -9,7 +9,6 @@
 add_library("mx_actionregistry"
 
   include/multiplier/ui/ActionRegistry.h
-  include/multiplier/ui/IAction.h
 
   src/ActionRegistry.cpp
   src/ActionRegistry.h

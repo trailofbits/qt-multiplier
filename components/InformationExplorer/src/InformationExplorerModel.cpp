@@ -396,6 +396,14 @@ QVariant InformationExplorerModel::data(const QModelIndex &index,
       }
     }
 
+  } else if (role == IModel::EntityRole) {
+    if (EntityData *ed = std::get_if<EntityData>(&(node->data))) {
+      ret.setValue(QVariant::fromValue(ed->entity));
+    }
+
+  } else if (role == IModel::ModelName) {
+    ret.setValue(QString("com.trailofbits.EntityExplorerModel"));
+
   } else if (role == EntityIdRole) {
     if (EntityData *ed = std::get_if<EntityData>(&(node->data))) {
       ret.setValue(mx::EntityId(ed->entity).Pack());

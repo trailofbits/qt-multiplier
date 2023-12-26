@@ -26,26 +26,24 @@ CreateInformationExplorerMainWindowPlugin(
       new InformationExplorerPlugin(context, parent));
 }
 
-QString UpdateInformationExplorerAction::Verb(void) const noexcept {
-  return "com.trailofbits.UpdatePrimaryInformationExplorer";
-}
-
-void UpdateInformationExplorerAction::Run(const QVariant &input) noexcept {
-  if (!widget || !input.canConvert<VariantEntity>()) {
-    return;
-  }
-
-  VariantEntity entity = input.value<VariantEntity>();
-  widget->DisplayEntity(EntityId(entity).Pack());
-}
-
 InformationExplorerPlugin::InformationExplorerPlugin(
     const Context &context_, QMainWindow *parent)
     : IMainWindowPlugin(context_, parent),
       context(context_),
       main_window(parent),
-      update_primary(this),
-      update_primary_trigger(context.RegisterAction(update_primary)) {}
+      update_primary_trigger(context.ActionRegistry().Register(
+          this,
+          "com.trailofbits.UpdatePrimaryInformationExplorer",
+          [this] (const QVariant &input) {
+            if (!primary_widget || !input.canConvert<VariantEntity>()) {
+              return;
+            }
+
+            VariantEntity entity = input.value<VariantEntity>();
+            primary_widget->DisplayEntity(EntityId(entity).Pack());
+          })),
+      open_entity_trigger(
+          context.FindAction("com.trailofbits.OpenEntity")) {}
 
 InformationExplorerPlugin::~InformationExplorerPlugin(void) {}
 
@@ -74,15 +72,21 @@ void InformationExplorerPlugin::ActOnSecondaryClick(
 }
 
 QWidget *InformationExplorerPlugin::CreateDockWidget(QWidget *parent) {
-  if (update_primary.widget) {
-    return update_primary.widget;
+  if (primary_widget) {
+    return primary_widget;
   }
 
-  update_primary.widget = new InformationExplorerWidget(
+  primary_widget = new InformationExplorerWidget(
       context.Index(), context.FileLocationCache(), nullptr, true, parent);
-  update_primary.widget->setWindowTitle(tr("Information Explorer"));
+  primary_widget->setWindowTitle(tr("Information Explorer"));
 
-  return update_primary.widget;
+  connect(
+      primary_widget, &InformationExplorerWidget::SelectedItemChanged,
+      [oet = open_entity_trigger] (const QModelIndex &index) {
+        oet.Trigger(index.data(IModel::EntityRole));
+      });
+
+  return primary_widget;
 }
 
 }  // namespace mx::gui

@@ -9,7 +9,6 @@
 #pragma once
 
 #include <multiplier/ui/ActionRegistry.h>
-#include <multiplier/ui/IAction.h>
 
 #include <atomic>
 #include <deque>

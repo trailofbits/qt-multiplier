@@ -30,8 +30,6 @@
 #include <multiplier/ui/CallHierarchyGenerator.h>
 #include <multiplier/ui/IGeneratorView.h>
 
-
-#include <multiplier/ui/IAction.h>
 #include <multiplier/ui/ActionRegistry.h>
 
 #ifndef MX_DISABLE_PYTHON_BINDINGS
@@ -102,6 +100,8 @@ struct MainWindow::PrivateData final {
   const mx::Index index;  // TODO(pag): Remove.
   const mx::FileLocationCache file_location_cache;  // TODO(pag): Remove.
 
+  TriggerHandle open_entity;
+
   std::vector<std::unique_ptr<IMainWindowPlugin>> plugins;
 
   IProjectExplorer *project_explorer{nullptr};
@@ -133,15 +133,22 @@ struct MainWindow::PrivateData final {
   QMenu *view_menu{nullptr};
   ToolBar toolbar;
 
-  inline PrivateData(const Context &context_)
+  inline PrivateData(const Context &context_, MainWindow *self)
       : context(context_),
         index(context.Index()),
-        file_location_cache(context.FileLocationCache()) {}
+        file_location_cache(context.FileLocationCache()),
+        open_entity(context.ActionRegistry().Register(
+            self, "com.trailofbits.OpenEntity",
+            [=] (const QVariant &data) {
+              if (data.canConvert<VariantEntity>()) {
+                self->OnOpenEntity(EntityId(data.value<VariantEntity>()).Pack());
+              }
+            })) {}
 };
 
 MainWindow::MainWindow(const Context &context)
     : QMainWindow(nullptr),
-      d(new PrivateData(context)) {
+      d(new PrivateData(context, this)) {
 
   setWindowTitle("Multiplier");
   setWindowIcon(QIcon(":/Icons/Multiplier"));
@@ -992,6 +999,7 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
   }
 }
 
+// TODO(pag): Migrate to `VariantEntity`.
 void MainWindow::OnOpenEntity(RawEntityId entity_id) {
   CloseAllPopups();
   d->toolbar.back_forward->CommitCurrentLocationToHistory();

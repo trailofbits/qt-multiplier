@@ -16,8 +16,29 @@
 namespace mx::gui {
 
 class ActionRegistry;
-class IAction;
 class TriggerHandleImpl;
+
+// Generic action. These actions are run on the main thread, so they should
+// not arbitrarily block.
+class IAction : public QObject {
+  Q_OBJECT
+
+ public:
+  using QObject::QObject;
+
+  virtual ~IAction(void);
+
+  // Globally unique verb name associated with this signal. Verb names should
+  // be namespaced, e.g. `com.trailofbits.TopLevelActionName` or
+  // `com.trailofbits.PluginName.ActionName`.
+  virtual QString Verb(void) const noexcept = 0;
+
+ protected:
+  friend class ActionRegistry;
+
+ protected slots:
+  virtual void Run(const QVariant &input) noexcept = 0;
+};
 
 // A handle on a registered action.
 class TriggerHandle {
@@ -32,6 +53,28 @@ class TriggerHandle {
 
   // Triggers an action.
   void Trigger(const QVariant &data) const noexcept;
+};
+
+template <typename Lambda>
+class LambdaAction Q_DECL_FINAL : public IAction {
+  const QString verb;
+  Lambda callable;
+
+ public:
+  virtual ~LambdaAction(void) = default;
+
+  inline LambdaAction(const QString &verb_, Lambda callable_, QObject *parent)
+      : IAction(parent),
+        verb(verb_),
+        callable(std::move(callable_)) {}
+
+  QString Verb(void) const noexcept Q_DECL_FINAL {
+    return verb;
+  }
+
+  void Run(const QVariant &input) noexcept Q_DECL_FINAL {
+    callable(input);
+  }
 };
 
 // Registry for actions.
@@ -51,6 +94,14 @@ class ActionRegistry {
 
   // Register an action with the action registry.
   TriggerHandle Register(IAction &action);
+
+  template <typename Lambda>
+  TriggerHandle Register(QObject *parent, const QString &verb, Lambda lambda) {
+    auto action = new LambdaAction(verb, std::move(lambda), parent);
+    return Register(*action);
+  }
 };
 
 }  // namespace mx::gui
+
+Q_DECLARE_INTERFACE(mx::gui::IAction, "com.trailofbits.IAction")

@@ -9,7 +9,6 @@
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>
 #include <multiplier/ui/ActionRegistry.h>
-#include <multiplier/ui/IAction.h>
 #include <multiplier/ui/IMainWindowPlugin.h>
 
 namespace mx::gui {
