@@ -8,8 +8,6 @@
 
 #include "InformationExplorer.h"
 
-#include <multiplier/ui/IInformationExplorer.h>
-
 namespace mx::gui {
 
 IInformationExplorer *

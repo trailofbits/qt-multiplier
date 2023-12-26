@@ -12,38 +12,28 @@
 
 namespace mx::gui {
 
-RootAction::~RootAction(void) {}
-
-// Globally unique verb name associated with this signal. 
-QString RootAction::Verb(void) const noexcept {
-  return verb;
+TriggerHandleImpl::~TriggerHandleImpl(void) {
+  runner_thread.quit();
+  runner_thread.wait();
 }
 
-// Apply the action. This never executes on the main GUI thread, so it's safe
-// for it to do blocking operations.
-void RootAction::Run(const QVariant &input) noexcept {
-  std::unique_lock<std::mutex> locker(actions_lock);
-  for (const auto &action_ptr : async_actions) {
-    if (auto action = action_ptr.load()) {
-      action->Run(input);
-    }
-  }
+void TriggerHandle::Trigger(const QVariant &data) const noexcept {
+  d->Trigger(data);
 }
 
 ActionRegistry::PrivateData::PrivateData(void) {}
 ActionRegistry::PrivateData::~PrivateData(void) {}
 
-RootAction &ActionRegistry::PrivateData::RootActionFor(const QString &verb) {
-  std::unique_lock<std::mutex> locker(named_actions_lock);
+TriggerHandleImpl *ActionRegistry::PrivateData::TriggerFor(const QString &verb) {
+  std::unique_lock<std::mutex> locker(named_triggers_lock);
 
-  auto action_it = named_actions.find(verb);
-  if (action_it == named_actions.end()) {
-    auto action = new RootAction(verb, runner);
-    owned_actions.emplace_back(action);
-    action_it = named_actions.insert(verb, action);
+  auto trigger_it = named_triggers.find(verb);
+  if (trigger_it == named_triggers.end()) {
+    TriggerHandleImpl &trigger = owned_triggers.emplace_back(nullptr);
+    trigger_it = named_triggers.insert(verb, &trigger);
   }
 
-  return **action_it;
+  return *trigger_it;
 }
 
 ActionRegistry::ActionRegistry(void)
@@ -52,30 +42,20 @@ ActionRegistry::ActionRegistry(void)
 ActionRegistry::~ActionRegistry(void) {}
 
 // We always return the `RootAction`. 
-IAction &ActionRegistry::LookUp(const QString &verb) const {
-  return d->RootActionFor(verb);
+TriggerHandle ActionRegistry::Find(const QString &verb) const {
+  return std::shared_ptr<TriggerHandleImpl>(d, d->TriggerFor(verb));
 }
 
 // Register an action with the action registry.
-ActionHandle ActionRegistry::Register(IAction &action) {
-  if (dynamic_cast<RootAction *>(&action)) {
-    return {};
-  }
+TriggerHandle ActionRegistry::Register(IAction &action) {
+  TriggerHandleImpl *trigger = d->TriggerFor(action.Verb());
 
-  auto &root_action = d->RootActionFor(action.Verb());
+  action.moveToThread(&(trigger->runner_thread));
 
-  std::atomic<IAction *> *action_ptr = nullptr;
-  {
-    std::unique_lock<std::mutex> locker(root_action.actions_lock);
-    if (dynamic_cast<IAsyncAction *>(&action)) {
-      action_ptr = &(root_action.async_actions.emplace_back(&action));
+  QObject::connect(trigger, &TriggerHandleImpl::Triggered,
+                   &action, &IAction::Run);
 
-    } else if (dynamic_cast<ISyncAction *>(&action)) {
-      action_ptr = &(root_action.sync_actions.emplace_back(&action));
-    }
-  }
-
-  return ActionHandle(ActionHandle::IActionPtr(d, action_ptr));
+  return std::shared_ptr<TriggerHandleImpl>(d, trigger);
 }
 
 }  // namespace mx::gui

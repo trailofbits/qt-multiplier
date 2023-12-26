@@ -8,11 +8,12 @@
 
 #pragma once
 
-#include <multiplier/ui/IInformationExplorer.h>
 #include <multiplier/ui/ISearchWidget.h>
 #include <multiplier/ui/IThemeManager.h>
 
 #include <QWidget>
+
+#include "IInformationExplorer.h"
 
 namespace mx::gui {
 

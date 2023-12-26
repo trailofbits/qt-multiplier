@@ -8,54 +8,30 @@
 
 #pragma once
 
-#include <multiplier/Index.h>
-#include <multiplier/Types.h>
-
 #include <QVariant>
-#include <QWidget>
 #include <QString>
 
-#include <atomic>
 #include <memory>
-#include <functional>
-#include <unordered_set>
-#include <unordered_map>
 
 namespace mx::gui {
 
 class ActionRegistry;
 class IAction;
+class TriggerHandleImpl;
 
-// A handle to a registered, or once-registered action. When an `IAction` is
-// registered with an `ActionRegistry`, the `ActionRegistry` gives the
-// registree the ability to unregister the action with this handle.
-class ActionHandle {
- public:
-  
-  using IActionPtr = std::shared_ptr<std::atomic<IAction *>>;
-
- private:
+// A handle on a registered action.
+class TriggerHandle {
   friend class ActionRegistry;
 
-  struct PrivateData;
+  std::shared_ptr<TriggerHandleImpl> d;
 
-  IActionPtr action;
-
-  inline ActionHandle(IActionPtr action_)
-      : action(std::move(action_)) {}
+  inline TriggerHandle(std::shared_ptr<TriggerHandleImpl> d_)
+      : d(std::move(d_)) {}
 
  public:
-  inline ~ActionHandle(void) {
-    action->store(nullptr);
-  }
 
-  ActionHandle(void) = default;
-
-  // Unregister an action. Returns `true` if the corresponding action was
-  // unregistered, and `false` if it has already been disconnected.
-  inline bool Unregister(void) {
-    return action->exchange(nullptr) != nullptr;
-  }
+  // Triggers an action.
+  void Trigger(const QVariant &data) const noexcept;
 };
 
 // Registry for actions.
@@ -71,13 +47,10 @@ class ActionRegistry {
 
   // Look up an action by its name, and return an `IAction` that can be
   // triggered. This always returns a valid action.
-  //
-  // TOOD(pag): Consider returning some kind of `TriggerHandle`, that is a
-  //            bit better/safer with the memory management.
-  IAction &LookUp(const QString &verb) const;
+  TriggerHandle Find(const QString &verb) const;
 
   // Register an action with the action registry.
-  ActionHandle Register(IAction &action);
+  TriggerHandle Register(IAction &action);
 };
 
 }  // namespace mx::gui

@@ -29,7 +29,7 @@ class IMainWindowPlugin : public QObject {
  public:
   virtual ~IMainWindowPlugin(void);
 
-  IMainWindowPlugin(const Context &context, QObject *parent = nullptr);
+  IMainWindowPlugin(const Context &context, QMainWindow *parent = nullptr);
 
   // Act on a primary click. For example, if browse mode is enabled, then this
   // is a "normal" click, however, if browse mode is off, then this is a meta-
@@ -55,3 +55,5 @@ class IMainWindowPlugin : public QObject {
 };
 
 }  // namespace mx::gui
+
+Q_DECLARE_INTERFACE(mx::gui::IMainWindowPlugin, "com.trailofbits.IMainWindowPlugin")

@@ -17,44 +17,32 @@
 #include <vector>
 
 #include <QMap>
-#include <QThreadPool>
+#include <QThread>
 
 namespace mx::gui {
 
 // All actions have a root action. The root actions are responsible to executing
 // other actions. 
-class RootAction final : public IAction {
+class TriggerHandleImpl final : public QObject {
+  Q_OBJECT
+
  public:
-  const QString verb;
-  
-  // The list of actions for this root action.
-  std::deque<std::atomic<IAction *>> sync_actions;
-  std::deque<std::atomic<IAction *>> async_actions;
+  QThread runner_thread;
 
-  // Lock on the actions.
-  std::mutex actions_lock;
+  virtual ~TriggerHandleImpl(void);
 
-  QThreadPool &runner;
+  inline explicit TriggerHandleImpl(QObject *parent)
+      : QObject(parent),
+        runner_thread(this) {
+    runner_thread.start();        
+  }
 
-  virtual ~RootAction(void);
+  inline void Trigger(const QVariant &input) {
+    emit Triggered(input);
+  }
 
-  inline RootAction(const QString &verb_, QThreadPool &runner_)
-      : verb(verb_),
-        runner(runner_) {}
-
-  // Globally unique verb name associated with this signal. 
-  QString Verb(void) const noexcept Q_DECL_FINAL;
-
-  // Apply the action. This never executes on the main GUI thread, so it's safe
-  // for it to do blocking operations with `index`.
-  void Run(const QVariant &input) noexcept Q_DECL_FINAL;
-};
-
-struct ActionHandle::PrivateData {
-  std::shared_ptr<IAction> action;
-
-  inline PrivateData(std::shared_ptr<IAction> action_)
-      : action(std::move(action_)) {}
+ signals:
+  void Triggered(const QVariant &input);
 };
 
 struct ActionRegistry::PrivateData {
@@ -63,12 +51,11 @@ struct ActionRegistry::PrivateData {
   PrivateData(void);
   ~PrivateData(void);
 
-  std::vector<std::unique_ptr<RootAction>> owned_actions;
-  QMap<QString, RootAction *> named_actions;
-  std::mutex named_actions_lock;
-  QThreadPool runner;
+  std::deque<TriggerHandleImpl> owned_triggers;
+  QMap<QString, TriggerHandleImpl *> named_triggers;
+  std::mutex named_triggers_lock;
 
-  RootAction &RootActionFor(const QString &verb);
+  TriggerHandleImpl *TriggerFor(const QString &verb);
 };
 
 }  // namespace mx::gui

@@ -27,7 +27,7 @@ class InformationExplorerWidget final : public QWidget {
   //! Constructor
   InformationExplorerWidget(Index index, FileLocationCache file_location_cache,
                             IGlobalHighlighter *global_highlighter,
-                            const bool &enable_history, QWidget *parent);
+                            bool enable_history, QWidget *parent);
 
   //! Destructor
   virtual ~InformationExplorerWidget() override;

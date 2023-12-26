@@ -7,11 +7,11 @@
 #include "MainWindow.h"
 
 #include <multiplier/ui/Context.h>
-#include <multiplier/ui/IMainWindowPlugin.h>
+#include <multiplier/ui/InformationExplorer.h>
 #include <multiplier/ui/ReferenceExplorer.h>
 
 #include <multiplier/ui/SimpleTextInputDialog.h>
-#include <multiplier/ui/InformationExplorerWidget.h>
+// #include <multiplier/ui/InformationExplorerWidget.h>
 #include <multiplier/ui/MxTabWidget.h>
 #include <multiplier/ui/CodeWidget.h>
 #include <multiplier/ui/PopupWidgetContainer.h>
@@ -22,7 +22,6 @@
 #include <multiplier/ui/Icons.h>
 #include <multiplier/ui/IEntityExplorer.h>
 #include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/IInformationExplorer.h>
 #include <multiplier/ui/IMacroExplorer.h>
 #include <multiplier/ui/IProjectExplorer.h>
 #include <multiplier/ui/IThemeManager.h>
@@ -67,8 +66,8 @@ namespace {
 using CodeWidgetPopup = PopupWidgetContainer<CodeWidget>;
 
 using DockableCodeWidget = DockWidgetContainer<CodeWidget>;
-using DockableInformationExplorer =
-    DockWidgetContainer<InformationExplorerWidget>;
+// using DockableInformationExplorer =
+//     DockWidgetContainer<InformationExplorerWidget>;
 
 const std::size_t kMaxHistorySize{30};
 
@@ -103,8 +102,6 @@ struct MainWindow::PrivateData final {
   const mx::Index index;  // TODO(pag): Remove.
   const mx::FileLocationCache file_location_cache;  // TODO(pag): Remove.
 
-  IAction &open_call_hierarchy;
-
   std::vector<std::unique_ptr<IMainWindowPlugin>> plugins;
 
   IProjectExplorer *project_explorer{nullptr};
@@ -129,7 +126,7 @@ struct MainWindow::PrivateData final {
   QDockWidget *highlight_explorer_dock{nullptr};
   QDockWidget *python_console_dock{nullptr};
 
-  DockableInformationExplorer *info_explorer_dock{nullptr};
+  // DockableInformationExplorer *info_explorer_dock{nullptr};
 
   IGlobalHighlighter *global_highlighter{nullptr};
 
@@ -139,9 +136,7 @@ struct MainWindow::PrivateData final {
   inline PrivateData(const Context &context_)
       : context(context_),
         index(context.Index()),
-        file_location_cache(context.FileLocationCache()),
-        open_call_hierarchy(
-            context.Action("com.trailofbits.ReferenceExplorer.OpenCallHierarchy")) {}
+        file_location_cache(context.FileLocationCache()) {}
 };
 
 MainWindow::MainWindow(const Context &context)
@@ -286,7 +281,7 @@ void MainWindow::InitializeWidgets() {
   // CreateReferenceExplorerMenuOptions();
   CreateProjectExplorerDock();
   CreateEntityExplorerDock();
-  CreateInfoExplorerDock();
+  // CreateInfoExplorerDock();
   CreateCodeView();
   // CreateReferenceExplorerDock();
   CreatePythonConsoleDock();
@@ -330,6 +325,9 @@ void MainWindow::InitializeToolBar() {
 
 void MainWindow::InitializePlugins(void) {
   d->plugins.emplace_back(CreateReferenceExplorerMainWindowPlugin(
+      d->context, this));
+
+  d->plugins.emplace_back(CreateInformationExplorerMainWindowPlugin(
       d->context, this));
 
   for (const auto &plugin : d->plugins) {
@@ -409,15 +407,15 @@ void MainWindow::CreateEntityExplorerDock() {
 }
 
 void MainWindow::CreateInfoExplorerDock() {
-  d->info_explorer_dock = new DockableInformationExplorer(
-      d->index, d->file_location_cache, d->global_highlighter, true, this);
+  // d->info_explorer_dock = new DockableInformationExplorer(
+  //     d->index, d->file_location_cache, d->global_highlighter, true, this);
 
-  connect(d->info_explorer_dock->GetWrappedWidget(),
-          &InformationExplorerWidget::SelectedItemChanged, this,
-          &MainWindow::OnInformationExplorerSelectionChange);
+  // connect(d->info_explorer_dock->GetWrappedWidget(),
+  //         &InformationExplorerWidget::SelectedItemChanged, this,
+  //         &MainWindow::OnInformationExplorerSelectionChange);
 
-  d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
-  addDockWidget(Qt::LeftDockWidgetArea, d->info_explorer_dock);
+  // d->view_menu->addAction(d->info_explorer_dock->toggleViewAction());
+  // addDockWidget(Qt::LeftDockWidgetArea, d->info_explorer_dock);
 }
 
 void MainWindow::CreateMacroExplorerDock() {
@@ -581,8 +579,7 @@ void MainWindow::OpenTokenContextMenu(const QModelIndex &index) {
 }
 
 void MainWindow::OpenCallHierarchy(const QModelIndex &index) {
-  d->open_call_hierarchy.Trigger(index.data(ICodeModel::RealRelatedEntityIdRole));
-
+  (void) index;
   // d->action_registry->Execute("OpenCallHierarchy",
   //                             index.data(ICodeModel::RealRelatedEntityIdRole),
   //                             this);
@@ -601,18 +598,18 @@ void MainWindow::OpenTokenEntityInfo(const QModelIndex &index,
   auto entity_id = qvariant_cast<RawEntityId>(related_entity_id_var);
 
   if (new_window) {
-    auto info_explorer_dock = new DockableInformationExplorer(
-        d->index, d->file_location_cache, d->global_highlighter, false, this);
+    // auto info_explorer_dock = new DockableInformationExplorer(
+    //     d->index, d->file_location_cache, d->global_highlighter, false, this);
 
-    connect(info_explorer_dock->GetWrappedWidget(),
-            &InformationExplorerWidget::SelectedItemChanged, this,
-            &MainWindow::OnInformationExplorerSelectionChange);
+    // connect(info_explorer_dock->GetWrappedWidget(),
+    //         &InformationExplorerWidget::SelectedItemChanged, this,
+    //         &MainWindow::OnInformationExplorerSelectionChange);
 
-    info_explorer_dock->GetWrappedWidget()->DisplayEntity(entity_id);
-    info_explorer_dock->GetWrappedWidget()->setAttribute(Qt::WA_DeleteOnClose);
-    info_explorer_dock->GetWrappedWidget()->show();
+    // info_explorer_dock->GetWrappedWidget()->DisplayEntity(entity_id);
+    // info_explorer_dock->GetWrappedWidget()->setAttribute(Qt::WA_DeleteOnClose);
+    // info_explorer_dock->GetWrappedWidget()->show();
 
-    addDockWidget(Qt::RightDockWidgetArea, info_explorer_dock);
+    // addDockWidget(Qt::RightDockWidgetArea, info_explorer_dock);
 
   } else {
     OpenEntityInfo(entity_id);
@@ -835,8 +832,9 @@ void MainWindow::OpenEntityRelatedToToken(const QModelIndex &index) {
 }
 
 void MainWindow::OpenEntityInfo(RawEntityId entity_id) {
-  d->info_explorer_dock->show();
-  d->info_explorer_dock->GetWrappedWidget()->DisplayEntity(entity_id);
+  (void) entity_id;
+  // d->info_explorer_dock->show();
+  // d->info_explorer_dock->GetWrappedWidget()->DisplayEntity(entity_id);
 }
 
 void MainWindow::OpenEntityCode(RawEntityId entity_id, bool canonicalize) {
@@ -1009,15 +1007,16 @@ void MainWindow::OnHistoryNavigationEntitySelected(RawEntityId,
 
 void MainWindow::OnInformationExplorerSelectionChange(
     const QModelIndex &index) {
-  auto entity_id_var = index.data(IInformationExplorerModel::EntityIdRole);
-  if (!entity_id_var.isValid()) {
-    return;
-  }
+  (void) index;
+  // auto entity_id_var = index.data(IInformationExplorerModel::EntityIdRole);
+  // if (!entity_id_var.isValid()) {
+  //   return;
+  // }
 
-  auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
+  // auto entity_id = qvariant_cast<RawEntityId>(entity_id_var);
 
-  d->toolbar.back_forward->CommitCurrentLocationToHistory();
-  OpenEntityCode(entity_id, false /* don't canonicalize entity IDs */);
+  // d->toolbar.back_forward->CommitCurrentLocationToHistory();
+  // OpenEntityCode(entity_id, false /* don't canonicalize entity IDs */);
 }
 
 // void MainWindow::OnReferenceExplorerItemActivated(const QModelIndex &index) {

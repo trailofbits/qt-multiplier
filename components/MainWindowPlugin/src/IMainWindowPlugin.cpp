@@ -8,7 +8,7 @@
 
 namespace mx::gui {
 
-IMainWindowPlugin::IMainWindowPlugin(const Context &, QObject *parent)
+IMainWindowPlugin::IMainWindowPlugin(const Context &, QMainWindow *parent)
     : QObject(parent) {}
 
 IMainWindowPlugin::~IMainWindowPlugin(void) {}

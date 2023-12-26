@@ -22,6 +22,9 @@ class IModel : public QAbstractItemModel {
     // Returns a `VariantEntity`.
     EntityRole = Qt::UserRole,
 
+    // Returns a `QString` of the model name.
+    ModelName,
+
     MultiplierUserRole = Qt::UserRole + 100
   };
 

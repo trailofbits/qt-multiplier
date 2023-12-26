@@ -12,7 +12,7 @@ namespace mx::gui {
 
 class Context;
 
-std::unique_ptr<IMainWindowPlugin> CreateReferenceExplorerMainWindowPlugin(
+std::unique_ptr<IMainWindowPlugin> CreateInformationExplorerMainWindowPlugin(
     const Context &context, QMainWindow *parent);
 
 }  // namespace mx::gui

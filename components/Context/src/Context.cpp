@@ -34,8 +34,12 @@ class ActionRegistry &Context::ActionRegistry(void) const noexcept {
   return d->action_registry;
 }
 
-IAction &Context::Action(const QString &action) const noexcept {
-  return d->action_registry.LookUp(action);
+TriggerHandle Context::RegisterAction(IAction &action) const noexcept {
+  return d->action_registry.Register(action);
+}
+
+TriggerHandle Context::FindAction(const QString &action) const noexcept {
+  return d->action_registry.Find(action);
 }
 
 // Return the current index being used.

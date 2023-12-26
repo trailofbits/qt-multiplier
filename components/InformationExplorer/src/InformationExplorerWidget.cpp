@@ -6,8 +6,8 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/IInformationExplorer.h>
-#include <multiplier/ui/InformationExplorerWidget.h>
+#include "IInformationExplorer.h"
+#include "InformationExplorerWidget.h"
 
 #include <QVBoxLayout>
 
@@ -22,7 +22,7 @@ InformationExplorerWidget::~InformationExplorerWidget() {}
 
 InformationExplorerWidget::InformationExplorerWidget(
     Index index, FileLocationCache file_location_cache,
-    IGlobalHighlighter *global_highlighter, const bool &enable_history,
+    IGlobalHighlighter *global_highlighter, bool enable_history,
     QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {

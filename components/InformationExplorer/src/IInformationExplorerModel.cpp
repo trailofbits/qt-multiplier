@@ -8,9 +8,6 @@
 
 #include "InformationExplorerModel.h"
 
-#include <multiplier/ui/IInformationExplorerModel.h>
-
-
 namespace mx::gui {
 
 IInformationExplorerModel *IInformationExplorerModel::Create(

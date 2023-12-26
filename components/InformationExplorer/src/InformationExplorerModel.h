@@ -11,12 +11,13 @@
 #include <QObject>
 #include <QString>
 
-#include <multiplier/ui/IInformationExplorerModel.h>
 #include <multiplier/ui/IDatabase.h>
 
 #include <unordered_map>
 #include <vector>
 #include <unordered_set>
+
+#include "IInformationExplorerModel.h"
 
 namespace mx::gui {
 

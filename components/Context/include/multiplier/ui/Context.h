@@ -18,6 +18,7 @@ namespace mx::gui {
 class ActionRegistry;
 class IAction;
 class IThemeManager;
+class TriggerHandle;
 
 // Global UI context. There is one context per application.
 class Context {
@@ -34,7 +35,8 @@ class Context {
 
   class ActionRegistry &ActionRegistry(void) const noexcept;
 
-  IAction &Action(const QString &action) const noexcept;
+  TriggerHandle RegisterAction(IAction &action) const noexcept;
+  TriggerHandle FindAction(const QString &action) const noexcept;
 
   // Return the current index being used.
   const class Index &Index(void) const noexcept;

@@ -16,7 +16,7 @@ namespace mx::gui {
 
 class MxTabWidget;
 
-class ReferenceExplorerPlugin : public IMainWindowPlugin {
+class ReferenceExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
   Q_OBJECT
 
   const Context &context;
@@ -29,7 +29,7 @@ class ReferenceExplorerPlugin : public IMainWindowPlugin {
   virtual ~ReferenceExplorerPlugin(void);
 
   inline ReferenceExplorerPlugin(const Context &context_,
-                                 QObject *parent)
+                                 QMainWindow *parent)
       : IMainWindowPlugin(context_, parent),
         context(context_) {}
         // call_hierarchy_action(

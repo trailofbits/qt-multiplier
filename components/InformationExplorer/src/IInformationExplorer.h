@@ -8,10 +8,11 @@
 
 #pragma once
 
-#include <multiplier/ui/IInformationExplorerModel.h>
 #include <multiplier/ui/IGlobalHighlighter.h>
 
 #include <QWidget>
+
+#include "IInformationExplorerModel.h"
 
 namespace mx::gui {
 

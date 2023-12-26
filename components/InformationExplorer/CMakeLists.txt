@@ -7,10 +7,12 @@
 #
 
 add_library("mx_informationexplorer"
-  include/multiplier/ui/IInformationExplorerModel.h
+  include/multiplier/ui/InformationExplorer.h
+
+  src/IInformationExplorerModel.h
   src/IInformationExplorerModel.cpp
 
-  include/multiplier/ui/IInformationExplorer.h
+  src/IInformationExplorer.h
   src/IInformationExplorer.cpp
 
   src/InformationExplorerModel.h
@@ -31,17 +33,26 @@ add_library("mx_informationexplorer"
   src/SortFilterProxyModel.h
   src/SortFilterProxyModel.cpp
 
-  include/multiplier/ui/InformationExplorerWidget.h
+  src/InformationExplorerWidget.h
   src/InformationExplorerWidget.cpp
+
+  src/InformationExplorerPlugin.h
+  src/InformationExplorerPlugin.cpp
 )
 
 target_link_libraries("mx_informationexplorer"
   PRIVATE
     "mx_cxxflags"
 
+    "mx_actionregistry"
+    "mx_context"
+
   PUBLIC
     "thirdparty_qt"
     "thirdparty_multiplier"
+
+    "mx_mainwindowplugin"
+    
     "mx_database"
     "mx_searchwidget"
     "mx_codeviewtheme"

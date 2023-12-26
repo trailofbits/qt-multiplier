@@ -1,4 +1,4 @@
-// Copyright (c) 2021-present, Trail of Bits, Inc.
+// Copyright (c) 2023-present, Trail of Bits, Inc.
 // All rights reserved.
 //
 // This source code is licensed in accordance with the terms specified in
@@ -19,7 +19,7 @@ namespace mx::gui {
 
 std::unique_ptr<IMainWindowPlugin>
 CreateReferenceExplorerMainWindowPlugin(
-    const Context &context, QObject *parent) {
+    const Context &context, QMainWindow *parent) {
   return std::unique_ptr<IMainWindowPlugin>(
       new ReferenceExplorerPlugin(context, parent));
 }
