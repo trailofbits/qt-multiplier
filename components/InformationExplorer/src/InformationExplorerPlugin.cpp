@@ -89,14 +89,14 @@ void InformationExplorerPlugin::OpenSecondary(const QVariant &input) {
   auto secondary_widget = dock->GetWrappedWidget();
   InitializeSignals(secondary_widget);
 
-  main_window->addDockWidget(Qt::LeftDockWidgetArea, dock);
+  main_window->addDockWidget(Qt::RightDockWidgetArea, dock);
   secondary_widget->DisplayEntity(EntityId(entity).Pack());
 }
 
 // A right-click menu option is added that lets us open up an entity in the
 // primary information explorer.
-std::optional<IMainWindowPlugin::NamedAction>
-InformationExplorerPlugin::ActOnSecondaryClick(const QModelIndex &index) {
+std::optional<NamedAction> InformationExplorerPlugin::ActOnSecondaryClick(
+    const QModelIndex &index) {
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
   if (std::holds_alternative<NotAnEntity>(entity)) {
@@ -113,9 +113,9 @@ InformationExplorerPlugin::ActOnSecondaryClick(const QModelIndex &index) {
 // If `I` is pressed, then we open up the entity in the primary information
 // explorer. If `Shift-I` is pressed, then we open up the entity in the
 // secondary information explorer.
-std::optional<IMainWindowPlugin::NamedAction>
-InformationExplorerPlugin::ActOnKeyPress(const QKeySequence &keys,
-                                         const QModelIndex &index) {
+std::optional<NamedAction> InformationExplorerPlugin::ActOnKeyPress(
+    const QKeySequence &keys, const QModelIndex &index) {
+
   const TriggerHandle *trigger = nullptr;
   if (keys == kKeySeqI) {
     trigger = &update_primary_trigger;

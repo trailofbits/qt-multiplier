@@ -21,15 +21,15 @@ IMainWindowPlugin::~IMainWindowPlugin(void) {}
 void IMainWindowPlugin::ActOnPrimaryClick(const QModelIndex &) {}
 
 // Allow a main window to add an a named action to a context menu.
-std::optional<IMainWindowPlugin::NamedAction>
-IMainWindowPlugin::ActOnSecondaryClick(const QModelIndex &) {
+std::optional<NamedAction> IMainWindowPlugin::ActOnSecondaryClick(
+    const QModelIndex &) {
   return std::nullopt;
 }
 
 // Allow a main window to add an arbitrary number of named actions to a
 // context menu.
-std::vector<IMainWindowPlugin::NamedAction>
-IMainWindowPlugin::ActOnSecondaryClickEx(const QModelIndex &index) {
+std::vector<NamedAction> IMainWindowPlugin::ActOnSecondaryClickEx(
+    const QModelIndex &index) {
   std::vector<NamedAction> ret;
   if (auto maybe_named_action = ActOnSecondaryClick(index)) {
     ret.emplace_back(std::move(maybe_named_action.value()));
@@ -56,16 +56,15 @@ void IMainWindowPlugin::ActOnContextMenu(QMenu *menu,
 void IMainWindowPlugin::ActOnLongHover(const QModelIndex &) {}
 
 // Allow a main window plugin to act on a key sequence.
-std::optional<IMainWindowPlugin::NamedAction>
-IMainWindowPlugin::ActOnKeyPress(const QKeySequence &, const QModelIndex &) {
+std::optional<NamedAction> IMainWindowPlugin::ActOnKeyPress(
+    const QKeySequence &, const QModelIndex &) {
   return std::nullopt;
 }
 
 // Allow a main window plugin to provide one of several actions to be
 // performed on a key press.
-std::vector<IMainWindowPlugin::NamedAction>
-IMainWindowPlugin::ActOnKeyPressEx(const QKeySequence &keys,
-                                   const QModelIndex &index) {
+std::vector<NamedAction> IMainWindowPlugin::ActOnKeyPressEx(
+    const QKeySequence &keys, const QModelIndex &index) {
   std::vector<NamedAction> ret;
   if (auto maybe_named_action = ActOnKeyPress(keys, index)) {
     ret.emplace_back(std::move(maybe_named_action.value()));

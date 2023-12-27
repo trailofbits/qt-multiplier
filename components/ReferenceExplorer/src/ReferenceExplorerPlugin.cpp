@@ -26,8 +26,17 @@ CreateReferenceExplorerMainWindowPlugin(
 
 ReferenceExplorerPlugin::~ReferenceExplorerPlugin(void) {}
 
-std::optional<IMainWindowPlugin::NamedAction>
-ReferenceExplorerPlugin::ActOnSecondaryClick(const QModelIndex &index) {
+// Act on a primary click. For example, if browse mode is enabled, then this
+// is a "normal" click, however, if browse mode is off, then this is a meta-
+// click.
+void ReferenceExplorerPlugin::ActOnPrimaryClick(const QModelIndex &index) {
+  for (const auto &plugin : plugins) {
+    plugin->ActOnMainWindowPrimaryClick(main_window, index);
+  }
+}
+
+std::optional<NamedAction> ReferenceExplorerPlugin::ActOnSecondaryClick(
+    const QModelIndex &index) {
   (void) index;
   
   return std::nullopt;
@@ -43,6 +52,41 @@ ReferenceExplorerPlugin::ActOnSecondaryClick(const QModelIndex &index) {
   //   .name = tr("Show callers of ''"),
   //   .action = 
   // };
+}
+
+// Allow a main window plugin to act on, e.g. modify, a context menu.
+void ReferenceExplorerPlugin::ActOnContextMenu(
+    QMenu *menu, const QModelIndex &index) {
+
+  this->IMainWindowPlugin::ActOnContextMenu(menu, index);
+  for (const auto &plugin : plugins) {
+    plugin->ActOnMainWindowContextMenu(main_window, menu, index);
+  }
+}
+
+// Allow a main window plugin to act on a long hover over something.
+void ReferenceExplorerPlugin::ActOnLongHover(const QModelIndex &index) {
+  for (const auto &plugin : plugins) {
+    plugin->ActOnMainWindowLongHover(main_window, index);
+  }
+}
+
+// Allow a main window plugin to provide one of several actions to be
+// performed on a key press.
+std::vector<NamedAction> ReferenceExplorerPlugin::ActOnKeyPressEx(
+    const QKeySequence &keys, const QModelIndex &index) {
+  std::vector<NamedAction> actions;
+
+  for (const auto &plugin : plugins) {
+    auto plugin_actions = 
+        plugin->ActOnMainWindowKeyPressEx(main_window, keys, index);
+
+    actions.insert(actions.end(),
+                 std::make_move_iterator(plugin_actions.begin()),
+                 std::make_move_iterator(plugin_actions.end()));
+  }
+
+  return actions;
 }
 
 QWidget *ReferenceExplorerPlugin::CreateDockWidget(QWidget *parent) {

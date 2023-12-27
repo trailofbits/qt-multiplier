@@ -16,10 +16,6 @@
 #include <optional>
 #include <vector>
 
-namespace mx {
-class FileLocationCache;
-class Index;
-}  // namespace mx
 namespace mx::gui {
 
 class CodeViewTheme;
@@ -31,12 +27,6 @@ class IMainWindowPlugin : public QObject {
 
  public:
   virtual ~IMainWindowPlugin(void);
-
-  struct NamedAction {
-    QString name;
-    TriggerHandle action;
-    QVariant data;
-  };
 
   IMainWindowPlugin(const Context &context, QMainWindow *parent = nullptr);
 
@@ -77,6 +67,7 @@ class IMainWindowPlugin : public QObject {
   virtual QWidget *CreateDockWidget(QWidget *parent);
  
  signals:
+  // TODO(pag): Consider removing?
   void HideDockWidget(void);
   void ShowDockWidget(void);
 };

@@ -7,7 +7,10 @@
 #
 
 add_library("mx_referenceexplorer" STATIC
+  include/multiplier/ui/IReferenceExplorerPlugin.h
   include/multiplier/ui/ReferenceExplorer.h
+
+  src/IReferenceExplorerPlugin.cpp
 
   src/ReferenceExplorerItemDelegate.h
   src/ReferenceExplorerItemDelegate.cpp

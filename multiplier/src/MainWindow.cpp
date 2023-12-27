@@ -981,14 +981,11 @@ void MainWindow::OnTokenTriggered(const ICodeView::TokenAction &token_action,
       return;
     }
 
-    QKeyCombination key_comb(
+    QKeySequence key_seq(QKeyCombination(
         keyboard_button.shift_modifier ? Qt::ShiftModifier : Qt::NoModifier,
-        static_cast<Qt::Key>(keyboard_button.key));
+        static_cast<Qt::Key>(keyboard_button.key)));
 
-    QKeySequence key_seq(key_comb);
-
-    std::vector<IMainWindowPlugin::NamedAction> actions;
-
+    std::vector<NamedAction> actions;
     for (const auto &plugin : d->plugins) {
       auto plugin_actions = plugin->ActOnKeyPressEx(key_seq, index);
       actions.insert(actions.end(),

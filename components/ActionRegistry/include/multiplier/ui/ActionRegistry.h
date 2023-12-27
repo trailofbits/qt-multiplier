@@ -40,21 +40,6 @@ class IAction : public QObject {
   virtual void Run(const QVariant &input) noexcept = 0;
 };
 
-// A handle on a registered action.
-class TriggerHandle {
-  friend class ActionRegistry;
-
-  std::shared_ptr<TriggerHandleImpl> d;
-
-  inline TriggerHandle(std::shared_ptr<TriggerHandleImpl> d_)
-      : d(std::move(d_)) {}
-
- public:
-
-  // Triggers an action.
-  void Trigger(const QVariant &data) const noexcept;
-};
-
 // An action that can wrap over a lambda.
 template <typename Lambda>
 class LambdaAction Q_DECL_FINAL : public IAction {
@@ -101,6 +86,27 @@ class MethodPointerAction Q_DECL_FINAL : public IAction {
   void Run(const QVariant &input) noexcept Q_DECL_FINAL {
     (dynamic_cast<Class *>(parent())->*method)(input);
   }
+};
+
+// A handle on a registered action.
+class TriggerHandle {
+  friend class ActionRegistry;
+
+  std::shared_ptr<TriggerHandleImpl> d;
+
+  inline TriggerHandle(std::shared_ptr<TriggerHandleImpl> d_)
+      : d(std::move(d_)) {}
+
+ public:
+
+  // Triggers an action.
+  void Trigger(const QVariant &data) const noexcept;
+};
+
+struct NamedAction {
+  QString name;
+  TriggerHandle action;
+  QVariant data;
 };
 
 // Registry for actions.
