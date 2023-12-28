@@ -15,16 +15,16 @@ namespace mx::gui {
 class TabBar Q_DECL_FINAL : public QTabBar {
   Q_OBJECT
 
+  TabBar(const TabBar &) = delete;
+  TabBar(TabBar &&) noexcept = delete;
+  TabBar &operator=(const TabBar &) = delete;
+  TabBar &operator=(TabBar &&) noexcept = delete;
+
  public:
   TabBar(QWidget *parent = nullptr)
       : QTabBar(parent) {}
 
   virtual ~TabBar(void);
-
-  TabBar(const TabBar &) = delete;
-  TabBar(TabBar &&) noexcept = delete;
-  TabBar &operator=(const TabBar &) = delete;
-  TabBar &operator=(TabBar &&) noexcept = delete;
 
  protected:
   void wheelEvent(QWheelEvent *event) Q_DECL_FINAL;

@@ -34,17 +34,17 @@ add_subdirectory("libraries")
 
 find_package("multiplier" REQUIRED GLOBAL)
 
-add_library("thirdparty_multiplier" INTERFACE)
+add_library("mx_multiplier_library" INTERFACE)
 
 if(MX_ENABLE_PYTHON_BINDINGS)
   find_dependency(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
-  target_link_libraries("thirdparty_multiplier"
+  target_link_libraries("mx_multiplier_library"
     INTERFACE
       Python3::Python
       "multiplier::mx-python"
   )
 else()
-  target_link_libraries("thirdparty_multiplier"
+  target_link_libraries("mx_multiplier_library"
     INTERFACE
       "multiplier::multiplier"
   )
@@ -52,10 +52,10 @@ endif(MX_ENABLE_PYTHON_BINDINGS)
 
 add_subdirectory("components")
 add_subdirectory("managers")
-add_subdirectory("media")
+add_subdirectory("themes")
 add_subdirectory("widgets")
-add_subdirectory("plugins")
-add_subdirectory("multiplier")
+#add_subdirectory("plugins")
+#add_subdirectory("multiplier")
 
 if(MXQT_ENABLE_INSTALL)
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

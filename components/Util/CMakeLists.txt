@@ -6,7 +6,7 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_library("mx_util"
+add_library("mx_util_component"
   include/multiplier/GUI/IModel.h
   src/IModel.cpp
 
@@ -14,46 +14,32 @@ add_library("mx_util"
   src/Util.h
   src/Util.cpp
 
-  include/multiplier/GUI/TokenPainter.h
-  src/TokenPainter.cpp
+  # include/multiplier/GUI/TokenPainter.h
+  # src/TokenPainter.cpp
 
-  include/multiplier/GUI/Icons.h
-  src/Icons.cpp
-
-  include/multiplier/GUI/DockWidgetContainer.h
-  include/multiplier/GUI/PopupWidgetContainer.h
-
-  include/multiplier/GUI/TabWidget.h
-  src/TabWidget.cpp
-
-  include/multiplier/GUI/TreeWidget.h
-  src/TreeWidget.cpp
-
-  include/multiplier/GUI/SimpleTextInputDialog.h
-  src/SimpleTextInputDialog.cpp
 
   include/multiplier/GUI/Assert.h
   src/Assert.cpp
 )
 
-target_link_libraries("mx_util"
+target_link_libraries("mx_util_component"
   PRIVATE
     "mx_cxx_flags"
     "mx_codeviewtheme"
-    "thirdparty_qt"
-    "thirdparty_multiplier"
+    "mx_qt_library"
+    "mx_multiplier_library"
 
   PUBLIC
-    "mx_thememanager"
+    "mx_theme_manager"
 )
 
-target_include_directories("mx_util" PRIVATE
+target_include_directories("mx_util_component" PRIVATE
   "include"
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-target_include_directories("mx_util" SYSTEM INTERFACE
+target_include_directories("mx_util_component" SYSTEM INTERFACE
   "include"
 )
 
-enable_qt_properties("mx_util")
+enable_qt_properties("mx_util_component")

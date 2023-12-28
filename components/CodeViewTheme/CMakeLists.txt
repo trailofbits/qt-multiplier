@@ -19,8 +19,8 @@ target_link_libraries("mx_codeviewtheme"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
+    "mx_qt_library"
+    "mx_multiplier_library"
 )
 
 target_include_directories("mx_codeviewtheme" PRIVATE

@@ -29,7 +29,7 @@ target_link_libraries("thirdparty_phantomstyle"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
+    "mx_qt_library"
 )
 
 target_include_directories("thirdparty_phantomstyle" PRIVATE

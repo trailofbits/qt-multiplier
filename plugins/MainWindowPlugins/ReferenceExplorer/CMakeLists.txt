@@ -34,19 +34,19 @@ target_link_libraries("mx_reference_explorer_plugin"
     "mx_cxx_flags"
     "mx_codeview"
     "mx_searchwidget"
-    "mx_util"
+    "mx_util_component"
     "mx_context"
-    "mx_actionregistry"
+    "mx_action_manager"
     "mx_mainwindowplugin"
 
-    "thirdparty_qt"
-    "thirdparty_multiplier"
+    "mx_qt_library"
+    "mx_multiplier_library"
 
     "gap::gap"
 
   PUBLIC
     "mx_globalhighlighter"
-    "mx_thememanager"
+    "mx_theme_manager"
     "mx_generators"
 )
 

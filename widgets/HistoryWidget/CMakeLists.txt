@@ -17,11 +17,12 @@ add_library("mx_history_widget"
 target_link_libraries("mx_history_widget"
   PRIVATE
     "mx_cxx_flags"
+    "mx_media_manager"
+    "mx_util_component"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
-    "mx_util"
+    "mx_qt_library"
+    "mx_multiplier_library"
 )
 
 target_include_directories("mx_history_widget" PRIVATE

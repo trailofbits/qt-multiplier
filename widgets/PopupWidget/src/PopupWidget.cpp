@@ -6,9 +6,7 @@
 
 #include <multiplier/GUI/Widgets/PopupWidget.h>
 
-#include <multiplier/GUI/Icons.h>
-#include <multiplier/GUI/Util.h>
-#include <multiplier/GUI/ThemeManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
 
 #include <optional>
 
@@ -29,6 +27,8 @@ namespace mx::gui {
 struct PopupWidget::PrivateData final {
   bool closed{false};
 
+  QIcon close_icon;
+
   QPushButton *close_button{nullptr};
   QLabel *window_title{nullptr};
   QWidget *wrapped_widget{nullptr};
@@ -38,46 +38,52 @@ struct PopupWidget::PrivateData final {
   QSizeGrip *size_grip{nullptr};
 
   QTimer title_update_timer;
+
+  inline PrivateData(const MediaManager &media_manager)
+      : close_icon(media_manager.Pixmap("com.trailofbits.icon.Close")) {}
 };
 
 PopupWidget::~PopupWidget(void) {}
 
 //! Constructor
-PopupWidget::PopupWidget(QWidget *parent)
+PopupWidget::PopupWidget(const MediaManager &media_manager, QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData) {}
+      d(new PrivateData(media_manager)) {
+  
+  connect(&media_manager, &MediaManager::IconsChanged,
+          this, &PopupWidget::OnIconsChanged);
 
-//! Initializes the internal widgets
-void PopupWidget::SetWrappedWidget(QWidget *wrapped_widget) {
-  d->wrapped_widget = wrapped_widget;
+  connect(qApp, &QGuiApplication::applicationStateChanged,
+          this, &PopupWidget::OnApplicationStateChange);
+
+  connect(&d->title_update_timer, &QTimer::timeout,
+          this, &PopupWidget::OnUpdateTitle);
+
   setAttribute(Qt::WA_QuitOnClose, false);
-
   setContentsMargins(5, 5, 5, 5);
   setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                  Qt::WindowStaysOnTopHint);
 
-  QWidget::connect(qApp, &QGuiApplication::applicationStateChanged, this,
-                   &PopupWidget<Widget>::OnApplicationStateChange);
+  d->close_button = new QPushButton(d->close_icon, "", this);
+  d->close_button->setToolTip(QObject::tr("Close"));
+  d->close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
 
+  connect(d->close_button, &QPushButton::clicked, this,
+          &PopupWidget::close);
+}
+
+//! Initializes the internal widgets
+void PopupWidget::SetWrappedWidget(QWidget *wrapped_widget) {
+  d->wrapped_widget = wrapped_widget;
+
+  // Get the title.
   QString inherited_title = d->wrapped_widget->windowTitle();
-  setWindowTitle(inherited_title);
   if (!d->window_title) {
     d->window_title = new QLabel(inherited_title);
-
-    connect(&d->title_update_timer, &QTimer::timeout,
-            this, &PopupWidget::OnUpdateTitle);
   
   } else {
     d->window_title->setText(inherited_title);
   }
-
-  if (!d->close_button) {
-    d->close_button = new QPushButton(QIcon(), "", this);
-    d->close_button->setToolTip(QObject::tr("Close"));
-    d->close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
-
-    QWidget::connect(d->close_button, &QPushButton::clicked, this,
-                     &PopupWidget::close);
 
   auto created = !d->main_layout;
   if (!d->main_layout) {
@@ -96,6 +102,9 @@ void PopupWidget::SetWrappedWidget(QWidget *wrapped_widget) {
     d->main_layout->setContentsMargins(0, 0, 0, 0);
     d->main_layout->addWidget(title_frame);
 
+    d->size_grip = new QSizeGrip(this);
+    d->size_grip->resize(12, 12);
+
   } else {
     auto prev_widget = d->main_layout->takeAt(1);
     prev_widget->setParent(nullptr);
@@ -110,15 +119,6 @@ void PopupWidget::SetWrappedWidget(QWidget *wrapped_widget) {
 
   if (created) {
     setLayout(main_layout);
-  }
-
-  if (!d->size_grip) {
-    d->size_grip = new QSizeGrip(this);
-    d->size_grip->resize(12, 12);
-
-    UpdateIcons();
-    connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
-            &PopupWidget::OnThemeChange);
   }
 
   OnUpdateTitle();
@@ -143,22 +143,22 @@ void PopupWidget::keyPressEvent(QKeyEvent *event) {
 //! Helps determine if the widget should be restored on focus
 void PopupWidget::showEvent(QShowEvent *event) {
   d->closed = false;
-
   QWidget::showEvent(event);
 }
 
 //! Helps determine if the widget should be restored on focus
 void PopupWidget::closeEvent(QCloseEvent *event) {
   d->closed = true;
-
   QWidget::closeEvent(event);
 }
 
 //! Used to update the size grip position
 void PopupWidget::resizeEvent(QResizeEvent *event) {
-  QPoint size_grip_pos(width() - d->size_grip->width(),
-                       height() - d->size_grip->height());
-  d->size_grip->move(size_grip_pos);
+  if (d->size_grip) {
+    QPoint size_grip_pos(width() - d->size_grip->width(),
+                         height() - d->size_grip->height());
+    d->size_grip->move(size_grip_pos);
+  }
   QWidget::resizeEvent(event);
 }
 
@@ -211,8 +211,9 @@ void PopupWidget::OnTitleFrameMouseRelease(QMouseEvent *event) {
 }
 
 //! Updates the widget icons to match the active theme
-void PopupWidget::UpdateIcons(void) {
-  d->close_button->setIcon(GetIcon(":/Icons/PopupWidget/close"));
+void PopupWidget::OnIconsChanged(const MediaManager &media_manager) {
+  d->close_icon = media_manager.Pixmap("com.trailofbits.icon.Close");
+  d->close_button->setIcon(d->close_icon);
 }
 
 //! Restores the widget visibility when the application gains focus
@@ -229,12 +230,6 @@ void PopupWidget::OnApplicationStateChange(Qt::ApplicationState state) {
 void PopupWidget::OnUpdateTitle(void) {
   setWindowTitle(d->wrapped_widget->windowTitle());
   d->window_title->setText(windowTitle());
-}
-
-//! Called by the theme manager
-void PopupWidget::OnThemeChange(const QPalette &palette,
-                   const CodeViewTheme &code_view_theme) {
-  UpdateIcons();
 }
 
 }  // namespace mx::gui

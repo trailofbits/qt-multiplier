@@ -1,35 +1,33 @@
 #
-# Copyright (c) 2022-present, Trail of Bits, Inc.
+# Copyright (c) 2023-present, Trail of Bits, Inc.
 # All rights reserved.
 #
 # This source code is licensed in accordance with the terms specified in
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_library("mx_actionregistry"
-
+add_library("mx_action_manager"
   include/multiplier/GUI/Managers/ActionManager.h
 
   src/ActionManager.cpp
-  src/Managers/ActionManager.h
+  src/ActionManager.h
   src/IAction.cpp
 )
 
-target_link_libraries("mx_actionregistry"
+target_link_libraries("mx_action_manager"
   PRIVATE
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
+    "mx_qt_library"
 )
 
-target_include_directories("mx_actionregistry" PRIVATE
+target_include_directories("mx_action_manager" PRIVATE
   "include"
 )
 
-target_include_directories("mx_actionregistry" SYSTEM INTERFACE
+target_include_directories("mx_action_manager" SYSTEM INTERFACE
   "include"
 )
 
-enable_qt_properties("mx_actionregistry")
+enable_qt_properties("mx_action_manager")

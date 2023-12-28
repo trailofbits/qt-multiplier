@@ -20,7 +20,7 @@ static QPoint gScrollAmount = {};
 
 TabBar::~TabBar(void) {}
 
-void TabBar::wheelEvent(QWheelEvent *event) override {
+void TabBar::wheelEvent(QWheelEvent *event) {
   if (event->device()->type() == QInputDevice::DeviceType::TouchPad) {
 
     if (event->isBeginEvent()) {

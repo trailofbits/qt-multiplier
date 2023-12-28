@@ -16,27 +16,7 @@
 
 namespace mx::gui {
 
-struct HistoryLabelBuilder::PrivateData {
-  const Index index;
-  const FileLocationCache file_cache;
-  const RawEntityId entity_id;
-  const std::uint64_t item_id;
-
-  inline PrivateData(const Index &index_, const FileLocationCache &file_cache_,
-                     RawEntityId entity_id_, std::uint64_t item_id_)
-      : index(index_),
-        file_cache(file_cache_),
-        entity_id(entity_id_),
-        item_id(item_id_) {}
-};
-
 HistoryLabelBuilder::~HistoryLabelBuilder(void) {}
-
-HistoryLabelBuilder::HistoryLabelBuilder(
-    const Index &index_, const FileLocationCache &file_cache_,
-    RawEntityId entity_id_, std::uint64_t item_id_, QObject *parent)
-    : QObject(parent),
-      d(new PrivateData(index_, file_cache_, entity_id_, item_id_)) {}
 
 //! Formulate a nice label for the history item associated with `entity`. This
 //! label is shown in the back/forward drop-down menus beside the back/forward
@@ -47,7 +27,6 @@ void HistoryLabelBuilder::run(void) {
   QString line_col_label;
   QString file_label;
 
-  VariantEntity entity = d->index.entity(d->entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     return;
   }
@@ -68,7 +47,7 @@ void HistoryLabelBuilder::run(void) {
     // append to the file name. We ignore the file case, because it would be
     // noise to add in `:1:1`.
     if (!std::holds_alternative<File>(entity)) {
-      if (auto maybe_line_col = file_loc.location(d->file_cache);
+      if (auto maybe_line_col = file_loc.location(file_cache);
           maybe_line_col && !(maybe_line_col->first == 1u &&
                               maybe_line_col->second == 1u)) {
         line_col_label = ":" + QString::number(maybe_line_col->first) +
@@ -128,7 +107,7 @@ void HistoryLabelBuilder::run(void) {
   }
 
   if (!label.isEmpty()) {
-    emit LabelForItem(d->item_id, label);
+    emit LabelForItem(item_id, label);
   }
 }
 

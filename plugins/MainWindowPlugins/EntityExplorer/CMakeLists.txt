@@ -31,9 +31,9 @@ target_link_libraries("mx_entity_explorer_plugin"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
-    "mx_util"
+    "mx_qt_library"
+    "mx_multiplier_library"
+    "mx_util_component"
     "mx_searchwidget"
     "mx_database"
     "mx_codeviewtheme"

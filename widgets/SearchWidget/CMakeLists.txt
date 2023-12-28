@@ -14,12 +14,11 @@ add_library("mx_search_widget"
 target_link_libraries("mx_search_widget"
   PRIVATE
     "mx_cxx_flags"
+    "mx_line_edit_widget"
+    "mx_media_manager"
 
   PUBLIC
-    "thirdparty_qt"
-    "mx_lineedit"
-    "mx_util"
-    "mx_thememanager"
+    "mx_qt_library"
 )
 
 target_include_directories("mx_search_widget" PRIVATE

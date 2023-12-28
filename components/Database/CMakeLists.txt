@@ -39,10 +39,10 @@ target_link_libraries("mx_database"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
+    "mx_qt_library"
+    "mx_multiplier_library"
     "xxhash::xxhash"
-    "mx_util"
+    "mx_util_component"
 )
 
 target_include_directories("mx_database" PRIVATE

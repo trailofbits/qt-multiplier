@@ -18,14 +18,14 @@
 
 namespace mx::gui {
 
-class CodeViewTheme;
+class MediaManager;
 
 //! A wrapper class that turns a widget into a popup
 class PopupWidget Q_DECL_FINAL : public QWidget {
   Q_OBJECT
 
   struct PrivateData;
-  std::unique_ptr<PrivateData> d;
+  const std::unique_ptr<PrivateData> d;
 
  public:
 
@@ -33,19 +33,13 @@ class PopupWidget Q_DECL_FINAL : public QWidget {
   virtual ~PopupWidget(void);
 
   //! Constructor
-  PopupWidget(QWidget *parent = nullptr);
+  PopupWidget(const MediaManager &media_manager, QWidget *parent = nullptr);
 
   //! Initializes the internal widgets
   void SetWrappedWidget(QWidget *wrapped_widget);
 
   //! Returns the wrapped widget
   QWidget *WrappedWidget(void) const;
-
-  //! Disabled copy constructor
-  PopupWidget(const PopupWidget &) = delete;
-  PopupWidget(PopupWidget &&) noexcept = delete;
-  PopupWidget &operator=(const PopupWidget &) = delete;
-  PopupWidget &operator=(PopupWidget &&) noexcept = delete;
 
  protected:
   //! Closes the widget when the escape key is pressed
@@ -78,15 +72,13 @@ class PopupWidget Q_DECL_FINAL : public QWidget {
   void UpdateIcons(void);
 
  private slots:
+  void OnIconsChanged(const MediaManager &media_manager);
+
   //! Restores the widget visibility when the application gains focus
   void OnApplicationStateChange(Qt::ApplicationState state);
 
   //! Updates the window title at regular intervals
   void OnUpdateTitle(void);
-
-  //! Called by the theme manager
-  void OnThemeChange(const QPalette &palette,
-                     const CodeViewTheme &code_view_theme);
 };
 
 }  // namespace mx::gui

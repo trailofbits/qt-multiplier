@@ -38,22 +38,22 @@ target_link_libraries("mx_information_explorer_plugin"
   PRIVATE
     "mx_cxx_flags"
 
-    "mx_actionregistry"
+    "mx_action_manager"
     "mx_context"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
+    "mx_qt_library"
+    "mx_multiplier_library"
 
     "mx_mainwindowplugin"
 
     "mx_database"
     "mx_searchwidget"
     "mx_codeviewtheme"
-    "mx_util"
+    "mx_util_component"
     "mx_historywidget"
     "mx_globalhighlighter"
-    "mx_thememanager"
+    "mx_theme_manager"
 )
 
 target_include_directories("mx_information_explorer_plugin" PRIVATE

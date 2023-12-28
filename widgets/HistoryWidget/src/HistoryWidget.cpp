@@ -6,13 +6,13 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "HistoryLabelBuilder.h"
+#include <multiplier/GUI/Widgets/HistoryWidget.h>
 
-#include <multiplier/GUI/HistoryWidget.h>
-#include <multiplier/GUI/Icons.h>
+#include <multiplier/AST/Decl.h>
+#include <multiplier/Frontend/Compilation.h>
+#include <multiplier/Frontend/File.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Assert.h>
-
-#include <multiplier/Index.h>
 
 #include <QHBoxLayout>
 #include <QIcon>
@@ -26,6 +26,8 @@
 #include <list>
 #include <vector>
 
+#include "HistoryLabelBuilder.h"
+
 namespace mx::gui {
 namespace {
 
@@ -38,22 +40,16 @@ static const char *const kForwardButtonToolTip =
     "Go forward in the navigation history";
 
 struct Item final {
-  std::uint64_t item_id;
-  RawEntityId original_id;
-  RawEntityId canonical_id;
+  uint64_t item_id;
+  VariantEntity original_entity;
+  VariantEntity canonical_entity;
   QString name;
 
-  Item(RawEntityId original_id_, RawEntityId canonical_id_)
+  inline Item(VariantEntity original_entity_, VariantEntity canonical_entity_,
+              const QString &name_)
       : item_id(gNextItemId.fetch_add(1u)),
-        original_id(original_id_),
-        canonical_id(canonical_id_),
-        name(QString("Entity %1").arg(canonical_id)) {}
-
-  Item(RawEntityId original_id_, RawEntityId canonical_id_,
-       const QString &name_)
-      : item_id(gNextItemId.fetch_add(1u)),
-        original_id(original_id_),
-        canonical_id(canonical_id_),
+        original_entity(std::move(original_entity_)),
+        canonical_entity(std::move(canonical_entity_)),
         name(name_) {}
 };
 
@@ -62,7 +58,6 @@ using ItemList = std::list<Item>;
 }  // namespace
 
 struct HistoryWidget::PrivateData {
-  const Index index;
   const FileLocationCache file_cache;
 
   const unsigned max_history_size;
@@ -77,7 +72,7 @@ struct HistoryWidget::PrivateData {
 
   // Represents our present item, and isn't added to history until something
   // changes.
-  std::optional<std::pair<RawEntityId, std::optional<QString>>> next_item;
+  std::optional<std::pair<VariantEntity, std::optional<QString>>> next_item;
 
   QIcon back_icon;
   QIcon forward_icon;
@@ -91,26 +86,25 @@ struct HistoryWidget::PrivateData {
   QShortcut *back_shortcut{nullptr};
   QShortcut *forward_shortcut{nullptr};
 
-  inline PrivateData(const Index &index_, const FileLocationCache &file_cache_,
+  inline PrivateData(const FileLocationCache &file_cache_,
                      unsigned max_history_size_)
-      : index(index_),
-        file_cache(file_cache_),
+      : file_cache(file_cache_),
         max_history_size(max_history_size_),
         current_item_it(item_list.end()) {}
 
-
-  void AddToHistory(RawEntityId id, std::optional<QString> opt_label,
+  void AddToHistory(VariantEntity entity, std::optional<QString> opt_label,
                     HistoryWidget *widget);
   void NavigateBackToHistoryItem(ItemList::iterator next_item_it);
   void NavigateForwardToHistoryItem(ItemList::iterator next_item_it);
 };
 
-HistoryWidget::HistoryWidget(const Index &index_,
+HistoryWidget::HistoryWidget(const MediaManager &media_manager_,
                              const FileLocationCache &file_cache_,
-                             unsigned max_history_size, QWidget *parent,
-                             bool install_global_shortcuts)
+                             unsigned max_history_size,
+                             bool install_global_shortcuts,
+                             QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData(index_, file_cache_, max_history_size)) {
+      d(new PrivateData(file_cache_, max_history_size)) {
 
   // Since we install the keyboard shortcuts on the widget, the parent
   // parameters must always be valid
@@ -118,9 +112,10 @@ HistoryWidget::HistoryWidget(const Index &index_,
 
   InitializeWidgets(parent, install_global_shortcuts);
 
-  UpdateIcons();
-  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
-          &HistoryWidget::OnThemeChange);
+  OnIconsChanged(media_manager_);
+  
+  connect(media_manager_, &MediaManager::IconsChanged,
+          this, &HistoryWidget::OnIconsChanged);
 }
 
 HistoryWidget::~HistoryWidget(void) {}
@@ -130,10 +125,14 @@ void HistoryWidget::SetIconSize(QSize size) {
   d->forward_button->setIconSize(size);
 }
 
-void HistoryWidget::SetCurrentLocation(RawEntityId id,
+void HistoryWidget::SetCurrentLocation(VariantEntity entity,
                                        std::optional<QString> opt_label) {
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
+
   d->next_item.reset();
-  d->next_item.emplace(id, std::move(opt_label));
+  d->next_item.emplace(std::move(entity), std::move(opt_label));
 }
 
 void HistoryWidget::CommitCurrentLocationToHistory(void) {
@@ -141,38 +140,40 @@ void HistoryWidget::CommitCurrentLocationToHistory(void) {
     return;
   }
 
-  std::pair<RawEntityId, std::optional<QString>> ret =
+  std::pair<VariantEntity, std::optional<QString>> ret =
       std::move(d->next_item.value());
   d->next_item.reset();
-  d->AddToHistory(ret.first, std::move(ret.second), this);
+  d->AddToHistory(std::move(ret.first), std::move(ret.second), this);
   UpdateMenus();
 }
 
-void HistoryWidget::PrivateData::AddToHistory(RawEntityId entity_id,
+void HistoryWidget::PrivateData::AddToHistory(VariantEntity original_entity,
                                               std::optional<QString> opt_label,
                                               HistoryWidget *widget) {
 
-  VariantId vid = EntityId(entity_id).Unpack();
-  if (std::holds_alternative<InvalidId>(vid)) {
+  if (std::holds_alternative<NotAnEntity>(original_entity)) {
     return;
   }
+
+  VariantEntity canonical_entity = original_entity;
+  VariantEntity label_entity = original_entity;
+
+  if (std::holds_alternative<Decl>(original_entity)) {
+    canonical_entity = std::get<Decl>(original_entity).canonical_declaration();
+    label_entity = canonical_entity;
 
   // Canonicalize on the first file token. We might get updates from cursor
   // events and from open file events, so it's nice if we can make the file
   // events and cursor events "look the same" so that we don't end up with a
   // file and a file's first token beside one another in history.
-  RawEntityId original_id{entity_id};
-  RawEntityId canonical_id{entity_id};
-
-  if (std::holds_alternative<FileId>(vid)) {
-    auto file = index.file(std::get<FileId>(vid));
-    if (!file) {
-      return;
-    }
-
-    if (TokenRange file_tokens = file->tokens()) {
-      canonical_id = file_tokens.front().id().Pack();
-    }
+  } else if (std::holds_alternative<File>(original_entity)) {
+    canonical_entity = std::get<File>(original_entity).tokens().front();
+  
+  // If it's a compilation, then take the first token of the main source file.
+  } else if (std::holds_alternative<Compilation>(original_entity)) {
+    auto file = std::get<Compilation>(original_entity).main_source_file();
+    canonical_entity = file.tokens().front();
+    label_entity = file;
   }
 
   // Truncate the "previous future" history.
@@ -189,22 +190,27 @@ void HistoryWidget::PrivateData::AddToHistory(RawEntityId entity_id,
   }
 
   // Don't add repeat items to the end.
-  if (item_list.empty() || item_list.back().canonical_id != canonical_id) {
+  if (item_list.empty() ||
+      EntityId(item_list.back()) != EntityId(canonical_entity)) {
 
     // If we're given a label then we're done.
     if (opt_label.has_value()) {
-      item_list.emplace_back(original_id, canonical_id, opt_label.value());
+      item_list.emplace_back(
+          std::move(original_entity), std::move(canonical_entity),
+          opt_label.value());
 
-      // If we weren't given a label, then compute a label on a background thread.
+    // If we weren't given a label, then compute a label on a background thread.
     } else {
-      Item &item = item_list.emplace_back(original_id, canonical_id);
+      Item &item = item_list.emplace_back(
+          std::move(original_entity), std::move(canonical_entity),
+          QString("Entity %1").arg(EntityId(canonical_entity).Pack()));
 
-      auto labeller = new HistoryLabelBuilder(index, file_cache, canonical_id,
-                                              item.item_id);
+      auto labeller = new HistoryLabelBuilder(
+          file_cache, std::move(label_entity), item.item_id);
       labeller->setAutoDelete(true);
 
-      connect(labeller, &HistoryLabelBuilder::LabelForItem, widget,
-              &HistoryWidget::OnLabelForItem);
+      connect(labeller, &HistoryLabelBuilder::LabelForItem,
+              widget, &HistoryWidget::OnLabelForItem);
 
       QThreadPool::globalInstance()->start(labeller);
     }
@@ -371,16 +377,15 @@ void HistoryWidget::UpdateMenus(void) {
   d->forward_button->setEnabled(0 < num_forward_actions);
 }
 
-void HistoryWidget::UpdateIcons() {
-  d->back_icon = GetIcon(":/Icons/HistoryWidget/HistoryBack");
-  d->forward_icon = GetIcon(":/Icons/HistoryWidget/HistoryForward");
+void HistoryWidget::OnIconsChanged(const MediaManager &media_manager) {
+  d->back_icon = media_manager.Pixmap("com.trailofbits.icon.Back");
+  d->forward_icon = media_manager.Pixmap("com.trailofbits.icon.Forward");
 
   d->back_button->setIcon(d->back_icon);
   d->forward_button->setIcon(d->forward_icon);
 }
 
-void HistoryWidget::OnLabelForItem(std::uint64_t item_id,
-                                   const QString &label) {
+void HistoryWidget::OnLabelForItem(uint64_t item_id, const QString &label) {
   for (Item &item : d->item_list) {
     if (item.item_id == item_id) {
       item.name = label;
@@ -425,8 +430,8 @@ void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
   ItemList::iterator it =
       std::next(d->item_list.begin(), item_index_var.toInt());
 
-  RawEntityId original_id = it->original_id;
-  RawEntityId canonical_id = it->canonical_id;
+  VariantEntity original_entity = it->original_id;
+  VariantEntity canonical_entity = it->canonical_id;
 
   // If we're going back to some place in the past, and if we're starting from
   // "the present," then we need to materialize a history item representing our
@@ -441,7 +446,7 @@ void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
 
   d->NavigateBackToHistoryItem(it);
   UpdateMenus();
-  emit GoToEntity(original_id, canonical_id);
+  emit GoToEntity(std::move(original_entity), std::move(canonical_entity));
 }
 
 void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
@@ -453,12 +458,12 @@ void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
   ItemList::iterator it =
       std::next(d->item_list.begin(), item_index_var.toInt());
 
-  RawEntityId original_id = it->original_id;
-  RawEntityId canonical_id = it->canonical_id;
+  VariantEntity original_entity = it->original_id;
+  VariantEntity canonical_entity = it->canonical_id;
 
   d->NavigateForwardToHistoryItem(it);
   UpdateMenus();
-  emit GoToEntity(original_id, canonical_id);
+  emit GoToEntity(std::move(original_entity), std::move(canonical_entity));
 }
 
 
@@ -484,10 +489,6 @@ void HistoryWidget::PrivateData::NavigateForwardToHistoryItem(
   } else {
     current_item_it = next_item_it;
   }
-}
-
-void HistoryWidget::OnThemeChange(const QPalette &, const CodeViewTheme &) {
-  UpdateIcons();
 }
 
 }  // namespace mx::gui

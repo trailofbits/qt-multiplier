@@ -14,13 +14,13 @@ add_library("mx_context"
 target_link_libraries("mx_context"
   PRIVATE
     "mx_cxx_flags"
-    "thirdparty_qt"
+    "mx_qt_library"
 
   PUBLIC
-    "thirdparty_multiplier"
+    "mx_multiplier_library"
     
-    "mx_actionregistry"
-    "mx_thememanager"
+    "mx_action_manager"
+    "mx_theme_manager"
 )
 
 target_include_directories("mx_context" PRIVATE

@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/GUI/TreeWidget.h>
+#include <multiplier/GUI/Widgets/TreeWidget.h>
 
 #include <QPainter>
 
@@ -14,7 +14,7 @@ namespace mx::gui {
 
 TreeWidget::TreeWidget(QWidget *parent) : QTreeView(parent) {}
 
-TreeWidget::~TreeWidget() {}
+TreeWidget::~TreeWidget(void) {}
 
 void TreeWidget::drawRow(QPainter *painter, const QStyleOptionViewItem &option,
                          const QModelIndex &index) const {

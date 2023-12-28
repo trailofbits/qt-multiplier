@@ -16,9 +16,9 @@ target_link_libraries("mx_mainwindowplugin"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
-    "mx_actionregistry"
+    "mx_qt_library"
+    "mx_multiplier_library"
+    "mx_action_manager"
     "mx_globalhighlighter"
 )
 

@@ -20,10 +20,10 @@ find_package("Qt6"
   GLOBAL
 )
 
-add_library("thirdparty_qt" INTERFACE)
+add_library("mx_qt_library" INTERFACE)
 
 foreach(qt_component ${qt_component_list})
-  target_link_libraries("thirdparty_qt" INTERFACE
+  target_link_libraries("mx_qt_library" INTERFACE
     "Qt6::${qt_component}"
   )
 endforeach()

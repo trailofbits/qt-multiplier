@@ -31,9 +31,9 @@ target_link_libraries("mx_codeview"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
-    "mx_util"
+    "mx_qt_library"
+    "mx_multiplier_library"
+    "mx_util_component"
     "mx_database"
     "mx_searchwidget"
     "mx_codeviewtheme"

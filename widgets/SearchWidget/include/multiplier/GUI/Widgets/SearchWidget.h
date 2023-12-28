@@ -16,14 +16,14 @@
 
 namespace mx::gui {
 
-class CodeViewTheme;
+class MediaManager;
 
 //! A reusable search widget
 class SearchWidget Q_DECL_FINAL : public QWidget {
   Q_OBJECT
 
   struct PrivateData;
-  std::unique_ptr<PrivateData> d;
+  const std::unique_ptr<PrivateData> d;
 
  public:
   //! Search parameters, such as pattern and pattern type
@@ -52,7 +52,7 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   virtual ~SearchWidget(void);
 
   //! Constructor
-  SearchWidget(Mode mode, QWidget *parent);
+  SearchWidget(const MediaManager &media_manager, Mode mode, QWidget *parent);
 
   //! Called by the other client widget to update the search result count
   void UpdateSearchResultCount(size_t search_result_count);
@@ -60,7 +60,7 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
  private:
 
   //! Loads the required icons from the resources
-  void LoadIcons(void);
+  void LoadIcons(const MediaManager &media_manager);
 
   //! Initializes the internal widgets
   void InitializeWidgets(void);
@@ -99,10 +99,7 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   //! Called when the show next result button is pressed
   void OnShowNextResult(void);
 
-  //! Called by the theme manager
-  void OnThemeChange(const QPalette &palette,
-                     const CodeViewTheme &code_view_theme);
-
+  void OnIconsChanged(const MediaManager &media_manager);
 
  public slots:
   //! Activates the search widget

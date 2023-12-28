@@ -6,7 +6,7 @@
 
 #include <Python.h>
 
-#include <multiplier/GUI/PythonConsoleWidget.h>
+#include <multiplier/GUI/Widgets/PythonConsoleWidget.h>
 
 #include <QAbstractItemView>
 #include <QApplication>

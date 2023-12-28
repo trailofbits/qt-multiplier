@@ -26,9 +26,9 @@ target_link_libraries("mx_python_console_widget"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
-    "mx_thememanager"
+    "mx_qt_library"
+    "mx_multiplier_library"
+    "mx_theme_manager"
 )
 
 target_include_directories("mx_python_console_widget" PRIVATE

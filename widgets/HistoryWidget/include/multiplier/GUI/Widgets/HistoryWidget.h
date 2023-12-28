@@ -8,41 +8,42 @@
 
 #pragma once
 
-#include <multiplier/GUI/ThemeManager.h>
-
 #include <QAction>
 #include <QSize>
 #include <QString>
 #include <QWidget>
 
 #include <memory>
-#include <multiplier/Types.h>
+#include <multiplier/Entity.h>
 #include <optional>
 
 namespace mx {
-class Index;
 class FileLocationCache;
 }  // namespace mx
 namespace mx::gui {
+
+class MediaManager;
 
 //! \todo Hide the implementation details
 class HistoryWidget final : public QWidget {
   Q_OBJECT
 
   struct PrivateData;
-  std::unique_ptr<PrivateData> d;
+  const std::unique_ptr<PrivateData> d;
 
  private:
   void InitializeWidgets(QWidget *parent, bool install_global_shortcuts);
   void UpdateMenus(void);
-  void UpdateIcons();
+  void UpdateIcons(void);
 
  public:
   //! Constructor
   //! \param parent The parent widget, where the shortcuts will be installed
-  HistoryWidget(const Index &index_, const FileLocationCache &file_cache_,
-                unsigned max_history_size, QWidget *parent,
-                bool install_global_shortcuts);
+  HistoryWidget(const MediaManager &media_manager_,
+                const FileLocationCache &file_cache_,
+                unsigned max_history_size,
+                bool install_global_shortcuts,
+                QWidget *parent = nullptr);
 
   virtual ~HistoryWidget(void);
 
@@ -50,7 +51,7 @@ class HistoryWidget final : public QWidget {
   void SetIconSize(QSize size);
 
   //! Tells the history what our current location is.
-  void SetCurrentLocation(RawEntityId id,
+  void SetCurrentLocation(VariantEntity entity,
                           std::optional<QString> opt_label = std::nullopt);
 
   //! Commits our "last current" location to the history. This makes our last
@@ -58,11 +59,11 @@ class HistoryWidget final : public QWidget {
   void CommitCurrentLocationToHistory(void);
 
  signals:
-  void GoToEntity(RawEntityId original_id, RawEntityId canonical_id);
+  void GoToEntity(VariantEntity original_entity,
+                  VariantEntity canonical_entity);
 
  private slots:
-  void OnThemeChange(const QPalette &palette,
-                     const CodeViewTheme &code_view_theme);
+  void OnIconsChanged(const MediaManager &media_manager);
 
   //! Called when the back button is pressed to navigate backward through history.
   //! We distinguish this from the forward menu case because if this is our first

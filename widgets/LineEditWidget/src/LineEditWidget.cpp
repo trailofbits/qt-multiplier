@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/GUI/LineEditWidget.h>
+#include <multiplier/GUI/Widgets/LineEditWidget.h>
 
 #include <QCompleter>
 #include <QStringListModel>
@@ -23,7 +23,7 @@ struct LineEditWidget::PrivateData final {
   QStringListModel history_model;
 };
 
-LineEditWidget::~LineEditWidget() {}
+LineEditWidget::~LineEditWidget(void) {}
 
 QStringList LineEditWidget::History(void) const {
   return d->history_model.stringList();
@@ -54,7 +54,7 @@ void LineEditWidget::OnEditingFinished(void) {
     return;
   }
 
-  auto history = GetHistory();
+  auto history = History();
   if (history.contains(history_item)) {
     return;
   }

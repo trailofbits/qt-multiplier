@@ -46,11 +46,11 @@ target_link_libraries("mx_generators"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
-    "mx_util"
+    "mx_qt_library"
+    "mx_multiplier_library"
+    "mx_util_component"
     "mx_searchwidget"
-    "mx_thememanager"
+    "mx_theme_manager"
 )
 
 target_include_directories("mx_generators" PRIVATE

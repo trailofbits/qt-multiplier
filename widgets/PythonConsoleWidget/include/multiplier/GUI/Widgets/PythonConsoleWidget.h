@@ -27,7 +27,7 @@ class PythonConsoleWidget final : public QWidget {
   Q_OBJECT
 
   struct PrivateData;
-  std::unique_ptr<PrivateData> d;
+  const std::unique_ptr<PrivateData> d;
 
   void InitializeModel(void);
   void InitializeWidgets(void);

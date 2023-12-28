@@ -13,7 +13,7 @@ add_library("mx_tree_widget"
 
 target_link_libraries("mx_tree_widget"
   PRIVATE
-    "thirdparty_qt"
+    "mx_qt_library"
 )
 
 target_include_directories("mx_tree_widget" PRIVATE

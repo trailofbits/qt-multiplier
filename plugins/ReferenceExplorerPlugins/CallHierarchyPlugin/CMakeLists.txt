@@ -16,16 +16,16 @@ add_library("mx_call_hierarchy_plugin"
 
 target_link_libraries("mx_call_hierarchy_plugin"
   PRIVATE
-    "mx_actionregistry"
+    "mx_action_manager"
     "mx_context"
     "mx_cxx_flags"
     "mx_generators"
     "mx_referenceexplorer"
-    "mx_thememanager"
-    "mx_util"
+    "mx_theme_manager"
+    "mx_util_component"
 
-    "thirdparty_qt"
-    "thirdparty_multiplier"
+    "mx_qt_library"
+    "mx_multiplier_library"
 )
 
 target_include_directories("mx_call_hierarchy_plugin" PRIVATE

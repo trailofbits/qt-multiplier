@@ -15,7 +15,7 @@ add_library("mx_tab_widget"
 
 target_link_libraries("mx_tab_widget"
   PRIVATE
-    "thirdparty_qt"
+    "mx_qt_library"
 )
 
 target_include_directories("mx_tab_widget" PRIVATE

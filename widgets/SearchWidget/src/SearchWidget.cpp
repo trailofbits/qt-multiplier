@@ -6,11 +6,11 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/GUI/SearchWidget.h>
+#include <multiplier/GUI/Widgets/SearchWidget.h>
 
 #include <multiplier/GUI/Assert.h>
-#include <multiplier/GUI/ILineEdit.h>
-#include <multiplier/GUI/Icons.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Widgets/LineEditWidget.h>
 
 #include <QLineEdit>
 #include <QVBoxLayout>
@@ -54,7 +54,7 @@ struct SearchWidget::PrivateData final {
   QIcon disabled_whole_word_search;
   QAction *whole_word_search_action{nullptr};
 
-  ILineEdit *search_input{nullptr};
+  LineEditWidget *search_input{nullptr};
   QLineEdit *search_input_error_display{nullptr};
 
   QShortcut *enable_search_shortcut{nullptr};
@@ -63,7 +63,7 @@ struct SearchWidget::PrivateData final {
   QShortcut *search_next_shortcut{nullptr};
 };
 
-SearchWidget::~SearchWidget() {}
+SearchWidget::~SearchWidget(void) {}
 
 void SearchWidget::UpdateSearchResultCount(size_t search_result_count) {
   d->search_result_count = search_result_count;
@@ -80,46 +80,24 @@ void SearchWidget::UpdateSearchResultCount(size_t search_result_count) {
   ShowResult();
 }
 
-SearchWidget::SearchWidget(Mode mode, QWidget *parent)
+SearchWidget::SearchWidget(const MediaManager &media_manager, Mode mode,
+                           QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
   // It is important to have a valid parent because that's what
   // we use to scope the keyboard shortcuts
   Assert(parent != nullptr,
-         "Invalid parent widget specified in ISearchWidget::Create()");
+         "Invalid parent widget specified in SearchWidget");
 
   d->mode = mode;
 
+  LoadIcons(media_manager);
   InitializeWidgets();
   InitializeKeyboardShortcuts(parent);
 
-  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
-          &SearchWidget::OnThemeChange);
-}
-
-void SearchWidget::LoadIcons(void) {
-  d->search_icon = GetIcon(":/SearchWidget/search_icon");
-
-  d->enabled_case_sensitive_search = GetIcon(
-      ":/SearchWidget/search_icon_case_sensitive", IconStyle::Highlighted);
-
-  d->disabled_case_sensitive_search =
-      GetIcon(":/SearchWidget/search_icon_case_sensitive");
-
-  d->enabled_regex_search =
-      GetIcon(":/SearchWidget/search_icon_regex", IconStyle::Highlighted);
-
-  d->disabled_regex_search = GetIcon(":/SearchWidget/search_icon_regex");
-
-  d->enabled_whole_word_search =
-      GetIcon(":/SearchWidget/search_icon_whole_word", IconStyle::Highlighted);
-
-  d->disabled_whole_word_search =
-      GetIcon(":/SearchWidget/search_icon_whole_word");
-
-  d->show_prev_result_icon = GetIcon(":/SearchWidget/show_prev_result");
-  d->show_next_result_icon = GetIcon(":/SearchWidget/show_next_result");
+  connect(&media_manager, &MediaManager::IconsChanged,
+          this, &SearchWidget::OnIconsChanged);
 }
 
 void SearchWidget::InitializeWidgets(void) {
@@ -128,7 +106,7 @@ void SearchWidget::InitializeWidgets(void) {
   search_widget_layout->setContentsMargins(0, 0, 0, 0);
   search_widget_layout->setSpacing(0);
 
-  d->search_input = ILineEdit::Create(this);
+  d->search_input = new LineEditWidget(this);
   d->search_input->setClearButtonEnabled(true);
   d->search_input->setPlaceholderText(d->mode == Mode::Search ? tr("Search")
                                                               : tr("Filter"));
@@ -262,8 +240,6 @@ void SearchWidget::ShowResult() {
 }
 
 void SearchWidget::UpdateIcons(void) {
-  LoadIcons();
-
   d->search_input->removeAction(d->search_icon_action);
   d->search_icon_action->setIcon(d->search_icon);
   d->search_input->addAction(d->search_icon_action, QLineEdit::LeadingPosition);
@@ -396,7 +372,34 @@ void SearchWidget::OnShowNextResult(void) {
   ShowResult();
 }
 
-void SearchWidget::OnThemeChange(const QPalette &, const CodeViewTheme &) {
+//! Loads the required icons from the resources
+void SearchWidget::LoadIcons(const MediaManager &media_manager) {
+  d->search_icon = media_manager.Pixmap(":/SearchWidget/search_icon");
+
+  d->enabled_case_sensitive_search = media_manager.Pixmap(
+      ":/SearchWidget/search_icon_case_sensitive", IconStyle::Highlighted);
+
+  d->disabled_case_sensitive_search =
+      media_manager.Pixmap(":/SearchWidget/search_icon_case_sensitive");
+
+  d->enabled_regex_search =
+      media_manager.Pixmap(":/SearchWidget/search_icon_regex", IconStyle::Highlighted);
+
+  d->disabled_regex_search = media_manager.Pixmap(":/SearchWidget/search_icon_regex");
+
+  d->enabled_whole_word_search =
+      media_manager.Pixmap(":/SearchWidget/search_icon_whole_word", IconStyle::Highlighted);
+
+  d->disabled_whole_word_search =
+      media_manager.Pixmap(":/SearchWidget/search_icon_whole_word");
+
+  d->show_prev_result_icon = media_manager.Pixmap(":/SearchWidget/show_prev_result");
+  d->show_next_result_icon = media_manager.Pixmap(":/SearchWidget/show_next_result");
+
+}
+
+void SearchWidget::OnIconsChanged(MediaManager &media_manager) {
+  LoadIcons(media_manager);
   UpdateIcons();
 }
 

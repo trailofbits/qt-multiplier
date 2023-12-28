@@ -17,21 +17,21 @@ class LineEditWidget Q_DECL_FINAL : public QLineEdit {
   Q_OBJECT
 
   struct PrivateData;
-  std::unique_ptr<PrivateData> d;
+  const std::unique_ptr<PrivateData> d;
 
  public:
 
   //! Constructor
-  LineEdit(QWidget *parent);
+  LineEditWidget(QWidget *parent);
 
   //! Destructor
-  virtual ~LineEditWidget(void) override;
+  virtual ~LineEditWidget(void);
 
   //! Returns the current history
   QStringList History(void) const;
 
   //! Sets the history
-  void SetHistory(const QStringList &history) override;
+  void SetHistory(const QStringList &history);
 
  private:
 

@@ -7,36 +7,39 @@
 */
 
 #include <cstdint>
-#include <memory>
-#include <multiplier/Types.h>
+#include <multiplier/Entity.h>
+#include <multiplier/Frontend/File.h>
 #include <QObject>
 #include <QRunnable>
 #include <QString>
 
 namespace mx {
-class Index;
 class FileLocationCache;
 }  // namespace mx
 namespace mx::gui {
 
-class HistoryLabelBuilder final : public QObject, public QRunnable {
+class HistoryLabelBuilder Q_DECL_FINAL : public QObject, public QRunnable {
   Q_OBJECT
 
-  struct PrivateData;
-  std::unique_ptr<PrivateData> d;
+  const FileLocationCache file_cache;
+  const VariantEntity entity;
+  const uint64_t item_id;
 
  public:
   virtual ~HistoryLabelBuilder(void);
 
-  explicit HistoryLabelBuilder(const Index &index_,
-                               const FileLocationCache &file_cache_,
-                               RawEntityId id_, std::uint64_t item_id_,
-                               QObject *parent=nullptr);
+  inline HistoryLabelBuilder(FileLocationCache &file_cache_,
+                             VariantEntity entity_, uint64_t item_id_,
+                             QObject *parent=nullptr)
+      : QObject(parent),
+        file_cache(file_cache_),
+        entity(std::move(entity_)),
+        item_id(item_id_) {}
 
   virtual void run(void) Q_DECL_FINAL;
 
  signals:
-  void LabelForItem(std::uint64_t item_id, const QString &label);
+  void LabelForItem(uint64_t item_id, const QString &label);
 };
 
 }  // namespace mx::gui

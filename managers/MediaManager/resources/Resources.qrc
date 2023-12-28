@@ -1,0 +1,33 @@
+<RCC>
+    <qresource>
+        <file alias="com.trailofbits.icon.Logo">Icons/logo.icns</file>
+        <file alias="com.trailofbits.icon.Back">Icons/back.png</file>
+        <file alias="com.trailofbits.icon.Forward">Icons/forward.png</file>
+        <file alias="com.trailofbits.icon.Close">Icons/close.png</file>
+        <file alias="com.trailofbits.icon.CaseSensitiveSearch">Icons/search_icon_case_sensitive.png</file>
+        <file alias="com.trailofbits.icon.RegexSearch">Icons/search_icon_regex.png</file>
+        <file alias="com.trailofbits.icon.WholeWordSearch">Icons/search_icon_whole_word.png</file>
+        <file alias="com.trailofbits.icon.PreviousSearchResult">Icons/show_prev_result.png</file>
+        <file alias="com.trailofbits.icon.NextSearchResult">Icons/show_next_result.png</file>
+        <file alias="com.trailofbits.icon.Search">Icons/search_icon.png</file>
+        <file alias="com.trailofbits.icon.BrowserMode">Icons/browser_mode.png</file>
+    </qresource>
+    <qresource>
+        <file alias="com.trailofbits.font.SourceCodePro-Black">Fonts/Source_Code_Pro/static/SourceCodePro-Black.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-BlackItalic">Fonts/Source_Code_Pro/static/SourceCodePro-BlackItalic.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-Bold">Fonts/Source_Code_Pro/static/SourceCodePro-Bold.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-BoldItalic">Fonts/Source_Code_Pro/static/SourceCodePro-BoldItalic.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-ExtraBold">Fonts/Source_Code_Pro/static/SourceCodePro-ExtraBold.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-ExtraBoldItalic">Fonts/Source_Code_Pro/static/SourceCodePro-ExtraBoldItalic.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-ExtraLight">Fonts/Source_Code_Pro/static/SourceCodePro-ExtraLight.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-ExtraLightItalic">Fonts/Source_Code_Pro/static/SourceCodePro-ExtraLightItalic.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-Italic">Fonts/Source_Code_Pro/static/SourceCodePro-Italic.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-Light">Fonts/Source_Code_Pro/static/SourceCodePro-Light.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-LightItalic">Fonts/Source_Code_Pro/static/SourceCodePro-LightItalic.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-Medium">Fonts/Source_Code_Pro/static/SourceCodePro-Medium.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-MediumItalic">Fonts/Source_Code_Pro/static/SourceCodePro-MediumItalic.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-Regular">Fonts/Source_Code_Pro/static/SourceCodePro-Regular.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-SemiBold">Fonts/Source_Code_Pro/static/SourceCodePro-SemiBold.ttf</file>
+        <file alias="com.trailofbits.font.SourceCodePro-SemiBoldItalic">Fonts/Source_Code_Pro/static/SourceCodePro-SemiBoldItalic.ttf</file>
+    </qresource>
+</RCC>

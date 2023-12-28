@@ -16,7 +16,7 @@ target_link_libraries("mx_line_edit_widget"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
+    "mx_qt_library"
 )
 
 target_include_directories("mx_line_edit_widget" PRIVATE

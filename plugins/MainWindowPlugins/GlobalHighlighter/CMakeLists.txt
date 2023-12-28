@@ -29,10 +29,10 @@ target_link_libraries("mx_global_highlighter_plugin"
     "mx_cxx_flags"
 
   PUBLIC
-    "thirdparty_qt"
-    "thirdparty_multiplier"
+    "mx_qt_library"
+    "mx_multiplier_library"
     "mx_database"
-    "mx_util"
+    "mx_util_component"
     "mx_tokenlabel"
 )
 

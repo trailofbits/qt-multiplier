@@ -6,10 +6,12 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
+add_subdirectory("DockWidget")
 add_subdirectory("HistoryWidget")
 add_subdirectory("LineEditWidget")
 add_subdirectory("PopupWidget")
 add_subdirectory("PythonConsoleWidget")
 add_subdirectory("SearchWidget")
+add_subdirectory("SimpleTextInputDialog")
 add_subdirectory("TabWidget")
 add_subdirectory("TreeWidget")

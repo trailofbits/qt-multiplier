@@ -16,17 +16,17 @@ namespace mx::gui {
 class TreeWidget Q_DECL_FINAL : public QTreeView {
   Q_OBJECT
 
+  TreeWidget(const TreeWidget &) = delete;
+  TreeWidget(TreeWidget &&) noexcept = delete;
+  TreeWidget &operator=(const TreeWidget &) = delete;
+  TreeWidget &operator=(TreeWidget &&) noexcept = delete;
+
  public:
   //! Constructor
   TreeWidget(QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~TreeWidget(void);
-
-  TreeWidget(const TreeWidget &) = delete;
-  TreeWidget(TreeWidget &&) noexcept = delete;
-  TreeWidget &operator=(const TreeWidget &) = delete;
-  TreeWidget &operator=(TreeWidget &&) noexcept = delete;
 
  protected:
   //! Draws the background role on rows
