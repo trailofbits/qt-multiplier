@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/ui/ActionRegistry.h>
+#include <multiplier/GUI/ActionRegistry.h>
 
 #include <atomic>
 #include <deque>

@@ -9,8 +9,8 @@
 #include "ReferenceExplorerView.h"
 #include "ReferenceExplorerItemDelegate.h"
 
-#include <multiplier/ui/IGeneratorView.h>
-#include <multiplier/ui/Icons.h>
+#include <multiplier/GUI/IGeneratorView.h>
+#include <multiplier/GUI/Icons.h>
 
 #include <QVBoxLayout>
 #include <QAction>

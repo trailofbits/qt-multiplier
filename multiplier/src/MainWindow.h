@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/ICodeView.h>
+#include <multiplier/GUI/ICodeView.h>
 
 #include <multiplier/Index.h>
 

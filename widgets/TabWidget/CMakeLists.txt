@@ -7,18 +7,18 @@
 #
 
 add_library("mx_tab_widget"
-  include/multiplier/ui/TabWidget.h
+  include/multiplier/GUI/TabWidget.h
   src/TabBar.cpp
   src/TabBar.h
   src/TabWidget.cpp
 
-  include/multiplier/ui/MxTreeView.h
+  include/multiplier/GUI/MxTreeView.h
   src/MxTreeView.cpp
 
-  include/multiplier/ui/SimpleTextInputDialog.h
+  include/multiplier/GUI/SimpleTextInputDialog.h
   src/SimpleTextInputDialog.cpp
 
-  include/multiplier/ui/Assert.h
+  include/multiplier/GUI/Assert.h
   src/Assert.cpp
 )
 

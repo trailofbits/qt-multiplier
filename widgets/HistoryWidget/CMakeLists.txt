@@ -6,19 +6,19 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_library("mx_historywidget"
-  include/multiplier/ui/HistoryWidget.h
+add_library("mx_history_widget"
+  include/multiplier/GUI/HistoryWidget.h
   src/HistoryWidget.cpp
 
   src/HistoryLabelBuilder.h
   src/HistoryLabelBuilder.cpp
 )
 
-target_sources("mx_historywidget" INTERFACE
+target_sources("mx_history_widget" INTERFACE
   Resources/resources.qrc
 )
 
-target_link_libraries("mx_historywidget"
+target_link_libraries("mx_history_widget"
   PRIVATE
     "mx_cxxflags"
 
@@ -28,12 +28,12 @@ target_link_libraries("mx_historywidget"
     "mx_util"
 )
 
-target_include_directories("mx_historywidget" PRIVATE
+target_include_directories("mx_history_widget" PRIVATE
   "include"
 )
 
-target_include_directories("mx_historywidget" SYSTEM INTERFACE
+target_include_directories("mx_history_widget" SYSTEM INTERFACE
   "include"
 )
 
-enable_qt_properties("mx_historywidget")
+enable_qt_properties("mx_history_widget")

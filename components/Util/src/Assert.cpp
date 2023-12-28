@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/Assert.h>
+#include <multiplier/GUI/Assert.h>
 
 #include <iostream>
 

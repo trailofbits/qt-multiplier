@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <multiplier/ui/IEntityExplorerModel.h>
-#include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/GUI/IEntityExplorerModel.h>
+#include <multiplier/GUI/IGlobalHighlighter.h>
 
 #include <QWidget>
 

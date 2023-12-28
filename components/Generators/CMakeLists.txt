@@ -7,7 +7,7 @@
 #
 
 add_library("mx_generators"
-  include/multiplier/ui/IGeneratorView.h
+  include/multiplier/GUI/IGeneratorView.h
   src/IGeneratorView.cpp
 
   src/GeneratorView.h
@@ -19,10 +19,10 @@ add_library("mx_generators"
   src/FilterSettingsWidget.h
   src/FilterSettingsWidget.cpp
 
-  include/multiplier/ui/IGeneratorModel.h
+  include/multiplier/GUI/IGeneratorModel.h
   src/IGeneratorModel.cpp
 
-  include/multiplier/ui/ITreeGenerator.h
+  include/multiplier/GUI/ITreeGenerator.h
   src/ITreeGenerator.cpp
 
   src/ITreeExplorerExpansionThread.h

@@ -6,9 +6,9 @@
 
 #include "ReferenceExplorer.h"
 
-#include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/IMacroExplorer.h>
-#include <multiplier/ui/IGeneratorModel.h>
+#include <multiplier/GUI/IGlobalHighlighter.h>
+#include <multiplier/GUI/IMacroExplorer.h>
+#include <multiplier/GUI/IGeneratorModel.h>
 
 #include <multiplier/Index.h>
 

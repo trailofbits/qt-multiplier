@@ -8,7 +8,7 @@
 
 #include "FileTreeModel.h"
 
-#include <multiplier/ui/IFileTreeModel.h>
+#include <multiplier/GUI/IFileTreeModel.h>
 
 namespace mx::gui {
 

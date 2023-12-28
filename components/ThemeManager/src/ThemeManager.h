@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include <memory>
 

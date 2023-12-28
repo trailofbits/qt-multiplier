@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <multiplier/ui/ITokenLabel.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/ITokenLabel.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 namespace mx::gui {
 

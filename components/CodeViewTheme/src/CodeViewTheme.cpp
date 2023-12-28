@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/CodeViewTheme.h>
+#include <multiplier/GUI/CodeViewTheme.h>
 
 #include <multiplier/Frontend/TokenCategory.h>
 

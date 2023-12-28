@@ -10,7 +10,7 @@
 #include "HighlightingModelProxy.h"
 #include "GlobalHighlighterItem.h"
 
-#include <multiplier/ui/IDatabase.h>
+#include <multiplier/GUI/IDatabase.h>
 
 #include <QFutureWatcher>
 #include <QVBoxLayout>

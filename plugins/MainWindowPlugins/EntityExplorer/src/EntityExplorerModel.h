@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <multiplier/ui/IEntityExplorerModel.h>
-#include <multiplier/ui/IDatabase.h>
+#include <multiplier/GUI/IEntityExplorerModel.h>
+#include <multiplier/GUI/IDatabase.h>
 
 #include <memory>
 

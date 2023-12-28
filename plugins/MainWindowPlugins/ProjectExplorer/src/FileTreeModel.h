@@ -13,7 +13,7 @@
 #include <unordered_set>
 
 #include <multiplier/Types.h>
-#include <multiplier/ui/IFileTreeModel.h>
+#include <multiplier/GUI/IFileTreeModel.h>
 
 namespace mx::gui {
 

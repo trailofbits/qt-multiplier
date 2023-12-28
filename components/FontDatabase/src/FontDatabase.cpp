@@ -6,8 +6,8 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/FontDatabase.h>
-#include <multiplier/ui/Assert.h>
+#include <multiplier/GUI/FontDatabase.h>
+#include <multiplier/GUI/Assert.h>
 
 #include <QFontDatabase>
 

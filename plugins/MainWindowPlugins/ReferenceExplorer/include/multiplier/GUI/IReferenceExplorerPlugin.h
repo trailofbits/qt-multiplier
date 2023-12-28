@@ -10,7 +10,7 @@
 #include <QMenu>
 #include <QModelIndex>
 
-#include <multiplier/ui/ActionRegistry.h>
+#include <multiplier/GUI/ActionRegistry.h>
 #include <optional>
 #include <vector>
 

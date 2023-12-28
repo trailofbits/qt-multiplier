@@ -6,7 +6,7 @@
 
 #include "Database.h"
 
-#include <multiplier/ui/IDatabase.h>
+#include <multiplier/GUI/IDatabase.h>
 
 namespace mx::gui {
 

@@ -14,7 +14,7 @@
 #include <multiplier/Frontend/MacroExpansion.h>
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/Index.h>
-#include <multiplier/ui/ICodeModel.h>
+#include <multiplier/GUI/ICodeModel.h>
 
 #include <QDebug>
 #include <QLabel>

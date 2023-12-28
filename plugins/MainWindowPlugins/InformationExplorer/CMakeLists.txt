@@ -7,7 +7,7 @@
 #
 
 add_library("mx_information_explorer_plugin"
-  include/multiplier/ui/InformationExplorer.h
+  include/multiplier/GUI/InformationExplorer.h
 
   src/InformationExplorerModel.h
   src/InformationExplorerModel.cpp

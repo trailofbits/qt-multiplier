@@ -8,7 +8,7 @@
 
 #include "MacroExplorer.h"
 
-#include <multiplier/ui/IMacroExplorer.h>
+#include <multiplier/GUI/IMacroExplorer.h>
 
 namespace mx::gui {
 

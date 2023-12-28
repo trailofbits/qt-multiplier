@@ -7,7 +7,7 @@
 #
 
 add_library("mx_global_highlighter_plugin"
-  include/multiplier/ui/IGlobalHighlighter.h
+  include/multiplier/GUI/IGlobalHighlighter.h
   src/IGlobalHighlighter.cpp
 
   src/GlobalHighlighter.h

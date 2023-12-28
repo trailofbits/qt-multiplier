@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/MxTreeView.h>
+#include <multiplier/GUI/MxTreeView.h>
 
 #include <QPainter>
 

@@ -8,7 +8,7 @@
 
 #include "GeneratorView.h"
 
-#include <multiplier/ui/IGeneratorView.h>
+#include <multiplier/GUI/IGeneratorView.h>
 
 namespace mx::gui {
 

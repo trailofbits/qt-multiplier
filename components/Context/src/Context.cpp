@@ -4,13 +4,13 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <multiplier/ui/Context.h>
+#include <multiplier/GUI/Context.h>
 
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>
 
-#include <multiplier/ui/ActionRegistry.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/ActionRegistry.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 namespace mx::gui {
 

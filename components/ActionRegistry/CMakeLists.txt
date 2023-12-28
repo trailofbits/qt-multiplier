@@ -8,7 +8,7 @@
 
 add_library("mx_actionregistry"
 
-  include/multiplier/ui/ActionRegistry.h
+  include/multiplier/GUI/ActionRegistry.h
 
   src/ActionRegistry.cpp
   src/ActionRegistry.h

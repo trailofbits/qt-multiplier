@@ -6,11 +6,11 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/SearchWidget.h>
+#include <multiplier/GUI/SearchWidget.h>
 
-#include <multiplier/ui/Assert.h>
-#include <multiplier/ui/ILineEdit.h>
-#include <multiplier/ui/Icons.h>
+#include <multiplier/GUI/Assert.h>
+#include <multiplier/GUI/ILineEdit.h>
+#include <multiplier/GUI/Icons.h>
 
 #include <QLineEdit>
 #include <QVBoxLayout>

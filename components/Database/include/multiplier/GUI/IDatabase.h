@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include <multiplier/ui/EntityInformation.h>
-#include <multiplier/ui/IndexedTokenRangeData.h>
-#include <multiplier/ui/Result.h>
-#include <multiplier/ui/RPCErrorCode.h>
+#include <multiplier/GUI/EntityInformation.h>
+#include <multiplier/GUI/IndexedTokenRangeData.h>
+#include <multiplier/GUI/Result.h>
+#include <multiplier/GUI/RPCErrorCode.h>
 
 #include <multiplier/Index.h>
 #include <multiplier/Frontend/Token.h>

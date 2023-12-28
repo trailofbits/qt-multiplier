@@ -8,8 +8,8 @@
 
 #include "ThemeManager.h"
 
-#include <multiplier/ui/IThemeManager.h>
-#include <multiplier/ui/Assert.h>
+#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/Assert.h>
 
 namespace mx::gui {
 namespace {

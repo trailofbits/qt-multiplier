@@ -10,8 +10,8 @@
 
 #include "Types.h"
 
-#include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/IGlobalHighlighter.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 namespace mx::gui {
 

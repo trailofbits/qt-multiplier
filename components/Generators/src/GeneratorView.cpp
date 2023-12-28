@@ -10,9 +10,9 @@
 #include "FilterSettingsWidget.h"
 #include "SearchFilterModelProxy.h"
 
-#include <multiplier/ui/IThemeManager.h>
-#include <multiplier/ui/Assert.h>
-#include <multiplier/ui/MxTreeView.h>
+#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/Assert.h>
+#include <multiplier/GUI/MxTreeView.h>
 
 #include <QListView>
 #include <QTableView>

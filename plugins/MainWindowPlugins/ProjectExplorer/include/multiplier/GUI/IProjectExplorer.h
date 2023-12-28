@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IFileTreeModel.h>
+#include <multiplier/GUI/IFileTreeModel.h>
 
 #include <multiplier/Types.h>
 

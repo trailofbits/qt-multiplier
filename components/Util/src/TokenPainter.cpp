@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/TokenPainter.h>
+#include <multiplier/GUI/TokenPainter.h>
 
 #include <multiplier/Frontend/TokenKind.h>
 #include <QApplication>

@@ -10,7 +10,7 @@
 
 #include <QVBoxLayout>
 #include <memory>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include "InformationExplorer.h"
 #include "InformationExplorerModel.h"

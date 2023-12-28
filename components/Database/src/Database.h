@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IDatabase.h>
+#include <multiplier/GUI/IDatabase.h>
 
 namespace mx::gui {
 

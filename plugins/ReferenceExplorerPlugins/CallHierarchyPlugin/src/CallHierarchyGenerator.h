@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/ITreeGenerator.h>
+#include <multiplier/GUI/ITreeGenerator.h>
 
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>

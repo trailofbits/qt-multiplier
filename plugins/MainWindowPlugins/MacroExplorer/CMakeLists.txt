@@ -7,7 +7,7 @@
 #
 
 add_library("mx_macro_explorer_plugin"
-  include/multiplier/ui/IMacroExplorer.h
+  include/multiplier/GUI/IMacroExplorer.h
   src/IMacroExplorer.cpp
 
   src/MacroExplorer.h

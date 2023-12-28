@@ -7,7 +7,7 @@
 #
 
 add_library("mx_fontdatabase"
-  include/multiplier/ui/FontDatabase.h
+  include/multiplier/GUI/FontDatabase.h
   src/FontDatabase.cpp
 )
 

@@ -7,8 +7,8 @@
 #
 
 add_library("mx_reference_explorer_plugin"
-  include/multiplier/ui/IReferenceExplorerPlugin.h
-  include/multiplier/ui/ReferenceExplorer.h
+  include/multiplier/GUI/IReferenceExplorerPlugin.h
+  include/multiplier/GUI/ReferenceExplorer.h
 
   src/IReferenceExplorerPlugin.cpp
 

@@ -7,32 +7,32 @@
 #
 
 add_library("mx_util"
-  include/multiplier/ui/IModel.h
+  include/multiplier/GUI/IModel.h
   src/IModel.cpp
 
-  include/multiplier/ui/Util.h
+  include/multiplier/GUI/Util.h
   src/Util.h
   src/Util.cpp
 
-  include/multiplier/ui/TokenPainter.h
+  include/multiplier/GUI/TokenPainter.h
   src/TokenPainter.cpp
 
-  include/multiplier/ui/Icons.h
+  include/multiplier/GUI/Icons.h
   src/Icons.cpp
 
-  include/multiplier/ui/DockWidgetContainer.h
-  include/multiplier/ui/PopupWidgetContainer.h
+  include/multiplier/GUI/DockWidgetContainer.h
+  include/multiplier/GUI/PopupWidgetContainer.h
 
-  include/multiplier/ui/MxTabWidget.h
+  include/multiplier/GUI/MxTabWidget.h
   src/MxTabWidget.cpp
 
-  include/multiplier/ui/MxTreeView.h
+  include/multiplier/GUI/MxTreeView.h
   src/MxTreeView.cpp
 
-  include/multiplier/ui/SimpleTextInputDialog.h
+  include/multiplier/GUI/SimpleTextInputDialog.h
   src/SimpleTextInputDialog.cpp
 
-  include/multiplier/ui/Assert.h
+  include/multiplier/GUI/Assert.h
   src/Assert.cpp
 )
 

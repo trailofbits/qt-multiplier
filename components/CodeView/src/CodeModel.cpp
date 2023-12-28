@@ -8,7 +8,7 @@
 
 #include "CodeModel.h"
 
-#include <multiplier/ui/IDatabase.h>
+#include <multiplier/GUI/IDatabase.h>
 #include <multiplier/Frontend/TokenTree.h>
 
 #include <QFutureWatcher>

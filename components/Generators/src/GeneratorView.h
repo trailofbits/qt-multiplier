@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <multiplier/ui/ISearchWidget.h>
-#include <multiplier/ui/IGeneratorView.h>
+#include <multiplier/GUI/ISearchWidget.h>
+#include <multiplier/GUI/IGeneratorView.h>
 
 #include <QPoint>
 

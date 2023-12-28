@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/TabWidget.h>
+#include <multiplier/GUI/TabWidget.h>
 
 #include "TabBar.h"
 

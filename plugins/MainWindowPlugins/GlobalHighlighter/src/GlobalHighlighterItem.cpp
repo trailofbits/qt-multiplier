@@ -9,8 +9,8 @@
 #include "GlobalHighlighter.h"
 #include "GlobalHighlighterItem.h"
 
-#include <multiplier/ui/Icons.h>
-#include <multiplier/ui/ITokenLabel.h>
+#include <multiplier/GUI/Icons.h>
+#include <multiplier/GUI/ITokenLabel.h>
 
 #include <QHBoxLayout>
 #include <QPushButton>

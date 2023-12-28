@@ -8,8 +8,8 @@
 
 #include "GetEntityInformation.h"
 
-#include <multiplier/ui/Assert.h>
-#include <multiplier/ui/Util.h>
+#include <multiplier/GUI/Assert.h>
+#include <multiplier/GUI/Util.h>
 
 #include <multiplier/AST/ArraySubscriptExpr.h>
 #include <multiplier/AST/BinaryOperator.h>

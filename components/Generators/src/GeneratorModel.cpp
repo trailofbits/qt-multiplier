@@ -12,7 +12,7 @@
 
 #include <gap/core/generator.hpp>
 #include <multiplier/Frontend/Token.h>
-#include <multiplier/ui/ITreeGenerator.h>
+#include <multiplier/GUI/ITreeGenerator.h>
 
 #include <QColor>
 #include <QApplication>

@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <multiplier/ui/IProjectExplorer.h>
-#include <multiplier/ui/ISearchWidget.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/IProjectExplorer.h>
+#include <multiplier/GUI/ISearchWidget.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 namespace mx::gui {
 

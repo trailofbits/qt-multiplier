@@ -9,7 +9,7 @@
 #include "CodeView.h"
 #include "GoToLineWidget.h"
 
-#include <multiplier/ui/Assert.h>
+#include <multiplier/GUI/Assert.h>
 
 #include <multiplier/Frontend/TokenCategory.h>
 

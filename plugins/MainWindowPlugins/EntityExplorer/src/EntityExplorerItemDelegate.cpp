@@ -8,9 +8,9 @@
 
 #include "EntityExplorerItemDelegate.h"
 
-#include <multiplier/ui/CodeViewTheme.h>
-#include <multiplier/ui/IEntityExplorerModel.h>
-#include <multiplier/ui/TokenPainter.h>
+#include <multiplier/GUI/CodeViewTheme.h>
+#include <multiplier/GUI/IEntityExplorerModel.h>
+#include <multiplier/GUI/TokenPainter.h>
 
 #include <multiplier/Frontend/Token.h>
 

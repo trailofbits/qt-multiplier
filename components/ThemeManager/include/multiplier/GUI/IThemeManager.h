@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/ui/CodeViewTheme.h>
+#include <multiplier/GUI/CodeViewTheme.h>
 
 #include <QObject>
 #include <QPalette>

@@ -9,7 +9,7 @@
 #include "SortFilterProxyModel.h"
 #include "InformationExplorerModel.h"
 
-#include <multiplier/ui/Assert.h>
+#include <multiplier/GUI/Assert.h>
 
 namespace mx::gui {
 

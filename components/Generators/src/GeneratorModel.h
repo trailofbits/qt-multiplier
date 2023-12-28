@@ -10,7 +10,7 @@
 
 #include "ITreeExplorerExpansionThread.h"
 
-#include <multiplier/ui/IGeneratorModel.h>
+#include <multiplier/GUI/IGeneratorModel.h>
 
 #include <multiplier/Types.h>
 

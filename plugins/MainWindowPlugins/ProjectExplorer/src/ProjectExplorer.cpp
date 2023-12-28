@@ -9,7 +9,7 @@
 #include "ProjectExplorer.h"
 
 #include <filesystem>
-#include <multiplier/ui/Assert.h>
+#include <multiplier/GUI/Assert.h>
 
 #include <QTreeView>
 #include <QVBoxLayout>

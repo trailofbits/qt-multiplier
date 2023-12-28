@@ -8,7 +8,7 @@
 
 #include "ProjectExplorer.h"
 
-#include <multiplier/ui/IProjectExplorer.h>
+#include <multiplier/GUI/IProjectExplorer.h>
 
 namespace mx::gui {
 

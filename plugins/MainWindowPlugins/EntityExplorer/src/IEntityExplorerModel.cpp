@@ -8,7 +8,7 @@
 
 #include "EntityExplorerModel.h"
 
-#include <multiplier/ui/IEntityExplorerModel.h>
+#include <multiplier/GUI/IEntityExplorerModel.h>
 
 namespace mx::gui {
 

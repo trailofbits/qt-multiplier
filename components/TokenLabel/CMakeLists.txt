@@ -7,7 +7,7 @@
 #
 
 add_library("mx_tokenlabel"
-  include/multiplier/ui/ITokenLabel.h
+  include/multiplier/GUI/ITokenLabel.h
   src/ITokenLabel.cpp
 
   src/TokenLabel.h

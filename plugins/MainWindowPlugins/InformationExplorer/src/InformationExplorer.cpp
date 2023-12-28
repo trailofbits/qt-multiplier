@@ -12,9 +12,9 @@
 #include "SortFilterProxyModel.h"
 #include "InformationExplorerModel.h"
 
-#include <multiplier/ui/Assert.h>
-#include <multiplier/ui/HistoryWidget.h>
-#include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/GUI/Assert.h>
+#include <multiplier/GUI/HistoryWidget.h>
+#include <multiplier/GUI/IGlobalHighlighter.h>
 
 #include <QVBoxLayout>
 #include <QToolBar>

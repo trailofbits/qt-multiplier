@@ -9,7 +9,7 @@
 #include "CodeModel.h"
 
 #include <multiplier/Frontend/MacroKind.h>
-#include <multiplier/ui/ICodeModel.h>
+#include <multiplier/GUI/ICodeModel.h>
 
 #include <QModelIndex>
 #include <QVariant>

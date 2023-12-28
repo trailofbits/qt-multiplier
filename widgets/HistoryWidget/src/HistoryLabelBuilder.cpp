@@ -12,7 +12,7 @@
 
 #include <filesystem>
 #include <multiplier/Index.h>
-#include <multiplier/ui/Util.h>
+#include <multiplier/GUI/Util.h>
 
 namespace mx::gui {
 

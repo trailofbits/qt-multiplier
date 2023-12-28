@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/ITreeGenerator.h>
+#include <multiplier/GUI/ITreeGenerator.h>
 
 #include <multiplier/Types.h>
 

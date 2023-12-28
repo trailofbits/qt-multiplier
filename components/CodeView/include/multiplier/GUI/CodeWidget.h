@@ -8,10 +8,10 @@
 
 #include <QWidget>
 
-#include <multiplier/ui/ICodeView.h>
-#include <multiplier/ui/IThemeManager.h>
-#include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/IMacroExplorer.h>
+#include <multiplier/GUI/ICodeView.h>
+#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/IGlobalHighlighter.h>
+#include <multiplier/GUI/IMacroExplorer.h>
 
 #include <multiplier/Index.h>
 

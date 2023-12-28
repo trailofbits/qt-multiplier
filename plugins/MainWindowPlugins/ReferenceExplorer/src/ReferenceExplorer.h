@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include <multiplier/ui/ICodeView.h>
-#include <multiplier/ui/ITreeGenerator.h>
-#include <multiplier/ui/PopupWidgetContainer.h>
+#include <multiplier/GUI/ICodeView.h>
+#include <multiplier/GUI/ITreeGenerator.h>
+#include <multiplier/GUI/PopupWidgetContainer.h>
 
 #include <QWidget>
 

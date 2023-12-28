@@ -4,10 +4,10 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <multiplier/ui/CodeWidget.h>
-#include <multiplier/ui/IDatabase.h>
-#include <multiplier/ui/Icons.h>
-#include <multiplier/ui/Util.h>
+#include <multiplier/GUI/CodeWidget.h>
+#include <multiplier/GUI/IDatabase.h>
+#include <multiplier/GUI/Icons.h>
+#include <multiplier/GUI/Util.h>
 
 #include <QVBoxLayout>
 #include <QLabel>

@@ -7,10 +7,10 @@
 #
 
 add_library("mx_entity_explorer_plugin"
-  include/multiplier/ui/IEntityExplorerModel.h
+  include/multiplier/GUI/IEntityExplorerModel.h
   src/IEntityExplorerModel.cpp
 
-  include/multiplier/ui/IEntityExplorer.h
+  include/multiplier/GUI/IEntityExplorer.h
   src/IEntityExplorer.cpp
 
   src/EntityExplorerModel.h

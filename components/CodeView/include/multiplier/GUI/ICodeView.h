@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <multiplier/ui/CodeViewTheme.h>
-#include <multiplier/ui/ICodeModel.h>
+#include <multiplier/GUI/CodeViewTheme.h>
+#include <multiplier/GUI/ICodeModel.h>
 
 #include <QWidget>
 

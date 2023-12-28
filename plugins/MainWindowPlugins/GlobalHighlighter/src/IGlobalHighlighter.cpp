@@ -8,7 +8,7 @@
 
 #include "GlobalHighlighter.h"
 
-#include <multiplier/ui/IGlobalHighlighter.h>
+#include <multiplier/GUI/IGlobalHighlighter.h>
 
 namespace mx::gui {
 

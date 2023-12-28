@@ -8,9 +8,9 @@
 
 #include "HistoryLabelBuilder.h"
 
-#include <multiplier/ui/HistoryWidget.h>
-#include <multiplier/ui/Icons.h>
-#include <multiplier/ui/Assert.h>
+#include <multiplier/GUI/HistoryWidget.h>
+#include <multiplier/GUI/Icons.h>
+#include <multiplier/GUI/Assert.h>
 
 #include <multiplier/Index.h>
 

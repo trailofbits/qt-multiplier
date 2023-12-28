@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IReferenceExplorerPlugin.h>
+#include <multiplier/GUI/IReferenceExplorerPlugin.h>
 
 #include <memory>
 

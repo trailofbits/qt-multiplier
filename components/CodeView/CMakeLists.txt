@@ -7,13 +7,13 @@
 #
 
 add_library("mx_codeview"
-  include/multiplier/ui/ICodeView.h
+  include/multiplier/GUI/ICodeView.h
   src/ICodeView.cpp
 
   src/CodeView.h
   src/CodeView.cpp
 
-  include/multiplier/ui/ICodeModel.h
+  include/multiplier/GUI/ICodeModel.h
   src/ICodeModel.cpp
 
   src/CodeModel.h
@@ -22,7 +22,7 @@ add_library("mx_codeview"
   src/GoToLineWidget.h
   src/GoToLineWidget.cpp
 
-  include/multiplier/ui/CodeWidget.h
+  include/multiplier/GUI/CodeWidget.h
   src/CodeWidget.cpp
 )
 

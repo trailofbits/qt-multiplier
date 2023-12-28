@@ -7,7 +7,7 @@
 #
 
 add_library("mx_codeviewtheme"
-  include/multiplier/ui/CodeViewTheme.h
+  include/multiplier/GUI/CodeViewTheme.h
   src/CodeViewTheme.cpp
 
   src/DefaultCodeViewThemes.h

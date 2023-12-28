@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <multiplier/ui/IEntityExplorer.h>
-#include <multiplier/ui/ISearchWidget.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/IEntityExplorer.h>
+#include <multiplier/GUI/ISearchWidget.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include <QEvent>
 #include <QWidget>

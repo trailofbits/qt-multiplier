@@ -11,7 +11,7 @@ add_library("mx_python_console_widget"
   src/PythonCodeRunner.cpp
   src/PythonCodeRunner.h
 
-  include/multiplier/ui/PythonConsoleWidget.h
+  include/multiplier/GUI/PythonConsoleWidget.h
   src/PythonConsoleWidget.cpp
 
   src/PythonCompletionModel.cpp

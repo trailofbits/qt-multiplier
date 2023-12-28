@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/LineEditWidget.h>
+#include <multiplier/GUI/LineEditWidget.h>
 
 #include <QCompleter>
 #include <QStringListModel>

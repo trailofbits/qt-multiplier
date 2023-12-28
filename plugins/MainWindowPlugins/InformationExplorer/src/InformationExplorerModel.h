@@ -11,8 +11,8 @@
 #include <QObject>
 #include <QString>
 
-#include <multiplier/ui/IModel.h>
-#include <multiplier/ui/IDatabase.h>
+#include <multiplier/GUI/IModel.h>
+#include <multiplier/GUI/IDatabase.h>
 
 #include <unordered_map>
 #include <vector>

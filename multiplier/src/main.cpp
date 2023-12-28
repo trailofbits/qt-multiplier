@@ -9,9 +9,9 @@
 #include "Style.h"
 
 #include <multiplier/Index.h>
-#include <multiplier/ui/Context.h>
-#include <multiplier/ui/FontDatabase.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/Context.h>
+#include <multiplier/GUI/FontDatabase.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include <QApplication>
 #include <QCommandLineOption>

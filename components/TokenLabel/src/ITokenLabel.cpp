@@ -8,7 +8,7 @@
 
 #include "TokenLabel.h"
 
-#include <multiplier/ui/ITokenLabel.h>
+#include <multiplier/GUI/ITokenLabel.h>
 
 namespace mx::gui {
 

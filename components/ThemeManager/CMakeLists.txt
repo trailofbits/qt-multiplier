@@ -7,7 +7,7 @@
 #
 
 add_library("mx_thememanager"
-  include/multiplier/ui/IThemeManager.h
+  include/multiplier/GUI/IThemeManager.h
   src/IThemeManager.cpp
 
   src/ThemeManager.h

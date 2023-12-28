@@ -8,7 +8,7 @@
 
 #include "CategoryComboBox.h"
 
-#include <multiplier/ui/Assert.h>
+#include <multiplier/GUI/Assert.h>
 
 #include <QComboBox>
 #include <QVBoxLayout>

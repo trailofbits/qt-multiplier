@@ -6,8 +6,8 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/ui/Icons.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/Icons.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include <QBitmap>
 #include <QPainter>

@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include <multiplier/ui/Context.h>
-#include <multiplier/ui/ActionRegistry.h>
-#include <multiplier/ui/IMainWindowPlugin.h>
-#include <multiplier/ui/IReferenceExplorerPlugin.h>
+#include <multiplier/GUI/Context.h>
+#include <multiplier/GUI/ActionRegistry.h>
+#include <multiplier/GUI/IMainWindowPlugin.h>
+#include <multiplier/GUI/IReferenceExplorerPlugin.h>
 
 #include <vector>
 

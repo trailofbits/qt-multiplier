@@ -8,7 +8,7 @@
 
 #include "ExpandTreeExplorerThread.h"
 
-#include <multiplier/ui/ITreeGenerator.h>
+#include <multiplier/GUI/ITreeGenerator.h>
 
 namespace mx::gui {
 

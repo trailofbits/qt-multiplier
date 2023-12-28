@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IDatabase.h>
+#include <multiplier/GUI/IDatabase.h>
 
 #include <multiplier/Index.h>
 

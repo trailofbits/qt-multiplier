@@ -4,7 +4,7 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <multiplier/ui/IModel.h>
+#include <multiplier/GUI/IModel.h>
 
 #include <multiplier/Entity.h>
 #include <multiplier/Index.h>

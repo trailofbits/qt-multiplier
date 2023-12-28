@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include <multiplier/ui/Icons.h>
-#include <multiplier/ui/Util.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/Icons.h>
+#include <multiplier/GUI/Util.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include <optional>
 

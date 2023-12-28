@@ -10,8 +10,8 @@
 #include "InformationExplorerModel.h"
 #include "Utils.h"
 
-#include <multiplier/ui/TokenPainter.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/TokenPainter.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include <QFontMetrics>
 #include <QPainter>

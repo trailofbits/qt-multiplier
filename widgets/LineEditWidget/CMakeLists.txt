@@ -7,7 +7,7 @@
 #
 
 add_library("mx_line_edit_widget"
-  include/multiplier/ui/LineEditWidget.h
+  include/multiplier/GUI/LineEditWidget.h
   src/LineEditWidget.cpp
 )
 

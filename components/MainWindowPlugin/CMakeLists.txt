@@ -7,7 +7,7 @@
 #
 
 add_library("mx_mainwindowplugin"
-  include/multiplier/ui/IMainWindowPlugin.h
+  include/multiplier/GUI/IMainWindowPlugin.h
   src/IMainWindowPlugin.cpp
 )
 

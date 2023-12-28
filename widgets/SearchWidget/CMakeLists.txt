@@ -7,7 +7,7 @@
 #
 
 add_library("mx_search_widget"
-  include/multiplier/ui/SearchWidget.h
+  include/multiplier/GUI/SearchWidget.h
   src/SearchWidget.cpp
 )
 

@@ -9,7 +9,7 @@
 #pragma once
 
 #include <multiplier/Types.h>
-#include <multiplier/ui/IModel.h>
+#include <multiplier/GUI/IModel.h>
 
 #include <utility>
 

@@ -6,7 +6,7 @@
 
 #include <Python.h>
 
-#include <multiplier/ui/PythonConsoleWidget.h>
+#include <multiplier/GUI/PythonConsoleWidget.h>
 
 #include <QAbstractItemView>
 #include <QApplication>
@@ -21,7 +21,7 @@
 
 #include <multiplier/Bindings/Python.h>
 #include <multiplier/Index.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include "PythonCodeRunner.h"
 #include "PythonCompletionModel.h"

@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <multiplier/ui/IThemeManager.h>
-#include <multiplier/ui/IMacroExplorer.h>
+#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/IMacroExplorer.h>
 
 namespace mx {
 class DefineMacroDirective;

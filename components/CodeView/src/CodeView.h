@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <multiplier/ui/ICodeView.h>
-#include <multiplier/ui/ISearchWidget.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/ICodeView.h>
+#include <multiplier/GUI/ISearchWidget.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include <multiplier/Frontend/Token.h>
 

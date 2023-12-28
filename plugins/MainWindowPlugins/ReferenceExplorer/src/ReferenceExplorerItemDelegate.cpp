@@ -8,9 +8,9 @@
 
 #include "ReferenceExplorerItemDelegate.h"
 
-#include <multiplier/ui/CodeViewTheme.h>
-#include <multiplier/ui/IGeneratorModel.h>
-#include <multiplier/ui/TokenPainter.h>
+#include <multiplier/GUI/CodeViewTheme.h>
+#include <multiplier/GUI/IGeneratorModel.h>
+#include <multiplier/GUI/TokenPainter.h>
 
 #include <multiplier/Frontend/Token.h>
 

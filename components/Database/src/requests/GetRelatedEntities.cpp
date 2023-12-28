@@ -8,7 +8,7 @@
 
 #include "GetRelatedEntities.h"
 
-#include <multiplier/ui/Util.h>
+#include <multiplier/GUI/Util.h>
 
 #include <multiplier/AST/Decl.h>
 

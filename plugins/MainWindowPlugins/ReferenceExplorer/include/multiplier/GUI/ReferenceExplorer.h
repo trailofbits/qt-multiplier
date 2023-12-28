@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/ui/IMainWindowPlugin.h>
+#include <multiplier/GUI/IMainWindowPlugin.h>
 
 namespace mx::gui {
 

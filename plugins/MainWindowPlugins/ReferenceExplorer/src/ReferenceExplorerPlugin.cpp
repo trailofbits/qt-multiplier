@@ -6,11 +6,11 @@
 
 #include "ReferenceExplorerPlugin.h"
 
-#include <multiplier/ui/IModel.h>
-#include <multiplier/ui/ITreeGenerator.h>
-#include <multiplier/ui/MxTabWidget.h>
-#include <multiplier/ui/PopupWidgetContainer.h>
-#include <multiplier/ui/SimpleTextInputDialog.h>
+#include <multiplier/GUI/IModel.h>
+#include <multiplier/GUI/ITreeGenerator.h>
+#include <multiplier/GUI/MxTabWidget.h>
+#include <multiplier/GUI/PopupWidgetContainer.h>
+#include <multiplier/GUI/SimpleTextInputDialog.h>
 
 #include <QDialog>
 #include <QTabBar>

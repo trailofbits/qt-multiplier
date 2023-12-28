@@ -8,7 +8,7 @@
 
 #include "CodeView.h"
 
-#include <multiplier/ui/ICodeView.h>
+#include <multiplier/GUI/ICodeView.h>
 
 namespace mx::gui {
 

@@ -7,7 +7,7 @@
 #
 
 add_library("mx_context"
-  include/multiplier/ui/Context.h
+  include/multiplier/GUI/Context.h
   src/Context.cpp
 )
 

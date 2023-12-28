@@ -10,8 +10,8 @@
 #include "EntityExplorerItemDelegate.h"
 #include "CategoryComboBox.h"
 
-#include <multiplier/ui/Assert.h>
-#include <multiplier/ui/IThemeManager.h>
+#include <multiplier/GUI/Assert.h>
+#include <multiplier/GUI/IThemeManager.h>
 
 #include <QBrush>
 #include <QCheckBox>

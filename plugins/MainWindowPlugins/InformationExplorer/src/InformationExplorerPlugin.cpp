@@ -6,12 +6,12 @@
 
 #include "InformationExplorerPlugin.h"
 
-#include <multiplier/ui/Context.h>
-#include <multiplier/ui/DockWidgetContainer.h>
-#include <multiplier/ui/IModel.h>
-#include <multiplier/ui/MxTabWidget.h>
-#include <multiplier/ui/SimpleTextInputDialog.h>
-#include <multiplier/ui/Util.h>
+#include <multiplier/GUI/Context.h>
+#include <multiplier/GUI/DockWidgetContainer.h>
+#include <multiplier/GUI/IModel.h>
+#include <multiplier/GUI/MxTabWidget.h>
+#include <multiplier/GUI/SimpleTextInputDialog.h>
+#include <multiplier/GUI/Util.h>
 
 #include <QDialog>
 

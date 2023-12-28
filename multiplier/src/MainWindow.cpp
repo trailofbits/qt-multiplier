@@ -6,34 +6,34 @@
 
 #include "MainWindow.h"
 
-#include <multiplier/ui/CallHierarchyPlugin.h>
-#include <multiplier/ui/Context.h>
-#include <multiplier/ui/InformationExplorer.h>
-#include <multiplier/ui/ReferenceExplorer.h>
+#include <multiplier/GUI/CallHierarchyPlugin.h>
+#include <multiplier/GUI/Context.h>
+#include <multiplier/GUI/InformationExplorer.h>
+#include <multiplier/GUI/ReferenceExplorer.h>
 
-#include <multiplier/ui/SimpleTextInputDialog.h>
-// #include <multiplier/ui/InformationExplorerWidget.h>
-#include <multiplier/ui/MxTabWidget.h>
-#include <multiplier/ui/CodeWidget.h>
-#include <multiplier/ui/PopupWidgetContainer.h>
-#include <multiplier/ui/DockWidgetContainer.h>
-#include <multiplier/ui/Assert.h>
-#include <multiplier/ui/CodeViewTheme.h>
-#include <multiplier/ui/HistoryWidget.h>
-#include <multiplier/ui/Icons.h>
-#include <multiplier/ui/IEntityExplorer.h>
-#include <multiplier/ui/IGlobalHighlighter.h>
-#include <multiplier/ui/IMacroExplorer.h>
-#include <multiplier/ui/IProjectExplorer.h>
-#include <multiplier/ui/IThemeManager.h>
-#include <multiplier/ui/IGeneratorModel.h>
-#include <multiplier/ui/Util.h>
-#include <multiplier/ui/IGeneratorView.h>
+#include <multiplier/GUI/SimpleTextInputDialog.h>
+// #include <multiplier/GUI/InformationExplorerWidget.h>
+#include <multiplier/GUI/MxTabWidget.h>
+#include <multiplier/GUI/CodeWidget.h>
+#include <multiplier/GUI/PopupWidgetContainer.h>
+#include <multiplier/GUI/DockWidgetContainer.h>
+#include <multiplier/GUI/Assert.h>
+#include <multiplier/GUI/CodeViewTheme.h>
+#include <multiplier/GUI/HistoryWidget.h>
+#include <multiplier/GUI/Icons.h>
+#include <multiplier/GUI/IEntityExplorer.h>
+#include <multiplier/GUI/IGlobalHighlighter.h>
+#include <multiplier/GUI/IMacroExplorer.h>
+#include <multiplier/GUI/IProjectExplorer.h>
+#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/IGeneratorModel.h>
+#include <multiplier/GUI/Util.h>
+#include <multiplier/GUI/IGeneratorView.h>
 
-#include <multiplier/ui/ActionRegistry.h>
+#include <multiplier/GUI/ActionRegistry.h>
 
 #ifndef MX_DISABLE_PYTHON_BINDINGS
-# include <multiplier/ui/PythonConsoleWidget.h>
+# include <multiplier/GUI/PythonConsoleWidget.h>
 #endif
 
 #include <multiplier/AST/StmtKind.h>

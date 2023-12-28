@@ -7,10 +7,10 @@
 #
 
 add_library("mx_project_explorer_plugin"
-  include/multiplier/ui/IProjectExplorer.h
+  include/multiplier/GUI/IProjectExplorer.h
   src/IProjectExplorer.cpp
 
-  include/multiplier/ui/IFileTreeModel.h
+  include/multiplier/GUI/IFileTreeModel.h
   src/IFileTreeModel.cpp
 
   src/ProjectExplorer.h

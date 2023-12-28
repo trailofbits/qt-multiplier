@@ -7,7 +7,7 @@
 #
 
 add_library("mx_call_hierarchy_plugin"
-  include/multiplier/ui/CallHierarchyPlugin.h
+  include/multiplier/GUI/CallHierarchyPlugin.h
 
   src/CallHierarchyGenerator.cpp
   src/CallHierarchyGenerator.h

@@ -4,11 +4,11 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <multiplier/ui/CallHierarchyPlugin.h>
+#include <multiplier/GUI/CallHierarchyPlugin.h>
 
-#include <multiplier/ui/ActionRegistry.h>
-#include <multiplier/ui/Context.h>
-#include <multiplier/ui/IModel.h>
+#include <multiplier/GUI/ActionRegistry.h>
+#include <multiplier/GUI/Context.h>
+#include <multiplier/GUI/IModel.h>
 
 #include "CallHierarchyGenerator.h"
 

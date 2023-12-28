@@ -8,7 +8,7 @@
 
 #include <multiplier/Entity.h>
 #include <multiplier/Frontend/Token.h>
-#include <multiplier/ui/Util.h>
+#include <multiplier/GUI/Util.h>
 
 #include <QDebug>
 #include <QObject>
