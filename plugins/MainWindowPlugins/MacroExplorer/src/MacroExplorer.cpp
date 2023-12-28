@@ -295,7 +295,7 @@ MacroExplorer::MacroExplorer(const Index &index,
   layout->addWidget(scroll_area);
   setLayout(layout);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &MacroExplorer::OnThemeChange);
 }
 

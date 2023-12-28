@@ -15,9 +15,9 @@ class Index;
 }  // namespace mx
 namespace mx::gui {
 
-class ActionRegistry;
+class ActionManager;
 class IAction;
-class IThemeManager;
+class ThemeManager;
 class TriggerHandle;
 
 // Global UI context. There is one context per application.
@@ -33,7 +33,7 @@ class Context {
   
   explicit Context(const class Index &index_);
 
-  class ActionRegistry &ActionRegistry(void) const noexcept;
+  class ActionManager &ActionManager(void) const noexcept;
 
   TriggerHandle RegisterAction(IAction &action) const noexcept;
   TriggerHandle FindAction(const QString &action) const noexcept;
@@ -45,7 +45,7 @@ class Context {
   const class FileLocationCache &FileLocationCache(void) const noexcept;
 
   // Get access to the global theme manager.
-  IThemeManager &ThemeManager(void) const noexcept;
+  ThemeManager &ThemeManager(void) const noexcept;
 };
 
 }  // namespace mx::gui

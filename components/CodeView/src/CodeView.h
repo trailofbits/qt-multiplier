@@ -10,7 +10,7 @@
 
 #include <multiplier/GUI/ICodeView.h>
 #include <multiplier/GUI/ISearchWidget.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 #include <multiplier/Frontend/Token.h>
 

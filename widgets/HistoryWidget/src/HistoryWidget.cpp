@@ -119,7 +119,7 @@ HistoryWidget::HistoryWidget(const Index &index_,
   InitializeWidgets(parent, install_global_shortcuts);
 
   UpdateIcons();
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &HistoryWidget::OnThemeChange);
 }
 

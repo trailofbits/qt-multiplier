@@ -117,7 +117,7 @@ GlobalHighlighter::GlobalHighlighter(
   layout->addWidget(d->scroll_area);
   setLayout(layout);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &GlobalHighlighter::OnThemeChange);
 
   setEnabled(false);

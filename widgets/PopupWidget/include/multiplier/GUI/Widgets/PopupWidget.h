@@ -6,248 +6,87 @@
 
 #pragma once
 
-#include <multiplier/GUI/Icons.h>
-#include <multiplier/GUI/Util.h>
-#include <multiplier/GUI/IThemeManager.h>
-
-#include <optional>
-
-#include <QWidget>
-#include <QVBoxLayout>
-#include <QPushButton>
-#include <QSizeGrip>
-#include <QLabel>
-#include <QApplication>
-#include <QKeyEvent>
 #include <QCloseEvent>
+#include <QKeyEvent>
 #include <QMouseEvent>
-#include <QTimer>
+#include <QPalette>
+#include <QResizeEvent>
+#include <QShowEvent>
+#include <QWidget>
+
+#include <memory>
 
 namespace mx::gui {
 
+class CodeViewTheme;
+
 //! A wrapper class that turns a widget into a popup
-class PopupWidget final : public QWidget {
+class PopupWidget Q_DECL_FINAL : public QWidget {
   Q_OBJECT
 
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
-  PopupWidget(QWidget *parent);
-
  public:
 
-  template <typename Widget, typename... Args>
-  static PopupWidget *Create(Args... args, QWidget *parent = nullptr) {
-    auto popup = new PopupWidget(parent);
-    popup->InitializeWidgets(new Widget(std::move(args)..., popup));
-    return popup;
-  }
+  //! Destructor
+  virtual ~PopupWidget(void);
 
   //! Constructor
-  template <typename... Args>
-  PopupWidget(Args &&...args) : QWidget(nullptr),
-                                         d(new PrivateData) {
+  PopupWidget(QWidget *parent = nullptr);
 
-    auto wrapped_widget = new Widget(std::forward<Args>(args)...);
-    initializeWidgets(wrapped_widget);
-
-    UpdateIcons();
-    connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
-            &PopupWidget<Widget>::OnThemeChange);
-
-    OnUpdateTitle();
-    connect(&d->title_update_timer, &QTimer::timeout, this,
-            &PopupWidget<Widget>::OnUpdateTitle);
-
-    d->title_update_timer.start(500);
-  }
-
-  //! Destructor
-  virtual ~PopupWidget() = default;
+  //! Initializes the internal widgets
+  void SetWrappedWidget(QWidget *wrapped_widget);
 
   //! Returns the wrapped widget
-  Widget *GetWrappedWidget() {
-    return d->wrapped_widget;
-  }
+  QWidget *WrappedWidget(void) const;
 
   //! Disabled copy constructor
   PopupWidget(const PopupWidget &) = delete;
-
-  //! Disabled copy assignment operator
+  PopupWidget(PopupWidget &&) noexcept = delete;
   PopupWidget &operator=(const PopupWidget &) = delete;
+  PopupWidget &operator=(PopupWidget &&) noexcept = delete;
 
  protected:
   //! Closes the widget when the escape key is pressed
-  virtual void keyPressEvent(QKeyEvent *event) override {
-    if (event->key() == Qt::Key_Escape) {
-      close();
-
-    } else {
-      QWidget::keyPressEvent(event);
-    }
-  }
+  void keyPressEvent(QKeyEvent *event) Q_DECL_FINAL;
 
   //! Helps determine if the widget should be restored on focus
-  virtual void showEvent(QShowEvent *event) override {
-    d->closed = false;
-
-    QWidget::showEvent(event);
-  }
+  void showEvent(QShowEvent *event) Q_DECL_FINAL;
 
   //! Helps determine if the widget should be restored on focus
-  virtual void closeEvent(QCloseEvent *event) override {
-    d->closed = true;
-
-    QWidget::closeEvent(event);
-  }
-
-  //! Used to handle window movements
-  virtual bool eventFilter(QObject *obj, QEvent *event) override {
-    if (event->type() == QEvent::MouseButtonPress) {
-      auto mouse_event = static_cast<QMouseEvent *>(event);
-      OnTitleFrameMousePress(mouse_event);
-
-      return true;
-
-    } else if (event->type() == QEvent::MouseMove) {
-      auto mouse_event = static_cast<QMouseEvent *>(event);
-      OnTitleFrameMouseMove(mouse_event);
-
-      return true;
-
-    } else if (event->type() == QEvent::MouseButtonRelease) {
-      auto mouse_event = static_cast<QMouseEvent *>(event);
-      OnTitleFrameMouseRelease(mouse_event);
-
-      return true;
-    }
-
-    return QWidget::eventFilter(obj, event);
-  }
+  void closeEvent(QCloseEvent *event) Q_DECL_FINAL;
 
   //! Used to update the size grip position
-  virtual void resizeEvent(QResizeEvent *event) override {
-    QPoint size_grip_pos(width() - d->size_grip->width(),
-                         height() - d->size_grip->height());
-    d->size_grip->move(size_grip_pos);
-    QWidget::resizeEvent(event);
-  }
+  void resizeEvent(QResizeEvent *event) Q_DECL_FINAL;
+
+  //! Used to handle window movements
+  bool eventFilter(QObject *obj, QEvent *event) Q_DECL_FINAL;
 
  private:
-  //! Private class data
-  struct PrivateData final {
-    bool closed{false};
-
-    QPushButton *close_button{nullptr};
-    QLabel *window_title{nullptr};
-    Widget *wrapped_widget{nullptr};
-
-    std::optional<QPoint> opt_previous_drag_pos;
-    QSizeGrip *size_grip{nullptr};
-
-    QTimer title_update_timer;
-  };
-
-  std::unique_ptr<PrivateData> d;
-
-  //! Initializes the internal widgets
-  void InitializeWidgets(Widget *wrapped_widget) {
-    d->wrapped_widget = wrapped_widget;
-    setAttribute(Qt::WA_QuitOnClose, false);
-
-    setContentsMargins(5, 5, 5, 5);
-    setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
-                   Qt::WindowStaysOnTopHint);
-
-    QWidget::connect(qApp, &QGuiApplication::applicationStateChanged, this,
-                     &PopupWidget<Widget>::OnApplicationStateChange);
-
-    d->window_title = new QLabel(d->wrapped_widget->windowTitle());
-
-    d->close_button = new QPushButton(QIcon(), "", this);
-    d->close_button->setToolTip(QObject::tr("Close"));
-    d->close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
-
-    QWidget::connect(d->close_button, &QPushButton::clicked, this,
-                     &PopupWidget<Widget>::close);
-
-    auto title_frame_layout = new QHBoxLayout();
-    title_frame_layout->setContentsMargins(0, 0, 0, 0);
-    title_frame_layout->addWidget(d->window_title);
-    title_frame_layout->addStretch();
-    title_frame_layout->addWidget(d->close_button);
-
-    auto title_frame = new QWidget(this);
-    title_frame->installEventFilter(this);
-    title_frame->setContentsMargins(0, 0, 0, 0);
-    title_frame->setLayout(title_frame_layout);
-
-    d->wrapped_widget->setSizePolicy(QSizePolicy::Expanding,
-                                     QSizePolicy::Expanding);
-
-    auto main_layout = new QVBoxLayout();
-    main_layout->setContentsMargins(0, 0, 0, 0);
-    main_layout->addWidget(title_frame);
-    main_layout->addWidget(d->wrapped_widget);
-    main_layout->addStretch();
-
-    setLayout(main_layout);
-
-    d->size_grip = new QSizeGrip(this);
-    d->size_grip->resize(12, 12);
-  }
 
   //! Used to start window dragging
-  void OnTitleFrameMousePress(QMouseEvent *event) {
-    d->opt_previous_drag_pos = event->globalPosition().toPoint();
-  }
+  void OnTitleFrameMousePress(QMouseEvent *event);
 
   //! Used to move the window by moving the title frame
-  void OnTitleFrameMouseMove(QMouseEvent *event) {
-    if (!d->opt_previous_drag_pos.has_value()) {
-      return;
-    }
-
-    auto &previous_drag_pos = d->opt_previous_drag_pos.value();
-
-    auto diff = event->globalPosition().toPoint() - previous_drag_pos;
-    previous_drag_pos = event->globalPosition().toPoint();
-
-    move(x() + diff.x(), y() + diff.y());
-  }
+  void OnTitleFrameMouseMove(QMouseEvent *event);
 
   //! Used to stop window dragging
-  void OnTitleFrameMouseRelease(QMouseEvent *event) {
-    d->opt_previous_drag_pos = std::nullopt;
-  }
+  void OnTitleFrameMouseRelease(QMouseEvent *event);
 
   //! Updates the widget icons to match the active theme
-  void UpdateIcons() {
-    d->close_button->setIcon(GetIcon(":/Icons/PopupWidget/close"));
-  }
+  void UpdateIcons(void);
 
  private slots:
   //! Restores the widget visibility when the application gains focus
-  void OnApplicationStateChange(Qt::ApplicationState state) {
-    if (d->closed) {
-      return;
-    }
-
-    auto window_is_visible = state == Qt::ApplicationActive;
-    setVisible(window_is_visible);
-  }
+  void OnApplicationStateChange(Qt::ApplicationState state);
 
   //! Updates the window title at regular intervals
-  void OnUpdateTitle() {
-    setWindowTitle(d->wrapped_widget->windowTitle());
-    d->window_title->setText(windowTitle());
-  }
+  void OnUpdateTitle(void);
 
   //! Called by the theme manager
   void OnThemeChange(const QPalette &palette,
-                     const CodeViewTheme &code_view_theme) {
-    UpdateIcons();
-  }
+                     const CodeViewTheme &code_view_theme);
 };
 
 }  // namespace mx::gui

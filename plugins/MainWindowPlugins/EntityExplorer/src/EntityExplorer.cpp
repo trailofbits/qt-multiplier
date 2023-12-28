@@ -11,7 +11,7 @@
 #include "CategoryComboBox.h"
 
 #include <multiplier/GUI/Assert.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 #include <QBrush>
 #include <QCheckBox>
@@ -106,11 +106,11 @@ void EntityExplorer::InitializeWidgets() {
   setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &EntityExplorer::OnThemeChange);
 
-  OnThemeChange(IThemeManager::Get().GetPalette(),
-                IThemeManager::Get().GetCodeViewTheme());
+  OnThemeChange(ThemeManager::Get().GetPalette(),
+                ThemeManager::Get().GetCodeViewTheme());
 }
 
 void EntityExplorer::InstallModel(IEntityExplorerModel *model,

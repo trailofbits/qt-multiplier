@@ -13,7 +13,7 @@ add_library("mx_mainwindowplugin"
 
 target_link_libraries("mx_mainwindowplugin"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

@@ -10,7 +10,7 @@
 #include "FilterSettingsWidget.h"
 #include "SearchFilterModelProxy.h"
 
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 #include <multiplier/GUI/Assert.h>
 #include <multiplier/GUI/TreeWidget.h>
 

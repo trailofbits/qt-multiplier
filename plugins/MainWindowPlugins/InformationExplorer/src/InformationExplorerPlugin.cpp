@@ -44,11 +44,11 @@ InformationExplorerPlugin::InformationExplorerPlugin(
     : IMainWindowPlugin(context_, parent),
       context(context_),
       main_window(parent),
-      update_primary_trigger(context.ActionRegistry().Register(
+      update_primary_trigger(context.ActionManager().Register(
           this,
           "com.trailofbits.action.UpdatePrimaryInformationExplorer",
           &InformationExplorerPlugin::UpdatePrimary)),
-      open_secondary_trigger(context.ActionRegistry().Register(
+      open_secondary_trigger(context.ActionManager().Register(
           this,
           "com.trailofbits.action.OpenSecondaryInformationExplorer",
           &InformationExplorerPlugin::OpenSecondary)),

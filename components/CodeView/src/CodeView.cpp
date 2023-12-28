@@ -246,7 +246,7 @@ CodeView::CodeView(QAbstractItemModel *model, QWidget *parent)
   SetWordWrapping(false);
   OnModelReset();
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &CodeView::OnThemeChange);
 
   connect(&d->update_timer, &QTimer::timeout, this,
@@ -443,7 +443,7 @@ void CodeView::InitializeWidgets() {
                     &CodeView::OnResetZoom, Qt::WidgetWithChildrenShortcut);
 
   // This will also cause a model reset update
-  const auto &theme = IThemeManager::Get().GetCodeViewTheme();
+  const auto &theme = ThemeManager::Get().GetCodeViewTheme();
   SetTheme(theme);
 
   // NOTE(pag): This has to go last, as it requires all things to be

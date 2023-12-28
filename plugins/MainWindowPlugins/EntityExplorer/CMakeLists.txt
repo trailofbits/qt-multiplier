@@ -28,7 +28,7 @@ add_library("mx_entity_explorer_plugin"
 
 target_link_libraries("mx_entity_explorer_plugin"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

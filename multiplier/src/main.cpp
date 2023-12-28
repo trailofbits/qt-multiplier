@@ -11,7 +11,7 @@
 #include <multiplier/Index.h>
 #include <multiplier/GUI/Context.h>
 #include <multiplier/GUI/FontDatabase.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 #include <QApplication>
 #include <QCommandLineOption>
@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
 
   parser.process(application);
 
-  mx::gui::IThemeManager::Initialize(application);
+  mx::gui::ThemeManager::Initialize(application);
   mx::gui::RegisterMetaTypes();
   mx::gui::InitializeFontDatabase();
 

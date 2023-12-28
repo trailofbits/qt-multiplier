@@ -8,7 +8,7 @@
 
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>
-#include <multiplier/GUI/ActionRegistry.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/IMainWindowPlugin.h>
 
 namespace mx::gui {

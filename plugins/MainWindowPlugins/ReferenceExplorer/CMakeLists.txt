@@ -31,7 +31,7 @@ target_sources("mx_reference_explorer_plugin" INTERFACE
 
 target_link_libraries("mx_reference_explorer_plugin"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
     "mx_codeview"
     "mx_searchwidget"
     "mx_util"

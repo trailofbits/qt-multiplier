@@ -25,12 +25,12 @@
 #include <multiplier/GUI/IGlobalHighlighter.h>
 #include <multiplier/GUI/IMacroExplorer.h>
 #include <multiplier/GUI/IProjectExplorer.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 #include <multiplier/GUI/IGeneratorModel.h>
 #include <multiplier/GUI/Util.h>
 #include <multiplier/GUI/IGeneratorView.h>
 
-#include <multiplier/GUI/ActionRegistry.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 
 #ifndef MX_DISABLE_PYTHON_BINDINGS
 # include <multiplier/GUI/PythonConsoleWidget.h>
@@ -138,7 +138,7 @@ struct MainWindow::PrivateData final {
       : context(context_),
         index(context.Index()),
         file_location_cache(context.FileLocationCache()),
-        open_entity(context.ActionRegistry().Register(
+        open_entity(context.ActionManager().Register(
             self, "com.trailofbits.action.OpenEntity",
             [=] (const QVariant &data) {
               if (data.canConvert<VariantEntity>()) {
@@ -160,7 +160,7 @@ MainWindow::MainWindow(const Context &context)
   InitializeToolBar();
   InitializePlugins();
 
-  connect(&(context.ThemeManager()), &IThemeManager::ThemeChanged,
+  connect(&(context.ThemeManager()), &ThemeManager::ThemeChanged,
           this, &MainWindow::OnThemeChange);
 
   resize(1280, 800);
@@ -202,13 +202,13 @@ MainWindow::~MainWindow() {}
 //     return entity_id;
 //   };
 
-//   static const IActionRegistry::Action reference_explorer_action{
+//   static const IActionManager::Action reference_explorer_action{
 //       tr("Call Hierarchy"),
 //       "OpenCallHierarchy",
 
-//       {IActionRegistry::Action::InputType::Integer,
-//        IActionRegistry::Action::InputType::String,
-//        IActionRegistry::Action::InputType::EntityIdentifier},
+//       {IActionManager::Action::InputType::Integer,
+//        IActionManager::Action::InputType::String,
+//        IActionManager::Action::InputType::EntityIdentifier},
 
 //       [](Index index, const QVariant &input) -> bool {
 //         auto opt_entity_id = L_entityIdFromVariant(index, input);
@@ -301,7 +301,7 @@ void MainWindow::InitializeWidgets() {
   d->project_explorer_dock->raise();
 
   setDocumentMode(false);
-  mx::gui::IThemeManager::Get().SendGlobalUpdate();
+  mx::gui::ThemeManager::Get().SendGlobalUpdate();
 }
 
 void MainWindow::InitializeToolBar() {
@@ -1235,11 +1235,11 @@ void MainWindow::OnCodeViewTabClicked(int index) {
 // }
 
 void MainWindow::OnSetDarkTheme() {
-  mx::gui::IThemeManager::Get().SetTheme(true);
+  mx::gui::ThemeManager::Get().SetTheme(true);
 }
 
 void MainWindow::OnSetLightTheme() {
-  mx::gui::IThemeManager::Get().SetTheme(false);
+  mx::gui::ThemeManager::Get().SetTheme(false);
 }
 
 // void MainWindow::OnReferenceExplorerCodePreviewToggled(const bool &checked) {

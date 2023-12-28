@@ -43,7 +43,7 @@ add_library("mx_generators"
 
 target_link_libraries("mx_generators"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

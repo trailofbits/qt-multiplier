@@ -11,13 +11,9 @@ add_library("mx_search_widget"
   src/SearchWidget.cpp
 )
 
-target_sources("mx_search_widget" INTERFACE
-  resources/Resources.qrc
-)
-
 target_link_libraries("mx_search_widget"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

@@ -11,7 +11,7 @@
 #include "Types.h"
 
 #include <multiplier/GUI/IGlobalHighlighter.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 namespace mx::gui {
 

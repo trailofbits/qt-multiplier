@@ -12,7 +12,7 @@
 #include <QModelIndex>
 #include <QPalette>
 #include <QString>
-#include <multiplier/GUI/ActionRegistry.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <optional>
 #include <vector>
 

@@ -10,7 +10,7 @@
 
 #include <multiplier/GUI/IEntityExplorer.h>
 #include <multiplier/GUI/ISearchWidget.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 #include <QEvent>
 #include <QWidget>

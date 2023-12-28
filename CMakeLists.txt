@@ -51,6 +51,8 @@ else()
 endif(MX_ENABLE_PYTHON_BINDINGS)
 
 add_subdirectory("components")
+add_subdirectory("managers")
+add_subdirectory("media")
 add_subdirectory("widgets")
 add_subdirectory("plugins")
 add_subdirectory("multiplier")

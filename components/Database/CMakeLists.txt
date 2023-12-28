@@ -36,7 +36,7 @@ add_library("mx_database"
 
 target_link_libraries("mx_database"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

@@ -6,7 +6,7 @@
 
 #include <multiplier/GUI/CallHierarchyPlugin.h>
 
-#include <multiplier/GUI/ActionRegistry.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Context.h>
 #include <multiplier/GUI/IModel.h>
 
@@ -30,7 +30,7 @@ struct CallHierarchyPlugin::PrivateData {
 
   inline PrivateData(const Context &context_)
       : context(context_),
-        popup_reference_explorer_trigger(context.ActionRegistry().Find(
+        popup_reference_explorer_trigger(context.ActionManager().Find(
             "com.trailofbits.action.OpenReferenceExplorer")) {}
 };
 

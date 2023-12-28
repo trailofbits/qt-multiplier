@@ -1,9 +1,0 @@
-<RCC>
-    <qresource prefix="/Icons">
-        <file alias="Multiplier">Icons/Multiplier.icns</file>
-    </qresource>
-
-    <qresource prefix="/Icons/ToolBar">
-        <file alias="BrowserMode">Icons/browser_mode.png</file>
-    </qresource>
-</RCC>

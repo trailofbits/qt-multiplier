@@ -23,7 +23,7 @@ target_sources("mx_macro_explorer_plugin" INTERFACE
 
 target_link_libraries("mx_macro_explorer_plugin"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 #include <multiplier/GUI/IGlobalHighlighter.h>
 #include <multiplier/GUI/IGeneratorModel.h>
 

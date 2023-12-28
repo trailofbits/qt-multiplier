@@ -13,7 +13,7 @@ add_library("mx_line_edit_widget"
 
 target_link_libraries("mx_line_edit_widget"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

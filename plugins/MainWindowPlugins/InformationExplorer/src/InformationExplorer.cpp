@@ -95,7 +95,7 @@ void InformationExplorer::InitializeWidgets(InformationExplorerModel *model,
   setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &InformationExplorer::OnThemeChange);
 }
 

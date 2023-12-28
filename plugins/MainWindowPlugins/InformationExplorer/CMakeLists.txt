@@ -36,7 +36,7 @@ add_library("mx_information_explorer_plugin"
 
 target_link_libraries("mx_information_explorer_plugin"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
     "mx_actionregistry"
     "mx_context"

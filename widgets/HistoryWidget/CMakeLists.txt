@@ -14,13 +14,9 @@ add_library("mx_history_widget"
   src/HistoryLabelBuilder.cpp
 )
 
-target_sources("mx_history_widget" INTERFACE
-  resources/resources.qrc
-)
-
 target_link_libraries("mx_history_widget"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

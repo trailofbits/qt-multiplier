@@ -16,7 +16,7 @@ add_library("mx_tokenlabel"
 
 target_link_libraries("mx_tokenlabel"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
     "thirdparty_qt"
 
   PUBLIC

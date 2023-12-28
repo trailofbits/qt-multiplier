@@ -45,7 +45,7 @@ target_sources("Multiplier" PRIVATE
 
 target_link_libraries("Multiplier"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
     "thirdparty_multiplier"
     "thirdparty_qt"
     "thirdparty_phantomstyle"

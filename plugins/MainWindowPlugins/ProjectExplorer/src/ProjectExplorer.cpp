@@ -166,7 +166,7 @@ void ProjectExplorer::InitializeWidgets() {
   connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
           &ProjectExplorer::OnOpenItemContextMenu);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &ProjectExplorer::OnThemeChange);
 }
 

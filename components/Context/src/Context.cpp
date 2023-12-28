@@ -9,20 +9,20 @@
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>
 
-#include <multiplier/GUI/ActionRegistry.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 namespace mx::gui {
 
 struct Context::PrivateData {
-  class ActionRegistry action_registry;
+  class ActionManager action_registry;
   class Index index;
   class FileLocationCache file_location_cache;
-  class IThemeManager &theme_manager;
+  class ThemeManager &theme_manager;
 
   inline PrivateData(const class Index &index_)
       : index(index_),
-        theme_manager(IThemeManager::Get()) {}
+        theme_manager(ThemeManager::Get()) {}
 };
 
 Context::~Context(void) {}
@@ -30,7 +30,7 @@ Context::~Context(void) {}
 Context::Context(const class Index &index_)
     : d(new PrivateData(index_)) {}
 
-class ActionRegistry &Context::ActionRegistry(void) const noexcept {
+class ActionManager &Context::ActionManager(void) const noexcept {
   return d->action_registry;
 }
 
@@ -53,7 +53,7 @@ const class FileLocationCache &Context::FileLocationCache(void) const noexcept {
 }
 
 // Get access to the global theme manager.
-IThemeManager &Context::ThemeManager(void) const noexcept {
+ThemeManager &Context::ThemeManager(void) const noexcept {
   return d->theme_manager;
 }
 

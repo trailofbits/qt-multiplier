@@ -7,7 +7,7 @@
 #pragma once
 
 #include <multiplier/GUI/Context.h>
-#include <multiplier/GUI/ActionRegistry.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/IMainWindowPlugin.h>
 #include <multiplier/GUI/IReferenceExplorerPlugin.h>
 
@@ -41,7 +41,7 @@ class ReferenceExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
       : IMainWindowPlugin(context_, parent),
         context(context_),
         main_window(parent),
-        popup_reference_explorer_trigger(context.ActionRegistry().Register(
+        popup_reference_explorer_trigger(context.ActionManager().Register(
             this,
             "com.trailofbits.action.OpenReferenceExplorer",
             &ReferenceExplorerPlugin::OnPopupReferenceExplorer)) {}

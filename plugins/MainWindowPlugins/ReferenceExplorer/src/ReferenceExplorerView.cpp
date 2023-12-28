@@ -60,9 +60,9 @@ ReferenceExplorerView::ReferenceExplorerView(
   }
 
   // Initialize the item delegate
-  auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
+  auto code_view_theme = ThemeManager::Get().GetCodeViewTheme();
   auto item_delegate = new ReferenceExplorerItemDelegate(code_view_theme);
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, item_delegate,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, item_delegate,
           &ReferenceExplorerItemDelegate::OnThemeChange);
 
   IGeneratorView::Configuration config;
@@ -164,8 +164,8 @@ ReferenceExplorerView::ReferenceExplorerView(
   setLayout(layout);
 
   // Ensure that we receive theme updates so that we can update the icons
-  auto &theme_manager = IThemeManager::Get();
-  connect(&theme_manager, &IThemeManager::ThemeChanged, this,
+  auto &theme_manager = ThemeManager::Get();
+  connect(&theme_manager, &ThemeManager::ThemeChanged, this,
           &ReferenceExplorerView::OnThemeChange);
 
   OnThemeChange(theme_manager.GetPalette(), theme_manager.GetCodeViewTheme());

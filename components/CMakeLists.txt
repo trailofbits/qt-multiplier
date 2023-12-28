@@ -7,7 +7,7 @@
 #
 
 add_subdirectory("Util")
-add_subdirectory("ActionRegistry")
+add_subdirectory("ActionManager")
 add_subdirectory("ThemeManager")
 add_subdirectory("Context")
 add_subdirectory("MainWindowPlugin")

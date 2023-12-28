@@ -94,7 +94,7 @@ SearchWidget::SearchWidget(Mode mode, QWidget *parent)
   InitializeWidgets();
   InitializeKeyboardShortcuts(parent);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &SearchWidget::OnThemeChange);
 }
 

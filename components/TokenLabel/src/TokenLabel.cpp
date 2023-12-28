@@ -34,10 +34,10 @@ TokenLabel::TokenLabel(TokenRange tokens, QWidget *parent)
 
   d->tokens = std::move(tokens);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &TokenLabel::OnThemeChange);
 
-  OnThemeChange(palette(), IThemeManager::Get().GetCodeViewTheme());
+  OnThemeChange(palette(), ThemeManager::Get().GetCodeViewTheme());
 }
 
 

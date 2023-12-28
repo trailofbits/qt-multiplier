@@ -27,11 +27,11 @@ target_compile_definitions("qtmx_common_flags" INTERFACE
   MULTIPLIER_VERSION="${MXQT_MULTIPLIER_VERSION}"
 )
 
-add_library("mx_cxxflags" INTERFACE)
-target_compile_features("mx_cxxflags" INTERFACE
+add_library("mx_cxx_flags" INTERFACE)
+target_compile_features("mx_cxx_flags" INTERFACE
   cxx_std_17
 )
 
-target_link_libraries("mx_cxxflags" INTERFACE
+target_link_libraries("mx_cxx_flags" INTERFACE
   "qtmx_common_flags"
 )

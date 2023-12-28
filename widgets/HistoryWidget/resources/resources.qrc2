@@ -1,6 +1,0 @@
-<RCC>
-    <qresource prefix="/Icons/HistoryWidget">
-        <file alias="HistoryBack">Icons/back.png</file>
-        <file alias="HistoryForward">Icons/forward.png</file>
-    </qresource>
-</RCC>

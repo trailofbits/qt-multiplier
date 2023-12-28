@@ -9,7 +9,7 @@
 #include <QWidget>
 
 #include <multiplier/GUI/ICodeView.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 #include <multiplier/GUI/IGlobalHighlighter.h>
 #include <multiplier/GUI/IMacroExplorer.h>
 

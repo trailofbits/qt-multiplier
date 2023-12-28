@@ -8,6 +8,7 @@
 
 add_subdirectory("HistoryWidget")
 add_subdirectory("LineEditWidget")
+add_subdirectory("PopupWidget")
 add_subdirectory("PythonConsoleWidget")
 add_subdirectory("SearchWidget")
 add_subdirectory("TabWidget")

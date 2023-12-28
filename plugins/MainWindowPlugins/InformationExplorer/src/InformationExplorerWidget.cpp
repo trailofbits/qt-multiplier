@@ -10,7 +10,7 @@
 
 #include <QVBoxLayout>
 #include <memory>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 #include "InformationExplorer.h"
 #include "InformationExplorerModel.h"
@@ -40,14 +40,14 @@ InformationExplorerWidget::InformationExplorerWidget(
   connect(info_explorer, &InformationExplorer::SelectedItemChanged, this,
           &InformationExplorerWidget::SelectedItemChanged);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &InformationExplorerWidget::OnThemeChange);
 
   // This widget can be created way after the main window initialization.
   // If that is the case, we won't get the first theme change update. Manually
   // force an update now
-  auto palette = IThemeManager::Get().GetPalette();
-  auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
+  auto palette = ThemeManager::Get().GetPalette();
+  auto code_view_theme = ThemeManager::Get().GetCodeViewTheme();
   OnThemeChange(palette, code_view_theme);
 }
 

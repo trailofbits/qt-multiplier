@@ -18,7 +18,7 @@ target_link_libraries("mx_call_hierarchy_plugin"
   PRIVATE
     "mx_actionregistry"
     "mx_context"
-    "mx_cxxflags"
+    "mx_cxx_flags"
     "mx_generators"
     "mx_referenceexplorer"
     "mx_thememanager"

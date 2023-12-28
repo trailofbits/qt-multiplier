@@ -66,7 +66,7 @@ MacroExplorerItem::MacroExplorerItem(
   connect(this, &MacroExplorerItem::Deleted, explorer,
           &MacroExplorer::RemoveMacro);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &MacroExplorerItem::OnThemeChange);
 
   UpdateIcons();

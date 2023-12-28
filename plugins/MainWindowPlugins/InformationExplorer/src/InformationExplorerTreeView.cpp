@@ -19,7 +19,7 @@ namespace mx::gui {
 InformationExplorerTreeView::InformationExplorerTreeView(QWidget *parent)
     : QTreeView(parent) {
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &InformationExplorerTreeView::OnThemeChange);
 
   InstallItemDelegate();
@@ -31,7 +31,7 @@ void InformationExplorerTreeView::drawRow(QPainter *painter,
                                           const QStyleOptionViewItem &option,
                                           const QModelIndex &index) const {
 
-  auto code_view_theme = IThemeManager::Get().GetCodeViewTheme();
+  auto code_view_theme = ThemeManager::Get().GetCodeViewTheme();
   auto background_color = (option.state & QStyle::State_Selected) != 0
                               ? code_view_theme.selected_line_background_color
                               : code_view_theme.default_background_color;

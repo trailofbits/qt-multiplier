@@ -23,7 +23,7 @@ add_library("mx_python_console_widget"
 
 target_link_libraries("mx_python_console_widget"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

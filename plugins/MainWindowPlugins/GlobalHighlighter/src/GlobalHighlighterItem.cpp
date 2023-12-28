@@ -101,7 +101,7 @@ GlobalHighlighterItem::GlobalHighlighterItem(
   connect(this, &GlobalHighlighterItem::Deleted, global_highlighter,
           &GlobalHighlighter::RemoveEntity);
 
-  connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
+  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
           &GlobalHighlighterItem::OnThemeChange);
 
   UpdateIcons();

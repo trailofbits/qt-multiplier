@@ -17,7 +17,7 @@ target_sources("mx_fontdatabase" INTERFACE
 
 target_link_libraries("mx_fontdatabase"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
 
   PUBLIC
     "thirdparty_qt"

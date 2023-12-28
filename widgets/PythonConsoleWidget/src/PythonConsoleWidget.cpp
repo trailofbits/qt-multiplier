@@ -21,7 +21,7 @@
 
 #include <multiplier/Bindings/Python.h>
 #include <multiplier/Index.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 #include "PythonCodeRunner.h"
 #include "PythonCompletionModel.h"
@@ -250,10 +250,10 @@ void PythonConsoleWidget::InitializeWidgets(void) {
 
   d->output_box->setReadOnly(true);
 
-  auto &theme_manager = IThemeManager::Get();
+  auto &theme_manager = ThemeManager::Get();
   SetTheme(QApplication::palette(), theme_manager.GetCodeViewTheme());
 
-  connect(&theme_manager, &IThemeManager::ThemeChanged,
+  connect(&theme_manager, &ThemeManager::ThemeChanged,
           this, &PythonConsoleWidget::SetTheme);
 
   vlayout->addWidget(d->output_box, /*stretch=*/1);

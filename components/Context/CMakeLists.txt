@@ -13,7 +13,7 @@ add_library("mx_context"
 
 target_link_libraries("mx_context"
   PRIVATE
-    "mx_cxxflags"
+    "mx_cxx_flags"
     "thirdparty_qt"
 
   PUBLIC

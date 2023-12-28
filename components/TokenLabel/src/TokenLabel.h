@@ -9,7 +9,7 @@
 #pragma once
 
 #include <multiplier/GUI/ITokenLabel.h>
-#include <multiplier/GUI/IThemeManager.h>
+#include <multiplier/GUI/ThemeManager.h>
 
 namespace mx::gui {
 
