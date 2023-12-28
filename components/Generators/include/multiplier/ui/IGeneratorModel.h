@@ -10,23 +10,21 @@
 
 #include <memory>
 #include <multiplier/Types.h>
-#include <multiplier/Index.h>
-
-#include <QAbstractItemModel>
+#include <multiplier/ui/IModel.h>
 
 namespace mx::gui {
 
 class ITreeGenerator;
 
 //! A model for the reference explorer widget
-class IGeneratorModel : public QAbstractItemModel {
+class IGeneratorModel : public IModel {
   Q_OBJECT
 
  public:
   //! Additional item data roles for this model
   enum ItemDataRole {
     //! Returns a Location object
-    EntityIdRole = Qt::UserRole + 1,
+    EntityIdRole = IModel::MultiplierUserRole,
 
     //! Returns the token range associated with a given `QModelIndex`. This is
     //! for styled displaying.
@@ -46,7 +44,7 @@ class IGeneratorModel : public QAbstractItemModel {
   static IGeneratorModel *Create(QObject *parent = nullptr);
 
   //! Constructor
-  IGeneratorModel(QObject *parent) : QAbstractItemModel(parent) {}
+  IGeneratorModel(QObject *parent) : IModel(parent) {}
 
   //! Destructor
   virtual ~IGeneratorModel();

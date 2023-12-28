@@ -10,6 +10,7 @@
 
 #include <multiplier/Index.h>
 
+#include <QEvent>
 #include <QMainWindow>
 
 namespace mx::gui {
@@ -51,6 +52,8 @@ class MainWindow final : public QMainWindow {
   void ExpandMacro(const QModelIndex &index);
   void OpenCodePreview(const QModelIndex &index, const bool &as_new_window);
   void CloseAllPopups(void);
+
+  bool eventFilter(QObject *obj, QEvent *event) Q_DECL_FINAL;
 
   void SetHere(RawEntityId eid);
   void SetHere(const QModelIndex &index);

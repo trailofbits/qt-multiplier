@@ -67,11 +67,15 @@ class IMainWindowPlugin : public QObject {
   virtual QWidget *CreateDockWidget(QWidget *parent);
  
  signals:
-  // TODO(pag): Consider removing?
   void HideDockWidget(void);
   void ShowDockWidget(void);
+
+  // Signal emitted when this plugin opens a popup. This provides the main
+  // window with visibility into the current set of open popups.
+  void PopupOpened(QWidget *);
 };
 
 }  // namespace mx::gui
 
-Q_DECLARE_INTERFACE(mx::gui::IMainWindowPlugin, "com.trailofbits.IMainWindowPlugin")
+Q_DECLARE_INTERFACE(mx::gui::IMainWindowPlugin,
+                    "com.trailofbits.interface.IMainWindowPlugin")

@@ -6,6 +6,7 @@
 
 #include "MainWindow.h"
 
+#include <multiplier/ui/CallHierarchyPlugin.h>
 #include <multiplier/ui/Context.h>
 #include <multiplier/ui/InformationExplorer.h>
 #include <multiplier/ui/ReferenceExplorer.h>
@@ -27,7 +28,6 @@
 #include <multiplier/ui/IThemeManager.h>
 #include <multiplier/ui/IGeneratorModel.h>
 #include <multiplier/ui/Util.h>
-#include <multiplier/ui/CallHierarchyGenerator.h>
 #include <multiplier/ui/IGeneratorView.h>
 
 #include <multiplier/ui/ActionRegistry.h>
@@ -139,7 +139,7 @@ struct MainWindow::PrivateData final {
         index(context.Index()),
         file_location_cache(context.FileLocationCache()),
         open_entity(context.ActionRegistry().Register(
-            self, "com.trailofbits.OpenEntity",
+            self, "com.trailofbits.action.OpenEntity",
             [=] (const QVariant &data) {
               if (data.canConvert<VariantEntity>()) {
                 self->OnOpenEntity(EntityId(data.value<VariantEntity>()).Pack());
@@ -332,8 +332,8 @@ void MainWindow::InitializeToolBar() {
 }
 
 void MainWindow::InitializePlugins(void) {
-  d->plugins.emplace_back(CreateReferenceExplorerMainWindowPlugin(
-      d->context, this));
+  auto ref_explorer_plugin = d->plugins.emplace_back(
+      CreateReferenceExplorerMainWindowPlugin(d->context, this)).get();
 
   d->plugins.emplace_back(CreateInformationExplorerMainWindowPlugin(
       d->context, this));
@@ -362,7 +362,20 @@ void MainWindow::InitializePlugins(void) {
         [=] (void) {
           dock->hide();
         });
+
+    connect(
+        plugin.get(), &IMainWindowPlugin::PopupOpened,
+        [this] (QWidget *popup) {
+          popup->installEventFilter(this);
+          d->popup_widget_list.push_back(popup);
+        });
   }
+
+  CallHierarchyPlugin::Register(
+      ref_explorer_plugin,
+      [this] (IMainWindowPlugin *parent) {
+        return new CallHierarchyPlugin(d->context, parent);
+      });
 }
 
 void MainWindow::CreateProjectExplorerDock() {
@@ -684,6 +697,14 @@ void MainWindow::CloseAllPopups() {
   }
 
   d->popup_widget_list.clear();
+}
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+  if (event->type() == QEvent::Close) {
+    (void) std::erase(d->popup_widget_list, obj);
+  }
+
+  return QMainWindow::eventFilter(obj, event);
 }
 
 // void MainWindow::CreateReferenceExplorerMenuOptions() {

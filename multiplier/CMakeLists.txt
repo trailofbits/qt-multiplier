@@ -43,8 +43,6 @@ target_sources("Multiplier" PRIVATE
   "${multiplier_icon_path}"
 )
 
-add_subdirectory("DataGenerators")
-
 target_link_libraries("Multiplier"
   PRIVATE
     "mx_cxxflags"
@@ -66,9 +64,9 @@ target_link_libraries("Multiplier"
     "mx_codeviewtheme"
     "mx_thememanager"
     "mx_generators"
-    "mx_data_generators"
     "mx_actionregistry"
     "mx_mainwindowplugin"
+    "mx_callhierarchyplugin"
     "$<$<BOOL:MX_ENABLE_PYTHON_BINDINGS>:mx_pythonconsole>"
 )
 

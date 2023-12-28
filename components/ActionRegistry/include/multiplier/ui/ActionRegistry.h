@@ -143,4 +143,4 @@ class ActionRegistry {
 
 }  // namespace mx::gui
 
-Q_DECLARE_INTERFACE(mx::gui::IAction, "com.trailofbits.IAction")
+Q_DECLARE_INTERFACE(mx::gui::IAction, "com.trailofbits.interface.IAction")
