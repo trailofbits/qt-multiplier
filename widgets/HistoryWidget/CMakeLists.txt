@@ -7,7 +7,7 @@
 #
 
 add_library("mx_history_widget"
-  include/multiplier/GUI/HistoryWidget.h
+  include/multiplier/GUI/Widgets/HistoryWidget.h
   src/HistoryWidget.cpp
 
   src/HistoryLabelBuilder.h

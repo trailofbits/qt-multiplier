@@ -8,7 +8,7 @@
 
 #include <multiplier/GUI/IModel.h>
 #include <multiplier/GUI/ITreeGenerator.h>
-#include <multiplier/GUI/MxTabWidget.h>
+#include <multiplier/GUI/TabWidget.h>
 #include <multiplier/GUI/PopupWidgetContainer.h>
 #include <multiplier/GUI/SimpleTextInputDialog.h>
 
@@ -77,7 +77,7 @@ QWidget *ReferenceExplorerPlugin::CreateDockWidget(QWidget *parent) {
     return tab_widget;
   }
 
-  tab_widget = new MxTabWidget(parent);
+  tab_widget = new TabWidget(parent);
   tab_widget->setWindowTitle(tr("Reference Explorer"));
   tab_widget->setDocumentMode(true);
   tab_widget->setTabsClosable(true);

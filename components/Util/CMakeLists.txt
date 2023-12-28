@@ -23,11 +23,11 @@ add_library("mx_util"
   include/multiplier/GUI/DockWidgetContainer.h
   include/multiplier/GUI/PopupWidgetContainer.h
 
-  include/multiplier/GUI/MxTabWidget.h
-  src/MxTabWidget.cpp
+  include/multiplier/GUI/TabWidget.h
+  src/TabWidget.cpp
 
-  include/multiplier/GUI/MxTreeView.h
-  src/MxTreeView.cpp
+  include/multiplier/GUI/TreeWidget.h
+  src/TreeWidget.cpp
 
   include/multiplier/GUI/SimpleTextInputDialog.h
   src/SimpleTextInputDialog.cpp

@@ -26,12 +26,26 @@
 namespace mx::gui {
 
 //! A wrapper class that turns a widget into a popup
-template <typename Widget>
-class PopupWidgetContainer final : public QWidget {
+class PopupWidget final : public QWidget {
+  Q_OBJECT
+
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
+
+  PopupWidget(QWidget *parent);
+
  public:
+
+  template <typename Widget, typename... Args>
+  static PopupWidget *Create(Args... args, QWidget *parent = nullptr) {
+    auto popup = new PopupWidget(parent);
+    popup->InitializeWidgets(new Widget(std::move(args)..., popup));
+    return popup;
+  }
+
   //! Constructor
   template <typename... Args>
-  PopupWidgetContainer(Args &&...args) : QWidget(nullptr),
+  PopupWidget(Args &&...args) : QWidget(nullptr),
                                          d(new PrivateData) {
 
     auto wrapped_widget = new Widget(std::forward<Args>(args)...);
@@ -39,17 +53,17 @@ class PopupWidgetContainer final : public QWidget {
 
     UpdateIcons();
     connect(&IThemeManager::Get(), &IThemeManager::ThemeChanged, this,
-            &PopupWidgetContainer<Widget>::OnThemeChange);
+            &PopupWidget<Widget>::OnThemeChange);
 
     OnUpdateTitle();
     connect(&d->title_update_timer, &QTimer::timeout, this,
-            &PopupWidgetContainer<Widget>::OnUpdateTitle);
+            &PopupWidget<Widget>::OnUpdateTitle);
 
     d->title_update_timer.start(500);
   }
 
   //! Destructor
-  virtual ~PopupWidgetContainer() = default;
+  virtual ~PopupWidget() = default;
 
   //! Returns the wrapped widget
   Widget *GetWrappedWidget() {
@@ -57,10 +71,10 @@ class PopupWidgetContainer final : public QWidget {
   }
 
   //! Disabled copy constructor
-  PopupWidgetContainer(const PopupWidgetContainer &) = delete;
+  PopupWidget(const PopupWidget &) = delete;
 
   //! Disabled copy assignment operator
-  PopupWidgetContainer &operator=(const PopupWidgetContainer &) = delete;
+  PopupWidget &operator=(const PopupWidget &) = delete;
 
  protected:
   //! Closes the widget when the escape key is pressed
@@ -137,7 +151,7 @@ class PopupWidgetContainer final : public QWidget {
   std::unique_ptr<PrivateData> d;
 
   //! Initializes the internal widgets
-  void initializeWidgets(Widget *wrapped_widget) {
+  void InitializeWidgets(Widget *wrapped_widget) {
     d->wrapped_widget = wrapped_widget;
     setAttribute(Qt::WA_QuitOnClose, false);
 
@@ -146,7 +160,7 @@ class PopupWidgetContainer final : public QWidget {
                    Qt::WindowStaysOnTopHint);
 
     QWidget::connect(qApp, &QGuiApplication::applicationStateChanged, this,
-                     &PopupWidgetContainer<Widget>::OnApplicationStateChange);
+                     &PopupWidget<Widget>::OnApplicationStateChange);
 
     d->window_title = new QLabel(d->wrapped_widget->windowTitle());
 
@@ -155,7 +169,7 @@ class PopupWidgetContainer final : public QWidget {
     d->close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
 
     QWidget::connect(d->close_button, &QPushButton::clicked, this,
-                     &PopupWidgetContainer<Widget>::close);
+                     &PopupWidget<Widget>::close);
 
     auto title_frame_layout = new QHBoxLayout();
     title_frame_layout->setContentsMargins(0, 0, 0, 0);
@@ -209,7 +223,7 @@ class PopupWidgetContainer final : public QWidget {
 
   //! Updates the widget icons to match the active theme
   void UpdateIcons() {
-    d->close_button->setIcon(GetIcon(":/Icons/PopupWidgetContainer/close"));
+    d->close_button->setIcon(GetIcon(":/Icons/PopupWidget/close"));
   }
 
  private slots:

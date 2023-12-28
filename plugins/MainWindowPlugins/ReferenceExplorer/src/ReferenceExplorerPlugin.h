@@ -15,7 +15,7 @@
 
 namespace mx::gui {
 
-class MxTabWidget;
+class TabWidget;
 
 class ReferenceExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
   Q_OBJECT
@@ -26,7 +26,7 @@ class ReferenceExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
   QMainWindow * const main_window;
 
   // The tabbed reference explorer widget docked inside of the main window.
-  MxTabWidget *tab_widget{nullptr};
+  TabWidget *tab_widget{nullptr};
 
   // List of plugins.
   std::vector<std::unique_ptr<IReferenceExplorerPlugin>> plugins;

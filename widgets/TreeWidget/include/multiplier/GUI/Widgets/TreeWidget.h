@@ -13,26 +13,25 @@
 namespace mx::gui {
 
 //! A QTreeView class that can paint the background role on rows
-class MxTreeView final : public QTreeView {
+class TreeWidget Q_DECL_FINAL : public QTreeView {
   Q_OBJECT
 
  public:
   //! Constructor
-  MxTreeView(QWidget *parent = nullptr);
+  TreeWidget(QWidget *parent = nullptr);
 
   //! Destructor
-  virtual ~MxTreeView() override;
+  virtual ~TreeWidget(void);
 
-  //! Disabled copy constructor
-  MxTreeView(MxTreeView &) = delete;
-
-  //! Disabled copy assignment operator
-  MxTreeView &operator=(const MxTreeView &) = delete;
+  TreeWidget(const TreeWidget &) = delete;
+  TreeWidget(TreeWidget &&) noexcept = delete;
+  TreeWidget &operator=(const TreeWidget &) = delete;
+  TreeWidget &operator=(TreeWidget &&) noexcept = delete;
 
  protected:
   //! Draws the background role on rows
-  virtual void drawRow(QPainter *painter, const QStyleOptionViewItem &option,
-                       const QModelIndex &index) const override;
+  void drawRow(QPainter *painter, const QStyleOptionViewItem &option,
+               const QModelIndex &index) const Q_DECL_FINAL;
 };
 
 }  // namespace mx::gui

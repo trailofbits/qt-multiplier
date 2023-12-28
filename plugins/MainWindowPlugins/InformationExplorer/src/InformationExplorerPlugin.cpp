@@ -9,7 +9,7 @@
 #include <multiplier/GUI/Context.h>
 #include <multiplier/GUI/DockWidgetContainer.h>
 #include <multiplier/GUI/IModel.h>
-#include <multiplier/GUI/MxTabWidget.h>
+#include <multiplier/GUI/TabWidget.h>
 #include <multiplier/GUI/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Util.h>
 

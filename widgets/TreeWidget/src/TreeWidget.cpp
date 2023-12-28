@@ -6,17 +6,17 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/GUI/MxTreeView.h>
+#include <multiplier/GUI/TreeWidget.h>
 
 #include <QPainter>
 
 namespace mx::gui {
 
-MxTreeView::MxTreeView(QWidget *parent) : QTreeView(parent) {}
+TreeWidget::TreeWidget(QWidget *parent) : QTreeView(parent) {}
 
-MxTreeView::~MxTreeView() {}
+TreeWidget::~TreeWidget() {}
 
-void MxTreeView::drawRow(QPainter *painter, const QStyleOptionViewItem &option,
+void TreeWidget::drawRow(QPainter *painter, const QStyleOptionViewItem &option,
                          const QModelIndex &index) const {
 
   auto background_role_var = index.data(Qt::BackgroundRole);

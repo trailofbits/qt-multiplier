@@ -13,7 +13,7 @@
 
 #include <multiplier/GUI/SimpleTextInputDialog.h>
 // #include <multiplier/GUI/InformationExplorerWidget.h>
-#include <multiplier/GUI/MxTabWidget.h>
+#include <multiplier/GUI/TabWidget.h>
 #include <multiplier/GUI/CodeWidget.h>
 #include <multiplier/GUI/PopupWidgetContainer.h>
 #include <multiplier/GUI/DockWidgetContainer.h>
@@ -453,7 +453,7 @@ void MainWindow::CreateMacroExplorerDock() {
 }
 
 // void MainWindow::CreateReferenceExplorerDock() {
-//   d->ref_explorer_tab_widget = new MxTabWidget(this);
+//   d->ref_explorer_tab_widget = new TabWidget(this);
 //   d->ref_explorer_tab_widget->setDocumentMode(true);
 //   d->ref_explorer_tab_widget->setTabsClosable(true);
 
@@ -492,7 +492,7 @@ void MainWindow::OnCloseActiveCodeViewTab() {
 }
 
 void MainWindow::CreateCodeView() {
-  auto tab_widget = new MxTabWidget();
+  auto tab_widget = new TabWidget();
   tab_widget->setTabsClosable(true);
   tab_widget->setDocumentMode(true);
   tab_widget->setTabBarAutoHide(false);

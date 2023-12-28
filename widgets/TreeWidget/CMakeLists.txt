@@ -6,25 +6,23 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-add_library("mx_tab_widget"
-  include/multiplier/GUI/Widgets/TabWidget.h
-  src/TabBar.cpp
-  src/TabBar.h
-  src/TabWidget.cpp
+add_library("mx_tree_widget"
+  include/multiplier/GUI/Widgets/TreeWidget.h
+  src/TreeWidget.cpp
 )
 
-target_link_libraries("mx_tab_widget"
+target_link_libraries("mx_tree_widget"
   PRIVATE
     "thirdparty_qt"
 )
 
-target_include_directories("mx_tab_widget" PRIVATE
+target_include_directories("mx_tree_widget" PRIVATE
   "include"
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-target_include_directories("mx_tab_widget" SYSTEM INTERFACE
+target_include_directories("mx_tree_widget" SYSTEM INTERFACE
   "include"
 )
 
-enable_qt_properties("mx_tab_widget")
+enable_qt_properties("mx_tree_widget")

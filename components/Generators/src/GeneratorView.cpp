@@ -12,7 +12,7 @@
 
 #include <multiplier/GUI/IThemeManager.h>
 #include <multiplier/GUI/Assert.h>
-#include <multiplier/GUI/MxTreeView.h>
+#include <multiplier/GUI/TreeWidget.h>
 
 #include <QListView>
 #include <QTableView>
@@ -38,11 +38,11 @@ void InitializeModelViewCommonSettings(
 
   // clang-format off
   static_assert(
-    std::is_same<decltype(model_view), MxTreeView *>::value ||
+    std::is_same<decltype(model_view), TreeWidget *>::value ||
     std::is_same<decltype(model_view), QListView *>::value ||
     std::is_same<decltype(model_view), QTableView *>::value,
 
-    "InitializeModelViewCommonSettings can only accept: MxTreeView, QListView, QTableView"
+    "InitializeModelViewCommonSettings can only accept: TreeWidget, QListView, QTableView"
   );
   // clang-format on
 
@@ -73,10 +73,10 @@ void InitializeModelViewSortingSettings(ModelView *model_view) {
 
   // clang-format off
   static_assert(
-    std::is_same<decltype(model_view), MxTreeView *>::value ||
+    std::is_same<decltype(model_view), TreeWidget *>::value ||
     std::is_same<decltype(model_view), QTableView *>::value,
 
-    "InitializeModelViewSortingSettings can only accept: MxTreeView, QTableView"
+    "InitializeModelViewSortingSettings can only accept: TreeWidget, QTableView"
   );
   // clang-format on
 
@@ -85,12 +85,12 @@ void InitializeModelViewSortingSettings(ModelView *model_view) {
 }
 
 std::optional<QModelIndex> GetModelIndexAtCurrentMousePos(
-    const std::variant<std::monostate, MxTreeView *, QTableView *, QListView *>
+    const std::variant<std::monostate, TreeWidget *, QTableView *, QListView *>
         &view_var) {
 
   QAbstractItemView *model_view{nullptr};
-  if (std::holds_alternative<MxTreeView *>(view_var)) {
-    model_view = std::get<MxTreeView *>(view_var);
+  if (std::holds_alternative<TreeWidget *>(view_var)) {
+    model_view = std::get<TreeWidget *>(view_var);
 
   } else if (std::holds_alternative<QTableView *>(view_var)) {
     model_view = std::get<QTableView *>(view_var);
@@ -123,7 +123,7 @@ struct GeneratorView::PrivateData final {
 
   QSortFilterProxyModel *sort_filter_proxy_model{nullptr};
 
-  std::variant<std::monostate, MxTreeView *, QTableView *, QListView *>
+  std::variant<std::monostate, TreeWidget *, QTableView *, QListView *>
       view_var;
 
   std::vector<QPushButton *> osd_button_list;
@@ -157,7 +157,7 @@ void GeneratorView::SetSelection(const QModelIndex &index) {
       break;
 
     case Configuration::ViewType::Tree:
-      model_view = std::get<MxTreeView *>(d->view_var);
+      model_view = std::get<TreeWidget *>(d->view_var);
       break;
   }
 
@@ -200,7 +200,7 @@ bool GeneratorView::eventFilter(QObject *obj, QEvent *event) {
         break;
 
       case Configuration::ViewType::Tree:
-        model_view = std::get<MxTreeView *>(d->view_var);
+        model_view = std::get<TreeWidget *>(d->view_var);
         viewport = model_view->viewport();
         break;
     }
@@ -374,7 +374,7 @@ void GeneratorView::InitializeWidgets() {
     }
 
     case Configuration::ViewType::Tree: {
-      auto tree_view = new MxTreeView();
+      auto tree_view = new TreeWidget();
       tree_view->setModel(model_ptr);
       tree_view->expandAll();
 
@@ -519,8 +519,8 @@ void GeneratorView::UpdateOSDButtons() {
   // Get the boundaries of the hovered item, and redistribute the
   // buttons on top of it
   QAbstractItemView *model_view{nullptr};
-  if (std::holds_alternative<MxTreeView *>(d->view_var)) {
-    model_view = std::get<MxTreeView *>(d->view_var);
+  if (std::holds_alternative<TreeWidget *>(d->view_var)) {
+    model_view = std::get<TreeWidget *>(d->view_var);
 
   } else if (std::holds_alternative<QTableView *>(d->view_var)) {
     model_view = std::get<QTableView *>(d->view_var);
@@ -574,8 +574,8 @@ void GeneratorView::OnOpenItemContextMenu(const QPoint &point) {
   QModelIndex model_index;
   QPoint global_point;
 
-  if (std::holds_alternative<MxTreeView *>(d->view_var)) {
-    auto tree_view = std::get<MxTreeView *>(d->view_var);
+  if (std::holds_alternative<TreeWidget *>(d->view_var)) {
+    auto tree_view = std::get<TreeWidget *>(d->view_var);
 
     model_index = tree_view->indexAt(point);
     global_point = tree_view->viewport()->mapToGlobal(point);
@@ -633,8 +633,8 @@ void GeneratorView::OnOpenItemContextMenu(const QPoint &point) {
 }
 
 void GeneratorView::OnRowsInserted(const QModelIndex &parent, int, int) {
-  if (std::holds_alternative<MxTreeView *>(d->view_var)) {
-    auto &tree_view = *std::get<MxTreeView *>(d->view_var);
+  if (std::holds_alternative<TreeWidget *>(d->view_var)) {
+    auto &tree_view = *std::get<TreeWidget *>(d->view_var);
     tree_view.expand(parent);
   }
 }
