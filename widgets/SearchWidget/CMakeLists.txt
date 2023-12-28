@@ -12,7 +12,7 @@ add_library("mx_search_widget"
 )
 
 target_sources("mx_search_widget" INTERFACE
-  Resources/Resources.qrc
+  resources/Resources.qrc
 )
 
 target_link_libraries("mx_search_widget"
