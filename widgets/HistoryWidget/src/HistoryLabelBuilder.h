@@ -7,7 +7,7 @@
 */
 
 #include <cstdint>
-#include <multiplier/Entity.h>
+#include <multiplier/Index.h>
 #include <multiplier/Frontend/File.h>
 #include <QObject>
 #include <QRunnable>
@@ -28,7 +28,7 @@ class HistoryLabelBuilder Q_DECL_FINAL : public QObject, public QRunnable {
  public:
   virtual ~HistoryLabelBuilder(void);
 
-  inline HistoryLabelBuilder(FileLocationCache &file_cache_,
+  inline HistoryLabelBuilder(const FileLocationCache &file_cache_,
                              VariantEntity entity_, uint64_t item_id_,
                              QObject *parent=nullptr)
       : QObject(parent),

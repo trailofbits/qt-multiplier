@@ -6,22 +6,17 @@
 
 #pragma once
 
+#include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/Index.h>
 
 #include <QEvent>
 #include <QWidget>
 
 #include <memory>
-#include <multiplier/Types.h>
 
 typedef struct _object PyObject;
 
-namespace mx {
-class Index;
-}  // namespace mx
 namespace mx::gui {
-
-class CodeViewTheme;
 
 class PythonConsoleWidget final : public QWidget {
   Q_OBJECT
@@ -46,14 +41,14 @@ class PythonConsoleWidget final : public QWidget {
  public:
   virtual ~PythonConsoleWidget(void);
 
-  PythonConsoleWidget(const Index &index, QWidget *parent=nullptr);
+  PythonConsoleWidget(const ThemeManager &theme_manager, const Index &index,
+                      QWidget *parent=nullptr);
 
   void SetHere(VariantEntity entity);
  
  public slots:
-  //! Sets the specified theme, refreshing the view
-  void SetTheme(const QPalette &palette,
-                const CodeViewTheme &code_view_theme);
+  //! Emitted when the theme has changed. Sends out the new theme.
+  void OnThemeChanged(ITheme::Ptr);
 };
 
 }  // namespace mx::gui

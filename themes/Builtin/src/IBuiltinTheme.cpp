@@ -60,8 +60,13 @@ QColor IBuiltinTheme::CurrentEntityBackgroundColor(void) const {
   return data.highlighted_entity_background_color;
 }
 
-ColorAndStyle IBuiltinTheme::TokenColorAndStyle(const Token &token) const {
+IBuiltinTheme::ColorAndStyle IBuiltinTheme::TokenColorAndStyle(
+    const Token &token) const {
   return data.token_styles[static_cast<unsigned>(token.category())];
+}
+
+const QPalette &IBuiltinTheme::Palette(void) const {
+  return palette;
 }
 
 }  // namespace mx::gui

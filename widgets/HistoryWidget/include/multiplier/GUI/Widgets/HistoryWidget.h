@@ -14,7 +14,7 @@
 #include <QWidget>
 
 #include <memory>
-#include <multiplier/Entity.h>
+#include <multiplier/Index.h>
 #include <optional>
 
 namespace mx {

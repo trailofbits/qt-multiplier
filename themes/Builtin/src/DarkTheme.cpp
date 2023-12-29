@@ -125,7 +125,7 @@ class DarkTheme Q_DECL_FINAL : public IBuiltinTheme {
       : IBuiltinTheme(media, tr("Dark"), "com.trailofbits.theme.Dark",
                       GetDarkPalette(), kDarkThemeData) {}
 
-  virtual void Apply(QApplication &) Q_DECL_FINAL {
+  void Apply(QApplication &) Q_DECL_FINAL {
 #ifdef __APPLE__
     SetNSAppToDarkTheme();
 #endif

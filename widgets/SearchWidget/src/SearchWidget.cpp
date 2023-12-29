@@ -8,7 +8,6 @@
 
 #include <multiplier/GUI/Widgets/SearchWidget.h>
 
-#include <multiplier/GUI/Assert.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/LineEditWidget.h>
 
@@ -87,8 +86,7 @@ SearchWidget::SearchWidget(const MediaManager &media_manager, Mode mode,
 
   // It is important to have a valid parent because that's what
   // we use to scope the keyboard shortcuts
-  Assert(parent != nullptr,
-         "Invalid parent widget specified in SearchWidget");
+  Q_ASSERT(parent != nullptr);
 
   d->mode = mode;
 
@@ -193,12 +191,12 @@ void SearchWidget::InitializeWidgets(void) {
 
 void SearchWidget::InitializeKeyboardShortcuts(QWidget *parent) {
   d->enable_search_shortcut =
-      new QShortcut(QKeySequence::Find, parent, this, &ISearchWidget::Activate,
+      new QShortcut(QKeySequence::Find, parent, this, &SearchWidget::Activate,
                     Qt::WidgetWithChildrenShortcut);
 
   d->disable_search_shortcut =
       new QShortcut(QKeySequence::Cancel, this, this,
-                    &ISearchWidget::Deactivate, Qt::WidgetWithChildrenShortcut);
+                    &SearchWidget::Deactivate, Qt::WidgetWithChildrenShortcut);
 
   if (d->mode == Mode::Search) {
     d->search_previous_shortcut = new QShortcut(
@@ -377,28 +375,32 @@ void SearchWidget::LoadIcons(const MediaManager &media_manager) {
   d->search_icon = media_manager.Pixmap(":/SearchWidget/search_icon");
 
   d->enabled_case_sensitive_search = media_manager.Pixmap(
-      ":/SearchWidget/search_icon_case_sensitive", IconStyle::Highlighted);
+      "com.trailofbits.icon.CaseSensitiveSearch",
+      ITheme::IconStyle::HIGHLIGHTED);
 
-  d->disabled_case_sensitive_search =
-      media_manager.Pixmap(":/SearchWidget/search_icon_case_sensitive");
+  d->disabled_case_sensitive_search = media_manager.Pixmap(
+      "com.trailofbits.icon.CaseSensitiveSearch");
 
-  d->enabled_regex_search =
-      media_manager.Pixmap(":/SearchWidget/search_icon_regex", IconStyle::Highlighted);
+  d->enabled_regex_search = media_manager.Pixmap(
+      "com.trailofbits.icon.RegexSearch", ITheme::IconStyle::HIGHLIGHTED);
 
-  d->disabled_regex_search = media_manager.Pixmap(":/SearchWidget/search_icon_regex");
+  d->disabled_regex_search = media_manager.Pixmap(
+      "com.trailofbits.icon.RegexSearch");
 
-  d->enabled_whole_word_search =
-      media_manager.Pixmap(":/SearchWidget/search_icon_whole_word", IconStyle::Highlighted);
+  d->enabled_whole_word_search = media_manager.Pixmap(
+      "com.trailofbits.icon.WholeWordSearch", ITheme::IconStyle::HIGHLIGHTED);
 
-  d->disabled_whole_word_search =
-      media_manager.Pixmap(":/SearchWidget/search_icon_whole_word");
+  d->disabled_whole_word_search = media_manager.Pixmap(
+      "com.trailofbits.icon.WholeWordSearch");
 
-  d->show_prev_result_icon = media_manager.Pixmap(":/SearchWidget/show_prev_result");
-  d->show_next_result_icon = media_manager.Pixmap(":/SearchWidget/show_next_result");
+  d->show_prev_result_icon = media_manager.Pixmap(
+      "com.trailofbits.icon.PreviousSearchResult");
 
+  d->show_next_result_icon = media_manager.Pixmap(
+      "com.trailofbits.icon.NextSearchResult");
 }
 
-void SearchWidget::OnIconsChanged(MediaManager &media_manager) {
+void SearchWidget::OnIconsChanged(const MediaManager &media_manager) {
   LoadIcons(media_manager);
   UpdateIcons();
 }

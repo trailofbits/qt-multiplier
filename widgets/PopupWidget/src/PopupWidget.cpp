@@ -106,9 +106,7 @@ void PopupWidget::SetWrappedWidget(QWidget *wrapped_widget) {
     d->size_grip->resize(12, 12);
 
   } else {
-    auto prev_widget = d->main_layout->takeAt(1);
-    prev_widget->setParent(nullptr);
-    prev_widget->deleteLater();
+    delete d->main_layout->takeAt(1);
   }
 
   d->wrapped_widget->setSizePolicy(QSizePolicy::Expanding,
@@ -118,7 +116,7 @@ void PopupWidget::SetWrappedWidget(QWidget *wrapped_widget) {
   d->main_layout->addStretch();
 
   if (created) {
-    setLayout(main_layout);
+    setLayout(d->main_layout);
   }
 
   OnUpdateTitle();

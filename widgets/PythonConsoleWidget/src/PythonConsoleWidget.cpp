@@ -20,8 +20,8 @@
 #include <QThreadPool>
 
 #include <multiplier/Bindings/Python.h>
+#include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/Index.h>
-#include <multiplier/GUI/ThemeManager.h>
 
 #include "PythonCodeRunner.h"
 #include "PythonCompletionModel.h"
@@ -32,8 +32,6 @@ extern "C" PyObject *PyInit_multiplier(void);
 namespace mx::gui {
 
 struct PythonConsoleWidget::PrivateData {
-  Index index;
-  CodeViewTheme theme;
   QPalette palette;
 
   QLineEdit *input_box{nullptr};
@@ -67,8 +65,7 @@ struct PythonConsoleWidget::PrivateData {
   bool InputBoxFilter(QEvent *event);
   bool CompleterFilter(QEvent *event);
 
-  PrivateData(const Index &index_)
-    : index(index_) {
+  PrivateData(const Index &index) {
 
     Py_Initialize();
     main_module = PyImport_AddModule("__main__");
@@ -198,10 +195,16 @@ bool PythonConsoleWidget::PrivateData::CompleterFilter(QEvent *event) {
   return true;
 }
 
-PythonConsoleWidget::PythonConsoleWidget(const Index &index_, QWidget *parent)
+PythonConsoleWidget::PythonConsoleWidget(const ThemeManager &theme_manager,
+                                         const Index &index_, QWidget *parent)
     : QWidget(parent),
       d(std::make_unique<PrivateData>(index_)) {
-  
+
+  connect(&theme_manager, &ThemeManager::ThemeChanged,
+          this, &PythonConsoleWidget::OnThemeChanged);
+
+  OnThemeChanged(theme_manager.Theme());
+
   InitializeModel();
   InitializeWidgets();
   SetHere(NotAnEntity{});
@@ -224,19 +227,13 @@ void PythonConsoleWidget::SetHere(VariantEntity entity) {
     d->main_module, "here", ::mx::to_python<VariantEntity>(std::move(entity)));
 }
 
-void PythonConsoleWidget::SetTheme(const QPalette &palette,
-                                   const CodeViewTheme &theme) {
-  d->theme = theme;
-  d->palette = palette;
-
-  QFont font(d->theme.font_name);
-  font.setStyleHint(QFont::TypeWriter);
-
+void PythonConsoleWidget::OnThemeChanged(ITheme::Ptr theme) {
+  d->palette = theme->Palette();
+  
+  auto font = theme->Font();
   d->input_box->setFont(font);
   d->output_box->setFont(font);
   d->prompt_label->setFont(font);
-
-  ResetFontColor();
 }
 
 void PythonConsoleWidget::InitializeWidgets(void) {
@@ -249,12 +246,6 @@ void PythonConsoleWidget::InitializeWidgets(void) {
   d->prompt_label = new QLabel(">>>");
 
   d->output_box->setReadOnly(true);
-
-  auto &theme_manager = ThemeManager::Get();
-  SetTheme(QApplication::palette(), theme_manager.GetCodeViewTheme());
-
-  connect(&theme_manager, &ThemeManager::ThemeChanged,
-          this, &PythonConsoleWidget::SetTheme);
 
   vlayout->addWidget(d->output_box, /*stretch=*/1);
 
@@ -364,17 +355,18 @@ void PythonConsoleWidget::ResetFontColor(void) {
 }
 
 void PythonConsoleWidget::OnStdOut(const QString &str) {
+  ResetFontColor();
   d->output_box->moveCursor(QTextCursor::End);
   d->output_box->setFontItalic(false);
   d->output_box->insertPlainText(str);
 }
 
 void PythonConsoleWidget::OnStdErr(const QString &str) {
+  ResetFontColor();
   d->output_box->moveCursor(QTextCursor::End);
   d->output_box->setTextColor(Qt::red);
   d->output_box->setFontItalic(false);
   d->output_box->insertPlainText(str);
-  ResetFontColor();
 }
 
 bool PythonConsoleWidget::eventFilter(QObject *sender, QEvent *event) {

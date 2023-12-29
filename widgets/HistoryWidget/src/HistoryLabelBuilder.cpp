@@ -11,7 +11,6 @@
 #include <QDebug>
 
 #include <filesystem>
-#include <multiplier/Index.h>
 #include <multiplier/GUI/Util.h>
 
 namespace mx::gui {

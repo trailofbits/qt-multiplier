@@ -54,7 +54,7 @@ static const QColor kDefaultLightForegroundColor = QColor::fromRgb(34, 34, 34);
 static const QColor kDefaultLightBackgroundColor
     = QColor::fromRgb(255, 255, 255);
 
-static const IBuiltinTheme::::ThemeData kLightThemeData{
+static const IBuiltinTheme::ThemeData kLightThemeData{
   // selected_line_background_color
   QColor::fromRgb(236, 236, 236),
 
@@ -107,7 +107,7 @@ static const IBuiltinTheme::::ThemeData kLightThemeData{
     [TCI(TEMPLATE_PARAMETER_TYPE)] = {QColor::fromRgb(0, 0, 0), kDefaultLightBackgroundColor, false, true, false, false},
     [TCI(TEMPLATE_PARAMETER_VALUE)] = {QColor::fromRgb(0, 128, 128), kDefaultLightBackgroundColor, false, false, false, true},
     [TCI(LABEL)] = {QColor::fromRgb(16, 16, 16), kDefaultLightBackgroundColor, false, false, false, false},
-    [TCI(WHITESPACE)] = {kDefaultLightForegroundColor false, faLight,
+    [TCI(WHITESPACE)] = {kDefaultLightForegroundColor, false, false, false, false, false},
     [TCI(FILE_NAME)] = {QColor::fromRgb(206, 18, 18), kDefaultLightBackgroundColor, false, false, false, false},
     [TCI(LINE_NUMBER)] = {QColor::fromRgb(0, 0, 0), kDefaultLightBackgroundColor, false, false, false, false},
     [TCI(COLUMN_NUMBER)] = {QColor::fromRgb(0, 0, 0), kDefaultLightBackgroundColor, false, false, false, false},
@@ -124,7 +124,7 @@ class LightTheme Q_DECL_FINAL : public IBuiltinTheme {
       : IBuiltinTheme(media, tr("Light"), "com.trailofbits.theme.Light",
                       GetLightPalette(), kLightThemeData) {}
 
-  virtual void Apply(QApplication &) Q_DECL_FINAL {
+  void Apply(QApplication &) Q_DECL_FINAL {
 #ifdef __APPLE__
     SetNSAppToLightTheme();
 #endif
@@ -141,7 +141,7 @@ class LightTheme Q_DECL_FINAL : public IBuiltinTheme {
 
 }  // namespace
 
-std::unique_ptr<ITheme> ITheme::CreateLightTheme(MediaManager &media) {
+std::unique_ptr<ITheme> CreateLightTheme(MediaManager &media) {
   return std::make_unique<LightTheme>(media);
 }
 

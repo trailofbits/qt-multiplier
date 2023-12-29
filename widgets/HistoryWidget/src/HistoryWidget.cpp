@@ -12,7 +12,6 @@
 #include <multiplier/Frontend/Compilation.h>
 #include <multiplier/Frontend/File.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
-#include <multiplier/GUI/Assert.h>
 
 #include <QHBoxLayout>
 #include <QIcon>
@@ -108,13 +107,13 @@ HistoryWidget::HistoryWidget(const MediaManager &media_manager_,
 
   // Since we install the keyboard shortcuts on the widget, the parent
   // parameters must always be valid
-  Assert(parent != nullptr, "The parent widget must be valid");
+  Q_ASSERT(parent != nullptr);
 
   InitializeWidgets(parent, install_global_shortcuts);
 
   OnIconsChanged(media_manager_);
   
-  connect(media_manager_, &MediaManager::IconsChanged,
+  connect(&media_manager_, &MediaManager::IconsChanged,
           this, &HistoryWidget::OnIconsChanged);
 }
 
@@ -191,7 +190,7 @@ void HistoryWidget::PrivateData::AddToHistory(VariantEntity original_entity,
 
   // Don't add repeat items to the end.
   if (item_list.empty() ||
-      EntityId(item_list.back()) != EntityId(canonical_entity)) {
+      EntityId(item_list.back().canonical_entity) != EntityId(canonical_entity)) {
 
     // If we're given a label then we're done.
     if (opt_label.has_value()) {
@@ -403,7 +402,7 @@ void HistoryWidget::OnNavigateBack(void) {
   QAction dummy;
   ssize_t index =
       std::distance(d->item_list.begin(), std::prev(d->current_item_it, 1));
-  Assert(0 <= index, "Invalid index");
+  Q_ASSERT(0 <= index);
   dummy.setData(QVariant::fromValue(static_cast<size_t>(index)));
 
   OnNavigateBackToHistoryItem(&dummy);
@@ -417,7 +416,7 @@ void HistoryWidget::OnNavigateForward(void) {
   QAction dummy;
   ssize_t index =
       std::distance(d->item_list.begin(), std::next(d->current_item_it, 1));
-  Assert(0 < index, "Invalid index");
+  Q_ASSERT(0 < index);
   dummy.setData(QVariant::fromValue(static_cast<size_t>(index)));
   OnNavigateForwardToHistoryItem(&dummy);
 }
@@ -430,8 +429,8 @@ void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
   ItemList::iterator it =
       std::next(d->item_list.begin(), item_index_var.toInt());
 
-  VariantEntity original_entity = it->original_id;
-  VariantEntity canonical_entity = it->canonical_id;
+  VariantEntity original_entity = it->original_entity;
+  VariantEntity canonical_entity = it->canonical_entity;
 
   // If we're going back to some place in the past, and if we're starting from
   // "the present," then we need to materialize a history item representing our
@@ -458,8 +457,8 @@ void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
   ItemList::iterator it =
       std::next(d->item_list.begin(), item_index_var.toInt());
 
-  VariantEntity original_entity = it->original_id;
-  VariantEntity canonical_entity = it->canonical_id;
+  VariantEntity original_entity = it->original_entity;
+  VariantEntity canonical_entity = it->canonical_entity;
 
   d->NavigateForwardToHistoryItem(it);
   UpdateMenus();
@@ -469,16 +468,16 @@ void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
 
 void HistoryWidget::PrivateData::NavigateBackToHistoryItem(
     ItemList::iterator next_item_it) {
-  Assert(!item_list.empty(), "Invalid history list");
+  Q_ASSERT(!item_list.empty());
   current_item_it = next_item_it;
 }
 
 void HistoryWidget::PrivateData::NavigateForwardToHistoryItem(
     ItemList::iterator next_item_it) {
 
-  Assert(2u <= item_list.size(), "Invalid history list");
-  Assert(next_item_it != item_list.begin(), "Invalid history item");
-  Assert(next_item_it != item_list.end(), "Invalid history item");
+  Q_ASSERT(2u <= item_list.size());
+  Q_ASSERT(next_item_it != item_list.begin());
+  Q_ASSERT(next_item_it != item_list.end());
 
   // If we're back to the present, then take off the previously materialized
   // "present" value.
