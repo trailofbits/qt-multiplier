@@ -12,4 +12,9 @@ namespace mx::gui {
 
 ITheme::~ITheme(void) {}
 
+std::optional<QColor> ITheme::EntityBackgroundColor(
+    const VariantEntity &) const {
+  return std::nullopt;
+}
+
 }  // namespace mx::gui

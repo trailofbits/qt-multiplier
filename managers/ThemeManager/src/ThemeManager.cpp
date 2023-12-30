@@ -1,12 +1,12 @@
 /*
-  Copyright (c) 2022-present, Trail of Bits, Inc.
+  Copyright (c) 2023-present, Trail of Bits, Inc.
   All rights reserved.
 
   This source code is licensed in accordance with the terms specified in
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/GUI/Managers/ThemeManager.h>
+#include "ProxyTheme.h"
 
 namespace mx::gui {
 
@@ -19,8 +19,9 @@ struct ThemeManager::PrivateData final
   QApplication &application;
 
   std::vector<std::unique_ptr<ITheme>> themes;
+  std::unique_ptr<ProxyTheme> proxy_theme;
 
-  const ITheme *current_theme{nullptr};
+  ITheme *current_theme{nullptr};
 };
 
 ThemeManager::~ThemeManager(void) {}
@@ -41,60 +42,89 @@ void ThemeManager::Register(std::unique_ptr<ITheme> theme) {
           [raw_theme_ptr, this] (void) {
             if (d->current_theme == raw_theme_ptr) {
               raw_theme_ptr->Apply(d->application);
-              emit ThemeChanged(ITheme::Ptr(d, raw_theme_ptr));
+              emit ThemeChanged(*this);
             }
           });
 
-  emit ThemeListChanged(ThemeList());
+  emit ThemeListChanged(*this);
 
   if (!d->current_theme) {
-    d->current_theme = raw_theme_ptr;
-    raw_theme_ptr->Apply(d->application);
-    emit ThemeChanged(ITheme::Ptr(d, raw_theme_ptr));
+    d->current_theme = const_cast<ITheme *>(raw_theme_ptr);
+    d->current_theme->Apply(d->application);
+    emit ThemeChanged(*this);
   }
+}
+
+//! Add a theme proxy to the manager. This wraps whatever theme or theme
+//! proxies are already present. Ownership of the proxy is given to the
+//! theme manager, which shares ownership back with the creator of the proxy.
+void ThemeManager::AddProxy(std::unique_ptr<IThemeProxy> proxy) {
+  if (!d->proxy_theme) {
+    d->proxy_theme.reset(
+        new ProxyTheme(d->current_theme, this));
+    d->current_theme = d->proxy_theme.get();
+
+    connect(d->proxy_theme.get(), &ProxyTheme::UninstallProxy,
+            [this] (void) {
+              d->current_theme = d->proxy_theme->current_theme;
+              auto raw_proxy = d->proxy_theme.release();
+
+              d->current_theme->Apply(d->application);
+              emit ThemeChanged(*this);
+              raw_proxy->deleteLater();
+            });
+
+    connect(d->proxy_theme.get(), &ITheme::ThemeChanged,
+            [this] (void) {
+              d->current_theme->Apply(d->application);
+              emit ThemeChanged(*this);
+            });
+  }
+
+  d->proxy_theme->Add(std::move(proxy));
 }
 
 //! Sets the active theme. This is a no-op if `theme` is not owned by this
 //! theme manager.
-void ThemeManager::SetTheme(ITheme::Ptr theme) {
+void ThemeManager::SetTheme(IThemePtr theme) {
   if (!theme || theme.get() == d->current_theme) {
     return;
   }
 
   for (const auto &owned_theme : d->themes) {
     if (owned_theme.get() == theme.get()) {
-      d->current_theme = theme.get();
-      const_cast<ITheme *>(d->current_theme)->Apply(d->application);
-      emit ThemeChanged(ITheme::Ptr(d, d->current_theme));
+      d->current_theme = const_cast<ITheme *>(theme.get());
+      d->current_theme->Apply(d->application);
+      emit ThemeChanged(*this);
       return;
     }
   }
 }
 
 //! Returns the active CodeViewTheme
-ITheme::Ptr ThemeManager::Theme(void) const {
+IThemePtr ThemeManager::Theme(void) const {
   if (!d->current_theme) {
     return {};
   }
-  return ITheme::Ptr(d, d->current_theme);
+  return IThemePtr(d, d->current_theme);
 }
 
 //! Look up a theme by its id, e.g. `com.trailofbits.theme.Dark`. Returns
 //! `nullptr` on failure.
-ITheme::Ptr ThemeManager::Find(const QString &id) const {
+IThemePtr ThemeManager::Find(const QString &id) const {
   for (const auto &owned_theme : d->themes) {
     if (owned_theme->Id() == id) {
-      return ITheme::Ptr(d, owned_theme.get());
+      return IThemePtr(d, owned_theme.get());
     }
   }
   return {};
 }
 
 // Return the list of registered theme IDs.
-std::vector<ITheme::Ptr> ThemeManager::ThemeList(void) const {
-  std::vector<ITheme::Ptr> themes;
+std::vector<IThemePtr> ThemeManager::ThemeList(void) const {
+  std::vector<IThemePtr> themes;
   for (const auto &owned_theme : d->themes) {
-    themes.emplace_back(ITheme::Ptr(d, owned_theme.get()));
+    themes.emplace_back(IThemePtr(d, owned_theme.get()));
   }
   return themes;
 }

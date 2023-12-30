@@ -54,7 +54,7 @@ class IBuiltinTheme : public ITheme {
   QColor DefaultForegroundColor(void) const Q_DECL_FINAL;
   QColor DefaultBackgroundColor(void) const Q_DECL_FINAL;
   QColor CurrentLineBackgroundColor(void) const Q_DECL_FINAL;
-  QColor CurrentEntityBackgroundColor(void) const Q_DECL_FINAL;
+  QColor CurrentEntityBackgroundColor(const VariantEntity &) const Q_DECL_FINAL;
   ColorAndStyle TokenColorAndStyle(const Token &token) const Q_DECL_FINAL;
   const QPalette &Palette(void) const Q_DECL_FINAL;
 };

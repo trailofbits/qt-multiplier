@@ -10,14 +10,17 @@ add_library("mx_theme_manager"
   include/multiplier/GUI/Managers/ThemeManager.h
   src/ThemeManager.cpp
   src/ITheme.cpp
+  src/IThemeProxy.cpp
+  src/ProxyTheme.cpp
+  src/ProxyTheme.h
 )
 
 target_link_libraries("mx_theme_manager"
   PRIVATE
     "mx_cxx_flags"
-    "mx_multiplier_library"
 
   PUBLIC
+    "mx_multiplier_library"
     "mx_qt_library"
 )
 

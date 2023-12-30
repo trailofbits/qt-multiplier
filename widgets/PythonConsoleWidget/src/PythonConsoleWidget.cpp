@@ -203,7 +203,7 @@ PythonConsoleWidget::PythonConsoleWidget(const ThemeManager &theme_manager,
   connect(&theme_manager, &ThemeManager::ThemeChanged,
           this, &PythonConsoleWidget::OnThemeChanged);
 
-  OnThemeChanged(theme_manager.Theme());
+  OnThemeChanged(theme_manager);
 
   InitializeModel();
   InitializeWidgets();
@@ -227,7 +227,8 @@ void PythonConsoleWidget::SetHere(VariantEntity entity) {
     d->main_module, "here", ::mx::to_python<VariantEntity>(std::move(entity)));
 }
 
-void PythonConsoleWidget::OnThemeChanged(ITheme::Ptr theme) {
+void PythonConsoleWidget::OnThemeChanged(const ThemeManager &theme_manager) {
+  auto theme = theme_manager.Theme();
   d->palette = theme->Palette();
   
   auto font = theme->Font();

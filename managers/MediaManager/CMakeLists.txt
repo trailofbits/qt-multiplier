@@ -20,8 +20,8 @@ target_link_libraries("mx_media_manager"
     "mx_cxx_flags"
 
   PUBLIC
-    "mx_theme_manager"
     "mx_qt_library"
+    "mx_theme_manager"
 )
 
 target_include_directories("mx_media_manager" PRIVATE

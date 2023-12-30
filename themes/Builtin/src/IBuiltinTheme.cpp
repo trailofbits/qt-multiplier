@@ -56,7 +56,8 @@ QColor IBuiltinTheme::CurrentLineBackgroundColor(void) const {
   return data.selected_line_background_color;
 }
 
-QColor IBuiltinTheme::CurrentEntityBackgroundColor(void) const {
+QColor IBuiltinTheme::CurrentEntityBackgroundColor(
+    const VariantEntity &) const {
   return data.highlighted_entity_background_color;
 }
 

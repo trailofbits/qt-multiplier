@@ -7,8 +7,8 @@
 #
 
 add_library("mx_context"
-  include/multiplier/GUI/Context.h
-  src/Context.cpp
+  include/multiplier/GUI/Managers/ContextManager.h
+  src/ContextManager.cpp
 )
 
 target_link_libraries("mx_context"

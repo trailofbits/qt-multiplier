@@ -14,7 +14,6 @@
 #include <QPixmap>
 
 #include <memory>
-
 #include <multiplier/GUI/Managers/ThemeManager.h>
 
 namespace mx::gui {
@@ -48,7 +47,7 @@ class MediaManager Q_DECL_FINAL : public QObject {
   void IconsChanged(const MediaManager &manager);
 
  private slots:
-  void OnThemeChanged(ITheme::Ptr);
+  void OnThemeChanged(const ThemeManager &theme_manager);
 };
 
 }  // namespace mx::gui

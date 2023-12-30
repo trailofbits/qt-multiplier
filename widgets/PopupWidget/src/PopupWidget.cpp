@@ -204,7 +204,7 @@ void PopupWidget::OnTitleFrameMouseMove(QMouseEvent *event) {
 }
 
 //! Used to stop window dragging
-void PopupWidget::OnTitleFrameMouseRelease(QMouseEvent *event) {
+void PopupWidget::OnTitleFrameMouseRelease(QMouseEvent *) {
   d->opt_previous_drag_pos = std::nullopt;
 }
 

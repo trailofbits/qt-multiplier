@@ -13,6 +13,8 @@
 #include <QPainter>
 #include <QColor>
 
+#include <multiplier/GUI/Managers/ThemeManager.h>
+
 namespace mx::gui {
 namespace {
 
@@ -56,7 +58,7 @@ static QPixmap GetColorizedPixmap(const QString &path, const QColor &color) {
 }  // namespace
 
 struct MediaManager::PrivateData {
-  ITheme::Ptr theme;
+  IThemePtr theme;
 
   inline PrivateData(ThemeManager &theme_manager)
       : theme(theme_manager.Theme()) {
@@ -74,8 +76,8 @@ MediaManager::MediaManager(ThemeManager &theme_manager)
 // TODO(pag): Could technically be a race condition where the theme manager
 //            emits a `ThemeChanged` signal, but some other thing sees it first
 //            and asks the media manager for an icon using the stale theme.
-void MediaManager::OnThemeChanged(ITheme::Ptr new_theme) {
-  d->theme = std::move(new_theme);
+void MediaManager::OnThemeChanged(const ThemeManager &theme_manager) {
+  d->theme = theme_manager.Theme();
   emit IconsChanged(*this);
 }
 
