@@ -28,7 +28,22 @@ ThemeManager::~ThemeManager(void) {}
 
 ThemeManager::ThemeManager(QApplication &application)
     : QObject(&application),
-      d((new PrivateData(application))->shared_from_this()) {}
+      d((new PrivateData(application))->shared_from_this()) {
+  d->proxy_theme.reset(new ProxyTheme(nullptr, this));
+
+  connect(d->proxy_theme.get(), &ProxyTheme::UninstallProxy,
+          [this] (void) {
+            d->current_theme = d->proxy_theme->current_theme;
+            d->current_theme->Apply(d->application);
+            emit ThemeChanged(*this);
+          });
+
+  connect(d->proxy_theme.get(), &ITheme::ThemeChanged,
+          [this] (void) {
+            d->proxy_theme->current_theme->Apply(d->application);
+            emit ThemeChanged(*this);
+          });
+}
 
 //! Register a theme with the manager.
 void ThemeManager::Register(std::unique_ptr<ITheme> theme) {
@@ -50,6 +65,7 @@ void ThemeManager::Register(std::unique_ptr<ITheme> theme) {
 
   if (!d->current_theme) {
     d->current_theme = const_cast<ITheme *>(raw_theme_ptr);
+    d->proxy_theme->current_theme = d->current_theme;
     d->current_theme->Apply(d->application);
     emit ThemeChanged(*this);
   }
@@ -59,45 +75,35 @@ void ThemeManager::Register(std::unique_ptr<ITheme> theme) {
 //! proxies are already present. Ownership of the proxy is given to the
 //! theme manager, which shares ownership back with the creator of the proxy.
 void ThemeManager::AddProxy(std::unique_ptr<IThemeProxy> proxy) {
-  if (!d->proxy_theme) {
-    d->proxy_theme.reset(
-        new ProxyTheme(d->current_theme, this));
+  d->proxy_theme->Add(std::move(proxy));
+
+  if (!dynamic_cast<ProxyTheme *>(d->current_theme)) {
+    d->proxy_theme->current_theme = d->current_theme;
     d->current_theme = d->proxy_theme.get();
-
-    connect(d->proxy_theme.get(), &ProxyTheme::UninstallProxy,
-            [this] (void) {
-              d->current_theme = d->proxy_theme->current_theme;
-              auto raw_proxy = d->proxy_theme.release();
-
-              d->current_theme->Apply(d->application);
-              emit ThemeChanged(*this);
-              raw_proxy->deleteLater();
-            });
-
-    connect(d->proxy_theme.get(), &ITheme::ThemeChanged,
-            [this] (void) {
-              d->current_theme->Apply(d->application);
-              emit ThemeChanged(*this);
-            });
   }
 
-  d->proxy_theme->Add(std::move(proxy));
+  d->current_theme->Apply(d->application);
+  emit ThemeChanged(*this);
 }
 
 //! Sets the active theme. This is a no-op if `theme` is not owned by this
 //! theme manager.
 void ThemeManager::SetTheme(IThemePtr theme) {
-  if (!theme || theme.get() == d->current_theme) {
+  if (!theme || theme.get() == d->current_theme ||
+      theme.get() == d->proxy_theme.get()) {
     return;
   }
 
   for (const auto &owned_theme : d->themes) {
-    if (owned_theme.get() == theme.get()) {
-      d->current_theme = const_cast<ITheme *>(theme.get());
-      d->current_theme->Apply(d->application);
-      emit ThemeChanged(*this);
-      return;
+    if (owned_theme.get() != theme.get()) {
+      continue;
     }
+
+    d->current_theme = const_cast<ITheme *>(theme.get());
+    d->proxy_theme->current_theme = d->current_theme;
+    d->current_theme->Apply(d->application);
+    emit ThemeChanged(*this);
+    break;
   }
 }
 

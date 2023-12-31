@@ -9,31 +9,12 @@
 #include <multiplier/GUI/TokenPainter.h>
 
 #include <multiplier/Frontend/TokenKind.h>
-#include <QApplication>
-#include <QBrush>
-#include <QColor>
-#include <QFont>
-#include <QFontMetricsF>
-#include <QPalette>
-#include <QPointF>
-#include <QRectF>
-#include <QTextOption>
+
 #include <string>
 
 namespace mx::gui {
 namespace {
 
-QPointF GetRectPosition(const QRectF &rect) {
-  return rect.topLeft();
-}
-
-#ifdef __APPLE__
-
-QPointF GetRectPosition(const QRect &rect) {
-  return GetRectPosition(rect.toRectF());
-}
-
-#endif
 
 static QFont CreateFont(const CodeViewTheme &theme_) {
   QFont font(theme_.font_name);
@@ -48,24 +29,6 @@ static std::string WhitespaceReplacement(const TokenPainterConfiguration &c) {
     return {};
   }
 }
-
-class MeasuringPainter {
- public:
-  QRectF area;
-
-  inline MeasuringPainter(const QRectF &area_) : area(area_) {}
-
-  inline void setPen(const QColor &) {}
-  inline void setFont(const QFont &) {}
-
-  inline void fillRect(const QRectF &rect, const QColor &) {
-    area = area.united(rect);
-  }
-
-  inline void drawText(const QRectF &rect, QChar, const QTextOption &) {
-    area = area.united(rect);
-  }
-};
 
 }  // namespace
 

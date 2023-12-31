@@ -50,7 +50,17 @@ else()
   )
 endif(MX_ENABLE_PYTHON_BINDINGS)
 
+add_library("mx_gap_library" INTERFACE)
+  target_link_libraries("mx_gap_library"
+    INTERFACE
+      "gap::gap"
+      "gap::gap-core"
+      "gap::gap-settings"
+      "std::coroutines"
+  )
+
 add_subdirectory("components")
+add_subdirectory("interfaces")
 add_subdirectory("managers")
 add_subdirectory("themes")
 add_subdirectory("widgets")

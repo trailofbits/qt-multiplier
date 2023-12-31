@@ -1246,8 +1246,8 @@ void MainWindow::OnSetLightTheme() {
 //   d->enable_ref_explorer_code_preview = checked;
 // }
 
-void MainWindow::OnThemeChange(const QPalette &, const CodeViewTheme &) {
-  UpdateIcons();
+void MainWindow::OnIconsChanged(const MediaManager &media_manager) {
+  UpdateIcons(media_manager);
 }
 
 void MainWindow::UpdateIcons() {

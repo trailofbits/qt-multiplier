@@ -57,6 +57,9 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   //! Called by the other client widget to update the search result count
   void UpdateSearchResultCount(size_t search_result_count);
 
+  //! Return the current search paramters.
+  const SearchParameters &Parameters(void) const;
+
  private:
 
   //! Loads the required icons from the resources
@@ -116,7 +119,7 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   void Deactivated(void);
 
   //! Emitted when search parameters have been changed
-  void SearchParametersChanged(const SearchParameters &search_parameters);
+  void SearchParametersChanged(void);
 
   //! Emitted when the user presses the prev/next buttons
   void SearchResultSelected(size_t index);

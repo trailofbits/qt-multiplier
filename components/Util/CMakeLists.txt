@@ -7,9 +7,6 @@
 #
 
 add_library("mx_util_component"
-  include/multiplier/GUI/IModel.h
-  src/IModel.cpp
-
   include/multiplier/GUI/Util.h
   src/Util.h
   src/Util.cpp

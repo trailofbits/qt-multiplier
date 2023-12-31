@@ -11,6 +11,21 @@
         <file alias="com.trailofbits.icon.NextSearchResult">Icons/show_next_result.png</file>
         <file alias="com.trailofbits.icon.Search">Icons/search_icon.png</file>
         <file alias="com.trailofbits.icon.BrowserMode">Icons/browser_mode.png</file>
+
+        <file alias="com.trailofbits.icon.Activate">Icons/activate_ref_item.png</file>
+        <file alias="com.trailofbits.icon.Expand">Icons/expand_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth1">Icons/expand_1_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth2">Icons/expand_2_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth3">Icons/expand_3_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth4">Icons/expand_4_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth5">Icons/expand_5_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth6">Icons/expand_6_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth7">Icons/expand_7_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth8">Icons/expand_8_ref_item.png</file>
+        <file alias="com.trailofbits.icon.ExpandDepth9">Icons/expand_9_ref_item.png</file>
+        <file alias="com.trailofbits.icon.Goto">Icons/goto_ref_item.png</file>
+        <file alias="com.trailofbits.icon.PopOut">Icons/save_as_new_tab.png</file>
+        <file alias="com.trailofbits.icon.Close">Icons/close.png</file>
     </qresource>
     <qresource>
         <file alias="com.trailofbits.font.SourceCodePro-Black">Fonts/Source_Code_Pro/static/SourceCodePro-Black.ttf</file>

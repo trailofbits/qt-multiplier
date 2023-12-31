@@ -9,3 +9,6 @@
 add_subdirectory("ActionManager")
 add_subdirectory("ThemeManager")
 add_subdirectory("MediaManager")
+
+# Depends on the above
+add_subdirectory("ConfigManager")

@@ -7,6 +7,7 @@
 #
 
 add_subdirectory("DockWidget")
+add_subdirectory("FilterSettingsWidget")
 add_subdirectory("HistoryWidget")
 add_subdirectory("LineEditWidget")
 add_subdirectory("PopupWidget")
@@ -15,3 +16,4 @@ add_subdirectory("SearchWidget")
 add_subdirectory("SimpleTextInputDialog")
 add_subdirectory("TabWidget")
 add_subdirectory("TreeWidget")
+add_subdirectory("GeneratorWidget")  # Relies on TreeWidget, SearchWidget, FilterSettingsWidget

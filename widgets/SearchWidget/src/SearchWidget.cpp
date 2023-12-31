@@ -60,6 +60,8 @@ struct SearchWidget::PrivateData final {
   QShortcut *disable_search_shortcut{nullptr};
   QShortcut *search_previous_shortcut{nullptr};
   QShortcut *search_next_shortcut{nullptr};
+
+  SearchParameters search_parameters;
 };
 
 SearchWidget::~SearchWidget(void) {}
@@ -255,11 +257,10 @@ void SearchWidget::UpdateIcons(void) {
 void SearchWidget::OnSearchInputTextChanged(const QString &) {
   ClearDisplayMessage();
 
-  SearchParameters search_parameters;
   if (d->enable_regex) {
-    search_parameters.type = SearchParameters::Type::RegularExpression;
-    search_parameters.case_sensitive = d->case_sensitive;
-    search_parameters.whole_word = false;
+    d->search_parameters.type = SearchParameters::Type::RegularExpression;
+    d->search_parameters.case_sensitive = d->case_sensitive;
+    d->search_parameters.whole_word = false;
 
     QRegularExpression::PatternOption options{
         QRegularExpression::NoPatternOption};
@@ -269,7 +270,7 @@ void SearchWidget::OnSearchInputTextChanged(const QString &) {
     }
 
     auto search_pattern = d->search_input->text();
-    search_parameters.pattern = search_pattern.toStdString();
+    d->search_parameters.pattern = search_pattern.toStdString();
 
     QRegularExpression regex(search_pattern, options);
     if (!regex.isValid()) {
@@ -278,16 +279,20 @@ void SearchWidget::OnSearchInputTextChanged(const QString &) {
     }
 
   } else {
-    search_parameters.type = SearchParameters::Type::Text;
-    search_parameters.case_sensitive = d->case_sensitive;
-    search_parameters.whole_word = d->whole_word;
-    search_parameters.pattern = d->search_input->text().toStdString();
+    d->search_parameters.type = SearchParameters::Type::Text;
+    d->search_parameters.case_sensitive = d->case_sensitive;
+    d->search_parameters.whole_word = d->whole_word;
+    d->search_parameters.pattern = d->search_input->text().toStdString();
   }
 
   d->search_result_count = 0;
   d->current_search_result = 0;
 
-  emit SearchParametersChanged(search_parameters);
+  emit SearchParametersChanged();
+}
+
+const SearchWidget::SearchParameters &SearchWidget::Parameters(void) const {
+  return d->search_parameters;
 }
 
 void SearchWidget::OnCaseSensitiveSearchOptionToggled(bool checked) {
