@@ -33,3 +33,6 @@ target_include_directories("mx_config_manager" PRIVATE
 target_include_directories("mx_config_manager" SYSTEM INTERFACE
   "include"
 )
+
+enable_qt_properties("mx_config_manager")
+

@@ -11,6 +11,7 @@
 
 #include <QAbstractItemView>
 #include <QApplication>
+#include <QObject>
 #include <QString>
 
 namespace mx {
@@ -31,7 +32,7 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   const std::unique_ptr<PrivateData> d;
 
  public:
-  ~ConfigManager(void);
+  virtual ~ConfigManager(void);
   
   explicit ConfigManager(QApplication &application);
 

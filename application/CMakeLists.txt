@@ -9,11 +9,11 @@
 cmake_minimum_required(VERSION 3.19)
 
 set(MACOSX_BUNDLE_ICON_FILE
-  "Multiplier.icns"
+  "logo.icns"
 )
 
 set(multiplier_icon_path
-  "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Icons/${MACOSX_BUNDLE_ICON_FILE}"
+  "${PROJECT_SOURCE_DIR}/managers/MediaManager/resources/Icons/${MACOSX_BUNDLE_ICON_FILE}"
 )
 
 set_source_files_properties("${multiplier_icon_path}" PROPERTIES
@@ -25,49 +25,52 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 
 add_executable("Multiplier" ${executable_type}
-  src/main.cpp
+  src/Main.cpp
 
-  src/MainWindow.h
-  src/MainWindow.cpp
+  #src/MainWindow.h
+  #src/MainWindow.cpp
 
   src/MetaTypes.h
   src/MetaTypes.cpp
   
-  src/Style.h
-  src/Style.cpp
+  src/MultiplierStyle.h
+  src/MultiplierStyle.cpp
 )
 
 target_sources("Multiplier" PRIVATE
-  Resources/resources.qrc
   Info.plist
   "${multiplier_icon_path}"
 )
 
 target_link_libraries("Multiplier"
   PRIVATE
+    "mx_builtin_theme"
+    "mx_config_manager"
     "mx_cxx_flags"
+    "mx_media_manager"
     "mx_multiplier_library"
-    "mx_qt_library"
-    "thirdparty_phantomstyle"
-    "mx_codeview"
-    "mx_util_component"
-    "mx_context"
-    "mx_database"
-    "mx_font_manager"
-    "mx_projectexplorer"
-    "mx_referenceexplorer"
-    "mx_entityexplorer"
-    "mx_historywidget"
-    "mx_informationexplorer"
-    "mx_globalhighlighter"
-    "mx_macroexplorer"
-    "mx_codeviewtheme"
+    "mx_phantomstyle_library"
     "mx_theme_manager"
-    "mx_generators"
-    "mx_action_manager"
-    "mx_mainwindowplugin"
-    "mx_callhierarchyplugin"
-    "$<$<BOOL:MX_ENABLE_PYTHON_BINDINGS>:mx_pythonconsole>"
+
+    #"mx_codeview"
+    #"mx_util_component"
+    #"mx_context"
+    #"mx_database"
+    #"mx_font_manager"
+    #"mx_projectexplorer"
+    #"mx_referenceexplorer"
+    #"mx_entityexplorer"
+    #"mx_historywidget"
+    #"mx_informationexplorer"
+    #"mx_globalhighlighter"
+    #"mx_macroexplorer"
+    #"mx_codeviewtheme"
+    #"mx_theme_manager"
+    #"mx_generators"
+    #"mx_action_manager"
+    #"mx_mainwindowplugin"
+    #"mx_callhierarchyplugin"
+    #"$<$<BOOL:MX_ENABLE_PYTHON_BINDINGS>:mx_pythonconsole>"
 )
 
 enable_qt_properties("Multiplier")

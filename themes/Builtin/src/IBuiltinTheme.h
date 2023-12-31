@@ -43,7 +43,7 @@ class IBuiltinTheme : public ITheme {
 
   virtual ~IBuiltinTheme(void);
 
-  IBuiltinTheme(MediaManager &media, QString name_, QString id_,
+  IBuiltinTheme(const MediaManager &media, QString name_, QString id_,
                 QPalette palette_, const ThemeData &data_);
 
   QString Name(void) const Q_DECL_FINAL;

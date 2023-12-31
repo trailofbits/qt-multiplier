@@ -65,7 +65,7 @@ inline static QColor PaletteBackgroundColor(const QPalette &palette) {
 
 ThemedItemDelegate::~ThemedItemDelegate(void) {
   if (prev_delegate) {
-    const_cast<QAbstractItemDelegate *>(prev_delegate)->deleteLater();
+    prev_delegate->deleteLater();
   }
 }
 

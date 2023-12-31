@@ -60,12 +60,11 @@ void ConfigManager::InstallItemDelegate(
     QAbstractItemView *view, const ItemDelegateConfig &config) const {
 
   auto set_delegate = [=] (const class ThemeManager &self) {
-    auto old_delegate = view->itemDelegate();
-    auto old_themed_delegate
-        = dynamic_cast<const ThemedItemDelegate *>(old_delegate);
+    QAbstractItemDelegate *old_delegate = view->itemDelegate();
+    auto old_themed_delegate = dynamic_cast<ThemedItemDelegate *>(old_delegate);
 
     // Try to proxy the old delegate that's there.
-    const QAbstractItemDelegate *prev_delegate = nullptr;
+    QAbstractItemDelegate *prev_delegate = nullptr;
     if (old_themed_delegate) {
       prev_delegate = old_themed_delegate->prev_delegate;
       old_themed_delegate->prev_delegate = nullptr;

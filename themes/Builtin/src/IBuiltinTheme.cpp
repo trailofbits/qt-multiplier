@@ -14,7 +14,7 @@ namespace mx::gui {
 
 IBuiltinTheme::~IBuiltinTheme(void) {}
 
-IBuiltinTheme::IBuiltinTheme(MediaManager &media, QString name_, QString id_,
+IBuiltinTheme::IBuiltinTheme(const MediaManager &media, QString name_, QString id_,
                              QPalette palette_, const ThemeData &data_)
     : font(media.Font("Source Code Pro")),
       id(std::move(id_)),

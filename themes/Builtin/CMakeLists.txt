@@ -6,20 +6,22 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(extra_sources
+    src/MacosUtils.h
+    src/MacosUtils.mm
+  )
+endif()
+
 add_library("mx_builtin_theme"
   include/multiplier/GUI/Themes/BuiltinTheme.h
   src/DarkTheme.cpp
   src/IBuiltinTheme.cpp
   src/IBuiltinTheme.h
   src/LightTheme.cpp
+  ${extra_sources}
 )
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  target_sources("mx_builtin_theme" PRIVATE
-    src/MacosUtils.h
-    src/MacosUtils.mm
-  )
-endif()
 
 target_link_libraries("mx_builtin_theme"
   PRIVATE
@@ -29,7 +31,7 @@ target_link_libraries("mx_builtin_theme"
 
   PUBLIC
     "mx_qt_library"
-    "mx_theme_manager"
+    "mx_interfaces"
 )
 
 target_include_directories("mx_builtin_theme" PRIVATE

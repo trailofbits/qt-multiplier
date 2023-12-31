@@ -10,7 +10,7 @@ set(library_root
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-add_library("thirdparty_phantomstyle" STATIC
+add_library("mx_phantomstyle_library" STATIC
   "${library_root}/src/phantom/phantomtweak.h"
 
   "${library_root}/src/phantom/phantomcolor.h"
@@ -20,11 +20,11 @@ add_library("thirdparty_phantomstyle" STATIC
   "${library_root}/src/phantom/phantomstyle.cpp"
 )
 
-target_compile_definitions("thirdparty_phantomstyle" PUBLIC
+target_compile_definitions("mx_phantomstyle_library" PUBLIC
   QT_VERSION=620
 )
 
-target_link_libraries("thirdparty_phantomstyle"
+target_link_libraries("mx_phantomstyle_library"
   PRIVATE
     "mx_cxx_flags"
 
@@ -32,11 +32,11 @@ target_link_libraries("thirdparty_phantomstyle"
     "mx_qt_library"
 )
 
-target_include_directories("thirdparty_phantomstyle" PRIVATE
+target_include_directories("mx_phantomstyle_library" PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/patches"
 )
 
-target_include_directories("thirdparty_phantomstyle" SYSTEM INTERFACE
+target_include_directories("mx_phantomstyle_library" SYSTEM INTERFACE
   "${library_root}/src"
 )
 
@@ -48,15 +48,15 @@ set_source_files_properties(
       "-include;qt6_compatibility.h"
 )
 
-enable_qt_properties("thirdparty_phantomstyle")
+enable_qt_properties("mx_phantomstyle_library")
 
-add_library("thirdparty_phantomstyle_disable_warnings" INTERFACE)
-target_compile_options("thirdparty_phantomstyle_disable_warnings" INTERFACE
+add_library("mx_phantomstyle_library_disable_warnings" INTERFACE)
+target_compile_options("mx_phantomstyle_library_disable_warnings" INTERFACE
   -Wno-everything
   -Wno-error
 )
 
-target_link_libraries("thirdparty_phantomstyle"
+target_link_libraries("mx_phantomstyle_library"
   PRIVATE
-    "thirdparty_phantomstyle_disable_warnings"
+    "mx_phantomstyle_library_disable_warnings"
 )

@@ -65,7 +65,7 @@ add_subdirectory("managers")
 add_subdirectory("themes")
 add_subdirectory("widgets")
 #add_subdirectory("plugins")
-#add_subdirectory("multiplier")
+add_subdirectory("application")
 
 if(MXQT_ENABLE_INSTALL)
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

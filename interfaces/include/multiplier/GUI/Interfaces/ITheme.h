@@ -54,7 +54,7 @@ class ITheme : public QObject {
   //! Apply this theme to an application. This is invoked when the theme manager
   //! sets the theme, or when this is already the active theme but the theme
   //! itself changes, e.g. due to signalling `ThemeChanged`.
-  virtual void Apply(QApplication &application);
+  virtual void Apply(QApplication &application) = 0;
 
   //! Returns the active QPalette
   virtual const QPalette &Palette(void) const = 0;

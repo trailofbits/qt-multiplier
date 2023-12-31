@@ -16,12 +16,13 @@
 
 namespace mx::gui {
 
+class ThemeManagerImpl;
+
 //! Manages the themes.
 class ThemeManager Q_DECL_FINAL : public QObject {
   Q_OBJECT
 
-  struct PrivateData;
-  const std::shared_ptr<PrivateData> d;
+  const std::shared_ptr<ThemeManagerImpl> d;
 
  public:
   virtual ~ThemeManager(void);

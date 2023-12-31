@@ -9,7 +9,7 @@
   <key>CFBundleGetInfoString</key>
   <string></string>
   <key>CFBundleIconFile</key>
-  <string>Logo.ico</string>
+  <string>logo</string>
   <key>CFBundleIdentifier</key>
   <string>com.trailofbits.Multiplier</string>
   <key>CFBundleInfoDictionaryVersion</key>

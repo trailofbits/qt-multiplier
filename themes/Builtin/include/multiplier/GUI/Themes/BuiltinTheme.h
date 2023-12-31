@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/GUI/Interfaces/ITheme.h>
 
 namespace mx::gui {
 

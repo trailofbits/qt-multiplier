@@ -10,10 +10,9 @@
 
 namespace mx::gui {
 
-struct ThemeManager::PrivateData final
-    : std::enable_shared_from_this<ThemeManager::PrivateData> {
-
-  PrivateData(QApplication &application_)
+class ThemeManagerImpl final {
+ public:
+  ThemeManagerImpl(QApplication &application_)
       : application(application_) {}
 
   QApplication &application;
@@ -28,7 +27,8 @@ ThemeManager::~ThemeManager(void) {}
 
 ThemeManager::ThemeManager(QApplication &application)
     : QObject(&application),
-      d((new PrivateData(application))->shared_from_this()) {
+      d(std::make_shared<ThemeManagerImpl>(application)) {
+
   d->proxy_theme.reset(new ProxyTheme(nullptr, this));
 
   connect(d->proxy_theme.get(), &ProxyTheme::UninstallProxy,

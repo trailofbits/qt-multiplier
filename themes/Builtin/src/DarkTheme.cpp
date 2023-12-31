@@ -121,7 +121,7 @@ class DarkTheme Q_DECL_FINAL : public IBuiltinTheme {
  public:
   virtual ~DarkTheme(void) = default;
 
-  explicit DarkTheme(MediaManager &media)
+  explicit DarkTheme(const MediaManager &media)
       : IBuiltinTheme(media, tr("Dark"), "com.trailofbits.theme.Dark",
                       GetDarkPalette(), kDarkThemeData) {}
 
@@ -142,11 +142,10 @@ class DarkTheme Q_DECL_FINAL : public IBuiltinTheme {
 
 }  // namespace
 
-std::unique_ptr<ITheme> CreateDarkTheme(MediaManager &media) {
+std::unique_ptr<ITheme> CreateDarkTheme(const MediaManager &media) {
   return std::make_unique<DarkTheme>(media);
 }
 
 }  // namespace mx::gui
 
 #include "DarkTheme.moc"
-

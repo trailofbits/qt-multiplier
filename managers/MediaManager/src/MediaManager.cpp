@@ -66,6 +66,8 @@ struct MediaManager::PrivateData {
   }
 };
 
+MediaManager::~MediaManager(void) {}
+
 MediaManager::MediaManager(ThemeManager &theme_manager)
     : d(new PrivateData(theme_manager)) {
   

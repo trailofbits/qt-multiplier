@@ -120,7 +120,7 @@ class LightTheme Q_DECL_FINAL : public IBuiltinTheme {
  public:
   virtual ~LightTheme(void) = default;
 
-  explicit LightTheme(MediaManager &media)
+  explicit LightTheme(const MediaManager &media)
       : IBuiltinTheme(media, tr("Light"), "com.trailofbits.theme.Light",
                       GetLightPalette(), kLightThemeData) {}
 
@@ -141,7 +141,7 @@ class LightTheme Q_DECL_FINAL : public IBuiltinTheme {
 
 }  // namespace
 
-std::unique_ptr<ITheme> CreateLightTheme(MediaManager &media) {
+std::unique_ptr<ITheme> CreateLightTheme(const MediaManager &media) {
   return std::make_unique<LightTheme>(media);
 }
 
