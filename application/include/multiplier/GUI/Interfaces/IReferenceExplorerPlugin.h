@@ -16,7 +16,7 @@
 
 namespace mx::gui {
 
-class Context;
+class ConfigManager;
 class IMainWindowPlugin;
 
 // Describes a plugin to the reference explorer.
@@ -26,7 +26,7 @@ class IReferenceExplorerPlugin : public QObject {
  public:
   virtual ~IReferenceExplorerPlugin(void);
 
-  IReferenceExplorerPlugin(const Context &context, QObject *parent = nullptr);
+  IReferenceExplorerPlugin(ConfigManager &config, QObject *parent = nullptr);
 
   // If `reference_explorer` is a pointer to a reference explorer, then
   // invoke `create_plugin(reference_explorer)`, returning a raw pointer to
@@ -60,6 +60,10 @@ class IReferenceExplorerPlugin : public QObject {
   // performed on a key press.
   virtual std::vector<NamedAction> ActOnMainWindowKeyPressEx(
       QMainWindow *window, const QKeySequence &keys, const QModelIndex &index);
+
+ public slots:
+  virtual void OnThemeChanged(const ThemeManager &theme_manager);
+  virtual void OnIconsChanged(const MediaManager &media_manager);
 };
 
 }  // namespace mx::gui

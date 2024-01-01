@@ -11,7 +11,6 @@ add_library("mx_action_manager"
 
   src/ActionManager.cpp
   src/ActionManager.h
-  src/IAction.cpp
 )
 
 target_link_libraries("mx_action_manager"
@@ -20,6 +19,7 @@ target_link_libraries("mx_action_manager"
 
   PUBLIC
     "mx_qt_library"
+    "mx_interfaces"
 )
 
 target_include_directories("mx_action_manager" PRIVATE

@@ -6,7 +6,7 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "ActionManager.h"
+#include <multiplier/GUI/Interfaces/IAction.h>
 
 #include <QRunnable>
 

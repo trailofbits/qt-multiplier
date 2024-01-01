@@ -10,17 +10,17 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QModelIndex>
-#include <QPalette>
-#include <QString>
+#include <QObject>
+
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <optional>
 #include <vector>
 
 namespace mx::gui {
 
-class CodeViewTheme;
-class Context;
-class IGlobalHighlighter;
+class ConfigManager;
+class MediaManager;
+class ThemeManager;
 
 class IMainWindowPlugin : public QObject {
   Q_OBJECT
@@ -28,7 +28,7 @@ class IMainWindowPlugin : public QObject {
  public:
   virtual ~IMainWindowPlugin(void);
 
-  IMainWindowPlugin(const Context &context, QMainWindow *parent = nullptr);
+  IMainWindowPlugin(ConfigManager &config, QMainWindow *parent = nullptr);
 
   // Act on a primary click. For example, if browse mode is enabled, then this
   // is a "normal" click, however, if browse mode is off, then this is a meta-
@@ -59,13 +59,9 @@ class IMainWindowPlugin : public QObject {
   virtual std::vector<NamedAction> ActOnKeyPressEx(
       const QKeySequence &keys, const QModelIndex &index);
 
-  // Allow a main window plugin to know when the theme is changed.
-  virtual void ActOnThemeChange(const QPalette &new_palette,
-                                const CodeViewTheme &new_theme);
-
   // Requests a dock wiget from this plugin. Can return `nullptr`.
   virtual QWidget *CreateDockWidget(QWidget *parent);
- 
+
  signals:
   void HideDockWidget(void);
   void ShowDockWidget(void);

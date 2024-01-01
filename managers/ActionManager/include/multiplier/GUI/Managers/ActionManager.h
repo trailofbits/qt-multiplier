@@ -8,37 +8,13 @@
 
 #pragma once
 
-#include <QVariant>
-#include <QString>
-
 #include <memory>
+#include <multiplier/GUI/Interfaces/IAction.h>
 
 namespace mx::gui {
 
-class ActionManager;
+class ActionManagerImpl;
 class TriggerHandleImpl;
-
-// Generic action. These actions are run on the main thread, so they should
-// not arbitrarily block.
-class IAction : public QObject {
-  Q_OBJECT
-
- public:
-  using QObject::QObject;
-
-  virtual ~IAction(void);
-
-  // Globally unique verb name associated with this signal. Verb names should
-  // be namespaced, e.g. `com.trailofbits.TopLevelActionName` or
-  // `com.trailofbits.PluginName.ActionName`.
-  virtual QString Verb(void) const noexcept = 0;
-
- protected:
-  friend class ActionManager;
-
- protected slots:
-  virtual void Run(const QVariant &input) noexcept = 0;
-};
 
 // An action that can wrap over a lambda.
 template <typename Lambda>
@@ -92,12 +68,16 @@ class MethodPointerAction Q_DECL_FINAL : public IAction {
 class TriggerHandle {
   friend class ActionManager;
 
-  std::shared_ptr<TriggerHandleImpl> d;
+  std::weak_ptr<TriggerHandleImpl> d;
 
   inline TriggerHandle(std::shared_ptr<TriggerHandleImpl> d_)
       : d(std::move(d_)) {}
 
  public:
+  TriggerHandle(void) = default;
+  ~TriggerHandle(void);
+
+  operator bool(void) const noexcept;
 
   // Triggers an action.
   void Trigger(const QVariant &data) const noexcept;
@@ -112,9 +92,7 @@ struct NamedAction {
 // Registry for actions.
 class ActionManager {
  private:
-  struct PrivateData;
-
-  std::shared_ptr<PrivateData> d;
+  std::shared_ptr<ActionManagerImpl> d;
 
  public:
   ActionManager(void);
@@ -142,5 +120,3 @@ class ActionManager {
 };
 
 }  // namespace mx::gui
-
-Q_DECLARE_INTERFACE(mx::gui::IAction, "com.trailofbits.interface.IAction")

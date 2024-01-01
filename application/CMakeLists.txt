@@ -27,14 +27,24 @@ endif()
 add_executable("Multiplier" ${executable_type}
   src/Main.cpp
 
-  #src/MainWindow.h
-  #src/MainWindow.cpp
+  include/multiplier/GUI/Interfaces/IMainWindowPlugin.h
+  src/Interfaces/IMainWindowPlugin.cpp
+
+  src/MainWindow.h
+  src/MainWindow.cpp
 
   src/MetaTypes.h
   src/MetaTypes.cpp
   
   src/MultiplierStyle.h
   src/MultiplierStyle.cpp
+
+  src/Explorers/ProjectExplorer/FileTreeModel.cpp
+  src/Explorers/ProjectExplorer/FileTreeModel.h
+  src/Explorers/ProjectExplorer/FileTreeView.cpp
+  src/Explorers/ProjectExplorer/FileTreeView.h
+  src/Explorers/ProjectExplorer/ProjectExplorer.cpp
+  src/Explorers/ProjectExplorer/ProjectExplorer.h
 )
 
 target_sources("Multiplier" PRIVATE
@@ -44,13 +54,16 @@ target_sources("Multiplier" PRIVATE
 
 target_link_libraries("Multiplier"
   PRIVATE
+    "mx_action_manager"
     "mx_builtin_theme"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_media_manager"
     "mx_multiplier_library"
     "mx_phantomstyle_library"
+    "mx_search_widget"
     "mx_theme_manager"
+    "mx_tree_widget"
 
     #"mx_codeview"
     #"mx_util_component"
@@ -71,6 +84,15 @@ target_link_libraries("Multiplier"
     #"mx_mainwindowplugin"
     #"mx_callhierarchyplugin"
     #"$<$<BOOL:MX_ENABLE_PYTHON_BINDINGS>:mx_pythonconsole>"
+)
+
+target_include_directories("Multiplier" PRIVATE
+  "include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_include_directories("Multiplier" SYSTEM INTERFACE
+  "include"
 )
 
 enable_qt_properties("Multiplier")

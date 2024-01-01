@@ -4,17 +4,28 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <multiplier/GUI/IReferenceExplorerPlugin.h>
+#include <multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h>
 
 #include <QAction>
+
+#include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Managers/ThemeManager.h>
 
 #include "ReferenceExplorerPlugin.h"
 
 namespace mx::gui {
 
 IReferenceExplorerPlugin::IReferenceExplorerPlugin(
-    const Context &, QObject *parent)
-    : QObject(parent) {}
+    const ConfigManager &config, QObject *parent)
+    : QObject(parent) {
+
+  connect(&(config.ThemeManager()), &ThemeManager::ThemeChanged,
+          this, &IReferenceExplorerPlugin::OnThemeChanged);
+
+  connect(&(config.MediaManager()), &MediaManager::IconsChanged,
+          this, &IReferenceExplorerPlugin::OnIconsChanged);
+}
 
 IReferenceExplorerPlugin::~IReferenceExplorerPlugin(void) {}
 
@@ -97,5 +108,8 @@ std::vector<NamedAction> IReferenceExplorerPlugin::ActOnMainWindowKeyPressEx(
   }
   return ret;
 }
+
+void IReferenceExplorerPlugin::OnThemeChanged(const ThemeManager &) {}
+void IReferenceExplorerPlugin::OnIconsChanged(const MediaManager &) {}
 
 }  // namespace mx::gui

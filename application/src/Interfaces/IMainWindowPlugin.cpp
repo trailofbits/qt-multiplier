@@ -4,13 +4,17 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <multiplier/GUI/IMainWindowPlugin.h>
+#include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 
 #include <QAction>
 
+#include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Managers/ThemeManager.h>
+
 namespace mx::gui {
 
-IMainWindowPlugin::IMainWindowPlugin(const Context &, QMainWindow *parent)
+IMainWindowPlugin::IMainWindowPlugin(ConfigManager &, QMainWindow *parent)
     : QObject(parent) {}
 
 IMainWindowPlugin::~IMainWindowPlugin(void) {}
@@ -71,10 +75,6 @@ std::vector<NamedAction> IMainWindowPlugin::ActOnKeyPressEx(
   }
   return ret;
 }
-
-// Allow a main window plugin to know when the theme is changed.
-void IMainWindowPlugin::ActOnThemeChange(const QPalette &,
-                                         const CodeViewTheme &) {}
 
 // Requests a dock wiget from this plugin. Can return `nullptr`.
 QWidget *IMainWindowPlugin::CreateDockWidget(QWidget *) {

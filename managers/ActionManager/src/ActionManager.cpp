@@ -14,14 +14,22 @@ namespace mx::gui {
 
 TriggerHandleImpl::~TriggerHandleImpl(void) {}
 
-void TriggerHandle::Trigger(const QVariant &data) const noexcept {
-  d->Trigger(data);
+TriggerHandle::~TriggerHandle(void) {}
+
+TriggerHandle::operator bool(void) const noexcept {
+  return !!d.lock();
 }
 
-ActionManager::PrivateData::PrivateData(void) {}
-ActionManager::PrivateData::~PrivateData(void) {}
+void TriggerHandle::Trigger(const QVariant &data) const noexcept {
+  if (auto shared_d = d.lock()) {
+    shared_d->Trigger(data);
+  }
+}
 
-TriggerHandleImpl *ActionManager::PrivateData::TriggerFor(const QString &verb) {
+ActionManagerImpl::ActionManagerImpl(void) {}
+ActionManagerImpl::~ActionManagerImpl(void) {}
+
+TriggerHandleImpl *ActionManagerImpl::TriggerFor(const QString &verb) {
   std::unique_lock<std::mutex> locker(named_triggers_lock);
 
   auto trigger_it = named_triggers.find(verb);
@@ -34,7 +42,7 @@ TriggerHandleImpl *ActionManager::PrivateData::TriggerFor(const QString &verb) {
 }
 
 ActionManager::ActionManager(void)
-    : d(std::make_shared<PrivateData>()) {}
+    : d(std::make_shared<ActionManagerImpl>()) {}
 
 ActionManager::~ActionManager(void) {}
 

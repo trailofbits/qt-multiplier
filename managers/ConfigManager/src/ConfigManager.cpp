@@ -17,22 +17,24 @@
 
 namespace mx::gui {
 
-struct ConfigManager::PrivateData {
+class ConfigManagerImpl {
+ public:
   class ThemeManager theme_manager;
   class MediaManager media_manager;
   class ActionManager action_manager;
   class FileLocationCache file_location_cache;
+  class Index index;
 
-  inline PrivateData(QApplication &application)
-      : theme_manager(application),
-        media_manager(theme_manager) {}
+  inline ConfigManagerImpl(QApplication &application, QObject *self)
+      : theme_manager(application, self),
+        media_manager(theme_manager, self) {}
 };
 
 ConfigManager::~ConfigManager(void) {}
 
-ConfigManager::ConfigManager(QApplication &application)
-    : QObject(&application),
-      d(new PrivateData(application)) {}
+ConfigManager::ConfigManager(QApplication &application, QObject *parent)
+    : QObject(parent),
+      d(std::make_shared<ConfigManagerImpl>(application, this)) {}
 
 class ActionManager &ConfigManager::ActionManager(void) const noexcept {
   return d->action_manager;
@@ -46,6 +48,18 @@ class ThemeManager &ConfigManager::ThemeManager(void) const noexcept {
 // Get access to the global media manager.
 class MediaManager &ConfigManager::MediaManager(void) const noexcept {
   return d->media_manager;
+}
+
+//! Get access to the current index.
+const class Index &ConfigManager::Index(void) const noexcept {
+  return d->index;
+}
+
+//! Change the current index.
+void ConfigManager::SetIndex(const class Index &index) noexcept {
+  d->file_location_cache.clear();
+  d->index = index;
+  emit IndexChanged(*this);
 }
 
 // Return the shared file location cache.

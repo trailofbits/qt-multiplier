@@ -38,11 +38,11 @@ class TriggerHandleImpl final : public QObject {
   void Triggered(const QVariant &input);
 };
 
-struct ActionManager::PrivateData {
+class ActionManagerImpl {
  public:
 
-  PrivateData(void);
-  ~PrivateData(void);
+  ActionManagerImpl(void);
+  ~ActionManagerImpl(void);
 
   std::deque<TriggerHandleImpl> owned_triggers;
   QMap<QString, TriggerHandleImpl *> named_triggers;

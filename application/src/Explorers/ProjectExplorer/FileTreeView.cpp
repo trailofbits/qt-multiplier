@@ -6,10 +6,13 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include "ProjectExplorer.h"
+#include "FileTreeView.h"
 
 #include <filesystem>
-#include <multiplier/GUI/Assert.h>
+
+#include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/GUI/Widgets/SearchWidget.h>
+#include <multiplier/GUI/Widgets/TreeWidget.h>
 
 #include <QTreeView>
 #include <QVBoxLayout>
@@ -21,8 +24,9 @@
 #include <QLabel>
 #include <QClipboard>
 
-namespace mx::gui {
+#include "FileTreeModel.h"
 
+namespace mx::gui {
 namespace {
 
 struct ContextMenu final {
@@ -40,7 +44,7 @@ struct ContextMenu final {
 };
 
 void SaveExpandedNodeListHelper(std::vector<QModelIndex> &expanded_node_list,
-                                const QTreeView &tree_view,
+                                const TreeWidget &tree_view,
                                 const QModelIndex &root) {
 
   const auto &model = *tree_view.model();
@@ -58,50 +62,56 @@ void SaveExpandedNodeListHelper(std::vector<QModelIndex> &expanded_node_list,
 
 }  // namespace
 
-struct ProjectExplorer::PrivateData final {
-  IFileTreeModel *model{nullptr};
+struct FileTreeView::PrivateData final {
+  FileTreeModel *model{nullptr};
   QSortFilterProxyModel *model_proxy{nullptr};
   std::vector<QModelIndex> expanded_node_list;
 
-  QTreeView *tree_view{nullptr};
-  ISearchWidget *search_widget{nullptr};
+  TreeWidget *tree_view{nullptr};
+  SearchWidget *search_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
 
   ContextMenu context_menu;
 };
 
-ProjectExplorer::~ProjectExplorer() {}
+FileTreeView::~FileTreeView(void) {}
 
-ProjectExplorer::ProjectExplorer(IFileTreeModel *model, QWidget *parent)
-    : IProjectExplorer(parent),
+FileTreeView::FileTreeView(const ThemeManager &theme_manager,
+                           const MediaManager &media_manager,
+                           FileTreeModel *model,
+                           QWidget *parent)
+    : QWidget(parent),
       d(new PrivateData) {
 
-  InitializeWidgets();
+  InitializeWidgets(theme_manager, media_manager);
   InstallModel(model);
 }
 
-void ProjectExplorer::InitializeWidgets() {
+void FileTreeView::InitializeWidgets(const ThemeManager &theme_manager,
+                                     const MediaManager &media_manager) {
   // Setup the tree view
-  d->tree_view = new QTreeView();
+  d->tree_view = new TreeWidget();
   d->tree_view->setHeaderHidden(true);
   d->tree_view->setAlternatingRowColors(false);
 
   d->tree_view->setSelectionBehavior(QAbstractItemView::SelectRows);
+  d->tree_view->setTextElideMode(Qt::ElideMiddle);
   d->tree_view->setAllColumnsShowFocus(true);
   d->tree_view->setTreePosition(0);
 
   auto indent_width = fontMetrics().horizontalAdvance("_");
   d->tree_view->setIndentation(indent_width);
 
-  d->search_widget = ISearchWidget::Create(ISearchWidget::Mode::Filter, this);
-  connect(d->search_widget, &ISearchWidget::SearchParametersChanged, this,
-          &ProjectExplorer::OnSearchParametersChange);
+  d->search_widget = new SearchWidget(media_manager, SearchWidget::Mode::Filter,
+                                      this);
+  connect(d->search_widget, &SearchWidget::SearchParametersChanged,
+          this, &FileTreeView::OnSearchParametersChange);
 
-  connect(d->search_widget, &ISearchWidget::Activated, this,
-          &ProjectExplorer::OnStartSearching);
+  connect(d->search_widget, &SearchWidget::Activated,
+          this, &FileTreeView::OnStartSearching);
 
-  connect(d->search_widget, &ISearchWidget::Deactivated, this,
-          &ProjectExplorer::OnStopSearching);
+  connect(d->search_widget, &SearchWidget::Deactivated,
+          this, &FileTreeView::OnStopSearching);
 
   // Create the alternative root item warning
   auto root_warning_label = new QLabel();
@@ -114,8 +124,8 @@ void ProjectExplorer::InitializeWidgets() {
   warning_font.setItalic(true);
   root_warning_label->setFont(warning_font);
 
-  connect(root_warning_label, &QLabel::linkActivated, this,
-          &ProjectExplorer::OnDisableCustomRootLinkClicked);
+  connect(root_warning_label, &QLabel::linkActivated,
+          this, &FileTreeView::OnDisableCustomRootLinkClicked);
 
   auto root_warning_layout = new QHBoxLayout();
   root_warning_layout->setContentsMargins(0, 0, 0, 0);
@@ -161,22 +171,24 @@ void ProjectExplorer::InitializeWidgets() {
   d->context_menu.menu->addMenu(d->context_menu.copy_menu);
 
   connect(d->context_menu.menu, &QMenu::triggered, this,
-          &ProjectExplorer::OnContextMenuActionTriggered);
+          &FileTreeView::OnContextMenuActionTriggered);
 
   connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
-          &ProjectExplorer::OnOpenItemContextMenu);
+          &FileTreeView::OnOpenItemContextMenu);
 
-  connect(&ThemeManager::Get(), &ThemeManager::ThemeChanged, this,
-          &ProjectExplorer::OnThemeChange);
+  connect(&theme_manager, &ThemeManager::ThemeChanged,
+          this, &FileTreeView::OnThemeChanged);
+
+  OnThemeChanged(theme_manager);
 }
 
-void ProjectExplorer::InstallModel(IFileTreeModel *model) {
+void FileTreeView::InstallModel(FileTreeModel *model) {
   d->model = model;
 
   d->model_proxy = new QSortFilterProxyModel(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);
-  d->model_proxy->setFilterRole(IFileTreeModel::AbsolutePathRole);
+  d->model_proxy->setFilterRole(FileTreeModel::AbsolutePathRole);
   d->model_proxy->setDynamicSortFilter(true);
   d->model_proxy->sort(0, Qt::AscendingOrder);
 
@@ -185,19 +197,19 @@ void ProjectExplorer::InstallModel(IFileTreeModel *model) {
   // Note: this needs to happen after the model has been set in the
   // tree view!
   auto tree_selection_model = d->tree_view->selectionModel();
-  connect(tree_selection_model, &QItemSelectionModel::currentChanged, this,
-          &ProjectExplorer::SelectionChanged);
+  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
+          this, &FileTreeView::SelectionChanged);
 
-  connect(d->tree_view, &QTreeView::clicked, this,
-          &ProjectExplorer::OnFileTreeItemClicked);
+  connect(d->tree_view, &QTreeView::clicked,
+          this, &FileTreeView::OnFileTreeItemClicked);
 
-  connect(d->model, &QAbstractItemModel::modelReset, this,
-          &ProjectExplorer::OnModelReset);
+  connect(d->model, &QAbstractItemModel::modelReset,
+          this, &FileTreeView::OnModelReset);
 
   OnModelReset();
 }
 
-std::vector<QModelIndex> ProjectExplorer::SaveExpandedNodeList() {
+std::vector<QModelIndex> FileTreeView::SaveExpandedNodeList(void) {
   std::vector<QModelIndex> expanded_node_list;
   SaveExpandedNodeListHelper(expanded_node_list, *d->tree_view, QModelIndex());
 
@@ -208,7 +220,7 @@ std::vector<QModelIndex> ProjectExplorer::SaveExpandedNodeList() {
   return expanded_node_list;
 }
 
-void ProjectExplorer::ApplyExpandedNodeList(
+void FileTreeView::ApplyExpandedNodeList(
     const std::vector<QModelIndex> &expanded_node_list) {
 
   d->tree_view->collapseAll();
@@ -219,14 +231,14 @@ void ProjectExplorer::ApplyExpandedNodeList(
   }
 }
 
-void ProjectExplorer::SelectionChanged(const QModelIndex &index,
+void FileTreeView::SelectionChanged(const QModelIndex &index,
                                        const QModelIndex &) {
   OnFileTreeItemClicked(index);
 }
 
-void ProjectExplorer::OnFileTreeItemClicked(const QModelIndex &index) {
+void FileTreeView::OnFileTreeItemClicked(const QModelIndex &index) {
   auto opt_file_id_var =
-      d->model_proxy->data(index, IFileTreeModel::FileIdRole);
+      d->model_proxy->data(index, FileTreeModel::FileIdRole);
 
   if (!opt_file_id_var.isValid()) {
     return;
@@ -235,13 +247,14 @@ void ProjectExplorer::OnFileTreeItemClicked(const QModelIndex &index) {
   const auto file_id = qvariant_cast<RawEntityId>(opt_file_id_var);
   auto file_name_var = d->model_proxy->data(index);
   auto file_path_var =
-      d->model_proxy->data(index, IFileTreeModel::AbsolutePathRole);
+      d->model_proxy->data(index, FileTreeModel::AbsolutePathRole);
 
   emit FileClicked(file_id, file_name_var.toString(), file_path_var.toString());
 }
 
-void ProjectExplorer::OnSearchParametersChange(
-    const ISearchWidget::SearchParameters &search_parameters) {
+void FileTreeView::OnSearchParametersChange(void) {
+
+  auto &search_parameters = d->search_widget->Parameters();
 
   QRegularExpression::PatternOptions options{
       QRegularExpression::NoPatternOption};
@@ -252,7 +265,7 @@ void ProjectExplorer::OnSearchParametersChange(
 
   auto pattern = QString::fromStdString(search_parameters.pattern);
 
-  if (search_parameters.type == ISearchWidget::SearchParameters::Type::Text) {
+  if (search_parameters.type == SearchWidget::SearchParameters::Type::Text) {
     pattern = QRegularExpression::escape(pattern);
     if (search_parameters.whole_word) {
       pattern = "\\b" + pattern + "\\b";
@@ -262,8 +275,7 @@ void ProjectExplorer::OnSearchParametersChange(
   QRegularExpression regex(pattern, options);
 
   // The regex is already validated by the search widget
-  Assert(regex.isValid(),
-         "Invalid regex found in CodeView::OnSearchParametersChange");
+  Q_ASSERT(regex.isValid());
 
   auto &selection_model = *d->tree_view->selectionModel();
   selection_model.select(QModelIndex(), QItemSelectionModel::Clear);
@@ -273,7 +285,7 @@ void ProjectExplorer::OnSearchParametersChange(
   d->tree_view->resizeColumnToContents(0);
 }
 
-void ProjectExplorer::OnOpenItemContextMenu(const QPoint &point) {
+void FileTreeView::OnOpenItemContextMenu(const QPoint &point) {
   auto index = d->tree_view->indexAt(point);
   if (!index.isValid()) {
     return;
@@ -282,7 +294,7 @@ void ProjectExplorer::OnOpenItemContextMenu(const QPoint &point) {
   QVariant action_data;
   action_data.setValue(index);
 
-  auto file_id_role = index.data(IFileTreeModel::FileIdRole);
+  auto file_id_role = index.data(FileTreeModel::FileIdRole);
   auto is_directory = !file_id_role.isValid();
   d->context_menu.set_root_action->setVisible(is_directory);
 
@@ -297,7 +309,7 @@ void ProjectExplorer::OnOpenItemContextMenu(const QPoint &point) {
   d->context_menu.menu->exec(menu_position);
 }
 
-void ProjectExplorer::OnContextMenuActionTriggered(QAction *action) {
+void FileTreeView::OnContextMenuActionTriggered(QAction *action) {
   auto index_var = action->data();
   if (!index_var.isValid()) {
     return;
@@ -309,12 +321,12 @@ void ProjectExplorer::OnContextMenuActionTriggered(QAction *action) {
   }
 
   if (action == d->context_menu.set_root_action) {
-    d->model->SetRoot(index);
+    d->model->SetRoot(d->model_proxy->mapToSource(index));
 
   } else if (action == d->context_menu.copy_file_name ||
              action == d->context_menu.copy_full_path) {
 
-    auto file_path_var = index.data(IFileTreeModel::AbsolutePathRole);
+    auto file_path_var = index.data(FileTreeModel::AbsolutePathRole);
     if (file_path_var.isValid()) {
       auto clipboard_value = file_path_var.toString();
 
@@ -344,7 +356,7 @@ void ProjectExplorer::OnContextMenuActionTriggered(QAction *action) {
   }
 }
 
-void ProjectExplorer::OnModelReset() {
+void FileTreeView::OnModelReset(void) {
   d->expanded_node_list.clear();
 
   auto display_root_warning = d->model->HasAlternativeRoot();
@@ -353,23 +365,22 @@ void ProjectExplorer::OnModelReset() {
   d->tree_view->expandRecursively(QModelIndex(), 1);
 }
 
-void ProjectExplorer::OnDisableCustomRootLinkClicked() {
+void FileTreeView::OnDisableCustomRootLinkClicked(void) {
   d->model->SetDefaultRoot();
 }
 
-void ProjectExplorer::OnStartSearching() {
+void FileTreeView::OnStartSearching(void) {
   d->expanded_node_list = SaveExpandedNodeList();
 }
 
-void ProjectExplorer::OnStopSearching() {
+void FileTreeView::OnStopSearching(void) {
   ApplyExpandedNodeList(d->expanded_node_list);
   d->expanded_node_list.clear();
 }
 
-void ProjectExplorer::OnThemeChange(const QPalette &,
-                                    const CodeViewTheme &code_view_theme) {
-  QFont font(code_view_theme.font_name);
-  setFont(font);
+//! Called by the theme manager
+void FileTreeView::OnThemeChanged(const ThemeManager &theme_manager) {
+  setFont(theme_manager.Theme()->Font());
 }
 
 }  // namespace mx::gui

@@ -18,18 +18,19 @@
 
 namespace mx::gui {
 
+class MediaManagerImpl;
+
 class MediaManager Q_DECL_FINAL : public QObject {
   Q_OBJECT
 
-  struct PrivateData;
-  std::shared_ptr<PrivateData> d;
+  const std::shared_ptr<MediaManagerImpl> d;
 
   MediaManager(void) = delete;
 
  public:
   virtual ~MediaManager(void);
 
-  explicit MediaManager(ThemeManager &theme_manager);
+  explicit MediaManager(ThemeManager &theme_manager, QObject *parent = nullptr);
 
   //! Load a font given its ID, e.g. `com.trailofbits.font.SourceCodePro`.
   QFont Font(const QString &id) const;

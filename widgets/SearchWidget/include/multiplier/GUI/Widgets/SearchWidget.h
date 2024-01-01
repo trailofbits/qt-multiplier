@@ -102,9 +102,11 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   //! Called when the show next result button is pressed
   void OnShowNextResult(void);
 
+  //! Called when the theme changes.
   void OnIconsChanged(const MediaManager &media_manager);
 
  public slots:
+
   //! Activates the search widget
   void Activate(void);
 

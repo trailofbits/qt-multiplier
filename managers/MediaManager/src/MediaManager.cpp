@@ -57,10 +57,11 @@ static QPixmap GetColorizedPixmap(const QString &path, const QColor &color) {
 
 }  // namespace
 
-struct MediaManager::PrivateData {
+class MediaManagerImpl {
+ public:
   IThemePtr theme;
 
-  inline PrivateData(ThemeManager &theme_manager)
+  inline MediaManagerImpl(ThemeManager &theme_manager)
       : theme(theme_manager.Theme()) {
     InitializeFontDatabase();    
   }
@@ -68,8 +69,9 @@ struct MediaManager::PrivateData {
 
 MediaManager::~MediaManager(void) {}
 
-MediaManager::MediaManager(ThemeManager &theme_manager)
-    : d(new PrivateData(theme_manager)) {
+MediaManager::MediaManager(ThemeManager &theme_manager, QObject *parent)
+    : QObject(parent),
+      d(std::make_shared<MediaManagerImpl>(theme_manager)) {
   
   connect(&theme_manager, &ThemeManager::ThemeChanged,
           this, &MediaManager::OnThemeChanged);      

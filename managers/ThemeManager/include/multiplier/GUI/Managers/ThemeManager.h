@@ -27,7 +27,7 @@ class ThemeManager Q_DECL_FINAL : public QObject {
  public:
   virtual ~ThemeManager(void);
 
-  explicit ThemeManager(QApplication &application);
+  explicit ThemeManager(QApplication &application, QObject *parent = nullptr);
 
   //! Register a theme with the manager. The first registered theme is set to
   //! be the current theme.

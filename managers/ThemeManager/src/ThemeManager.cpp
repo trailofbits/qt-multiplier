@@ -25,8 +25,8 @@ class ThemeManagerImpl final {
 
 ThemeManager::~ThemeManager(void) {}
 
-ThemeManager::ThemeManager(QApplication &application)
-    : QObject(&application),
+ThemeManager::ThemeManager(QApplication &application, QObject *parent)
+    : QObject(parent),
       d(std::make_shared<ThemeManagerImpl>(application)) {
 
   d->proxy_theme.reset(new ProxyTheme(nullptr, this));

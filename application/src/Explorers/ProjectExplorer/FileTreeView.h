@@ -8,35 +8,47 @@
 
 #pragma once
 
-#include <multiplier/GUI/IProjectExplorer.h>
-#include <multiplier/GUI/ISearchWidget.h>
-#include <multiplier/GUI/ThemeManager.h>
+#include <QAction>
+#include <QPoint>
+#include <QString>
+#include <QWidget>
+
+#include <multiplier/Types.h>
+#include <vector>
 
 namespace mx::gui {
 
-//! The main class implementing the IProjectExplorer interface
-class ProjectExplorer final : public IProjectExplorer {
+class FileTreeModel;
+class MediaManager;
+class ThemeManager;
+
+class FileTreeView Q_DECL_FINAL : public QWidget {
   Q_OBJECT
 
- public:
-  //! Destructor
-  virtual ~ProjectExplorer() override;
-
- private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
+ public:
+  //! Destructor
+  virtual ~FileTreeView(void);
+
   //! Constructor
-  ProjectExplorer(IFileTreeModel *model, QWidget *parent);
+  FileTreeView(const ThemeManager &theme_manager,
+               const MediaManager &media_manager,
+               FileTreeModel *model,
+               QWidget *parent = nullptr);
+
+ private:
 
   //! Initializes the widgets
-  void InitializeWidgets();
+  void InitializeWidgets(const ThemeManager &theme_manager,
+                         const MediaManager &media_manager);
 
   //! Installs the model, updating the UI state
-  void InstallModel(IFileTreeModel *model);
+  void InstallModel(FileTreeModel *model);
 
   //! Returns the list of nodes that have been expanded
-  std::vector<QModelIndex> SaveExpandedNodeList();
+  std::vector<QModelIndex> SaveExpandedNodeList(void);
 
   //! Expands the given set of model nodes
   void ApplyExpandedNodeList(const std::vector<QModelIndex> &index_list);
@@ -48,9 +60,8 @@ class ProjectExplorer final : public IProjectExplorer {
   //! Called when an item has been clicked in the tree view
   void OnFileTreeItemClicked(const QModelIndex &index);
 
-  //! Called by the ISearchWidget component whenever search options change
-  void OnSearchParametersChange(
-      const ISearchWidget::SearchParameters &search_parameters);
+  //! Called by the SearchWidget component whenever search options change
+  void OnSearchParametersChange(void);
 
   //! Custom context menu for the tree view items
   void OnOpenItemContextMenu(const QPoint &point);
@@ -59,22 +70,22 @@ class ProjectExplorer final : public IProjectExplorer {
   void OnContextMenuActionTriggered(QAction *action);
 
   //! Called at each model reset
-  void OnModelReset();
+  void OnModelReset(void);
 
   //! Called when the user disables the custom root item from the warning widget
-  void OnDisableCustomRootLinkClicked();
+  void OnDisableCustomRootLinkClicked(void);
 
   //! Called right after search is enabled to save the node expansion status
-  void OnStartSearching();
+  void OnStartSearching(void);
 
   //! Called right after search is disabled to restore the node expansion status
-  void OnStopSearching();
+  void OnStopSearching(void);
 
   //! Called by the theme manager
-  void OnThemeChange(const QPalette &palette,
-                     const CodeViewTheme &code_view_theme);
-
-  friend class IProjectExplorer;
+  void OnThemeChanged(const ThemeManager &theme_manager);
+ 
+ signals:
+  void FileClicked(RawEntityId file_id, QString name, QString full_path);
 };
 
 }  // namespace mx::gui
