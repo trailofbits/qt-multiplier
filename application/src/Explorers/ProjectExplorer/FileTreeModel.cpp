@@ -36,6 +36,7 @@ struct Node final {
 }  // namespace
 
 struct FileTreeModel::PrivateData {
+  Index index;
   std::deque<Node> nodes;
   Node root_node;
   Node custom_root_node;
@@ -53,10 +54,11 @@ struct FileTreeModel::PrivateData {
 FileTreeModel::~FileTreeModel(void) {}
 
 FileTreeModel::FileTreeModel(QObject *parent)
-    : QAbstractItemModel(parent),
+    : IModel(parent),
       d(new PrivateData) {}
 
 void FileTreeModel::SetIndex(const Index &index) {
+  d->index = index;
   SetRoot(QModelIndex());
 
   std::deque<Node> new_nodes;
@@ -234,6 +236,16 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
   
   } else if (role == Qt::DisplayRole) {
     return node->name;
+
+  } else if (role == IModel::EntityRole) {
+    if (node->file_id != kInvalidEntityId) {
+      if (auto file = d->index.file(node->file_id)) {
+        return QVariant::fromValue(VariantEntity(std::move(file.value())));
+      }
+    }
+
+  } else if (role == IModel::ModelName) {
+    return "com.trailofbits.explorer.ProjectExplorer.FileTreeModel";
   
   } else if (role == Qt::FontRole) {
     if (node->file_id == kInvalidEntityId) {

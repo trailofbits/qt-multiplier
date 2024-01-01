@@ -29,20 +29,6 @@
 namespace mx::gui {
 namespace {
 
-struct ContextMenu final {
-  QMenu *menu{nullptr};
-
-  QMenu *copy_menu{nullptr};
-  QMenu *sort_menu{nullptr};
-
-  QAction *set_root_action{nullptr};
-  QAction *copy_file_name{nullptr};
-  QAction *copy_full_path{nullptr};
-
-  QAction *sort_ascending_order{nullptr};
-  QAction *sort_descending_order{nullptr};
-};
-
 void SaveExpandedNodeListHelper(std::vector<QModelIndex> &expanded_node_list,
                                 const TreeWidget &tree_view,
                                 const QModelIndex &root) {
@@ -71,7 +57,7 @@ struct FileTreeView::PrivateData final {
   SearchWidget *search_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
 
-  ContextMenu context_menu;
+  QModelIndex requested_index;
 };
 
 FileTreeView::~FileTreeView(void) {}
@@ -145,36 +131,9 @@ void FileTreeView::InitializeWidgets(const ThemeManager &theme_manager,
   layout->addWidget(d->alternative_root_warning);
   setLayout(layout);
 
-  // Setup che custom context menu
   d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
-
-  d->context_menu.menu = new QMenu(tr("Index View menu"));
-  d->context_menu.set_root_action = new QAction(tr("Set as root"));
-  d->context_menu.menu->addAction(d->context_menu.set_root_action);
-
-  d->context_menu.sort_menu = new QMenu(tr("Sort..."));
-  d->context_menu.sort_ascending_order = new QAction(tr("Ascending order"));
-  d->context_menu.sort_menu->addAction(d->context_menu.sort_ascending_order);
-
-  d->context_menu.sort_descending_order = new QAction(tr("Descending order"));
-  d->context_menu.sort_menu->addAction(d->context_menu.sort_descending_order);
-
-  d->context_menu.menu->addMenu(d->context_menu.sort_menu);
-
-  d->context_menu.copy_menu = new QMenu(tr("Copy..."));
-  d->context_menu.copy_file_name = new QAction(tr("File name"));
-  d->context_menu.copy_menu->addAction(d->context_menu.copy_file_name);
-
-  d->context_menu.copy_full_path = new QAction(tr("Full path"));
-  d->context_menu.copy_menu->addAction(d->context_menu.copy_full_path);
-
-  d->context_menu.menu->addMenu(d->context_menu.copy_menu);
-
-  connect(d->context_menu.menu, &QMenu::triggered, this,
-          &FileTreeView::OnContextMenuActionTriggered);
-
-  connect(d->tree_view, &QTreeView::customContextMenuRequested, this,
-          &FileTreeView::OnOpenItemContextMenu);
+  connect(d->tree_view, &QTreeView::customContextMenuRequested,
+          this, &FileTreeView::OnOpenItemContextMenu);
 
   connect(&theme_manager, &ThemeManager::ThemeChanged,
           this, &FileTreeView::OnThemeChanged);
@@ -285,75 +244,56 @@ void FileTreeView::OnSearchParametersChange(void) {
   d->tree_view->resizeColumnToContents(0);
 }
 
-void FileTreeView::OnOpenItemContextMenu(const QPoint &point) {
-  auto index = d->tree_view->indexAt(point);
-  if (!index.isValid()) {
+void FileTreeView::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
+  if (index != d->requested_index) {
     return;
   }
 
-  QVariant action_data;
-  action_data.setValue(index);
+  auto copy_full_path = new QAction(tr("Copy Path"), menu);
+  menu->addAction(copy_full_path);
+  auto full_path = index.data(FileTreeModel::AbsolutePathRole).toString();
 
-  auto file_id_role = index.data(FileTreeModel::FileIdRole);
-  auto is_directory = !file_id_role.isValid();
-  d->context_menu.set_root_action->setVisible(is_directory);
+  auto set_root_action = new QAction(tr("Set As Root"), menu);
+  menu->addAction(set_root_action);
 
-  for (auto menu : {d->context_menu.menu, d->context_menu.sort_menu,
-                    d->context_menu.copy_menu}) {
-    for (auto &action : menu->actions()) {
-      action->setData(action_data);
-    }
-  }
+  auto sort_menu = new QMenu(tr("Sort..."), menu);
+  auto sort_ascending_order = new QAction(tr("Ascending Order"), sort_menu);
+  sort_menu->addAction(sort_ascending_order);
 
-  auto menu_position = d->tree_view->viewport()->mapToGlobal(point);
-  d->context_menu.menu->exec(menu_position);
+  auto sort_descending_order = new QAction(tr("Descending Order"), sort_menu);
+  sort_menu->addAction(sort_descending_order);
+
+  menu->addMenu(sort_menu);
+
+  connect(sort_ascending_order, &QAction::triggered,
+          [this] (void) {
+            d->model_proxy->sort(0, Qt::AscendingOrder);
+          });
+
+  connect(sort_descending_order, &QAction::triggered,
+          [this] (void) {
+            d->model_proxy->sort(0, Qt::DescendingOrder);
+          });
+
+  connect(copy_full_path, &QAction::triggered,
+          [=] (void) {
+            qApp->clipboard()->setText(full_path);
+          });
+
+  connect(set_root_action, &QAction::triggered,
+          [=, this] (void) {
+            d->model->SetRoot(index);
+          });
 }
 
-void FileTreeView::OnContextMenuActionTriggered(QAction *action) {
-  auto index_var = action->data();
-  if (!index_var.isValid()) {
+void FileTreeView::OnOpenItemContextMenu(const QPoint &point) {
+  auto index = d->model_proxy->mapToSource(d->tree_view->indexAt(point));
+  d->requested_index = index;
+  if (!d->requested_index.isValid()) {
     return;
   }
 
-  const auto &index = qvariant_cast<QModelIndex>(index_var);
-  if (!index.isValid()) {
-    return;
-  }
-
-  if (action == d->context_menu.set_root_action) {
-    d->model->SetRoot(d->model_proxy->mapToSource(index));
-
-  } else if (action == d->context_menu.copy_file_name ||
-             action == d->context_menu.copy_full_path) {
-
-    auto file_path_var = index.data(FileTreeModel::AbsolutePathRole);
-    if (file_path_var.isValid()) {
-      auto clipboard_value = file_path_var.toString();
-
-      if (action == d->context_menu.copy_file_name) {
-        std::filesystem::path path{clipboard_value.toStdString()};
-        clipboard_value = QString::fromStdString(path.filename());
-
-        // Use '/' as file name even if the absolute path is the
-        // root
-        if (clipboard_value.isEmpty()) {
-          clipboard_value = file_path_var.toString();
-        }
-      }
-
-      auto &clipboard = *QGuiApplication::clipboard();
-      clipboard.setText(clipboard_value);
-    }
-
-  } else if (action == d->context_menu.sort_ascending_order ||
-             action == d->context_menu.sort_descending_order) {
-
-    auto sorting_order = (action == d->context_menu.sort_ascending_order)
-                             ? Qt::AscendingOrder
-                             : Qt::DescendingOrder;
-
-    d->model_proxy->sort(0, sorting_order);
-  }
+  emit RequestContextMenu(d->requested_index);
 }
 
 void FileTreeView::OnModelReset(void) {

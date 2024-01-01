@@ -38,6 +38,8 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
                FileTreeModel *model,
                QWidget *parent = nullptr);
 
+  void ActOnContextMenu(QMenu *menu, const QModelIndex &index);
+
  private:
 
   //! Initializes the widgets
@@ -66,9 +68,6 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
   //! Custom context menu for the tree view items
   void OnOpenItemContextMenu(const QPoint &point);
 
-  //! Called when an action in the context menu is triggered
-  void OnContextMenuActionTriggered(QAction *action);
-
   //! Called at each model reset
   void OnModelReset(void);
 
@@ -86,6 +85,8 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
  
  signals:
   void FileClicked(RawEntityId file_id, QString name, QString full_path);
+
+  void RequestContextMenu(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

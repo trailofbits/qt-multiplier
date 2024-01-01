@@ -45,6 +45,10 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
     : QMainWindow(parent),
       d(new PrivateData(application, this)) {
 
+  //setContextMenuPolicy(Qt::DefaultContextMenu);
+  // connect(this, &QMainWindow::customContextMenuRequested,
+  //         this, &MainWindow::OnCustomConextMenuRequested);
+
   InitializeMenus();
   InitializeThemes();
   InitializeIndex(application);
@@ -79,6 +83,9 @@ void MainWindow::InitializePlugins(void) {
         [=] (void) {
           dock->hide();
         });
+
+    connect(plugin.get(), &IMainWindowPlugin::RequestContextMenu,
+            this, &MainWindow::OnRequestContextMenu);
 
     // connect(
     //     plugin.get(), &IMainWindowPlugin::PopupOpened,
@@ -168,6 +175,15 @@ void MainWindow::InitializeIndex(QApplication &application) {
       theme_manager.SetTheme(std::move(theme));
     }
   }
+}
+
+//! Invoked on an index whose underlying model follows the `IModel` interface.
+void MainWindow::OnRequestContextMenu(const QModelIndex &index) {
+  QMenu menu(tr("Context Menu"));
+  for (const auto &plugin : d->plugins) {
+    plugin->ActOnContextMenu(&menu, index);
+  }
+  menu.exec(QCursor::pos());
 }
 
 }  // namespace mx::gui

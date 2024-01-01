@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <QAbstractItemModel>
+#include <multiplier/GUI/Interfaces/IModel.h>
 
 namespace mx {
 class Index;
@@ -16,7 +16,7 @@ class Index;
 namespace mx::gui {
 
 //! Implements the IFileTreeModel interface
-class FileTreeModel Q_DECL_FINAL : public QAbstractItemModel {
+class FileTreeModel Q_DECL_FINAL : public IModel {
   Q_OBJECT
 
   struct PrivateData;
@@ -27,7 +27,7 @@ class FileTreeModel Q_DECL_FINAL : public QAbstractItemModel {
   //! Additional item data roles for this model
   enum ItemDataRole {
     //! Returns a `RawEntityId`.
-    FileIdRole = Qt::UserRole + 1,
+    FileIdRole = IModel::MultiplierUserRole,
 
     //! Returns a QString containing the absolute path
     AbsolutePathRole,

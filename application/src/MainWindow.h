@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QMainWindow>
 
 namespace mx::gui {
@@ -34,6 +35,9 @@ class MainWindow Q_DECL_FINAL : public QMainWindow {
 
  private slots:
   void OnThemeListChanged(const ThemeManager &theme_manager);
+
+  //! Invoked on an index whose underlying model follows the `IModel` interface.
+  void OnRequestContextMenu(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

@@ -45,8 +45,18 @@ QWidget *ProjectExplorer::CreateDockWidget(QWidget *parent) {
 
     d->view->setWindowTitle(tr("Project Explorer"));
     OnIndexChanged(d->config_manager);
+
+    connect(d->view, &FileTreeView::RequestContextMenu,
+            this, &IMainWindowPlugin::RequestContextMenu);
   }
   return d->view;
+}
+
+//! Allow a main window plugin to act on, e.g. modify, a context menu.
+void ProjectExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
+  if (d->view) {
+    d->view->ActOnContextMenu(menu, index);
+  }
 }
 
 void ProjectExplorer::OnIndexChanged(const ConfigManager &config_manager) {

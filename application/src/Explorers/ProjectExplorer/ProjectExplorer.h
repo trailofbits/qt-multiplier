@@ -25,6 +25,9 @@ class ProjectExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   // Requests a dock wiget from this plugin. Can return `nullptr`.
   QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
 
+  //! Allow a main window plugin to act on, e.g. modify, a context menu.
+  void ActOnContextMenu(QMenu *menu, const QModelIndex &index) Q_DECL_FINAL;
+
  private slots:
   void OnIndexChanged(const ConfigManager &config_manager);
 };
