@@ -49,27 +49,27 @@ struct ListGeneratorWidget::PrivateData final {
 ListGeneratorWidget::~ListGeneratorWidget(void) {}
 
 ListGeneratorWidget::ListGeneratorWidget(
-    const ConfigManager &config_manager, IListGeneratorPtr generator,
-    QWidget *parent)
+    const ConfigManager &config_manager, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
-  auto model = new ListGeneratorModel(this);
-  InitializeWidgets(config_manager, model);
-
-  model->InstallGenerator(std::move(generator));
-  InstallModel(model);
+  d->model = new ListGeneratorModel(this);
+  InitializeWidgets(config_manager);
+  InstallModel();
 
   // Synchronize the search widget and its addon
   d->search_widget->Deactivate();
 }
 
-void ListGeneratorWidget::InstallModel(ListGeneratorModel *model) {
-  d->model = model;
+//! Install a new generator.
+void ListGeneratorWidget::InstallGenerator(IListGeneratorPtr generator) {
+  d->model->InstallGenerator(std::move(generator));
+}
 
+void ListGeneratorWidget::InstallModel() {
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
-  d->model_proxy->setSourceModel(model);
+  d->model_proxy->setSourceModel(d->model);
   d->model_proxy->setDynamicSortFilter(true);
 
   connect(d->filter_settings_widget,
@@ -95,7 +95,7 @@ void ListGeneratorWidget::InstallModel(ListGeneratorModel *model) {
 }
 
 void ListGeneratorWidget::InitializeWidgets(
-    const ConfigManager &config_manager, ListGeneratorModel *model) {
+    const ConfigManager &config_manager) {
 
   auto &theme_manager = config_manager.ThemeManager();
   auto &media_manager = config_manager.MediaManager();
@@ -128,6 +128,11 @@ void ListGeneratorWidget::InitializeWidgets(
   connect(d->list_widget, &QListView::customContextMenuRequested,
           this, &ListGeneratorWidget::OnOpenItemContextMenu);
 
+  connect(d->list_widget, &QAbstractItemView::clicked,
+          [this] (const QModelIndex &index) {
+            OnCurrentItemChanged(index, {});
+          });
+
   // Make sure we can render tokens, if need be.
   config_manager.InstallItemDelegate(d->list_widget);
 
@@ -145,7 +150,7 @@ void ListGeneratorWidget::InitializeWidgets(
           this, &ListGeneratorWidget::OnSearchParametersChange);
 
   // Create the search widget addon
-  d->filter_settings_widget = new FilterSettingsWidget(model, this);
+  d->filter_settings_widget = new FilterSettingsWidget(d->model, this);
 
   connect(d->search_widget, &SearchWidget::Activated,
           d->filter_settings_widget, &FilterSettingsWidget::Activate);
@@ -167,12 +172,12 @@ void ListGeneratorWidget::InitializeWidgets(
   status_widget_layout->addWidget(cancel_button);
 
   connect(cancel_button, &QPushButton::pressed,
-          model, &ListGeneratorModel::CancelRunningRequest);
+          d->model, &ListGeneratorModel::CancelRunningRequest);
 
-  connect(model, &ListGeneratorModel::RequestStarted,
+  connect(d->model, &ListGeneratorModel::RequestStarted,
           this, &ListGeneratorWidget::OnModelRequestStarted);
 
-  connect(model, &ListGeneratorModel::RequestFinished,
+  connect(d->model, &ListGeneratorModel::RequestFinished,
           this, &ListGeneratorWidget::OnModelRequestFinished);
 
   d->status_widget->setLayout(status_widget_layout);
@@ -240,29 +245,6 @@ bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
     } else if (event->type() != QEvent::KeyRelease) {
       return false;
-
-    } else if (QKeyEvent *kevent = dynamic_cast<QKeyEvent *>(event)) {
-      auto ret = false;
-      for (auto index : d->list_widget->selectionModel()->selectedIndexes()) {
-        switch (kevent->key()) {
-          case Qt::Key_1:
-          case Qt::Key_2:
-          case Qt::Key_3:
-          case Qt::Key_4:
-          case Qt::Key_5:
-          case Qt::Key_6:
-          case Qt::Key_7:
-          case Qt::Key_8:
-          case Qt::Key_9:
-            d->model->Expand(d->model_proxy->mapToSource(index),
-                             static_cast<unsigned>(kevent->key() - Qt::Key_0));
-            ret = true;
-            break;
-          default: break;
-        }
-      }
-
-      return ret;
     }
 
     return false;
@@ -380,7 +362,7 @@ void ListGeneratorWidget::OnDataChanged(void) {
 void ListGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
                                                const QModelIndex &) {
   d->selected_index = d->model_proxy->mapToSource(current_index);
-  if (!current_index.isValid()) {
+  if (!d->selected_index.isValid()) {
     return;
   }
 
@@ -454,6 +436,12 @@ void ListGeneratorWidget::OnModelRequestStarted(void) {
 void ListGeneratorWidget::OnModelRequestFinished(void) {
   d->status_widget->setVisible(false);
   d->model_proxy->setDynamicSortFilter(true);
+}
+
+//! Used to hide the OSD buttons when focus is lost
+void ListGeneratorWidget::focusOutEvent(QFocusEvent *) {
+  d->hovered_index = {};
+  UpdateItemButtons();
 }
 
 }  // namespace mx::gui

@@ -44,9 +44,6 @@ class ListGeneratorModel Q_DECL_FINAL : public IModel {
   //! Install a new generator to back the data of this model.
   void InstallGenerator(IListGeneratorPtr generator_);
 
-  //! Expand starting at the model index, going up to `depth` levels deep.
-  void Expand(const QModelIndex &, unsigned depth);
-
   //! Find the original version of an item.
   QModelIndex Deduplicate(const QModelIndex &);
 

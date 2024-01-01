@@ -155,7 +155,7 @@ void FileTreeView::InstallModel(FileTreeModel *model) {
   connect(tree_selection_model, &QItemSelectionModel::currentChanged,
           this, &FileTreeView::SelectionChanged);
 
-  connect(d->tree_view, &QTreeView::clicked,
+  connect(d->tree_view, &QAbstractItemView::clicked,
           this, &FileTreeView::OnFileTreeItemClicked);
 
   connect(d->model, &QAbstractItemModel::modelReset,
@@ -279,10 +279,6 @@ void FileTreeView::OnStartSearching(void) {
 
 void FileTreeView::OnStopSearching(void) {
   ApplyExpandedNodeList(std::move(d->expanded_node_list));
-}
-
-const QModelIndex &FileTreeView::SelectedIndex(void) const {
-  return d->requested_index;
 }
 
 //! Called by the theme manager

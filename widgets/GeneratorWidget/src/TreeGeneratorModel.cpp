@@ -327,7 +327,7 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
   d->aliased_entity_to_key.clear();
   d->child_keys.clear();
   d->redundant_keys.clear();
-  d->num_columns = d->generator->NumColumns();
+  d->num_columns = d->generator ? d->generator->NumColumns() : 0u;
   d->root_node.parent_key = nullptr;
   d->root_node.data_index = 0u;
   d->root_node.child_index = 0u;
@@ -403,7 +403,7 @@ QVariant TreeGeneratorModel::headerData(int section, Qt::Orientation orientation
                                        int role) const {
 
   if (orientation != Qt::Horizontal || role != Qt::DisplayRole || section < 0 ||
-      section >= d->num_columns) {
+      section >= d->num_columns || !d->generator) {
     return QVariant();
   }
 
@@ -444,19 +444,21 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
   } else if (role == Qt::ToolTipRole) {
     QString tooltip = tr("Entity Id: ") + QString::number(entity_key->first);
 
-    for (int i = 0; i < d->num_columns; ++i) {
-      const NodeData &col_data =
-          d->node_data[node->data_index + static_cast<unsigned>(i)];
-      if (std::holds_alternative<QVariant>(data)) {
-        continue;
-      }
+    if (d->generator) {
+      for (int i = 0; i < d->num_columns; ++i) {
+        const NodeData &col_data =
+            d->node_data[node->data_index + static_cast<unsigned>(i)];
+        if (std::holds_alternative<QVariant>(data)) {
+          continue;
+        }
 
-      tooltip += "\n" + d->generator->ColumnTitle(i) + ": ";
-      if (std::holds_alternative<QString>(col_data)) {
-        tooltip += std::get<QString>(col_data);
+        tooltip += "\n" + d->generator->ColumnTitle(i) + ": ";
+        if (std::holds_alternative<QString>(col_data)) {
+          tooltip += std::get<QString>(col_data);
 
-      } else if (std::holds_alternative<TextAndTokenRange>(col_data)) {
-        tooltip += std::get<TextAndTokenRange>(col_data).first;
+        } else if (std::holds_alternative<TextAndTokenRange>(col_data)) {
+          tooltip += std::get<TextAndTokenRange>(col_data).first;
+        }
       }
     }
     value.setValue(tooltip);

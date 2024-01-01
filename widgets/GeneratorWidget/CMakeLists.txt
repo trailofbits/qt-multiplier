@@ -37,13 +37,16 @@ target_link_libraries("mx_generator_widget"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_filter_settings_widget"
+    "mx_gap_library"
     "mx_media_manager"
+    "mx_multiplier_library"
     "mx_search_widget"
     "mx_theme_manager"
     "mx_tree_widget"
 
   PUBLIC
     "mx_interfaces"
+    "mx_qt_library"
 )
 
 target_include_directories("mx_generator_widget" PRIVATE

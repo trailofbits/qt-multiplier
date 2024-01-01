@@ -21,6 +21,7 @@
 #include <multiplier/Index.h>
 #include <vector>
 
+#include "Explorers/EntityExplorer/EntityExplorer.h"
 #include "Explorers/ProjectExplorer/ProjectExplorer.h"
 
 namespace mx::gui {
@@ -44,11 +45,6 @@ MainWindow::~MainWindow(void) {}
 MainWindow::MainWindow(QApplication &application, QWidget *parent)
     : QMainWindow(parent),
       d(new PrivateData(application, this)) {
-
-  //setContextMenuPolicy(Qt::DefaultContextMenu);
-  // connect(this, &QMainWindow::customContextMenuRequested,
-  //         this, &MainWindow::OnCustomConextMenuRequested);
-
   InitializeMenus();
   InitializeThemes();
   InitializeIndex(application);
@@ -58,6 +54,7 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 
 void MainWindow::InitializePlugins(void) {
   d->plugins.emplace_back(new ProjectExplorer(d->config_manager, this));
+  d->plugins.emplace_back(new EntityExplorer(d->config_manager, this));
 
   for (const auto &plugin : d->plugins) {
     QWidget *dockable_widget = plugin->CreateDockWidget(this);

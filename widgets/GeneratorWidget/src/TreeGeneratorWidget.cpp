@@ -61,27 +61,27 @@ struct TreeGeneratorWidget::PrivateData final {
 TreeGeneratorWidget::~TreeGeneratorWidget(void) {}
 
 TreeGeneratorWidget::TreeGeneratorWidget(
-    const ConfigManager &config_manager, ITreeGeneratorPtr generator,
-    QWidget *parent)
+    const ConfigManager &config_manager, QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
-  auto model = new TreeGeneratorModel(this);
-  InitializeWidgets(config_manager, model);
-
-  model->InstallGenerator(std::move(generator));
-  InstallModel(model);
+  d->model = new TreeGeneratorModel(this);
+  InitializeWidgets(config_manager);
+  InstallModel();
 
   // Synchronize the search widget and its addon
   d->search_widget->Deactivate();
 }
 
-void TreeGeneratorWidget::InstallModel(TreeGeneratorModel *model) {
-  d->model = model;
+//! Install a new generator.
+void TreeGeneratorWidget::InstallGenerator(ITreeGeneratorPtr generator) {
+  d->model->InstallGenerator(std::move(generator));
+}
 
+void TreeGeneratorWidget::InstallModel(void) {
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
-  d->model_proxy->setSourceModel(model);
+  d->model_proxy->setSourceModel(d->model);
   d->model_proxy->setDynamicSortFilter(true);
 
   connect(d->filter_settings_widget,
@@ -110,7 +110,7 @@ void TreeGeneratorWidget::InstallModel(TreeGeneratorModel *model) {
 }
 
 void TreeGeneratorWidget::InitializeWidgets(
-    const ConfigManager &config_manager, TreeGeneratorModel *model) {
+    const ConfigManager &config_manager) {
 
   auto &theme_manager = config_manager.ThemeManager();
   auto &media_manager = config_manager.MediaManager();
@@ -156,6 +156,11 @@ void TreeGeneratorWidget::InitializeWidgets(
   connect(d->tree_widget, &TreeWidget::customContextMenuRequested,
           this, &TreeGeneratorWidget::OnOpenItemContextMenu);
 
+  connect(d->tree_widget, &QAbstractItemView::clicked,
+          [this] (const QModelIndex &index) {
+            OnCurrentItemChanged(index, {});
+          });
+
   // Make sure we can render tokens, if need be.
   config_manager.InstallItemDelegate(d->tree_widget);
 
@@ -186,7 +191,7 @@ void TreeGeneratorWidget::InitializeWidgets(
           this, &TreeGeneratorWidget::OnSearchParametersChange);
 
   // Create the search widget addon
-  d->filter_settings_widget = new FilterSettingsWidget(model, this);
+  d->filter_settings_widget = new FilterSettingsWidget(d->model, this);
 
   connect(d->search_widget, &SearchWidget::Activated,
           d->filter_settings_widget, &FilterSettingsWidget::Activate);
@@ -208,12 +213,12 @@ void TreeGeneratorWidget::InitializeWidgets(
   status_widget_layout->addWidget(cancel_button);
 
   connect(cancel_button, &QPushButton::pressed,
-          model, &TreeGeneratorModel::CancelRunningRequest);
+          d->model, &TreeGeneratorModel::CancelRunningRequest);
 
-  connect(model, &TreeGeneratorModel::RequestStarted,
+  connect(d->model, &TreeGeneratorModel::RequestStarted,
           this, &TreeGeneratorWidget::OnModelRequestStarted);
 
-  connect(model, &TreeGeneratorModel::RequestFinished,
+  connect(d->model, &TreeGeneratorModel::RequestFinished,
           this, &TreeGeneratorWidget::OnModelRequestFinished);
 
   d->status_widget->setLayout(status_widget_layout);
@@ -525,7 +530,7 @@ void TreeGeneratorWidget::OnRowsInserted(const QModelIndex &parent, int, int) {
 void TreeGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
                                                const QModelIndex &) {
   d->selected_index = d->model_proxy->mapToSource(current_index);
-  if (!current_index.isValid()) {
+  if (!d->selected_index.isValid()) {
     return;
   }
 
@@ -616,6 +621,12 @@ void TreeGeneratorWidget::OnModelRequestStarted(void) {
 void TreeGeneratorWidget::OnModelRequestFinished(void) {
   d->status_widget->setVisible(false);
   d->model_proxy->setDynamicSortFilter(true);
+}
+
+//! Used to hide the OSD buttons when focus is lost
+void TreeGeneratorWidget::focusOutEvent(QFocusEvent *) {
+  d->hovered_index = {};
+  UpdateItemButtons();
 }
 
 }  // namespace mx::gui

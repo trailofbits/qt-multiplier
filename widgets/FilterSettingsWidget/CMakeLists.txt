@@ -17,6 +17,7 @@ target_link_libraries("mx_filter_settings_widget"
 
   PUBLIC
     "mx_interfaces"
+    "mx_qt_library"
 )
 
 target_include_directories("mx_filter_settings_widget" PRIVATE

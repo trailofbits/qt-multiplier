@@ -41,9 +41,6 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
   void SortAscending(void);
   void SortDescending(void);
 
-  //! Returns the most recently selected index.
-  const QModelIndex &SelectedIndex(void) const;
-
   //! Sets the root index.
   void SetRoot(const QModelIndex &);
 

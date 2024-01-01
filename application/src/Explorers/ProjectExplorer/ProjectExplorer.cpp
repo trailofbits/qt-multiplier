@@ -24,6 +24,9 @@ struct ProjectExplorer::PrivateData {
   FileTreeModel *model{nullptr};
   FileTreeView *view{nullptr};
 
+  QModelIndex context_index;
+  QModelIndex clicked_index;
+
   // Action for opening an entity when the selection is changed.
   const TriggerHandle open_entity_trigger;
 
@@ -45,46 +48,44 @@ ProjectExplorer::ProjectExplorer(ConfigManager &config_manager,
 }
 
 QWidget *ProjectExplorer::CreateDockWidget(QWidget *parent) {
-  if (!d->view) {
-    d->model = new FileTreeModel(this);
-    d->view = new FileTreeView(
-        d->config_manager.ThemeManager(),
-        d->config_manager.MediaManager(),
-        d->model,
-        parent);
-
-    d->view->setWindowTitle(tr("Project Explorer"));
-    OnIndexChanged(d->config_manager);
-
-    connect(d->view, &FileTreeView::RequestContextMenu,
-            this, &IMainWindowPlugin::RequestContextMenu);
-
-    connect(d->view, &FileTreeView::RequestPrimaryClick,
-            this, &IMainWindowPlugin::RequestPrimaryClick);
+  if (d->view) {
+    return d->view;
   }
+  d->model = new FileTreeModel(this);
+  d->view = new FileTreeView(
+      d->config_manager.ThemeManager(),
+      d->config_manager.MediaManager(),
+      d->model,
+      parent);
+
+  d->view->setWindowTitle(tr("Project Explorer"));
+  OnIndexChanged(d->config_manager);
+
+  connect(d->view, &FileTreeView::RequestContextMenu,
+          [this] (const QModelIndex &index) {
+            d->context_index = index;
+            emit RequestContextMenu(d->context_index);
+          });
+
+  connect(d->view, &FileTreeView::RequestPrimaryClick,
+          [this] (const QModelIndex &index) {
+            d->clicked_index = index;
+            emit RequestPrimaryClick(d->clicked_index);
+          });
+
   return d->view;
 }
 
 void ProjectExplorer::ActOnPrimaryClick(const QModelIndex &index) {
-  if (!d->view) {
+  if (!d->view || d->clicked_index != index || !index.isValid()) {
     return;
   }
 
-  auto selected_index = d->view->SelectedIndex();
-  if (index != selected_index || !selected_index.isValid()) {
-    return;
-  }
-
-  d->open_entity_trigger.Trigger(selected_index.data(IModel::EntityRole));
+  d->open_entity_trigger.Trigger(index.data(IModel::EntityRole));
 }
 
 void ProjectExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
-  if (!d->view) {
-    return;
-  }
-
-  auto selected_index = d->view->SelectedIndex();
-  if (index != selected_index || !selected_index.isValid()) {
+  if (!d->view || d->context_index != index || !index.isValid()) {
     return;
   }
 
@@ -120,8 +121,8 @@ void ProjectExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
           });
 
   connect(set_root_action, &QAction::triggered,
-          [this] (void) {
-            d->view->SetRoot(d->view->SelectedIndex());
+          [=, this] (void) {
+            d->view->SetRoot(index);
           });
 }
 

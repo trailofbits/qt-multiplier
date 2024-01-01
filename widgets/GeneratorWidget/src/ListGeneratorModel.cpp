@@ -240,14 +240,14 @@ int ListGeneratorModel::rowCount(const QModelIndex &parent) const {
 }
 
 int ListGeneratorModel::columnCount(const QModelIndex &) const {
-  return 1;
+  return d->generator ? 1 : 0;
 }
 
 QVariant ListGeneratorModel::headerData(int section, Qt::Orientation orientation,
                                        int role) const {
 
   if (orientation != Qt::Horizontal || role != Qt::DisplayRole ||
-      section != 0) {
+      section != 0 || !d->generator) {
     return QVariant();
   }
 
@@ -290,7 +290,7 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
   } else if (role == Qt::ToolTipRole) {
     QString tooltip = tr("Entity Id: ") + QString::number(entity_key->first);
 
-    if (!std::holds_alternative<QVariant>(data)) {
+    if (!std::holds_alternative<QVariant>(data) && d->generator) {
       tooltip += "\n" + d->generator->ColumnTitle(0) + ": ";
       if (std::holds_alternative<QString>(data)) {
         tooltip += std::get<QString>(data);

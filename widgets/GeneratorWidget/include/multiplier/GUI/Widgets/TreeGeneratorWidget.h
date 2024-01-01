@@ -19,7 +19,6 @@ namespace mx::gui {
 class ConfigManager;
 class MediaManager;
 class ThemeManager;
-class TreeGeneratorModel;
 
 //! A concrete implementation for the IGeneratorView interface
 class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
@@ -28,23 +27,24 @@ class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
   struct PrivateData;
   const std::unique_ptr<PrivateData> d;
 
-  void InstallModel(TreeGeneratorModel *model);
+  void InstallModel(void);
 
-  void InitializeWidgets(const ConfigManager &config_manager,
-                         TreeGeneratorModel *model);
+  void InitializeWidgets(const ConfigManager &config_manager);
 
  public:
-
-  //! Constructor
-  TreeGeneratorWidget(const ConfigManager &config_manager,
-                      ITreeGeneratorPtr generator,
-                      QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~TreeGeneratorWidget(void);
 
+  //! Constructor
+  TreeGeneratorWidget(const ConfigManager &config_manager,
+                      QWidget *parent = nullptr);
+
   //! Called when we want to act on the context menu.
   void ActOnContextMenu(QMenu *menu, const QModelIndex &index);
+
+  //! Install a new generator.
+  void InstallGenerator(ITreeGeneratorPtr generator);
 
  private:
 

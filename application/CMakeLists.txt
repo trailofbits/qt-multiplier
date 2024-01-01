@@ -39,6 +39,9 @@ add_executable("Multiplier" ${executable_type}
   src/MultiplierStyle.h
   src/MultiplierStyle.cpp
 
+  src/Explorers/EntityExplorer/EntityExplorer.cpp
+  src/Explorers/EntityExplorer/EntityExplorer.h
+
   src/Explorers/ProjectExplorer/FileTreeModel.cpp
   src/Explorers/ProjectExplorer/FileTreeModel.h
   src/Explorers/ProjectExplorer/FileTreeView.cpp
@@ -58,6 +61,7 @@ target_link_libraries("Multiplier"
     "mx_builtin_theme"
     "mx_config_manager"
     "mx_cxx_flags"
+    "mx_generator_widget"
     "mx_media_manager"
     "mx_multiplier_library"
     "mx_phantomstyle_library"

@@ -19,7 +19,6 @@ namespace mx::gui {
 class ConfigManager;
 class MediaManager;
 class ThemeManager;
-class ListGeneratorModel;
 
 //! A concrete implementation for the IGeneratorView interface
 class ListGeneratorWidget Q_DECL_FINAL : public QWidget {
@@ -28,23 +27,24 @@ class ListGeneratorWidget Q_DECL_FINAL : public QWidget {
   struct PrivateData;
   const std::unique_ptr<PrivateData> d;
 
-  void InstallModel(ListGeneratorModel *model);
+  void InstallModel(void);
 
-  void InitializeWidgets(const ConfigManager &config_manager,
-                         ListGeneratorModel *model);
+  void InitializeWidgets(const ConfigManager &config_manager);
 
  public:
-
-  //! Constructor
-  ListGeneratorWidget(const ConfigManager &config_manager,
-                      IListGeneratorPtr generator,
-                      QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~ListGeneratorWidget(void);
 
+  //! Constructor
+  ListGeneratorWidget(const ConfigManager &config_manager,
+                      QWidget *parent = nullptr);
+
   //! Called when we want to act on the context menu.
   void ActOnContextMenu(QMenu *menu, const QModelIndex &index);
+  
+  //! Install a new generator.
+  void InstallGenerator(IListGeneratorPtr generator);
 
  private:
 
@@ -95,8 +95,6 @@ class ListGeneratorWidget Q_DECL_FINAL : public QWidget {
   void OnModelRequestFinished(void);
  
  signals:
-  //! The open button is clicked.
-  void OpenItem(const QModelIndex &index);
 
   //! This tells us when a specific item in the tree is selected.
   void SelectedItemChanged(const QModelIndex &index);
