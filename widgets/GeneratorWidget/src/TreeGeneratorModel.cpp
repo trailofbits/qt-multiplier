@@ -81,12 +81,12 @@ struct Node {
 
 struct DataBatch {
   NodeKey *parent_key;
-  QList<ITreeItemPtr> child_items;
+  QList<IGeneratedItemPtr> child_items;
   unsigned remaining_depth;
   unsigned *index_ptr{nullptr};
 
   inline DataBatch(NodeKey *parent_key_,
-                   QList<ITreeItemPtr> child_items_,
+                   QList<IGeneratedItemPtr> child_items_,
                    unsigned remaining_depth_)
       : parent_key(parent_key_),
         child_items(std::move(child_items_)),
@@ -100,7 +100,7 @@ using DataBatchQueue = QList<DataBatch>;
 struct TreeGeneratorModel::PrivateData final {
 
     // Data generator.
-  std::shared_ptr<ITreeGenerator> generator;
+  ITreeGeneratorPtr generator;
 
   // The non-uniqued nodes of the tree.
   std::deque<NodeKey *> child_keys;
@@ -144,7 +144,7 @@ struct TreeGeneratorModel::PrivateData final {
   //! A timer used to import data from the data batch queue
   QTimer import_timer;
 
-  // Queue of groups of children `ITreeItem`s to insert into the model.
+  // Queue of groups of children `IGeneratedItem`s to insert into the model.
   DataBatchQueue data_batch_queue;
 
   // Current theme.
@@ -193,7 +193,7 @@ struct TreeGeneratorModel::PrivateData final {
 
   gap::generator<NodeKey *> Children(Node *node) &;
 
-  void ImportData(Node *new_node, ITreeItemPtr item);
+  void ImportData(Node *new_node, IGeneratedItemPtr item);
 };
 
 // Convert a `node_key` into a `QModelIndex`.
@@ -235,15 +235,15 @@ TreeGeneratorModel::TreeGeneratorModel(QObject *parent)
           &TreeGeneratorModel::ProcessDataBatchQueue);
 }
 
-TreeGeneratorModel::~TreeGeneratorModel() {
+TreeGeneratorModel::~TreeGeneratorModel(void) {
   CancelRunningRequest();
 }
 
 void TreeGeneratorModel::RunExpansionThread(
     IGenerateTreeRunnable *runnable) {
 
-  connect(runnable, &IGenerateTreeRunnable::NewTreeItems,
-          this, &TreeGeneratorModel::OnNewTreeItems);
+  connect(runnable, &IGenerateTreeRunnable::NewGeneratedItems,
+          this, &TreeGeneratorModel::OnNewGeneratedItems);
 
   if (!d->num_pending_requests) {
     d->import_timer.start(kFirstUpdateInterval);
@@ -270,13 +270,7 @@ void TreeGeneratorModel::Expand(const QModelIndex &index, unsigned depth) {
   }
 
   NodeKey *node_key = d->NodeKeyFrom(index);
-
   if (!node_key) {
-    if (d->root_node.state == NodeState::kUnopened) {
-      d->root_node.state = NodeState::kOpening;
-      RunExpansionThread(new InitTreeRunnable(
-          d->generator, d->version_number, NotAnEntity{}, depth));
-    }
     return;
   }
   
@@ -320,14 +314,13 @@ void TreeGeneratorModel::Expand(const QModelIndex &index, unsigned depth) {
 }
 
 //! Install a new generator to back the data of this model.
-void TreeGeneratorModel::InstallGenerator(
-    std::shared_ptr<ITreeGenerator> generator_) {
+void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
 
   CancelRunningRequest();
 
   emit beginResetModel();
   d->version_number.fetch_add(1u);
-  d->num_pending_requests = 0;
+  d->num_pending_requests += 1;
   d->generator = std::move(generator_);
   d->node_data.clear();
   d->entity_to_node.clear();
@@ -340,17 +333,19 @@ void TreeGeneratorModel::InstallGenerator(
   d->root_node.child_index = 0u;
   d->root_node.sibling_index = 0u;
   d->root_node.num_children = 0;
-  d->root_node.state = NodeState::kUnopened;
+  d->root_node.state = NodeState::kOpening;
   d->import_timer.stop();
   d->data_batch_queue.clear();
-  emit endResetModel();
 
   // Start a request to fetch the name of this tree.
   d->tree_name_future = QtConcurrent::run(
-      [gen = d->generator](void) -> QString { return gen->TreeName(gen); });
+      [gen = d->generator](void) -> QString { return gen->Name(gen); });
   d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
-  Expand(QModelIndex(), 2u);
+  RunExpansionThread(new InitTreeRunnable(
+      d->generator, d->version_number, NotAnEntity{}, 2u));
+
+  emit endResetModel();
 }
 
 QModelIndex TreeGeneratorModel::index(int row, int column,
@@ -447,7 +442,7 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
     }
     // Tooltip used for hovering. Also, this is used for the copy details.
   } else if (role == Qt::ToolTipRole) {
-    QString tooltip = tr("Entity id: ") + QString::number(entity_key->first);
+    QString tooltip = tr("Entity Id: ") + QString::number(entity_key->first);
 
     for (int i = 0; i < d->num_columns; ++i) {
       const NodeData &col_data =
@@ -472,7 +467,7 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
   } else if (role == IModel::ModelName) {
     return "com.trailofbits.model.TreeGeneratorModel";
 
-  } else if (role == TreeGeneratorModel::TokenRangeRole) {
+  } else if (role == IModel::TokenRangeDisplayRole) {
     if (std::holds_alternative<TextAndTokenRange>(data)) {
       value.setValue(std::get<TextAndTokenRange>(data).second);
     }
@@ -493,7 +488,7 @@ void TreeGeneratorModel::OnNameResolved(void) {
     return;
   }
 
-  emit TreeNameChanged(d->tree_name_future.takeResult());
+  emit NameChanged(d->tree_name_future.takeResult());
 }
 
 void TreeGeneratorModel::CancelRunningRequest() {
@@ -513,9 +508,9 @@ void TreeGeneratorModel::CancelRunningRequest() {
 }
 
 //! Notify us when there's a batch of new data to update.
-void TreeGeneratorModel::OnNewTreeItems(
+void TreeGeneratorModel::OnNewGeneratedItems(
     uint64_t version_number, RawEntityId parent_node_id,
-    QList<ITreeItemPtr> child_items, unsigned remaining_depth) {
+    QList<IGeneratedItemPtr> child_items, unsigned remaining_depth) {
 
   if (version_number != d->version_number.load()) {
     return;
@@ -528,7 +523,7 @@ void TreeGeneratorModel::OnNewTreeItems(
 
 // Go get all of our data for this node.
 void TreeGeneratorModel::PrivateData::ImportData(
-    Node *new_node, ITreeItemPtr item) {
+    Node *new_node, IGeneratedItemPtr item) {
 
   new_node->data_index = static_cast<unsigned>(node_data.size());
 

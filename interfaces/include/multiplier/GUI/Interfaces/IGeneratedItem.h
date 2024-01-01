@@ -14,14 +14,14 @@
 
 namespace mx::gui {
 
-class ITreeItem;
+class IGeneratedItem;
 
-using ITreeItemPtr = std::shared_ptr<const ITreeItem>;
+using IGeneratedItemPtr = std::shared_ptr<const IGeneratedItem>;
 
 //! A generated tree item from an `ITreeGenerator`.
-class ITreeItem {
+class IGeneratedItem {
  public:
-  virtual ~ITreeItem(void);
+  virtual ~IGeneratedItem(void);
 
   // The entity that uniquely identifies this tree item.
   //
@@ -33,7 +33,7 @@ class ITreeItem {
   // child sets, but not necessarily in terms of their `Data`.
   //
   // NOTE(pag): If this returns a valid entity ID, then it must be one that was
-  //            associated with an item generated prior to this `ITreeItem` in
+  //            associated with an item generated prior to this `IGeneratedItem` in
   //            the current tree.
   virtual RawEntityId AliasedEntityId(void) const;
 
@@ -45,5 +45,5 @@ class ITreeItem {
 
 }  // namespace mx::gui
 
-Q_DECLARE_INTERFACE(mx::gui::ITreeItem,
-                    "com.trailofbits.interface.ITreeItem")
+Q_DECLARE_INTERFACE(mx::gui::IGeneratedItem,
+                    "com.trailofbits.interface.IGeneratedItem")

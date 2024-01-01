@@ -7,7 +7,10 @@
 #
 
 add_library("mx_generator_widget"
+  include/multiplier/GUI/Widgets/ListGeneratorWidget.h
   include/multiplier/GUI/Widgets/TreeGeneratorWidget.h
+
+  src/ListGeneratorWidget.cpp
   src/TreeGeneratorWidget.cpp
 
   src/ExpandTreeRunnable.cpp
@@ -18,6 +21,9 @@ add_library("mx_generator_widget"
 
   src/InitTreeRunnable.cpp
   src/InitTreeRunnable.h
+
+  src/ListGeneratorModel.cpp
+  src/ListGeneratorModel.h
 
   src/SearchFilterModelProxy.cpp
   src/SearchFilterModelProxy.h

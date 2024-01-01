@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2022-present, Trail of Bits, Inc.
+  Copyright (c) 2023-present, Trail of Bits, Inc.
   All rights reserved.
 
   This source code is licensed in accordance with the terms specified in
@@ -18,11 +18,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSortFilterProxyModel>
-#include <QApplication>
-#include <QMenu>
-#include <QAction>
 #include <QLabel>
-#include <QClipboard>
 
 #include "FileTreeModel.h"
 
@@ -100,7 +96,7 @@ void FileTreeView::InitializeWidgets(const ThemeManager &theme_manager,
           this, &FileTreeView::OnStopSearching);
 
   // Create the alternative root item warning
-  auto root_warning_label = new QLabel();
+  auto root_warning_label = new QLabel;
   root_warning_label->setTextFormat(Qt::RichText);
   root_warning_label->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
   root_warning_label->setText(tr(
@@ -180,7 +176,7 @@ std::vector<QModelIndex> FileTreeView::SaveExpandedNodeList(void) {
 }
 
 void FileTreeView::ApplyExpandedNodeList(
-    const std::vector<QModelIndex> &expanded_node_list) {
+    std::vector<QModelIndex> expanded_node_list) {
 
   d->tree_view->collapseAll();
 
@@ -191,11 +187,12 @@ void FileTreeView::ApplyExpandedNodeList(
 }
 
 void FileTreeView::SelectionChanged(const QModelIndex &index,
-                                       const QModelIndex &) {
+                                    const QModelIndex &) {
   OnFileTreeItemClicked(index);
 }
 
 void FileTreeView::OnFileTreeItemClicked(const QModelIndex &index) {
+  d->requested_index = {};
   auto opt_file_id_var =
       d->model_proxy->data(index, FileTreeModel::FileIdRole);
 
@@ -203,12 +200,8 @@ void FileTreeView::OnFileTreeItemClicked(const QModelIndex &index) {
     return;
   }
 
-  const auto file_id = qvariant_cast<RawEntityId>(opt_file_id_var);
-  auto file_name_var = d->model_proxy->data(index);
-  auto file_path_var =
-      d->model_proxy->data(index, FileTreeModel::AbsolutePathRole);
-
-  emit FileClicked(file_id, file_name_var.toString(), file_path_var.toString());
+  d->requested_index = d->model_proxy->mapToSource(index);
+  emit RequestPrimaryClick(d->requested_index);
 }
 
 void FileTreeView::OnSearchParametersChange(void) {
@@ -244,46 +237,17 @@ void FileTreeView::OnSearchParametersChange(void) {
   d->tree_view->resizeColumnToContents(0);
 }
 
-void FileTreeView::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
-  if (index != d->requested_index) {
-    return;
-  }
+//! Sets the root index.
+void FileTreeView::SetRoot(const QModelIndex &index) {
+  d->model->SetRoot(index);
+}
 
-  auto copy_full_path = new QAction(tr("Copy Path"), menu);
-  menu->addAction(copy_full_path);
-  auto full_path = index.data(FileTreeModel::AbsolutePathRole).toString();
+void FileTreeView::SortAscending(void) {
+  d->model_proxy->sort(0, Qt::AscendingOrder);
+}
 
-  auto set_root_action = new QAction(tr("Set As Root"), menu);
-  menu->addAction(set_root_action);
-
-  auto sort_menu = new QMenu(tr("Sort..."), menu);
-  auto sort_ascending_order = new QAction(tr("Ascending Order"), sort_menu);
-  sort_menu->addAction(sort_ascending_order);
-
-  auto sort_descending_order = new QAction(tr("Descending Order"), sort_menu);
-  sort_menu->addAction(sort_descending_order);
-
-  menu->addMenu(sort_menu);
-
-  connect(sort_ascending_order, &QAction::triggered,
-          [this] (void) {
-            d->model_proxy->sort(0, Qt::AscendingOrder);
-          });
-
-  connect(sort_descending_order, &QAction::triggered,
-          [this] (void) {
-            d->model_proxy->sort(0, Qt::DescendingOrder);
-          });
-
-  connect(copy_full_path, &QAction::triggered,
-          [=] (void) {
-            qApp->clipboard()->setText(full_path);
-          });
-
-  connect(set_root_action, &QAction::triggered,
-          [=, this] (void) {
-            d->model->SetRoot(index);
-          });
+void FileTreeView::SortDescending(void) {
+  d->model_proxy->sort(0, Qt::DescendingOrder);
 }
 
 void FileTreeView::OnOpenItemContextMenu(const QPoint &point) {
@@ -314,8 +278,11 @@ void FileTreeView::OnStartSearching(void) {
 }
 
 void FileTreeView::OnStopSearching(void) {
-  ApplyExpandedNodeList(d->expanded_node_list);
-  d->expanded_node_list.clear();
+  ApplyExpandedNodeList(std::move(d->expanded_node_list));
+}
+
+const QModelIndex &FileTreeView::SelectedIndex(void) const {
+  return d->requested_index;
 }
 
 //! Called by the theme manager

@@ -17,7 +17,7 @@ namespace mx::gui {
 // NOTE(pag): These are `shared_ptr`s so that implementations have the
 //            flexibility of having tree items extend the lifetime of
 //            tree generator itself.
-gap::generator<ITreeItemPtr> ITreeGenerator::Roots(
+gap::generator<IGeneratedItemPtr> ITreeGenerator::Roots(
     const ITreeGeneratorPtr &self) {
   return Children(self, NotAnEntity{});
 }

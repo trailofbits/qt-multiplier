@@ -8,18 +8,20 @@
 
 add_library("mx_interfaces"
   include/multiplier/GUI/Interfaces/IAction.h
+  include/multiplier/GUI/Interfaces/IGeneratedItem.h
+  include/multiplier/GUI/Interfaces/IListGenerator.h
   include/multiplier/GUI/Interfaces/IModel.h
   include/multiplier/GUI/Interfaces/ITheme.h
   include/multiplier/GUI/Interfaces/IThemeProxy.h
   include/multiplier/GUI/Interfaces/ITreeGenerator.h
-  include/multiplier/GUI/Interfaces/ITreeItem.h
 
   src/IAction.cpp
+  src/IGeneratedItem.cpp
+  src/IListGenerator.cpp
+  src/IModel.cpp
   src/ITheme.cpp
   src/IThemeProxy.cpp
-  src/ITreeItem.cpp
   src/ITreeGenerator.cpp
-  src/IModel.cpp
 )
 
 target_link_libraries("mx_interfaces"

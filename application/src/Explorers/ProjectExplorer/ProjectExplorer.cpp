@@ -6,6 +6,12 @@
 
 #include "ProjectExplorer.h"
 
+#include <QAction>
+#include <QApplication>
+#include <QClipboard>
+
+#include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 
 #include "FileTreeModel.h"
@@ -18,8 +24,13 @@ struct ProjectExplorer::PrivateData {
   FileTreeModel *model{nullptr};
   FileTreeView *view{nullptr};
 
+  // Action for opening an entity when the selection is changed.
+  const TriggerHandle open_entity_trigger;
+
   inline PrivateData(ConfigManager &config_manager_)
-      : config_manager(config_manager_) {}
+      : config_manager(config_manager_),
+        open_entity_trigger(config_manager.ActionManager().Find(
+            "com.trailofbits.action.OpenEntity")) {}
 };
 
 ProjectExplorer::~ProjectExplorer(void) {}
@@ -33,7 +44,6 @@ ProjectExplorer::ProjectExplorer(ConfigManager &config_manager,
           this, &ProjectExplorer::OnIndexChanged);
 }
 
-// Requests a dock wiget from this plugin. Can return `nullptr`.
 QWidget *ProjectExplorer::CreateDockWidget(QWidget *parent) {
   if (!d->view) {
     d->model = new FileTreeModel(this);
@@ -48,15 +58,71 @@ QWidget *ProjectExplorer::CreateDockWidget(QWidget *parent) {
 
     connect(d->view, &FileTreeView::RequestContextMenu,
             this, &IMainWindowPlugin::RequestContextMenu);
+
+    connect(d->view, &FileTreeView::RequestPrimaryClick,
+            this, &IMainWindowPlugin::RequestPrimaryClick);
   }
   return d->view;
 }
 
-//! Allow a main window plugin to act on, e.g. modify, a context menu.
-void ProjectExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
-  if (d->view) {
-    d->view->ActOnContextMenu(menu, index);
+void ProjectExplorer::ActOnPrimaryClick(const QModelIndex &index) {
+  if (!d->view) {
+    return;
   }
+
+  auto selected_index = d->view->SelectedIndex();
+  if (index != selected_index || !selected_index.isValid()) {
+    return;
+  }
+
+  d->open_entity_trigger.Trigger(selected_index.data(IModel::EntityRole));
+}
+
+void ProjectExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
+  if (!d->view) {
+    return;
+  }
+
+  auto selected_index = d->view->SelectedIndex();
+  if (index != selected_index || !selected_index.isValid()) {
+    return;
+  }
+
+  auto copy_full_path = new QAction(tr("Copy Path"), menu);
+  menu->addAction(copy_full_path);
+  auto full_path = index.data(FileTreeModel::AbsolutePathRole).toString();
+
+  auto set_root_action = new QAction(tr("Set As Root"), menu);
+  menu->addAction(set_root_action);
+
+  auto sort_menu = new QMenu(tr("Sort..."), menu);
+  auto sort_ascending_order = new QAction(tr("Ascending Order"), sort_menu);
+  sort_menu->addAction(sort_ascending_order);
+
+  auto sort_descending_order = new QAction(tr("Descending Order"), sort_menu);
+  sort_menu->addAction(sort_descending_order);
+
+  menu->addMenu(sort_menu);
+
+  connect(sort_ascending_order, &QAction::triggered,
+          [this] (void) {
+            d->view->SortAscending();
+          });
+
+  connect(sort_descending_order, &QAction::triggered,
+          [this] (void) {
+            d->view->SortDescending();
+          });
+
+  connect(copy_full_path, &QAction::triggered,
+          [=] (void) {
+            qApp->clipboard()->setText(full_path);
+          });
+
+  connect(set_root_action, &QAction::triggered,
+          [this] (void) {
+            d->view->SetRoot(d->view->SelectedIndex());
+          });
 }
 
 void ProjectExplorer::OnIndexChanged(const ConfigManager &config_manager) {

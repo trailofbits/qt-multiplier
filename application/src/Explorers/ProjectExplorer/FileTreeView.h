@@ -38,7 +38,14 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
                FileTreeModel *model,
                QWidget *parent = nullptr);
 
-  void ActOnContextMenu(QMenu *menu, const QModelIndex &index);
+  void SortAscending(void);
+  void SortDescending(void);
+
+  //! Returns the most recently selected index.
+  const QModelIndex &SelectedIndex(void) const;
+
+  //! Sets the root index.
+  void SetRoot(const QModelIndex &);
 
  private:
 
@@ -53,7 +60,7 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
   std::vector<QModelIndex> SaveExpandedNodeList(void);
 
   //! Expands the given set of model nodes
-  void ApplyExpandedNodeList(const std::vector<QModelIndex> &index_list);
+  void ApplyExpandedNodeList(std::vector<QModelIndex> index_list);
 
  private slots:
   //! Try to open the file related to a specific model index.
@@ -84,8 +91,7 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
   void OnThemeChanged(const ThemeManager &theme_manager);
  
  signals:
-  void FileClicked(RawEntityId file_id, QString name, QString full_path);
-
+  void RequestPrimaryClick(const QModelIndex &index);
   void RequestContextMenu(const QModelIndex &index);
 };
 

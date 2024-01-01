@@ -70,6 +70,11 @@ class IMainWindowPlugin : public QObject {
   //! window with visibility into the current set of open popups.
   void PopupOpened(QWidget *);
 
+  //! Signal emitted when some nested plugin widget wants to signal a click
+  //! action for a `QModelIndex` whose model follows the `IModel` interface, and
+  //! thus could benefit from allowing other plugins to see the index.
+  void RequestPrimaryClick(const QModelIndex &index);
+
   //! Signal emitted when some nested plugin widget wants to open a context
   //! menu for a `QModelIndex` whose model follows the `IModel` interface, and
   //! thus could benefit from allowing other plugins to see the index.

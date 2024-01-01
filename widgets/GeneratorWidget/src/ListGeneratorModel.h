@@ -9,7 +9,7 @@
 #pragma once
 
 #include <multiplier/GUI/Interfaces/IModel.h>
-#include <multiplier/GUI/Interfaces/ITreeGenerator.h>
+#include <multiplier/GUI/Interfaces/IListGenerator.h>
 
 #include <QList>
 
@@ -19,7 +19,7 @@ class IGenerateTreeRunnable;
 class ThemeManager;
 
 //! Implements the IReferenceExplorerModel interface
-class TreeGeneratorModel Q_DECL_FINAL : public IModel {
+class ListGeneratorModel Q_DECL_FINAL : public IModel {
   Q_OBJECT
 
   struct PrivateData;
@@ -31,21 +31,18 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
     //! Returns a Location object
     EntityIdRole = IModel::MultiplierUserRole,
 
-    //! Returns whether or not this row has been expanded.
-    CanBeExpanded,
-
     //! Returns whether or not this row is a duplicate of another.
-    IsDuplicate,
+    IsDuplicate
   };
 
   //! Constructor
-  TreeGeneratorModel(QObject *parent = nullptr);
+  ListGeneratorModel(QObject *parent = nullptr);
 
   //! Destructor
-  virtual ~TreeGeneratorModel(void);
+  virtual ~ListGeneratorModel(void);
 
   //! Install a new generator to back the data of this model.
-  void InstallGenerator(ITreeGeneratorPtr generator_);
+  void InstallGenerator(IListGeneratorPtr generator_);
 
   //! Expand starting at the model index, going up to `depth` levels deep.
   void Expand(const QModelIndex &, unsigned depth);
@@ -81,9 +78,9 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
  private slots:
 
   //! Notify us when there's a batch of new data to update.
-  void OnNewGeneratedItems(uint64_t version_number, RawEntityId parent_entity_id,
+  void OnNewListItems(uint64_t version_number, RawEntityId,
                       QList<IGeneratedItemPtr> child_items,
-                      unsigned remaining_depth);
+                      unsigned);
 
   //! Processes the entire data batch queue
   void ProcessDataBatchQueue(void);

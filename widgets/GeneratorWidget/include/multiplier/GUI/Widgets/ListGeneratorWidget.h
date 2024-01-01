@@ -12,36 +12,36 @@
 #include <QResizeEvent>
 #include <QWidget>
 
-#include <multiplier/GUI/Interfaces/ITreeGenerator.h>
+#include <multiplier/GUI/Interfaces/IListGenerator.h>
 
 namespace mx::gui {
 
 class ConfigManager;
 class MediaManager;
 class ThemeManager;
-class TreeGeneratorModel;
+class ListGeneratorModel;
 
 //! A concrete implementation for the IGeneratorView interface
-class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
+class ListGeneratorWidget Q_DECL_FINAL : public QWidget {
   Q_OBJECT
 
   struct PrivateData;
   const std::unique_ptr<PrivateData> d;
 
-  void InstallModel(TreeGeneratorModel *model);
+  void InstallModel(ListGeneratorModel *model);
 
   void InitializeWidgets(const ConfigManager &config_manager,
-                         TreeGeneratorModel *model);
+                         ListGeneratorModel *model);
 
  public:
 
   //! Constructor
-  TreeGeneratorWidget(const ConfigManager &config_manager,
-                      ITreeGeneratorPtr generator,
+  ListGeneratorWidget(const ConfigManager &config_manager,
+                      IListGeneratorPtr generator,
                       QWidget *parent = nullptr);
 
   //! Destructor
-  virtual ~TreeGeneratorWidget(void);
+  virtual ~ListGeneratorWidget(void);
 
   //! Called when we want to act on the context menu.
   void ActOnContextMenu(QMenu *menu, const QModelIndex &index);
@@ -69,12 +69,6 @@ class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
   //! ExpansionStatusRole changes
   void OnDataChanged(void);
 
-  //! Automatically expands all nodes
-  void ExpandAllNodes(void);
-
-  //! Used to automatically select the first inserted root
-  void OnRowsInserted(const QModelIndex &parent, int first, int last);
-
   //! Called when the user selects an item
   void OnCurrentItemChanged(const QModelIndex &current_index,
                             const QModelIndex &previous_index);
@@ -84,12 +78,6 @@ class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
 
   //! Called by the ISearchWidget component whenever search options change
   void OnSearchParametersChange(void);
-
-  //! Called when the "open" item button has been pressed
-  void OnOpenButtonPressed(void);
-
-  //! Called when the "expand" item button has been pressed
-  void OnExpandButtonPressed(void);
 
   //! Called when the "expand" item button has been pressed
   void OnGotoOriginalButtonPressed(void);

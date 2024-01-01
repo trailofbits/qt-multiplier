@@ -45,12 +45,12 @@ class CallHierarchyGenerator final : public ITreeGenerator {
   QString ColumnTitle(int) const Q_DECL_FINAL;
 
   QString
-  TreeName(const std::shared_ptr<ITreeGenerator> &self) const Q_DECL_FINAL;
+  Name(const std::shared_ptr<ITreeGenerator> &self) const Q_DECL_FINAL;
 
-  gap::generator<std::shared_ptr<ITreeItem>>
+  gap::generator<std::shared_ptr<IGeneratedItem>>
   Roots(const std::shared_ptr<ITreeGenerator> &self) Q_DECL_FINAL;
 
-  gap::generator<std::shared_ptr<ITreeItem>>
+  gap::generator<std::shared_ptr<IGeneratedItem>>
   Children(const std::shared_ptr<ITreeGenerator> &self,
            RawEntityId parent_entity) Q_DECL_FINAL;
 };

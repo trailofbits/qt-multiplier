@@ -68,8 +68,13 @@ ConfigManager::FileLocationCache(void) const noexcept {
   return d->file_location_cache;
 }
 
-//! Create an item delegate. Only one item delegate should be installed per
-//! `QAbstractItemView` at a time.
+//! Set an item delegate on `view` that pays attention to the theme. This
+//! allows items using `IModel` to present tokens.
+//!
+//! NOTE(pag): This will try to proxy any pre-existing item delegates.
+//!
+//! NOTE(pag): This should only be applied to views backed by `IModel`s,
+//!            either directly or by proxy.
 void ConfigManager::InstallItemDelegate(
     QAbstractItemView *view, const ItemDelegateConfig &config) const {
 

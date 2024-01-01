@@ -71,6 +71,10 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   //!
   //! NOTE(pag): This should only be applied to views backed by `IModel`s,
   //!            either directly or by proxy.
+  //!
+  //! NOTE(pag): This exists as a function of the `ConfigManager` and not the
+  //!            `ThemeManager` because tab width might be configurable in the
+  //!            future.
   void InstallItemDelegate(QAbstractItemView *view,
                            const ItemDelegateConfig &config={}) const;
 

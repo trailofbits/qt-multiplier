@@ -74,10 +74,10 @@ void ReferenceExplorer::InitializeWidgets(
   connect(d->ref_explorer_model, &QAbstractItemModel::rowsInserted, this,
           &ReferenceExplorer::OnRowsInserted);
 
-  connect(d->ref_explorer_model, &IGeneratorModel::TreeNameChanged, this,
-          &ReferenceExplorer::OnTreeNameChanged);
+  connect(d->ref_explorer_model, &IGeneratorModel::NameChanged, this,
+          &ReferenceExplorer::OnNameChanged);
 
-  OnTreeNameChanged(tr("Unnamed Tree"));
+  OnNameChanged(tr("Unnamed Tree"));
 
   ICodeModel *code_model = nullptr;
   if (macro_explorer) {
@@ -164,7 +164,7 @@ void ReferenceExplorer::OnRowsInserted() {
   UpdateCodePreview(first_item_index);
 }
 
-void ReferenceExplorer::OnTreeNameChanged(QString tree_name) {
+void ReferenceExplorer::OnNameChanged(QString tree_name) {
   if (tree_name.isEmpty()) {
     tree_name = tr("Unnamed tree");
   }

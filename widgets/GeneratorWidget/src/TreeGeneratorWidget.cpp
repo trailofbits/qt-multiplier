@@ -27,24 +27,9 @@
 #include "TreeGeneratorModel.h"
 
 namespace mx::gui {
-
 namespace {
 
-struct ContextMenu final {
-  QMenu *menu{nullptr};
-  QAction *copy_details_action{nullptr};
-};
-
-struct TreeviewItemButtons final {
-  std::optional<QModelIndex> opt_hovered_index;
-
-  bool updating_buttons{false};
-
-  // Keep up to date with UpdateTreeViewItemButtons
-  QPushButton *open{nullptr};
-  QPushButton *expand{nullptr};
-  QPushButton *goto_{nullptr};
-};
+static constexpr unsigned kMaxExpansionLevel = 9u;
 
 }  // namespace
 
@@ -55,9 +40,22 @@ struct TreeGeneratorWidget::PrivateData final {
   TreeWidget *tree_widget{nullptr};
   SearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
-  ContextMenu context_menu;
   QWidget *status_widget{nullptr};
-  TreeviewItemButtons tree_item_buttons;
+
+  bool updating_buttons{false};
+
+  // Keep up to date with UpdateTreeViewItemButtons
+  QPushButton *open{nullptr};
+  QPushButton *expand{nullptr};
+  QPushButton *goto_{nullptr};
+
+  QIcon open_item_icon;
+  QIcon expand_item_icon;
+  QIcon goto_item_icon;
+  QIcon expand_item_icon_n[kMaxExpansionLevel];
+
+  QModelIndex hovered_index;
+  QModelIndex selected_index;
 };
 
 TreeGeneratorWidget::~TreeGeneratorWidget(void) {}
@@ -150,32 +148,35 @@ void TreeGeneratorWidget::InitializeWidgets(
   d->tree_widget->setTextElideMode(Qt::TextElideMode::ElideRight);
 
   d->tree_widget->setAlternatingRowColors(false);
-  d->tree_widget->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree_widget->installEventFilter(this);
   d->tree_widget->viewport()->installEventFilter(this);
   d->tree_widget->viewport()->setMouseTracking(true);
 
+  d->tree_widget->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(d->tree_widget, &TreeWidget::customContextMenuRequested,
           this, &TreeGeneratorWidget::OnOpenItemContextMenu);
 
+  // Make sure we can render tokens, if need be.
+  config_manager.InstallItemDelegate(d->tree_widget);
+
   // Initialize the treeview item buttons
-  d->tree_item_buttons.open = new QPushButton(QIcon(), "", this);
-  d->tree_item_buttons.open->setToolTip(tr("Open"));
+  d->open = new QPushButton(QIcon(), "", this);
+  d->open->setToolTip(tr("Open"));
 
-  connect(d->tree_item_buttons.open, &QPushButton::pressed, this,
-          &TreeGeneratorWidget::OnActivateItem);
+  connect(d->open, &QPushButton::pressed, this,
+          &TreeGeneratorWidget::OnOpenButtonPressed);
 
-  d->tree_item_buttons.expand = new QPushButton(QIcon(), "", this);
-  d->tree_item_buttons.expand->setToolTip(tr("Expand"));
+  d->expand = new QPushButton(QIcon(), "", this);
+  d->expand->setToolTip(tr("Expand"));
 
-  connect(d->tree_item_buttons.expand, &QPushButton::pressed, this,
-          &TreeGeneratorWidget::OnExpandItem);
+  connect(d->expand, &QPushButton::pressed, this,
+          &TreeGeneratorWidget::OnExpandButtonPressed);
 
-  d->tree_item_buttons.goto_ = new QPushButton(QIcon(), "", this);
-  d->tree_item_buttons.goto_->setToolTip(tr("Goto original"));
+  d->goto_ = new QPushButton(QIcon(), "", this);
+  d->goto_->setToolTip(tr("Goto Original"));
 
-  connect(d->tree_item_buttons.goto_, &QPushButton::pressed, this,
-          &TreeGeneratorWidget::OnGotoOriginalItem);
+  connect(d->goto_, &QPushButton::pressed,
+          this, &TreeGeneratorWidget::OnGotoOriginalButtonPressed);
 
   // Create the search widget
   d->search_widget = new SearchWidget(
@@ -228,15 +229,6 @@ void TreeGeneratorWidget::InitializeWidgets(
   layout->addWidget(d->search_widget);
   setLayout(layout);
 
-  // Setup che custom context menu
-  d->context_menu.menu = new QMenu(tr("Entity tree browser menu"));
-  d->context_menu.copy_details_action = new QAction(tr("Copy details"));
-
-  d->context_menu.menu->addAction(d->context_menu.copy_details_action);
-
-  connect(d->context_menu.menu, &QMenu::triggered,
-          this, &TreeGeneratorWidget::OnContextMenuActionTriggered);
-
   // Set the theme.
   connect(&theme_manager, &ThemeManager::ThemeChanged,
           this, &TreeGeneratorWidget::OnThemeChanged);
@@ -252,38 +244,50 @@ void TreeGeneratorWidget::InitializeWidgets(
   config_manager.InstallItemDelegate(d->tree_widget);
 }
 
-void TreeGeneratorWidget::CopyItemDetails(
-    const QModelIndex &index) {
+//! Called when we want to act on the context menu.
+void TreeGeneratorWidget::ActOnContextMenu(
+    QMenu *menu, const QModelIndex &index) {
+  if (index != d->selected_index) {
+    return;
+  }
+
   auto tooltip_var = index.data(Qt::ToolTipRole);
-  if (!tooltip_var.isValid()) {
-    return;
+  if (tooltip_var.isValid()) {
+    auto details = tooltip_var.toString();
+    auto copy_details_action = new QAction(tr("Copy Details"), menu);
+    menu->addAction(copy_details_action);
+    connect(copy_details_action, &QAction::triggered,
+            [=] (void) {
+              qApp->clipboard()->setText(details);
+            });
   }
 
-  const auto &tooltip = tooltip_var.toString();
+  if (auto is_duplicate = index.data(TreeGeneratorModel::IsDuplicate);
+      is_duplicate.isValid() && is_duplicate.toBool()) {
 
-  auto &clipboard = *QGuiApplication::clipboard();
-  clipboard.setText(tooltip);
-}
+    auto i = 1u;
+    auto can_expand = index.data(TreeGeneratorModel::CanBeExpanded);
+    if (can_expand.isValid() && !can_expand.toBool()) {
+      i = 2u;
+    }
 
-void TreeGeneratorWidget::ExpandItem(
-    const QModelIndex &index, unsigned depth) {
-  auto source_index = d->model_proxy->mapToSource(index);
-  d->model->Expand(source_index, depth);
-}
+    for (; i <= kMaxExpansionLevel; ++i) {
+      auto action = new QAction(tr("Expand &%1 levels").arg(i), menu);
+      menu->addAction(action);
 
-//! Called when attempt to go to the original verison of a duplicate item.
-void TreeGeneratorWidget::GotoOriginalItem(const QModelIndex &index) {
-  auto orig = d->model_proxy->mapToSource(index);
-  auto dedup = d->model->Deduplicate(orig);
-  dedup = d->model_proxy->mapFromSource(dedup);
-  if (!dedup.isValid()) {
-    return;
+      // TODO(alessandro): There's a Qt 6.x bug that prevents the &<N> from
+      //                   working correctly, so for now we have to set the
+      //                   shortcut explicitly
+      action->setShortcut(static_cast<Qt::Key>(Qt::Key_0 + i));
+      action->setToolTip(tr("Expands this entity for three levels"));
+      action->setIcon(d->expand_item_icon_n[i]);
+
+      connect(action, &QAction::triggered,
+              [=, this] (void) {
+                d->model->Expand(index, i);
+              });
+    }
   }
-
-  auto sel = d->tree_widget->selectionModel();
-  sel->clearSelection();
-  sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
-  d->tree_widget->scrollTo(dedup);
 }
 
 bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
@@ -296,7 +300,7 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
            d->tree_widget->verticalScrollBar()->isVisible());
 
       if (scrolling_enabled) {
-        d->tree_item_buttons.opt_hovered_index = std::nullopt;
+        d->hovered_index = {};
         UpdateItemButtons();
       }
 
@@ -318,7 +322,8 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
           case Qt::Key_7:
           case Qt::Key_8:
           case Qt::Key_9:
-            ExpandItem(index, static_cast<unsigned>(kevent->key() - Qt::Key_0));
+            d->model->Expand(d->model_proxy->mapToSource(index),
+                             static_cast<unsigned>(kevent->key() - Qt::Key_0));
             ret = true;
             break;
           default: break;
@@ -339,9 +344,9 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
       auto index = d->tree_widget->indexAt(mouse_pos);
       if (!index.isValid()) {
-        d->tree_item_buttons.opt_hovered_index = std::nullopt;
+        d->hovered_index = {};
       } else {
-        d->tree_item_buttons.opt_hovered_index = index;
+        d->hovered_index = d->model_proxy->mapToSource(index);
       }
 
       UpdateItemButtons();
@@ -364,57 +369,50 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
 
   // TODO(pag): Sometimes we get infinite recursion from Qt doing a
   // `sendSyntheticEnterLeave` below when we `setVisible(is_redundant)`.
-  if (d->tree_item_buttons.updating_buttons) {
+  if (d->updating_buttons) {
     return;
   }
 
-  d->tree_item_buttons.updating_buttons = true;
-  d->tree_item_buttons.open->setVisible(false);
-  d->tree_item_buttons.goto_->setVisible(false);
-  d->tree_item_buttons.expand->setVisible(false);
+  d->updating_buttons = true;
+  d->open->setVisible(false);
+  d->goto_->setVisible(false);
+  d->expand->setVisible(false);
 
   // Always show the buttons, but disable the ones that are not
   // applicable. This is to prevent buttons from disappearing and/or
   // reordering while the user is clicking them
-  auto display_buttons = d->tree_item_buttons.opt_hovered_index.has_value();
+  auto display_buttons = d->hovered_index.isValid();
   if (!display_buttons) {
-    d->tree_item_buttons.updating_buttons = false;
+    d->updating_buttons = false;
     return;
   }
 
-  const auto &index = d->tree_item_buttons.opt_hovered_index.value();
+  const auto &index = d->hovered_index;
 
-  // Enable the go-to button if we have a referenced entity id.
-  d->tree_item_buttons.open->setEnabled(false);
-  d->tree_item_buttons.expand->setEnabled(false);
-  d->tree_item_buttons.expand->setEnabled(false);
-
-  auto entity_id_var = index.data(TreeGeneratorModel::EntityIdRole);
-  if (entity_id_var.isValid() &&
-      qvariant_cast<RawEntityId>(entity_id_var) != kInvalidEntityId) {
-    d->tree_item_buttons.open->setEnabled(true);
-  }
+  d->open->setEnabled(true);
+  d->goto_->setEnabled(false);
+  d->expand->setEnabled(false);
 
   // Enable the expansion button if we haven't yet expanded the node.
   // TODO(alessandro): Fix the button visibility
   auto expand_var = index.data(TreeGeneratorModel::CanBeExpanded);
-  d->tree_item_buttons.expand->setEnabled(expand_var.isValid() &&
+  d->expand->setEnabled(expand_var.isValid() &&
                                           expand_var.toBool());
 
   // Show/hide one of expand/goto if this is redundant.
   auto redundant_var = index.data(TreeGeneratorModel::IsDuplicate);
   auto is_redundant = redundant_var.isValid() && redundant_var.toBool();
 
-  d->tree_item_buttons.open->setVisible(display_buttons);
-  d->tree_item_buttons.goto_->setVisible(is_redundant);
-  d->tree_item_buttons.expand->setVisible(!is_redundant);
+  d->open->setVisible(display_buttons);
+  d->goto_->setVisible(is_redundant);
+  d->expand->setVisible(!is_redundant);
 
   // Keep up to date with TreeviewItemButtons
   static constexpr auto kNumButtons = 2u;
   QPushButton *button_list[kNumButtons] = {
-      d->tree_item_buttons.open,
-      (is_redundant ? d->tree_item_buttons.goto_
-                    : d->tree_item_buttons.expand),
+      d->open,
+      (is_redundant ? d->goto_
+                    : d->expand),
   };
 
   // Update the button positions
@@ -452,50 +450,58 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
     current_x += button_size + button_margin;
   }
 
-  d->tree_item_buttons.updating_buttons = false;
+  d->updating_buttons = false;
 }
 
 void TreeGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
-  QIcon open_item_icon;
-  open_item_icon.addPixmap(
+  d->open_item_icon = {};
+  d->open_item_icon.addPixmap(
       media_manager.Pixmap("com.trailofbits.icon.Activate"),
       QIcon::Normal, QIcon::On);
-
-  open_item_icon.addPixmap(
+  d->open_item_icon.addPixmap(
       media_manager.Pixmap("com.trailofbits.icon.Activate",
                            ITheme::IconStyle::DISABLED),
       QIcon::Disabled, QIcon::On);
 
-  d->tree_item_buttons.open->setIcon(open_item_icon);
-
-  QIcon expand_item_icon;
-  expand_item_icon.addPixmap(
+  d->expand_item_icon = {};
+  d->expand_item_icon.addPixmap(
       media_manager.Pixmap("com.trailofbits.icon.Expand"),
       QIcon::Normal, QIcon::On);
-
-  expand_item_icon.addPixmap(
+  d->expand_item_icon.addPixmap(
       media_manager.Pixmap("com.trailofbits.icon.Expand",
                            ITheme::IconStyle::DISABLED),
       QIcon::Disabled, QIcon::On);
 
-  d->tree_item_buttons.expand->setIcon(expand_item_icon);
-
-  QIcon goto_item_icon;
-  goto_item_icon.addPixmap(
+  d->goto_item_icon = {};
+  d->goto_item_icon.addPixmap(
       media_manager.Pixmap("com.trailofbits.icon.Goto"),
       QIcon::Normal, QIcon::On);
-
-  goto_item_icon.addPixmap(
+  d->goto_item_icon.addPixmap(
       media_manager.Pixmap("com.trailofbits.icon.Goto",
                            ITheme::IconStyle::DISABLED),
       QIcon::Disabled, QIcon::On);
 
-  d->tree_item_buttons.goto_->setIcon(goto_item_icon);
+  d->open->setIcon(d->open_item_icon);
+  d->expand->setIcon(d->expand_item_icon);
+  d->goto_->setIcon(d->goto_item_icon);
+
+  for (auto i = 1u; i <= kMaxExpansionLevel; ++i) {
+    d->expand_item_icon_n[i] = {};
+
+    auto icon_id = QString("com.trailofbits.icon.ExpandDepth%1").arg(i);
+
+    d->expand_item_icon_n[i].addPixmap(
+        media_manager.Pixmap(icon_id), QIcon::Normal, QIcon::On);
+
+    d->expand_item_icon_n[i].addPixmap(
+        media_manager.Pixmap(icon_id, ITheme::IconStyle::DISABLED),
+        QIcon::Disabled, QIcon::On);
+  }
 }
 
 void TreeGeneratorWidget::OnModelReset(void) {
   ExpandAllNodes();
-  d->tree_item_buttons.opt_hovered_index = std::nullopt;
+  d->hovered_index = {};
   UpdateItemButtons();
 }
 
@@ -517,46 +523,23 @@ void TreeGeneratorWidget::OnRowsInserted(const QModelIndex &parent, int, int) {
 }
 
 void TreeGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
-                                        const QModelIndex &) {
-
+                                               const QModelIndex &) {
+  d->selected_index = d->model_proxy->mapToSource(current_index);
   if (!current_index.isValid()) {
     return;
   }
 
-  emit SelectedItemChanged(current_index);
+  emit SelectedItemChanged(d->selected_index);
 }
 
 void TreeGeneratorWidget::OnOpenItemContextMenu(const QPoint &point) {
   auto index = d->tree_widget->indexAt(point);
-  if (!index.isValid()) {
+  d->selected_index = d->model_proxy->mapToSource(index);
+  if (!d->selected_index.isValid()) {
     return;
   }
 
-  QVariant action_data;
-  action_data.setValue(index);
-
-  for (auto &action : d->context_menu.menu->actions()) {
-    action->setData(action_data);
-  }
-
-  auto menu_position = d->tree_widget->viewport()->mapToGlobal(point);
-  d->context_menu.menu->exec(menu_position);
-}
-
-void TreeGeneratorWidget::OnContextMenuActionTriggered(QAction *action) {
-  auto index_var = action->data();
-  if (!index_var.isValid()) {
-    return;
-  }
-
-  const auto &index = qvariant_cast<QModelIndex>(index_var);
-  if (!index.isValid()) {
-    return;
-  }
-
-  if (action == d->context_menu.copy_details_action) {
-    CopyItemDetails(index);
-  }
+  emit RequestContextMenu(d->selected_index);
 }
 
 void TreeGeneratorWidget::OnSearchParametersChange(void) {
@@ -586,29 +569,37 @@ void TreeGeneratorWidget::OnSearchParametersChange(void) {
   ExpandAllNodes();
 }
 
-void TreeGeneratorWidget::OnActivateItem(void) {
-  if (!d->tree_item_buttons.opt_hovered_index.has_value()) {
+void TreeGeneratorWidget::OnOpenButtonPressed(void) {
+  if (!d->hovered_index.isValid()) {
     return;
   }
 
-  const auto &index = d->tree_item_buttons.opt_hovered_index.value();
-  emit ItemActivated(index);
+  emit OpenItem(d->hovered_index);
 }
 
-void TreeGeneratorWidget::OnExpandItem(void) {
-  if (!d->tree_item_buttons.opt_hovered_index.has_value()) {
+void TreeGeneratorWidget::OnExpandButtonPressed(void) {
+  if (!d->hovered_index.isValid()) {
     return;
   }
 
-  ExpandItem(d->tree_item_buttons.opt_hovered_index.value());
+  d->model->Expand(d->hovered_index, 1u);
 }
 
-void TreeGeneratorWidget::GotoOriginalItem(void) {
-  if (!d->tree_item_buttons.opt_hovered_index.has_value()) {
+void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
+  if (!d->hovered_index.isValid()) {
     return;
   }
 
-  ExpandItem(d->tree_item_buttons.opt_hovered_index.value());
+  auto dedup = d->model->Deduplicate(d->hovered_index);
+  dedup = d->model_proxy->mapFromSource(dedup);
+  if (!dedup.isValid()) {
+    return;
+  }
+
+  auto sel = d->tree_widget->selectionModel();
+  sel->clearSelection();
+  sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
+  d->tree_widget->scrollTo(dedup);
 }
 
 // NOTE(pag): The config manager handles the item delegate automatically.

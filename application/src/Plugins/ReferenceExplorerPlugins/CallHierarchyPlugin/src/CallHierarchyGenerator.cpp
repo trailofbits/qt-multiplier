@@ -20,7 +20,7 @@ Q_DECLARE_METATYPE(mx::TokenRange);
 namespace mx::gui {
 namespace {
 
-class CallHierarchyItem final : public ITreeItem {
+class CallHierarchyItem final : public IGeneratedItem {
 
   RawEntityId entity_id;
   RawEntityId aliased_entity_id;
@@ -41,7 +41,7 @@ class CallHierarchyItem final : public ITreeItem {
         location(std::move(location_)),
         breadcrumbs(std::move(breadcrumbs_)) {}
 
-  static std::shared_ptr<ITreeItem>
+  static std::shared_ptr<IGeneratedItem>
   Create(const FileLocationCache &file_location_cache, const VariantEntity &use,
          const VariantEntity &entity,
          RawEntityId aliased_entity_id_ = kInvalidEntityId);
@@ -69,7 +69,7 @@ class CallHierarchyItem final : public ITreeItem {
 };
 
 // Given that `use` is a use of `entity`, get us information about it.
-std::shared_ptr<ITreeItem>
+std::shared_ptr<IGeneratedItem>
 CallHierarchyItem::Create(const FileLocationCache &file_location_cache,
                           const VariantEntity &use, const VariantEntity &entity,
                           RawEntityId aliased_entity_id_) {
@@ -94,7 +94,7 @@ QString CallHierarchyGenerator::ColumnTitle(int col) const {
   }
 }
 
-QString CallHierarchyGenerator::TreeName(
+QString CallHierarchyGenerator::Name(
     const std::shared_ptr<ITreeGenerator> &) const {
 
   if (auto name = NameOfEntityAsString(root_entity)) {
@@ -105,7 +105,7 @@ QString CallHierarchyGenerator::TreeName(
   }
 }
 
-gap::generator<std::shared_ptr<ITreeItem>>
+gap::generator<std::shared_ptr<IGeneratedItem>>
 CallHierarchyGenerator::Roots(const std::shared_ptr<ITreeGenerator> &self) {
   if (std::holds_alternative<Decl>(root_entity)) {
     RawEntityId prev_redecl_id = kInvalidEntityId;
@@ -122,7 +122,7 @@ CallHierarchyGenerator::Roots(const std::shared_ptr<ITreeGenerator> &self) {
   }
 }
 
-gap::generator<std::shared_ptr<ITreeItem>> CallHierarchyGenerator::Children(const std::shared_ptr<ITreeGenerator> &self, RawEntityId parent_entity_id) {
+gap::generator<std::shared_ptr<IGeneratedItem>> CallHierarchyGenerator::Children(const std::shared_ptr<ITreeGenerator> &self, RawEntityId parent_entity_id) {
 
   VariantEntity entity = index.entity(parent_entity_id);
   if (std::holds_alternative<NotAnEntity>(entity)) {

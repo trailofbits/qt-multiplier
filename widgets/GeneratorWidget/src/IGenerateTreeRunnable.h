@@ -9,7 +9,7 @@
 #pragma once
 
 #include <multiplier/Index.h>
-#include <multiplier/GUI/Interfaces/ITreeItem.h>
+#include <multiplier/GUI/Interfaces/IGeneratedItem.h>
 
 #include <QRunnable>
 #include <QObject>
@@ -47,8 +47,8 @@ class IGenerateTreeRunnable : public QObject, public QRunnable {
   }
 
  signals:
-  void NewTreeItems(uint64_t version_number, RawEntityId parent_entity_id,
-                    QList<ITreeItemPtr> child_items,
+  void NewGeneratedItems(uint64_t version_number, RawEntityId parent_entity_id,
+                    QList<IGeneratedItemPtr> child_items,
                     unsigned remaining_depth);
 };
 

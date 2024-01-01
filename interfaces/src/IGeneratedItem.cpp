@@ -6,18 +6,18 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/GUI/Interfaces/ITreeItem.h>
+#include <multiplier/GUI/Interfaces/IGeneratedItem.h>
 
 #include <multiplier/Index.h>
 
 namespace mx::gui {
 
-ITreeItem::~ITreeItem(void) {}
+IGeneratedItem::~IGeneratedItem(void) {}
 
 // Returns the entity ID aliased by this entity, or `VariantEntity`. This
 // is a means of communicating equivalence of rows in terms of their
 // child sets, but not necessarily in terms of their `Data`.
-RawEntityId ITreeItem::AliasedEntityId(void) const {
+RawEntityId IGeneratedItem::AliasedEntityId(void) const {
   return kInvalidEntityId;
 }
 
