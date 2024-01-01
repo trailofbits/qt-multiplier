@@ -63,11 +63,7 @@ inline static QColor PaletteBackgroundColor(const QPalette &palette) {
 
 }  // namespace
 
-ThemedItemDelegate::~ThemedItemDelegate(void) {
-  if (prev_delegate) {
-    prev_delegate->deleteLater();
-  }
-}
+ThemedItemDelegate::~ThemedItemDelegate(void) {}
 
 //! Generate the characters of `data`. If `whitespace` has a value, then we
 //! encode any sequence of whitespace into a single space token. Also in this
@@ -201,11 +197,7 @@ void ThemedItemDelegate::paint(QPainter *painter,
                                const QModelIndex &index) const {
   TokenRange tokens = IModel::TokensToDisplay(index);
   if (!tokens) {
-    if (prev_delegate) {
-      prev_delegate->paint(painter, option, index);
-    } else {
-      this->QStyledItemDelegate::paint(painter, option, index);
-    }
+    this->QStyledItemDelegate::paint(painter, option, index);
     return;
   }
 
@@ -252,23 +244,19 @@ void ThemedItemDelegate::paint(QPainter *painter,
   // around the item
   //
   // TODO(pag): Might be that the border we print here doesn't get "unprinted".
-  if (is_selected) {
-    auto original_pen = painter->pen();
-    painter->setPen(QPen(option.palette.highlight().color()));
-    painter->drawRect(option.rect.adjusted(0, 0, -1, -1));
-    painter->setPen(original_pen);
-  }
+  // if (is_selected) {
+  //   auto original_pen = painter->pen();
+  //   painter->setPen(QPen(option.palette.highlight().color()));
+  //   painter->drawRect(option.rect.adjusted(0, 0, -1, -1));
+  //   painter->setPen(original_pen);
+  // }
 }
 
 QSize ThemedItemDelegate::sizeHint(
     const QStyleOptionViewItem &option, const QModelIndex &index) const {
   TokenRange tokens = IModel::TokensToDisplay(index);
   if (!tokens) {
-    if (prev_delegate) {
-      return prev_delegate->sizeHint(option, index);
-    } else {
-      return this->QStyledItemDelegate::sizeHint(option, index);
-    }
+    return this->QStyledItemDelegate::sizeHint(option, index);
   }
 
   QStyleOptionViewItem opt(option);

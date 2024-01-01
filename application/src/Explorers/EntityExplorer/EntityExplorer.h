@@ -7,7 +7,11 @@
 #pragma once
 
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
+#include <optional>
 
+namespace mx {
+enum class TokenCategory : unsigned char;
+}  // namespace mx
 namespace mx::gui {
 
 class EntityExplorer Q_DECL_FINAL : public IMainWindowPlugin {
@@ -27,7 +31,9 @@ class EntityExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void ActOnContextMenu(QMenu *menu, const QModelIndex &index) Q_DECL_FINAL;
 
  private slots:
+  void QueryParametersChanged(void);
   void OnIndexChanged(const ConfigManager &config_manager);
+  void OnCategoryChanged(std::optional<TokenCategory> token_category);
 };
 
 }  // namespace mx::gui

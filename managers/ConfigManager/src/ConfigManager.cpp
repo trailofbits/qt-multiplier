@@ -71,8 +71,6 @@ ConfigManager::FileLocationCache(void) const noexcept {
 //! Set an item delegate on `view` that pays attention to the theme. This
 //! allows items using `IModel` to present tokens.
 //!
-//! NOTE(pag): This will try to proxy any pre-existing item delegates.
-//!
 //! NOTE(pag): This should only be applied to views backed by `IModel`s,
 //!            either directly or by proxy.
 void ConfigManager::InstallItemDelegate(
@@ -80,21 +78,9 @@ void ConfigManager::InstallItemDelegate(
 
   auto set_delegate = [=] (const class ThemeManager &self) {
     QAbstractItemDelegate *old_delegate = view->itemDelegate();
-    auto old_themed_delegate = dynamic_cast<ThemedItemDelegate *>(old_delegate);
-
-    // Try to proxy the old delegate that's there.
-    QAbstractItemDelegate *prev_delegate = nullptr;
-    if (old_themed_delegate) {
-      prev_delegate = old_themed_delegate->prev_delegate;
-      old_themed_delegate->prev_delegate = nullptr;
-
-    } else if (old_delegate) {
-      prev_delegate = old_delegate;
-      old_delegate = nullptr;
-    }
 
     auto new_delegate = new ThemedItemDelegate(
-        self.Theme(), prev_delegate, config.whitespace_replacement,
+        self.Theme(), config.whitespace_replacement,
         4u  /* TODO(pag): Take from config manager. */, view);
     view->setItemDelegate(new_delegate);
 

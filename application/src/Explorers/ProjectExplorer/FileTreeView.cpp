@@ -122,7 +122,8 @@ void FileTreeView::InitializeWidgets(const ThemeManager &theme_manager,
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(d->tree_view);
+  layout->addWidget(d->tree_view, 1);
+  layout->addStretch();
   layout->addWidget(d->search_widget);
   layout->addWidget(d->alternative_root_warning);
   setLayout(layout);

@@ -8,10 +8,12 @@
 
 #pragma once
 
-#include <multiplier/Frontend/TokenCategory.h>
-
 #include <QWidget>
+#include <optional>
 
+namespace mx {
+enum class TokenCategory : unsigned char;
+}  // namespace mx
 namespace mx::gui {
 
 //! A listbox containing all the token categories
@@ -23,25 +25,25 @@ class CategoryComboBox final : public QWidget {
   CategoryComboBox(QWidget *parent);
 
   //! Destructor
-  virtual ~CategoryComboBox() override;
+  virtual ~CategoryComboBox(void) override;
 
   //! Resets the category back to "All", emitting a CategoryChanged signal
-  void Reset();
+  void Reset(void);
 
  private:
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
   //! Initializes the internal widgets
-  void InitializeWidgets();
+  void InitializeWidgets(void);
 
  private slots:
   //! Called when the active item in the combobox changes
-  void OnCurrentIndexChange();
+  void OnCurrentIndexChange(void);
 
  signals:
   //! Emitted when the category to show changes
-  void CategoryChanged(const std::optional<TokenCategory> &opt_token_category);
+  void CategoryChanged(std::optional<TokenCategory> new_category);
 };
 
 }  // namespace mx::gui

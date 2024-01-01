@@ -13,15 +13,6 @@
 #include <multiplier/GUI/Assert.h>
 #include <multiplier/GUI/ThemeManager.h>
 
-#include <QBrush>
-#include <QCheckBox>
-#include <QLineEdit>
-#include <QListView>
-#include <QMouseEvent>
-#include <QPalette>
-#include <QSortFilterProxyModel>
-#include <QVBoxLayout>
-#include <QRadioButton>
 
 namespace mx::gui {
 

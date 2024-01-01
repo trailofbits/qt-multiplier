@@ -228,7 +228,8 @@ void TreeGeneratorWidget::InitializeWidgets(
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(d->tree_widget);
+  layout->addWidget(d->tree_widget, 1);
+  layout->addStretch();
   layout->addWidget(d->status_widget);
   layout->addWidget(d->filter_settings_widget);
   layout->addWidget(d->search_widget);

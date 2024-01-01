@@ -39,6 +39,8 @@ add_executable("Multiplier" ${executable_type}
   src/MultiplierStyle.h
   src/MultiplierStyle.cpp
 
+  src/Explorers/EntityExplorer/CategoryComboBox.cpp
+  src/Explorers/EntityExplorer/CategoryComboBox.h
   src/Explorers/EntityExplorer/EntityExplorer.cpp
   src/Explorers/EntityExplorer/EntityExplorer.h
 

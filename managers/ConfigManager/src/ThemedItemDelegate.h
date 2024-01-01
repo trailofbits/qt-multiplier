@@ -34,8 +34,6 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   Q_OBJECT
 
  public:
-  mutable QAbstractItemDelegate *prev_delegate;
-
   const IThemePtr theme;
   const QFont theme_font;
   const QFontMetricsF font_metrics;
@@ -56,11 +54,9 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
 
   //! Constructor
   inline ThemedItemDelegate(
-      IThemePtr theme_, QAbstractItemDelegate *prev_delegate_,
-      const std::optional<std::string> &whitespace_replacement_,
+      IThemePtr theme_, const std::optional<std::string> &whitespace_replacement_,
       unsigned tab_width = 4u, QObject *parent = nullptr)
       : QStyledItemDelegate(parent),
-        prev_delegate(prev_delegate_),
         theme(std::move(theme_)),
         theme_font(theme->Font()),
         font_metrics(theme_font),
