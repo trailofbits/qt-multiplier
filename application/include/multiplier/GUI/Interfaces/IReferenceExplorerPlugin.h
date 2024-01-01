@@ -18,6 +18,11 @@ namespace mx::gui {
 
 class ConfigManager;
 class IMainWindowPlugin;
+class IReferenceExplorerPlugin;
+class MediaManager;
+class ThemeManager;
+
+using IReferenceExplorerPluginPtr = std::unique_ptr<IReferenceExplorerPlugin>;
 
 // Describes a plugin to the reference explorer.
 class IReferenceExplorerPlugin : public QObject {
@@ -33,7 +38,7 @@ class IReferenceExplorerPlugin : public QObject {
   // a created `IReferenceExplorerPlugin` to be owned by the reference explorer.
   static bool Register(
       IMainWindowPlugin *reference_explorer,
-      std::function<IReferenceExplorerPlugin *(IMainWindowPlugin *)>
+      std::function<IReferenceExplorerPluginPtr(IMainWindowPlugin *)>
           create_plugin);
 
   virtual void ActOnMainWindowPrimaryClick(

@@ -12,12 +12,12 @@
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 
-#include "ReferenceExplorerPlugin.h"
+#include "../Explorers/ReferenceExplorer/ReferenceExplorer.h"
 
 namespace mx::gui {
 
 IReferenceExplorerPlugin::IReferenceExplorerPlugin(
-    const ConfigManager &config, QObject *parent)
+    ConfigManager &config, QObject *parent)
     : QObject(parent) {
 
   connect(&(config.ThemeManager()), &ThemeManager::ThemeChanged,
@@ -34,9 +34,9 @@ IReferenceExplorerPlugin::~IReferenceExplorerPlugin(void) {}
 // a created `IReferenceExplorerPlugin` to be owned by the reference explorer.
 bool IReferenceExplorerPlugin::Register(
   IMainWindowPlugin *reference_explorer,
-  std::function<IReferenceExplorerPlugin *(IMainWindowPlugin *)> create_plugin) {
+  std::function<IReferenceExplorerPluginPtr(IMainWindowPlugin *)> create_plugin) {
 
-  auto parent = dynamic_cast<ReferenceExplorerPlugin *>(reference_explorer);
+  auto parent = dynamic_cast<ReferenceExplorer *>(reference_explorer);
   if (!parent) {
     return false;
   }
@@ -46,7 +46,7 @@ bool IReferenceExplorerPlugin::Register(
     return false;
   }
 
-  parent->plugins.emplace_back(child);
+  parent->AddPlugin(std::move(child));
   return true;
 }
 

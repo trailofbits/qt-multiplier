@@ -6,45 +6,23 @@
 
 #pragma once
 
-#include <multiplier/GUI/Context.h>
-#include <multiplier/GUI/Managers/ActionManager.h>
-#include <multiplier/GUI/IMainWindowPlugin.h>
-#include <multiplier/GUI/IReferenceExplorerPlugin.h>
-
-#include <vector>
+#include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 
 namespace mx::gui {
 
-class TabWidget;
+class IReferenceExplorerPlugin;
 
-class ReferenceExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
+class ReferenceExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   Q_OBJECT
 
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
+
  public:
-  const Context &context;
 
-  QMainWindow * const main_window;
+  virtual ~ReferenceExplorer(void);
 
-  // The tabbed reference explorer widget docked inside of the main window.
-  TabWidget *tab_widget{nullptr};
-
-  // List of plugins.
-  std::vector<std::unique_ptr<IReferenceExplorerPlugin>> plugins;
-
-  // Launches a reference explorer given a data generator.
-  TriggerHandle popup_reference_explorer_trigger;
-
-  virtual ~ReferenceExplorerPlugin(void);
-
-  inline ReferenceExplorerPlugin(const Context &context_,
-                                 QMainWindow *parent)
-      : IMainWindowPlugin(context_, parent),
-        context(context_),
-        main_window(parent),
-        popup_reference_explorer_trigger(context.ActionManager().Register(
-            this,
-            "com.trailofbits.action.OpenReferenceExplorer",
-            &ReferenceExplorerPlugin::OnPopupReferenceExplorer)) {}
+  ReferenceExplorer(ConfigManager &config_manager, QMainWindow *parent);
 
   // Act on a primary click. For example, if browse mode is enabled, then this
   // is a "normal" click, however, if browse mode is off, then this is a meta-
@@ -66,7 +44,11 @@ class ReferenceExplorerPlugin Q_DECL_FINAL : public IMainWindowPlugin {
   QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
 
  private:
-  void OnPopupReferenceExplorer(const QVariant &data);
+  friend class IReferenceExplorerPlugin;
+
+  void AddPlugin(std::unique_ptr<IReferenceExplorerPlugin> plugin);
+
+  void OnOpenReferenceExplorer(const QVariant &data);
 
  private slots:
   void OnTabBarClose(int index);

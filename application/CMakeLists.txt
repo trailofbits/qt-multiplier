@@ -30,6 +30,9 @@ add_executable("Multiplier" ${executable_type}
   include/multiplier/GUI/Interfaces/IMainWindowPlugin.h
   src/Interfaces/IMainWindowPlugin.cpp
 
+  include/multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h
+  src/Interfaces/IReferenceExplorerPlugin.cpp
+
   src/MainWindow.h
   src/MainWindow.cpp
 
@@ -50,6 +53,9 @@ add_executable("Multiplier" ${executable_type}
   src/Explorers/ProjectExplorer/FileTreeView.h
   src/Explorers/ProjectExplorer/ProjectExplorer.cpp
   src/Explorers/ProjectExplorer/ProjectExplorer.h
+
+  src/Explorers/ReferenceExplorer/ReferenceExplorer.cpp
+  src/Explorers/ReferenceExplorer/ReferenceExplorer.h
 )
 
 target_sources("Multiplier" PRIVATE
@@ -68,6 +74,8 @@ target_link_libraries("Multiplier"
     "mx_multiplier_library"
     "mx_phantomstyle_library"
     "mx_search_widget"
+    "mx_simple_text_input_dialog"
+    "mx_tab_widget"
     "mx_theme_manager"
     "mx_tree_widget"
 

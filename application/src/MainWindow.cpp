@@ -23,6 +23,7 @@
 
 #include "Explorers/EntityExplorer/EntityExplorer.h"
 #include "Explorers/ProjectExplorer/ProjectExplorer.h"
+#include "Explorers/ReferenceExplorer/ReferenceExplorer.h"
 
 namespace mx::gui {
 
@@ -55,6 +56,7 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 void MainWindow::InitializePlugins(void) {
   d->plugins.emplace_back(new ProjectExplorer(d->config_manager, this));
   d->plugins.emplace_back(new EntityExplorer(d->config_manager, this));
+  d->plugins.emplace_back(new ReferenceExplorer(d->config_manager, this));
 
   for (const auto &plugin : d->plugins) {
     QWidget *dockable_widget = plugin->CreateDockWidget(this);
