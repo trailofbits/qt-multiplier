@@ -10,6 +10,7 @@
 
 #include <filesystem>
 
+#include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
 #include <multiplier/GUI/Widgets/TreeWidget.h>
@@ -58,19 +59,20 @@ struct FileTreeView::PrivateData final {
 
 FileTreeView::~FileTreeView(void) {}
 
-FileTreeView::FileTreeView(const ThemeManager &theme_manager,
-                           const MediaManager &media_manager,
+FileTreeView::FileTreeView(const ConfigManager &config_manager,
                            FileTreeModel *model,
                            QWidget *parent)
     : QWidget(parent),
       d(new PrivateData) {
 
-  InitializeWidgets(theme_manager, media_manager);
+  InitializeWidgets(config_manager);
   InstallModel(model);
 }
 
-void FileTreeView::InitializeWidgets(const ThemeManager &theme_manager,
-                                     const MediaManager &media_manager) {
+void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {
+  auto &theme_manager = config_manager.ThemeManager();
+  auto &media_manager = config_manager.MediaManager();
+
   // Setup the tree view
   d->tree_view = new TreeWidget();
   d->tree_view->setHeaderHidden(true);
@@ -80,9 +82,6 @@ void FileTreeView::InitializeWidgets(const ThemeManager &theme_manager,
   d->tree_view->setTextElideMode(Qt::ElideMiddle);
   d->tree_view->setAllColumnsShowFocus(true);
   d->tree_view->setTreePosition(0);
-
-  auto indent_width = fontMetrics().horizontalAdvance("_");
-  d->tree_view->setIndentation(indent_width);
 
   d->search_widget = new SearchWidget(media_manager, SearchWidget::Mode::Filter,
                                       this);
@@ -136,6 +135,8 @@ void FileTreeView::InitializeWidgets(const ThemeManager &theme_manager,
           this, &FileTreeView::OnThemeChanged);
 
   OnThemeChanged(theme_manager);
+
+  config_manager.InstallItemDelegate(d->tree_view);
 }
 
 void FileTreeView::InstallModel(FileTreeModel *model) {

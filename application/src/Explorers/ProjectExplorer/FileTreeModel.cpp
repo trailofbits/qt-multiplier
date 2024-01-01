@@ -19,6 +19,8 @@
 #include <vector>
 
 #include <multiplier/Index.h>
+#include <multiplier/Frontend/TokenCategory.h>
+#include <multiplier/Frontend/TokenKind.h>
 
 namespace mx::gui {
 namespace {
@@ -31,6 +33,7 @@ struct Node final {
   Node *parent{nullptr};
   QList<Node *> children;
   int row{0};
+  unsigned name_token_index{0};
 };
 
 }  // namespace
@@ -41,6 +44,7 @@ struct FileTreeModel::PrivateData {
   Node root_node;
   Node custom_root_node;
   Node *current_root_node;
+  TokenRange name_tokens;
 
   int saved_row{0};
   Node *saved_parent{nullptr};
@@ -62,6 +66,7 @@ void FileTreeModel::SetIndex(const Index &index) {
   SetRoot(QModelIndex());
 
   std::deque<Node> new_nodes;
+  std::vector<CustomToken> name_tokens;
   FilePathMap files = index.file_paths();
 
   emit beginResetModel();
@@ -127,12 +132,20 @@ void FileTreeModel::SetIndex(const Index &index) {
       item_map.erase(base);
       last->file_id = file_id.Pack();
       last->full_path = QString::fromStdString(path.generic_string());
+      last->name_token_index = static_cast<unsigned>(name_tokens.size());
+
+      UserToken tok;
+      tok.kind = TokenKind::HEADER_NAME;
+      tok.category = TokenCategory::FILE_NAME;
+      tok.data = last->name.toStdString();
+      name_tokens.emplace_back(std::move(tok));
     }
   }
 
   // Publish the changes.
   d->nodes.swap(new_nodes);
   d->current_root_node = &(d->root_node);
+  d->name_tokens = TokenRange::create(std::move(name_tokens));
 
   emit endResetModel();
 }
@@ -247,11 +260,11 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
   } else if (role == IModel::ModelName) {
     return "com.trailofbits.explorer.ProjectExplorer.FileTreeModel";
   
-  } else if (role == Qt::FontRole) {
-    if (node->file_id == kInvalidEntityId) {
-      auto font = qApp->font();
-      font.setBold(true);
-      return font;
+  } else if (role == IModel::TokenRangeDisplayRole) {
+    if (node->file_id != kInvalidEntityId) {
+      return QVariant::fromValue(
+          d->name_tokens.slice(node->name_token_index,
+                               node->name_token_index + 1u));
     }
 
   } else if (role == FileIdRole) {

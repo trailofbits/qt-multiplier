@@ -51,12 +51,9 @@ QWidget *ProjectExplorer::CreateDockWidget(QWidget *parent) {
   if (d->view) {
     return d->view;
   }
+
   d->model = new FileTreeModel(this);
-  d->view = new FileTreeView(
-      d->config_manager.ThemeManager(),
-      d->config_manager.MediaManager(),
-      d->model,
-      parent);
+  d->view = new FileTreeView(d->config_manager, d->model, parent);
 
   d->view->setWindowTitle(tr("Project Explorer"));
   OnIndexChanged(d->config_manager);

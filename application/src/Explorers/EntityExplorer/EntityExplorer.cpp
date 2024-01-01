@@ -28,6 +28,7 @@
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Widgets/ListGeneratorWidget.h>
 #include <multiplier/Index.h>
 
@@ -223,6 +224,8 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
     return d->view;
   }
 
+  auto &theme_manager = d->config_manager.ThemeManager();
+
   d->view = new QWidget(parent);
   d->view->setWindowTitle(tr("Entity Explorer"));
 
@@ -231,6 +234,13 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
   d->search_input = new QLineEdit(d->view);
   d->search_input->setClearButtonEnabled(true);
   d->search_input->setPlaceholderText(tr("Search"));
+
+  // Keep the font up-to-date.
+  d->search_input->setFont(theme_manager.Theme()->Font());
+  connect(&theme_manager, &ThemeManager::ThemeChanged,
+          [this] (const ThemeManager &tm) {
+            d->search_input->setFont(tm.Theme()->Font());
+          });
 
   connect(d->search_input, &QLineEdit::textChanged,
           this, &EntityExplorer::QueryParametersChanged);

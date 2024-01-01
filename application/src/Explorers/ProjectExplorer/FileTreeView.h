@@ -18,6 +18,7 @@
 
 namespace mx::gui {
 
+class ConfigManager;
 class FileTreeModel;
 class MediaManager;
 class ThemeManager;
@@ -33,8 +34,7 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
   virtual ~FileTreeView(void);
 
   //! Constructor
-  FileTreeView(const ThemeManager &theme_manager,
-               const MediaManager &media_manager,
+  FileTreeView(const ConfigManager &config_manager,
                FileTreeModel *model,
                QWidget *parent = nullptr);
 
@@ -47,8 +47,7 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
  private:
 
   //! Initializes the widgets
-  void InitializeWidgets(const ThemeManager &theme_manager,
-                         const MediaManager &media_manager);
+  void InitializeWidgets(const ConfigManager &config_manager);
 
   //! Installs the model, updating the UI state
   void InstallModel(FileTreeModel *model);
