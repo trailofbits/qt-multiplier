@@ -25,7 +25,7 @@ class FilterSettingsWidget final : public QWidget {
 
  public:
   //! Constructor
-  FilterSettingsWidget(QAbstractItemModel *model, QWidget *parent);
+  FilterSettingsWidget(QAbstractItemModel *model, QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~FilterSettingsWidget() override;

@@ -52,7 +52,8 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   virtual ~SearchWidget(void);
 
   //! Constructor
-  SearchWidget(const MediaManager &media_manager, Mode mode, QWidget *parent);
+  SearchWidget(const MediaManager &media_manager, Mode mode,
+               QWidget *parent = nullptr);
 
   //! Called by the other client widget to update the search result count
   void UpdateSearchResultCount(size_t search_result_count);

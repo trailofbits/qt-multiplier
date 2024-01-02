@@ -54,7 +54,6 @@ struct TreeGeneratorWidget::PrivateData final {
   QIcon goto_item_icon;
   QIcon expand_item_icon_n[kMaxExpansionLevel];
 
-  QModelIndex hovered_index;
   QModelIndex selected_index;
 };
 
@@ -311,7 +310,6 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
            d->tree_widget->verticalScrollBar()->isVisible());
 
       if (scrolling_enabled) {
-        d->hovered_index = {};
         UpdateItemButtons();
       }
 
@@ -348,18 +346,6 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
   } else if (obj == d->tree_widget->viewport()) {
     if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
-      // It is important to double check the leave event; it is sent
-      // even if the mouse is still inside our treeview item but
-      // above the hovering button (which steals the focus)
-      auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
-
-      auto index = d->tree_widget->indexAt(mouse_pos);
-      if (!index.isValid()) {
-        d->hovered_index = {};
-      } else {
-        d->hovered_index = d->model_proxy->mapToSource(index);
-      }
-
       UpdateItemButtons();
       return false;
 
@@ -389,32 +375,26 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
   d->goto_->setVisible(false);
   d->expand->setVisible(false);
 
-  // Always show the buttons, but disable the ones that are not
-  // applicable. This is to prevent buttons from disappearing and/or
-  // reordering while the user is clicking them
-  auto display_buttons = d->hovered_index.isValid();
-  if (!display_buttons) {
+  // It is important to double check the leave event; it is sent
+  // even if the mouse is still inside our treeview item but
+  // above the hovering button (which steals the focus)
+  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->tree_widget->indexAt(mouse_pos);
+  if (!d->model_proxy->mapToSource(index).isValid()) {
     d->updating_buttons = false;
     return;
   }
 
-  const auto &index = d->hovered_index;
-
-  d->open->setEnabled(true);
-  d->goto_->setEnabled(false);
-  d->expand->setEnabled(false);
-
   // Enable the expansion button if we haven't yet expanded the node.
   // TODO(alessandro): Fix the button visibility
   auto expand_var = index.data(TreeGeneratorModel::CanBeExpanded);
-  d->expand->setEnabled(expand_var.isValid() &&
-                                          expand_var.toBool());
+  d->expand->setEnabled(expand_var.isValid() && expand_var.toBool());
 
   // Show/hide one of expand/goto if this is redundant.
   auto redundant_var = index.data(TreeGeneratorModel::IsDuplicate);
   auto is_redundant = redundant_var.isValid() && redundant_var.toBool();
 
-  d->open->setVisible(display_buttons);
+  d->open->setVisible(true);
   d->goto_->setVisible(is_redundant);
   d->expand->setVisible(!is_redundant);
 
@@ -428,7 +408,6 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
 
   // Update the button positions
   auto rect = d->tree_widget->visualRect(index);
-
   auto button_margin = rect.height() / 6;
   auto button_size = rect.height() - (button_margin * 2);
   auto button_count = static_cast<int>(kNumButtons);
@@ -512,14 +491,12 @@ void TreeGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
 
 void TreeGeneratorWidget::OnModelReset(void) {
   ExpandAllNodes();
-  d->hovered_index = {};
   UpdateItemButtons();
 }
 
 void TreeGeneratorWidget::OnDataChanged(void) {
   UpdateItemButtons();
   ExpandAllNodes();
-
   d->tree_widget->viewport()->repaint();
 }
 
@@ -581,27 +558,33 @@ void TreeGeneratorWidget::OnSearchParametersChange(void) {
 }
 
 void TreeGeneratorWidget::OnOpenButtonPressed(void) {
-  if (!d->hovered_index.isValid()) {
+  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->tree_widget->indexAt(mouse_pos));
+  if (!index.isValid()) {
     return;
   }
 
-  emit OpenItem(d->hovered_index);
+  emit OpenItem(index);
 }
 
 void TreeGeneratorWidget::OnExpandButtonPressed(void) {
-  if (!d->hovered_index.isValid()) {
+  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->tree_widget->indexAt(mouse_pos));
+  if (!index.isValid()) {
     return;
   }
 
-  d->model->Expand(d->hovered_index, 1u);
+  d->model->Expand(index, 1u);
 }
 
 void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
-  if (!d->hovered_index.isValid()) {
+  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->tree_widget->indexAt(mouse_pos));
+  if (!index.isValid()) {
     return;
   }
 
-  auto dedup = d->model->Deduplicate(d->hovered_index);
+  auto dedup = d->model->Deduplicate(index);
   dedup = d->model_proxy->mapFromSource(dedup);
   if (!dedup.isValid()) {
     return;
@@ -631,7 +614,6 @@ void TreeGeneratorWidget::OnModelRequestFinished(void) {
 
 //! Used to hide the OSD buttons when focus is lost
 void TreeGeneratorWidget::focusOutEvent(QFocusEvent *) {
-  d->hovered_index = {};
   UpdateItemButtons();
 }
 

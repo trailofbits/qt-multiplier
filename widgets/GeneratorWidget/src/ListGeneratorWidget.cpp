@@ -42,7 +42,6 @@ struct ListGeneratorWidget::PrivateData final {
   QPushButton *goto_{nullptr};
   QIcon goto_item_icon;
 
-  QModelIndex hovered_index;
   QModelIndex selected_index;
 };
 
@@ -262,7 +261,6 @@ bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
            d->list_widget->verticalScrollBar()->isVisible());
 
       if (scrolling_enabled) {
-        d->hovered_index = {};
         UpdateItemButtons();
       }
 
@@ -276,18 +274,6 @@ bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
   } else if (obj == d->list_widget->viewport()) {
     if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
-      // It is important to double check the leave event; it is sent
-      // even if the mouse is still inside our treeview item but
-      // above the hovering button (which steals the focus)
-      auto mouse_pos = d->list_widget->viewport()->mapFromGlobal(QCursor::pos());
-
-      auto index = d->list_widget->indexAt(mouse_pos);
-      if (!index.isValid()) {
-        d->hovered_index = {};
-      } else {
-        d->hovered_index = d->model_proxy->mapToSource(index);
-      }
-
       UpdateItemButtons();
       return false;
 
@@ -315,17 +301,14 @@ void ListGeneratorWidget::UpdateItemButtons(void) {
   d->updating_buttons = true;
   d->goto_->setVisible(false);
 
-  // Always show the buttons, but disable the ones that are not
-  // applicable. This is to prevent buttons from disappearing and/or
-  // reordering while the user is clicking them
-  auto display_buttons = d->hovered_index.isValid();
-  if (!display_buttons) {
+  auto mouse_pos = d->list_widget->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->list_widget->indexAt(mouse_pos);
+  if (!d->model_proxy->mapToSource(index).isValid()) {
     d->updating_buttons = false;
     return;
   }
 
   // Show/hide one of goto if this is redundant.
-  const auto &index = d->hovered_index;
   auto redundant_var = index.data(ListGeneratorModel::IsDuplicate);
   if (!redundant_var.isValid() || !redundant_var.toBool()) {
     d->updating_buttons = false;
@@ -374,7 +357,6 @@ void ListGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
 }
 
 void ListGeneratorWidget::OnModelReset(void) {
-  d->hovered_index = {};
   UpdateItemButtons();
 }
 
@@ -431,11 +413,14 @@ void ListGeneratorWidget::OnSearchParametersChange(void) {
 }
 
 void ListGeneratorWidget::OnGotoOriginalButtonPressed(void) {
-  if (!d->hovered_index.isValid()) {
+  auto mouse_pos = d->list_widget->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->list_widget->indexAt(mouse_pos));
+  if (!index.isValid()) {
+    d->updating_buttons = false;
     return;
   }
 
-  auto dedup = d->model->Deduplicate(d->hovered_index);
+  auto dedup = d->model->Deduplicate(index);
   dedup = d->model_proxy->mapFromSource(dedup);
   if (!dedup.isValid()) {
     return;
@@ -465,7 +450,6 @@ void ListGeneratorWidget::OnModelRequestFinished(void) {
 
 //! Used to hide the OSD buttons when focus is lost
 void ListGeneratorWidget::focusOutEvent(QFocusEvent *) {
-  d->hovered_index = {};
   UpdateItemButtons();
 }
 

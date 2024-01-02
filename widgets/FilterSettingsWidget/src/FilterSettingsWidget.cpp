@@ -87,13 +87,7 @@ void FilterSettingsWidget::InitializeWidgets(void) {
   }
 
   new_layout->addStretch();
-
-  auto old_layout = layout();
   setLayout(new_layout);
-
-  if (old_layout != nullptr) {
-    old_layout->deleteLater();
-  }
 
   EmitColumnFilterStateListChanged();
 }

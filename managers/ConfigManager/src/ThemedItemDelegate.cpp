@@ -238,6 +238,8 @@ void ThemedItemDelegate::paint(QPainter *painter,
   //            and the background color, and uses `background_color` to
   //            implement `Qt::BackgroundRole`, and passes everything else
   //            through to `index`.
+  //
+  // TODO(pag): Investigate if there's a role for the selected border color.
   } else {
     this->QStyledItemDelegate::paint(painter, option, index);
   }

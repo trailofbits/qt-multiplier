@@ -59,6 +59,7 @@ void TabWidget::RemoveTab(int index) {
   if (auto tab = widget(index)) {
     d->title_update_timers[tab].stop();
     d->title_update_timers.erase(tab);
+    removeTab(index);
   }
 }
 
