@@ -16,6 +16,15 @@ namespace mx::gui {
 class TabWidget final : public QTabWidget {
   Q_OBJECT
 
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
+
+  using QTabWidget::addTab;
+  using QTabWidget::insertTab;
+  using QTabWidget::removeTab;
+
+  void TrackTitle(QWidget *widget);
+
  public:
   //! Constructor
   TabWidget(QWidget *parent = nullptr);
@@ -23,13 +32,9 @@ class TabWidget final : public QTabWidget {
   //! Destructor
   virtual ~TabWidget(void);
 
-  //! Disabled copy constructor
-  TabWidget(const TabWidget &) = delete;
-  TabWidget(TabWidget &&) noexcept = delete;
-
-  //! Disabled copy assignment operator
-  TabWidget &operator=(const TabWidget &) = delete;
-  TabWidget &operator=(TabWidget &&) noexcept = delete;
+  void AddTab(QWidget *widget);
+  void InsertTab(int index, QWidget *widget);
+  void RemoveTab(int index);
 };
 
 }  // namespace mx::gui

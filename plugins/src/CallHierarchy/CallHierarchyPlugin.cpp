@@ -116,7 +116,15 @@ QString CallHierarchyGenerator::ColumnTitle(int col) const {
 QString CallHierarchyGenerator::Name(
     const ITreeGeneratorPtr &) const {
 
-  if (auto name = NameOfEntityAsString(root_entity)) {
+  auto name = NameOfEntityAsString(root_entity);
+  if (std::holds_alternative<File>(root_entity)) {
+    for (auto path : std::get<File>(root_entity).paths()) {
+      name = QString::fromStdString(path.filename().generic_string());
+      break;
+    }
+  }
+
+  if (name) {
     return QObject::tr("Call hierarchy of `%1`").arg(name.value());
   } else {
     return QObject::tr("Call hierarchy of entity %1").arg(

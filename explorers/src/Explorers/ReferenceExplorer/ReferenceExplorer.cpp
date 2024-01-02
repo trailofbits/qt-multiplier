@@ -121,7 +121,7 @@ void ReferenceExplorer::OnTabBarClose(int i) {
   }
 
   auto widget = d->view->widget(i);
-  d->view->removeTab(i);
+  d->view->RemoveTab(i);
 
   widget->close();
 
@@ -168,7 +168,8 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
   auto tree_view = new TreeGeneratorWidget(d->config_manager, d->view);
   tree_view->InstallGenerator(std::move(generator));
 
-  d->view->addTab(tree_view, tree_view->windowTitle());
+  d->view->InsertTab(0, tree_view);
+  d->view->setCurrentIndex(0);
 
   emit ShowDockWidget();
 }

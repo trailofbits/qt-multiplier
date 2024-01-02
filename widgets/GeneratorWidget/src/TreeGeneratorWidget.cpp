@@ -79,6 +79,11 @@ void TreeGeneratorWidget::InstallGenerator(ITreeGeneratorPtr generator) {
 }
 
 void TreeGeneratorWidget::InstallModel(void) {
+  connect(d->model, &TreeGeneratorModel::NameChanged,
+          [=] (QString new_name) {
+            setWindowTitle(new_name);
+          });
+
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);

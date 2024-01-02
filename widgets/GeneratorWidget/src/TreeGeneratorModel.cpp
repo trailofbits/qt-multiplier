@@ -149,6 +149,7 @@ struct TreeGeneratorModel::PrivateData final {
 
   // Current theme.
   IThemePtr theme;
+  QColor theme_background_color;
 
   inline PrivateData(void)
       : root_node(nullptr),
@@ -450,8 +451,10 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
       if (auto color = d->theme->EntityBackgroundColor(node->entity)) {
         return color.value();
       }
+      return d->theme_background_color;
     }
-    // Tooltip used for hovering. Also, this is used for the copy details.
+  
+  // Tooltip used for hovering. Also, this is used for the copy details.
   } else if (role == Qt::ToolTipRole) {
     QString tooltip = tr("Entity Id: ") + QString::number(entity_key->first);
 
@@ -754,6 +757,7 @@ void TreeGeneratorModel::ProcessDataBatchQueue(void) {
 
 void TreeGeneratorModel::OnThemeChanged(const ThemeManager &theme_manager) {
   d->theme = theme_manager.Theme();
+  d->theme_background_color = d->theme->DefaultBackgroundColor();
 }
 
 }  // namespace mx::gui

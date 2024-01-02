@@ -195,12 +195,6 @@ void ThemedItemDelegate::PaintToken(Painter *painter,
 void ThemedItemDelegate::paint(QPainter *painter,
                                const QStyleOptionViewItem &option,
                                const QModelIndex &index) const {
-  TokenRange tokens = IModel::TokensToDisplay(index);
-  if (!tokens) {
-    this->QStyledItemDelegate::paint(painter, option, index);
-    return;
-  }
-
   auto is_selected = (option.state & QStyle::State_Selected) != 0;
 
   QColor background_color;
@@ -237,19 +231,16 @@ void ThemedItemDelegate::paint(QPainter *painter,
 
   painter->fillRect(option.rect, QBrush(background_color));
   
-  PaintTokens(painter, option, std::move(tokens));
-
-  // The highlight color used by the theme is barely visible, force better
-  // highlighting using the standard highlight color to draw a frame
-  // around the item
-  //
-  // TODO(pag): Might be that the border we print here doesn't get "unprinted".
-  // if (is_selected) {
-  //   auto original_pen = painter->pen();
-  //   painter->setPen(QPen(option.palette.highlight().color()));
-  //   painter->drawRect(option.rect.adjusted(0, 0, -1, -1));
-  //   painter->setPen(original_pen);
-  // }
+  if (TokenRange tokens = IModel::TokensToDisplay(index)) {
+    PaintTokens(painter, option, std::move(tokens));
+  
+  // TODO(pag): Create some kind of proxy model that takes in the index and
+  //            and the background color, and uses `background_color` to
+  //            implement `Qt::BackgroundRole`, and passes everything else
+  //            through to `index`.
+  } else {
+    this->QStyledItemDelegate::paint(painter, option, index);
+  }
 }
 
 QSize ThemedItemDelegate::sizeHint(

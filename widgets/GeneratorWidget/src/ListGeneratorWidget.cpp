@@ -67,6 +67,11 @@ void ListGeneratorWidget::InstallGenerator(IListGeneratorPtr generator) {
 }
 
 void ListGeneratorWidget::InstallModel(void) {
+  connect(d->model, &ListGeneratorModel::NameChanged,
+          [=] (QString new_name) {
+            setWindowTitle(new_name);
+          });
+
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);
