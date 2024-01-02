@@ -12,6 +12,8 @@ add_library("mx_config_manager"
 
   src/ThemedItemDelegate.cpp
   src/ThemedItemDelegate.h
+  src/ThemedItemModel.cpp
+  src/ThemedItemModel.h
 )
 
 target_link_libraries("mx_config_manager"

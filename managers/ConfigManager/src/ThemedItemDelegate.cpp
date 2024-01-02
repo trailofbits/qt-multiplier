@@ -23,6 +23,8 @@
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/Index.h>
 
+#include "ThemedItemModel.h"
+
 namespace mx::gui {
 namespace {
 
@@ -64,6 +66,21 @@ inline static QColor PaletteBackgroundColor(const QPalette &palette) {
 }  // namespace
 
 ThemedItemDelegate::~ThemedItemDelegate(void) {}
+
+ThemedItemDelegate::ThemedItemDelegate(
+    IThemePtr theme_, const std::optional<std::string> &whitespace_replacement_,
+    unsigned tab_width, QObject *parent)
+    : QStyledItemDelegate(parent),
+      theme(std::move(theme_)),
+      theme_font(theme->Font()),
+      font_metrics(theme_font),
+      line_height(font_metrics.height()),
+      space_width(font_metrics.horizontalAdvance(QChar::Space)),
+      tab_width(space_width * static_cast<qreal>(tab_width)),
+      theme_background_color(theme->DefaultBackgroundColor()),
+      theme_highlight_color(theme->CurrentLineBackgroundColor()),
+      model(new ThemedItemModel(this)),
+      whitespace_replacement(whitespace_replacement_) {}
 
 //! Generate the characters of `data`. If `whitespace` has a value, then we
 //! encode any sequence of whitespace into a single space token. Also in this
@@ -228,21 +245,36 @@ void ThemedItemDelegate::paint(QPainter *painter,
       background_color = PaletteBackgroundColor(qApp->palette());
     }
   }
-
-  painter->fillRect(option.rect, QBrush(background_color));
   
   if (TokenRange tokens = IModel::TokensToDisplay(index)) {
+    painter->save();
+    painter->fillRect(option.rect, background_color);
     PaintTokens(painter, option, std::move(tokens));
-  
-  // TODO(pag): Create some kind of proxy model that takes in the index and
-  //            and the background color, and uses `background_color` to
-  //            implement `Qt::BackgroundRole`, and passes everything else
-  //            through to `index`.
-  //
-  // TODO(pag): Investigate if there's a role for the selected border color.
-  } else {
-    this->QStyledItemDelegate::paint(painter, option, index);
+    painter->restore();
+    return;
   }
+
+  this->QStyledItemDelegate::paint(painter, option, index);
+
+  // // This is pretty evil. The idea is that we want to inject our own model in
+  // // front of `index`s model to enforce our own coloring behavior.
+  // auto indexed_model = const_cast<QAbstractItemModel *>(index.model());
+  // if (indexed_model != model->sourceModel()) {
+  //   model->setSourceModel(indexed_model);
+  // }
+
+  // model->background_color = background_color;
+
+  // QStyleOptionViewItem opt = option;
+  // opt.backgroundBrush = background_color;
+  // opt.palette.setColor(QPalette::Inactive, QPalette::Window, background_color);
+  // opt.palette.setColor(QPalette::Active, QPalette::Window, background_color);
+  // opt.palette.setColor(QPalette::Normal, QPalette::Window, background_color);
+  // opt.palette.setColor(QPalette::Inactive, QPalette::Base, background_color);
+  // opt.palette.setColor(QPalette::Active, QPalette::Base, background_color);
+  // opt.palette.setColor(QPalette::Normal, QPalette::Base, background_color);
+
+  // this->QStyledItemDelegate::paint(painter, opt, model->mapFromSource(index));
 }
 
 QSize ThemedItemDelegate::sizeHint(

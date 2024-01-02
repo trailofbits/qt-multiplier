@@ -29,6 +29,8 @@
 
 namespace mx::gui {
 
+class ThemedItemModel;
+
 //! An item delegate used to paint tokens in the ReferenceExplorerView
 class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   Q_OBJECT
@@ -43,6 +45,8 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   const QColor theme_background_color;
   const QColor theme_highlight_color;
 
+  std::unique_ptr<ThemedItemModel> model;
+
   // TODO(pag): Think about if this even makes sense, especially with respect
   //            to the model's `Qt::DisplayRole`, as that isn't necessarily
   //            subjet to whitespace replacement.
@@ -53,19 +57,9 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   mutable int num_printed_since_space{0};
 
   //! Constructor
-  inline ThemedItemDelegate(
+  ThemedItemDelegate(
       IThemePtr theme_, const std::optional<std::string> &whitespace_replacement_,
-      unsigned tab_width = 4u, QObject *parent = nullptr)
-      : QStyledItemDelegate(parent),
-        theme(std::move(theme_)),
-        theme_font(theme->Font()),
-        font_metrics(theme_font),
-        line_height(font_metrics.height()),
-        space_width(font_metrics.horizontalAdvance(QChar::Space)),
-        tab_width(space_width * static_cast<qreal>(tab_width)),
-        theme_background_color(theme->DefaultBackgroundColor()),
-        theme_highlight_color(theme->CurrentLineBackgroundColor()),
-        whitespace_replacement(whitespace_replacement_) {}
+      unsigned tab_width = 4u, QObject *parent = nullptr);
 
   //! Destructor
   virtual ~ThemedItemDelegate(void);

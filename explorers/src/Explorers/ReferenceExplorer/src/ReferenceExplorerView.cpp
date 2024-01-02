@@ -152,7 +152,7 @@ ReferenceExplorerView::ReferenceExplorerView(
   // Setup the layout
   setContentsMargins(0, 0, 0, 0);
 
-  auto layout = new QVBoxLayout(this);
+  auto layout = new QVBoxLayout;
   layout->setContentsMargins(0, 0, 0, 0);
 
   d->generator_view->setSizePolicy(QSizePolicy::Expanding,

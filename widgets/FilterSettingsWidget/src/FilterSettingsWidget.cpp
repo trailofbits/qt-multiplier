@@ -15,8 +15,32 @@
 #include <algorithm>
 
 namespace mx::gui {
+namespace {
+
+static void ClearLayout(QLayout *layout);
+
+static void ClearLayoutItem(QLayoutItem *item) {
+  if (item) {
+    if (item->layout() != 0) {
+      ClearLayout(item->layout());
+
+    } else if (item->widget()) {
+      item->widget()->deleteLater();
+    }
+
+    delete item;
+  }
+}
+
+void ClearLayout(QLayout *layout) {
+  while (auto child = layout->takeAt(0)) {
+    ClearLayoutItem(child);
+  }
+}
+}  // namespace
 
 struct FilterSettingsWidget::PrivateData final {
+  QHBoxLayout *layout{nullptr};
   QAbstractItemModel *model{nullptr};
   std::vector<QCheckBox *> checkbox_list;
 };
@@ -29,6 +53,12 @@ FilterSettingsWidget::FilterSettingsWidget(QAbstractItemModel *model,
   d->model = model;
   connect(model, &QAbstractItemModel::modelReset, this,
           &FilterSettingsWidget::OnModelReset);
+
+
+  d->layout = new QHBoxLayout();
+  d->layout->setContentsMargins(0, 0, 0, 0);
+  setContentsMargins(0, 0, 0, 0);
+  setLayout(d->layout);
 
   OnModelReset();
 }
@@ -50,17 +80,14 @@ void FilterSettingsWidget::OnModelReset(void) {
 }
 
 void FilterSettingsWidget::InitializeWidgets(void) {
-  setContentsMargins(0, 0, 0, 0);
 
-  auto new_layout = new QHBoxLayout();
-  new_layout->setContentsMargins(0, 0, 0, 0);
+  ClearLayout(d->layout);
 
+  d->layout->addWidget(new QLabel(tr("Filter: ")));
   d->checkbox_list.clear();
 
   QModelIndex root_index;
   int column_count = std::max(0, d->model->columnCount(root_index));
-
-  new_layout->addWidget(new QLabel(tr("Filter: ")));
 
   for (auto i = 0; i < column_count; ++i) {
     QString column_name;
@@ -83,12 +110,10 @@ void FilterSettingsWidget::InitializeWidgets(void) {
             &FilterSettingsWidget::OnCheckboxStateChange);
 
     d->checkbox_list.push_back(checkbox);
-    new_layout->addWidget(checkbox);
+    d->layout->addWidget(checkbox);
   }
 
-  new_layout->addStretch();
-  setLayout(new_layout);
-
+  d->layout->addStretch();
   EmitColumnFilterStateListChanged();
 }
 
