@@ -45,6 +45,7 @@ class ReferenceExplorer Q_DECL_FINAL : public IMainWindowPlugin {
  private slots:
   void OnTabBarClose(int index);
   void OnTabBarDoubleClick(int index);
+  void OnSelectionChange(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

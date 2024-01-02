@@ -128,11 +128,9 @@ void ThemedItemDelegate::PaintTokens(
     TokenRange toks) const {
   Reset();
   QPointF pos = GetRectPosition(option.rect);
-  painter->save();
   for (auto token : toks) {
     PaintToken(painter, option, std::move(token), pos);
   }
-  painter->restore();
 }
 
 template <typename Painter>

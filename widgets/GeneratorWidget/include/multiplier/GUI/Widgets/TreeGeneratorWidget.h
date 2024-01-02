@@ -105,6 +105,8 @@ class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
 
   //! Called when the model request has finished
   void OnModelRequestFinished(void);
+
+  void GotoOriginal(const QModelIndex &index);
  
  signals:
   //! The open button is clicked.

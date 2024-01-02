@@ -34,6 +34,9 @@ struct ReferenceExplorer::PrivateData {
   // Launches a reference explorer given a data generator.
   TriggerHandle open_reference_explorer_trigger;
 
+  // Index for the context menu.
+  QModelIndex context_index;
+
   inline PrivateData(ConfigManager &config_manager_,
                      QMainWindow *main_window_)
       : config_manager(config_manager_),
@@ -65,7 +68,17 @@ void ReferenceExplorer::ActOnPrimaryClick(const QModelIndex &index) {
 void ReferenceExplorer::ActOnContextMenu(
     QMenu *menu, const QModelIndex &index) {
 
+  if (!d->view->isVisible()) {
+    return;
+  }
+
   this->IMainWindowPlugin::ActOnContextMenu(menu, index);
+
+  auto current = d->view->currentWidget();
+  if (auto tree = dynamic_cast<TreeGeneratorWidget *>(current)) {
+    tree->ActOnContextMenu(menu, index);
+  }
+
   for (const auto &plugin : d->plugins) {
     plugin->ActOnMainWindowContextMenu(d->main_window, menu, index);
   }
@@ -166,10 +179,20 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
   }
 
   auto tree_view = new TreeGeneratorWidget(d->config_manager, d->view);
+  connect(tree_view, &TreeGeneratorWidget::OpenItem,
+          this, &IMainWindowPlugin::RequestPrimaryClick);
+
+  connect(tree_view, &TreeGeneratorWidget::RequestContextMenu,
+          this, &IMainWindowPlugin::RequestContextMenu);
+
+  connect(tree_view, &TreeGeneratorWidget::SelectedItemChanged,
+          this, &ReferenceExplorer::OnSelectionChange);
+
   tree_view->InstallGenerator(std::move(generator));
 
   d->view->InsertTab(0, tree_view);
   d->view->setCurrentIndex(0);
+  d->context_index = {};
 
   emit ShowDockWidget();
 }
@@ -179,6 +202,13 @@ void ReferenceExplorer::AddPlugin(
   if (plugin) {
     d->plugins.emplace_back(std::move(plugin));
   }
+}
+
+// Behavior depends on if the code previews are open or not.
+void ReferenceExplorer::OnSelectionChange(const QModelIndex &index) {
+  d->context_index = {};
+
+  (void) index;
 }
 
 }  // namespace mx::gui

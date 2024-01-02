@@ -257,7 +257,9 @@ void TreeGeneratorWidget::InitializeWidgets(
 //! Called when we want to act on the context menu.
 void TreeGeneratorWidget::ActOnContextMenu(
     QMenu *menu, const QModelIndex &index) {
+
   if (index != d->selected_index) {
+    d->selected_index = {};
     return;
   }
 
@@ -269,11 +271,20 @@ void TreeGeneratorWidget::ActOnContextMenu(
     connect(copy_details_action, &QAction::triggered,
             [=] (void) {
               qApp->clipboard()->setText(details);
+              d->selected_index = {};
             });
   }
 
-  if (auto is_duplicate = index.data(TreeGeneratorModel::IsDuplicate);
-      is_duplicate.isValid() && is_duplicate.toBool()) {
+  auto open_action = new QAction(tr("Open"), menu);
+  menu->addAction(open_action);
+  connect(open_action, &QAction::triggered,
+          [=, this] (void) {
+            emit OpenItem(d->selected_index);
+            d->selected_index = {};
+          });
+
+  auto is_duplicate = index.data(TreeGeneratorModel::IsDuplicate);
+  if (!is_duplicate.isValid() || !is_duplicate.toBool()) {
 
     auto i = 0u;
     auto can_expand = index.data(TreeGeneratorModel::CanBeExpanded);
@@ -281,7 +292,7 @@ void TreeGeneratorWidget::ActOnContextMenu(
       i = 1u;
     }
 
-    for (; i <= kMaxExpansionLevel; ++i) {
+    for (; i < kMaxExpansionLevel; ++i) {
       auto action = new QAction(tr("Expand &%1 levels").arg(i + 1u), menu);
       menu->addAction(action);
 
@@ -290,13 +301,22 @@ void TreeGeneratorWidget::ActOnContextMenu(
       //                   shortcut explicitly
       action->setShortcut(static_cast<Qt::Key>(Qt::Key_1 + i));
       action->setToolTip(tr("Expands this entity for three levels"));
-      action->setIcon(d->expand_item_icon_n[i - 1u]);
+      action->setIcon(d->expand_item_icon_n[i]);
 
       connect(action, &QAction::triggered,
               [=, this] (void) {
-                d->model->Expand(index, i + 1u);
+                d->model->Expand(d->selected_index, i + 1u);
+                d->selected_index = {};
               });
     }
+  } else {
+    auto goto_action = new QAction(tr("Goto Original"), menu);
+    menu->addAction(goto_action);
+    connect(goto_action, &QAction::triggered,
+            [this] (void) {
+              GotoOriginal(d->selected_index);
+              d->selected_index = {};
+            });
   }
 }
 
@@ -577,9 +597,7 @@ void TreeGeneratorWidget::OnExpandButtonPressed(void) {
   d->model->Expand(index, 1u);
 }
 
-void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
-  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->model_proxy->mapToSource(d->tree_widget->indexAt(mouse_pos));
+void TreeGeneratorWidget::GotoOriginal(const QModelIndex &index) {
   if (!index.isValid()) {
     return;
   }
@@ -594,6 +612,12 @@ void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
   sel->clearSelection();
   sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
   d->tree_widget->scrollTo(dedup);
+}
+
+void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
+  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->tree_widget->indexAt(mouse_pos));
+  GotoOriginal(index);
 }
 
 // NOTE(pag): The config manager handles the item delegate automatically.
