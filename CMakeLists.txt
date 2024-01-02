@@ -65,9 +65,7 @@ add_subdirectory("managers")
 add_subdirectory("themes")
 add_subdirectory("widgets")
 add_subdirectory("explorers")
-
-
-#add_subdirectory("plugins")
+add_subdirectory("plugins")
 add_subdirectory("application")
 
 if(MXQT_ENABLE_INSTALL)

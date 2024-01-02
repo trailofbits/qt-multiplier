@@ -245,6 +245,9 @@ void TreeGeneratorModel::RunExpansionThread(
   connect(runnable, &IGenerateTreeRunnable::NewGeneratedItems,
           this, &TreeGeneratorModel::OnNewGeneratedItems);
 
+  connect(runnable, &IGenerateTreeRunnable::Finished,
+          this, &TreeGeneratorModel::OnRequestFinished);
+
   if (!d->num_pending_requests) {
     d->import_timer.start(kFirstUpdateInterval);
     emit RequestStarted();
@@ -252,6 +255,14 @@ void TreeGeneratorModel::RunExpansionThread(
 
   d->num_pending_requests += 1;
   d->thread_pool.start(runnable);
+}
+
+void TreeGeneratorModel::OnRequestFinished(void) {
+  d->num_pending_requests -= 1;
+  Q_ASSERT(d->num_pending_requests >= 0);
+  if (!d->num_pending_requests) {
+    emit RequestFinished();
+  }
 }
 
 //! Find the original version of an item.
@@ -320,7 +331,6 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
 
   emit beginResetModel();
   d->version_number.fetch_add(1u);
-  d->num_pending_requests += 1;
   d->generator = std::move(generator_);
   d->node_data.clear();
   d->entity_to_node.clear();
@@ -336,16 +346,17 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
   d->root_node.state = NodeState::kOpening;
   d->import_timer.stop();
   d->data_batch_queue.clear();
-
-  // Start a request to fetch the name of this tree.
-  d->tree_name_future = QtConcurrent::run(
-      [gen = d->generator](void) -> QString { return gen->Name(gen); });
-  d->tree_name_future_watcher.setFuture(d->tree_name_future);
-
-  RunExpansionThread(new InitTreeRunnable(
-      d->generator, d->version_number, NotAnEntity{}, 2u));
-
   emit endResetModel();
+
+  if (d->generator) {
+    // Start a request to fetch the name of this tree.
+    d->tree_name_future = QtConcurrent::run(
+        [gen = d->generator](void) -> QString { return gen->Name(gen); });
+    d->tree_name_future_watcher.setFuture(d->tree_name_future);
+
+    RunExpansionThread(new InitTreeRunnable(
+        d->generator, d->version_number, NotAnEntity{}, 2u));
+  }
 }
 
 QModelIndex TreeGeneratorModel::index(int row, int column,
@@ -503,10 +514,8 @@ void TreeGeneratorModel::CancelRunningRequest() {
   }
 
   d->version_number.fetch_add(1u);
-  d->num_pending_requests = 0;
   d->import_timer.stop();
   d->data_batch_queue.clear();
-  emit RequestFinished();
 }
 
 //! Notify us when there's a batch of new data to update.
@@ -518,7 +527,6 @@ void TreeGeneratorModel::OnNewGeneratedItems(
     return;
   }
 
-  d->num_pending_requests -= 1;
   d->data_batch_queue.emplaceBack(d->NodeKeyFromId(parent_node_id),
                                   std::move(child_items), remaining_depth);
 }

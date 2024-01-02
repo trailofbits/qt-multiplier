@@ -89,7 +89,7 @@ struct ListGeneratorModel::PrivateData final {
   std::unordered_map<RawEntityId, NodeKey *> aliased_entity_to_key;
 
   // Returns the if there's an outstanding request.
-  bool num_pending_requests{0};
+  int num_pending_requests{0};
 
   // Version number of this model. This is incremented when we install a new
   // generator.
@@ -184,7 +184,6 @@ void ListGeneratorModel::InstallGenerator(IListGeneratorPtr generator_) {
 
   emit beginResetModel();
   d->version_number.fetch_add(1u);
-  d->num_pending_requests += 1;
   d->generator = std::move(generator_);
   d->entity_to_node.clear();
   d->aliased_entity_to_key.clear();
@@ -192,24 +191,30 @@ void ListGeneratorModel::InstallGenerator(IListGeneratorPtr generator_) {
   d->redundant_keys.clear();
   d->import_timer.stop();
   d->data_batch_queue.clear();
-
-  // Start a request to fetch the name of this tree.
-  d->tree_name_future = QtConcurrent::run(
-      [gen = d->generator](void) -> QString { return gen->Name(gen); });
-  d->tree_name_future_watcher.setFuture(d->tree_name_future);
-
-  auto runnable = new InitTreeRunnable(
-      d->generator, d->version_number, NotAnEntity{}, 2u);
-
-  connect(runnable, &IGenerateTreeRunnable::NewGeneratedItems,
-          this, &ListGeneratorModel::OnNewListItems);
-
-  d->import_timer.start(kFirstUpdateInterval);
-  emit RequestStarted();
-
-  d->thread_pool.start(runnable);
-
   emit endResetModel();
+
+  // Start a request to fetch the data.
+  if (d->generator) {
+    d->num_pending_requests += 1;
+
+    d->tree_name_future = QtConcurrent::run(
+        [gen = d->generator](void) -> QString { return gen->Name(gen); });
+    d->tree_name_future_watcher.setFuture(d->tree_name_future);
+
+    auto runnable = new InitTreeRunnable(
+        d->generator, d->version_number, NotAnEntity{}, 2u);
+
+    connect(runnable, &IGenerateTreeRunnable::NewGeneratedItems,
+            this, &ListGeneratorModel::OnNewListItems);
+
+    connect(runnable, &IGenerateTreeRunnable::Finished,
+            this, &ListGeneratorModel::OnRequestFinished);
+
+    d->import_timer.start(kFirstUpdateInterval);
+    emit RequestStarted();
+
+    d->thread_pool.start(runnable);
+  }
 }
 
 QModelIndex ListGeneratorModel::index(int row, int column,
@@ -329,6 +334,14 @@ void ListGeneratorModel::OnNameResolved(void) {
   emit NameChanged(d->tree_name_future.takeResult());
 }
 
+void ListGeneratorModel::OnRequestFinished(void) {
+  d->num_pending_requests -= 1;
+  Q_ASSERT(d->num_pending_requests >= 0);
+  if (!d->num_pending_requests) {
+    emit RequestFinished();
+  }
+}
+
 void ListGeneratorModel::CancelRunningRequest(void) {
   d->tree_name_future.cancel();
   d->tree_name_future.waitForFinished();
@@ -339,10 +352,8 @@ void ListGeneratorModel::CancelRunningRequest(void) {
   }
 
   d->version_number.fetch_add(1u);
-  d->num_pending_requests -= 1;
   d->import_timer.stop();
   d->data_batch_queue.clear();
-  emit RequestFinished();
 }
 
 //! Notify us when there's a batch of new data to update.
@@ -354,7 +365,6 @@ void ListGeneratorModel::OnNewListItems(
     return;
   }
 
-  d->num_pending_requests -= 1;
   d->data_batch_queue.emplaceBack(std::move(child_items));
 }
 
@@ -515,7 +525,6 @@ void ListGeneratorModel::ProcessDataBatchQueue(void) {
 
   } else {
     d->import_timer.stop();
-    emit RequestFinished();
   }
 }
 

@@ -35,9 +35,6 @@ add_executable("Multiplier" ${executable_type}
   
   src/MultiplierStyle.h
   src/MultiplierStyle.cpp
-
-  #src/ReferenceExplorerPlugins/CallHierarchyPlugin/CallHierarchyPlugin.cpp
-  #src/ReferenceExplorerPlugins/CallHierarchyPlugin/CallHierarchyPlugin.h
 )
 
 target_sources("Multiplier" PRIVATE
@@ -55,6 +52,7 @@ target_link_libraries("Multiplier"
     "mx_media_manager"
     "mx_multiplier_library"
     "mx_phantomstyle_library"
+    "mx_plugins"
     "mx_tab_widget"
     "mx_theme_manager"
 

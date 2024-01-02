@@ -13,6 +13,7 @@
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Widgets/TabWidget.h>
+#include <multiplier/GUI/Widgets/TreeGeneratorWidget.h>
 
 #include <QDialog>
 #include <QTabBar>
@@ -127,9 +128,6 @@ void ReferenceExplorer::OnTabBarClose(int i) {
   if (!d->view->count()) {
     emit HideDockWidget();
   }
-
-  // d->reference_explorer_dock->setVisible(widget_visible);
-  // d->reference_explorer_dock->toggleViewAction()->setEnabled(widget_visible);
 }
 
 void ReferenceExplorer::OnTabBarDoubleClick(int i) {
@@ -151,36 +149,28 @@ void ReferenceExplorer::OnTabBarDoubleClick(int i) {
   if (opt_tab_name.has_value()) {
     new_tab_name = opt_tab_name.value();
   } else {
-    new_tab_name = tr("Reference browser #") + QString::number(i);
+    new_tab_name = tr("Reference Browser #") + QString::number(i);
   }
 
   d->view->setTabText(i, new_tab_name);
 }
 
 void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
-  if (data.isNull() || !data.canConvert<std::shared_ptr<ITreeGenerator>>()) {
+  if (data.isNull() || !data.canConvert<ITreeGeneratorPtr>()) {
     return;
   }
 
-  auto generator = data.value<std::shared_ptr<ITreeGenerator>>();
+  auto generator = data.value<ITreeGeneratorPtr>();
   if (!generator) {
     return;
   }
 
-  // auto popup = new PopupWidgetContainer<ReferenceExplorer>(
-  //     context.Index(), context.FileLocationCache(),
-  //     std::move(generator),
-  //     false  /* TODO: enable code preview */,
-  //     nullptr  /* TODO: global highlighter */,
-  //     nullptr  /* TODO: macro explorer */,
-  //     main_window);
+  auto tree_view = new TreeGeneratorWidget(d->config_manager, d->view);
+  tree_view->InstallGenerator(std::move(generator));
 
-  // popup->show();
-  // emit PopupOpened(popup);
+  d->view->addTab(tree_view, tree_view->windowTitle());
 
-  // TODO(pag): Trigger browser mode.
-  // popup->GetWrappedWidget()->SetBrowserMode(
-  //     d->toolbar.browser_mode->isChecked());
+  emit ShowDockWidget();
 }
 
 void ReferenceExplorer::AddPlugin(

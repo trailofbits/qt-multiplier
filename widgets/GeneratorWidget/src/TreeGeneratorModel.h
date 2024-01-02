@@ -82,8 +82,10 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
 
   //! Notify us when there's a batch of new data to update.
   void OnNewGeneratedItems(uint64_t version_number, RawEntityId parent_entity_id,
-                      QList<IGeneratedItemPtr> child_items,
-                      unsigned remaining_depth);
+                           QList<IGeneratedItemPtr> child_items,
+                           unsigned remaining_depth);
+
+  void OnRequestFinished(void);
 
   //! Processes the entire data batch queue
   void ProcessDataBatchQueue(void);

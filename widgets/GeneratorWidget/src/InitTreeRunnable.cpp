@@ -16,15 +16,22 @@ void InitTreeRunnable::run(void) {
   QList<IGeneratedItemPtr> items;
   for (auto item : generator->Roots(generator)) {
     if (version_number.load() != captured_version_number) {
+      emit Finished();
       return;
     }
+
+    // TODO(pag): Add batching.
     items.emplaceBack(std::move(item));
   }
+
   if (version_number.load() != captured_version_number) {
+    emit Finished();
     return;
   }
+
   emit NewGeneratedItems(captured_version_number, kInvalidEntityId, items,
                     depth - 1u);
+  emit Finished();
 }
 
 }  // namespace mx::gui

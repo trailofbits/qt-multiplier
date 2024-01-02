@@ -48,8 +48,10 @@ class IGenerateTreeRunnable : public QObject, public QRunnable {
 
  signals:
   void NewGeneratedItems(uint64_t version_number, RawEntityId parent_entity_id,
-                    QList<IGeneratedItemPtr> child_items,
-                    unsigned remaining_depth);
+                         QList<IGeneratedItemPtr> child_items,
+                         unsigned remaining_depth);
+
+  void Finished(void);
 };
 
 }  // namespace mx::gui

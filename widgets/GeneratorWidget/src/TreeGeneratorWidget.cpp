@@ -271,26 +271,26 @@ void TreeGeneratorWidget::ActOnContextMenu(
   if (auto is_duplicate = index.data(TreeGeneratorModel::IsDuplicate);
       is_duplicate.isValid() && is_duplicate.toBool()) {
 
-    auto i = 1u;
+    auto i = 0u;
     auto can_expand = index.data(TreeGeneratorModel::CanBeExpanded);
     if (can_expand.isValid() && !can_expand.toBool()) {
-      i = 2u;
+      i = 1u;
     }
 
     for (; i <= kMaxExpansionLevel; ++i) {
-      auto action = new QAction(tr("Expand &%1 levels").arg(i), menu);
+      auto action = new QAction(tr("Expand &%1 levels").arg(i + 1u), menu);
       menu->addAction(action);
 
       // TODO(alessandro): There's a Qt 6.x bug that prevents the &<N> from
       //                   working correctly, so for now we have to set the
       //                   shortcut explicitly
-      action->setShortcut(static_cast<Qt::Key>(Qt::Key_0 + i));
+      action->setShortcut(static_cast<Qt::Key>(Qt::Key_1 + i));
       action->setToolTip(tr("Expands this entity for three levels"));
-      action->setIcon(d->expand_item_icon_n[i]);
+      action->setIcon(d->expand_item_icon_n[i - 1u]);
 
       connect(action, &QAction::triggered,
               [=, this] (void) {
-                d->model->Expand(index, i);
+                d->model->Expand(index, i + 1u);
               });
     }
   }
@@ -491,10 +491,10 @@ void TreeGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
   d->expand->setIcon(d->expand_item_icon);
   d->goto_->setIcon(d->goto_item_icon);
 
-  for (auto i = 1u; i <= kMaxExpansionLevel; ++i) {
+  for (auto i = 0u; i < kMaxExpansionLevel; ++i) {
     d->expand_item_icon_n[i] = {};
 
-    auto icon_id = QString("com.trailofbits.icon.ExpandDepth%1").arg(i);
+    auto icon_id = QString("com.trailofbits.icon.ExpandDepth%1").arg(i + 1u);
 
     d->expand_item_icon_n[i].addPixmap(
         media_manager.Pixmap(icon_id), QIcon::Normal, QIcon::On);

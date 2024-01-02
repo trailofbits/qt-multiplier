@@ -4,13 +4,14 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "CallHierarchyPlugin.h"
+#include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
 
+#include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Interfaces/ITreeGenerator.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
-#include <multiplier/GUI/Context.h>
-#include <multiplier/GUI/IModel.h>
-
-#include "CallHierarchyGenerator.h"
+#include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Util.h>
+#include <multiplier/Index.h>
 
 Q_DECLARE_METATYPE(mx::TokenRange);
 
@@ -44,7 +45,7 @@ class CallHierarchyItem final : public IGeneratedItem {
         location(std::move(location_)),
         breadcrumbs(std::move(breadcrumbs_)) {}
 
-  VariantEntity EntityId(void) const Q_DECL_FINAL {
+  VariantEntity Entity(void) const Q_DECL_FINAL {
     return entity;
   }
 
@@ -125,13 +126,12 @@ QString CallHierarchyGenerator::Name(
 
 gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Roots(
     const ITreeGeneratorPtr &self) {
-
   if (std::holds_alternative<Decl>(root_entity)) {
     RawEntityId prev_redecl_id = kInvalidEntityId;
     for (Decl redecl : std::get<Decl>(root_entity).redeclarations()) {
       auto item = CreateGeneratedItem(file_location_cache, redecl, redecl,
                                       prev_redecl_id);
-      prev_redecl_id = item->EntityId();
+      prev_redecl_id = redecl.id().Pack();
       co_yield item;
     }
 
@@ -179,22 +179,22 @@ gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Children(
 }  // namespace
 
 struct CallHierarchyPlugin::PrivateData {
-  const Context &context;
+  const ConfigManager &config_manager;
 
-  TriggerHandle popup_reference_explorer_trigger;
+  TriggerHandle open_reference_explorer_trigger;
 
-  inline PrivateData(const Context &context_)
-      : context(context_),
-        popup_reference_explorer_trigger(context.ActionManager().Find(
+  inline PrivateData(const ConfigManager &config_manager_)
+      : config_manager(config_manager_),
+        open_reference_explorer_trigger(config_manager.ActionManager().Find(
             "com.trailofbits.action.OpenReferenceExplorer")) {}
 };
 
 CallHierarchyPlugin::~CallHierarchyPlugin(void) {}
 
 CallHierarchyPlugin::CallHierarchyPlugin(
-    const Context &context, QObject *parent)
-    : IReferenceExplorerPlugin(context, parent),
-      d(new PrivateData(context)) {}
+    ConfigManager &config_manager, QObject *parent)
+    : IReferenceExplorerPlugin(config_manager, parent),
+      d(new PrivateData(config_manager)) {}
 
 std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowSecondaryClick(
     QMainWindow *, const QModelIndex &index) {
@@ -206,11 +206,10 @@ std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowSecondaryClick(
 
   return NamedAction{
     .name = ActionName(entity),
-    .action = d->popup_reference_explorer_trigger,
-    .data = QVariant::fromValue(std::make_shared<CallHierarchyGenerator>(
-        d->context.Index(),
-        d->context.FileLocationCache(),
-        std::move(entity)))
+    .action = d->open_reference_explorer_trigger,
+    .data = QVariant::fromValue<ITreeGeneratorPtr>(
+        std::make_shared<CallHierarchyGenerator>(
+            d->config_manager.FileLocationCache(), std::move(entity)))
   };
 }
 

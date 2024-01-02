@@ -12,7 +12,8 @@
 
 namespace mx::gui {
 
-// Implements the call hierarchy plugin, which 
+// Implements the call hierarchy plugin, which shows recursive users of entities
+// in the reference explorer.
 class CallHierarchyPlugin Q_DECL_FINAL : public IReferenceExplorerPlugin {
   Q_OBJECT
 
@@ -22,7 +23,7 @@ class CallHierarchyPlugin Q_DECL_FINAL : public IReferenceExplorerPlugin {
  public:
   virtual ~CallHierarchyPlugin(void);
 
-  CallHierarchyPlugin(ConfigManager &config, QObject *parent = nullptr);
+  CallHierarchyPlugin(ConfigManager &config_manager, QObject *parent = nullptr);
 
   std::optional<NamedAction> ActOnMainWindowSecondaryClick(
       QMainWindow *window, const QModelIndex &index) Q_DECL_FINAL;

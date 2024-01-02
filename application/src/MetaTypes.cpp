@@ -8,17 +8,31 @@
 
 #include <QObject>
 
+#include <multiplier/GUI/Interfaces/IListGenerator.h>
 #include <multiplier/Index.h>
 
 namespace mx::gui {
 
-void RegisterMetaTypes() {
-  qRegisterMetaType<NamedEntityList>("NamedEntityList");
+void RegisterMetaTypes(void) {
+  qRegisterMetaType<ITreeGeneratorPtr>("ITreeGeneratorPtr");
+  qRegisterMetaType<IListGeneratorPtr>("IListGeneratorPtr");
   qRegisterMetaType<DeclCategory>("DeclCategory");
+
   qRegisterMetaType<uint8_t>("uint8_t");
   qRegisterMetaType<uint16_t>("uint16_t");
   qRegisterMetaType<uint32_t>("uint32_t");
   qRegisterMetaType<uint64_t>("uint64_t");
+  qRegisterMetaType<RawEntityId>("RawEntityId");
+
+  qRegisterMetaType<Attr>("Attr");
+  qRegisterMetaType<File>("File");
+  qRegisterMetaType<Fragment>("Fragment");
+  qRegisterMetaType<Decl>("Decl");
+  qRegisterMetaType<Stmt>("Stmt");
+  qRegisterMetaType<Type>("Type");
+  qRegisterMetaType<Token>("Token");
+  qRegisterMetaType<Macro>("Macro");
+
   qRegisterMetaType<std::optional<Attr>>("std::optional<Attr>");
   qRegisterMetaType<std::optional<File>>("std::optional<File>");
   qRegisterMetaType<std::optional<Fragment>>("std::optional<Fragment>");
@@ -27,24 +41,14 @@ void RegisterMetaTypes() {
   qRegisterMetaType<std::optional<Type>>("std::optional<Type>");
   qRegisterMetaType<std::optional<Token>>("std::optional<Token>");
   qRegisterMetaType<std::optional<Macro>>("std::optional<Macro>");
-  qRegisterMetaType<RawEntityId>("RawEntityId");
+
   qRegisterMetaType<EntityId>("EntityId");
   qRegisterMetaType<VariantEntity>("VariantEntity");
-  qRegisterMetaType<VariantId>("VariantEntity");
+  qRegisterMetaType<VariantId>("VariantId");
   qRegisterMetaType<FilePathMap>("FilePathMap");
   qRegisterMetaType<Token>("Token");
   qRegisterMetaType<TokenRange>("TokenRange");
   qRegisterMetaType<Index>("Index");
-  qRegisterMetaType<Index>("::mx::Index");
-  qRegisterMetaType<Index>("mx::Index");
-  qRegisterMetaType<std::vector<Fragment>>("std::vector<Fragment>");
-  qRegisterMetaType<std::vector<RawEntityId>>("std::vector<RawEntityId>");
-  qRegisterMetaType<FragmentIdList>("FragmentIdList");
-  qRegisterMetaType<std::vector<PackedFragmentId>>(
-      "std::vector<PackedFragmentId>");
-  qRegisterMetaType<std::vector<PackedFileId>>("std::vector<PackedFileId>");
-  qRegisterMetaType<std::optional<PackedFileId>>(
-      "std::optional<PackedFileId>");
 }
 
 }  // namespace mx::gui

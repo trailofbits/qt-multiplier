@@ -79,6 +79,8 @@ class ListGeneratorModel Q_DECL_FINAL : public IModel {
                       QList<IGeneratedItemPtr> child_items,
                       unsigned);
 
+  void OnRequestFinished(void);
+
   //! Processes the entire data batch queue
   void ProcessDataBatchQueue(void);
 

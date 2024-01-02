@@ -10,23 +10,15 @@ add_library("mx_util_component"
   include/multiplier/GUI/Util.h
   src/Util.h
   src/Util.cpp
-
-  # include/multiplier/GUI/TokenPainter.h
-  # src/TokenPainter.cpp
-
-
-  include/multiplier/GUI/Assert.h
-  src/Assert.cpp
 )
 
 target_link_libraries("mx_util_component"
   PRIVATE
     "mx_cxx_flags"
-    "mx_codeviewtheme"
-    "mx_qt_library"
-    "mx_multiplier_library"
 
   PUBLIC
+    "mx_multiplier_library"
+    "mx_qt_library"
     "mx_theme_manager"
 )
 

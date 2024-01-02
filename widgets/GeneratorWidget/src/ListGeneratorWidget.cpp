@@ -66,7 +66,7 @@ void ListGeneratorWidget::InstallGenerator(IListGeneratorPtr generator) {
   d->model->InstallGenerator(std::move(generator));
 }
 
-void ListGeneratorWidget::InstallModel() {
+void ListGeneratorWidget::InstallModel(void) {
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);
@@ -226,6 +226,25 @@ void ListGeneratorWidget::ActOnContextMenu(
               qApp->clipboard()->setText(details);
             });
   }
+
+  auto sort_menu = new QMenu(tr("Sort..."), menu);
+  auto sort_ascending_order = new QAction(tr("Ascending Order"), sort_menu);
+  sort_menu->addAction(sort_ascending_order);
+
+  auto sort_descending_order = new QAction(tr("Descending Order"), sort_menu);
+  sort_menu->addAction(sort_descending_order);
+
+  menu->addMenu(sort_menu);
+
+  connect(sort_ascending_order, &QAction::triggered,
+          [this] (void) {
+            d->model_proxy->sort(0, Qt::AscendingOrder);
+          });
+
+  connect(sort_descending_order, &QAction::triggered,
+          [this] (void) {
+            d->model_proxy->sort(0, Qt::DescendingOrder);
+          });
 }
 
 bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {

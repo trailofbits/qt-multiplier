@@ -8,6 +8,6 @@
 
 namespace mx::gui {
 
-void RegisterMetaTypes();
+void RegisterMetaTypes(void);
 
 }  // namespace mx::gui
