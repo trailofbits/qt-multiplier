@@ -13,6 +13,9 @@
 #include <QMenu>
 #include <QMenuBar>
 
+#include <multiplier/GUI/Explorers/EntityExplorer.h>
+#include <multiplier/GUI/Explorers/ProjectExplorer.h>
+#include <multiplier/GUI/Explorers/ReferenceExplorer.h>
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
@@ -20,10 +23,6 @@
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
 #include <multiplier/Index.h>
 #include <vector>
-
-#include "Explorers/EntityExplorer/EntityExplorer.h"
-#include "Explorers/ProjectExplorer/ProjectExplorer.h"
-#include "Explorers/ReferenceExplorer/ReferenceExplorer.h"
 
 namespace mx::gui {
 

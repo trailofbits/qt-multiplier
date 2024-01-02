@@ -27,12 +27,6 @@ endif()
 add_executable("Multiplier" ${executable_type}
   src/Main.cpp
 
-  include/multiplier/GUI/Interfaces/IMainWindowPlugin.h
-  src/Interfaces/IMainWindowPlugin.cpp
-
-  include/multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h
-  src/Interfaces/IReferenceExplorerPlugin.cpp
-
   src/MainWindow.h
   src/MainWindow.cpp
 
@@ -42,20 +36,8 @@ add_executable("Multiplier" ${executable_type}
   src/MultiplierStyle.h
   src/MultiplierStyle.cpp
 
-  src/Explorers/EntityExplorer/CategoryComboBox.cpp
-  src/Explorers/EntityExplorer/CategoryComboBox.h
-  src/Explorers/EntityExplorer/EntityExplorer.cpp
-  src/Explorers/EntityExplorer/EntityExplorer.h
-
-  src/Explorers/ProjectExplorer/FileTreeModel.cpp
-  src/Explorers/ProjectExplorer/FileTreeModel.h
-  src/Explorers/ProjectExplorer/FileTreeView.cpp
-  src/Explorers/ProjectExplorer/FileTreeView.h
-  src/Explorers/ProjectExplorer/ProjectExplorer.cpp
-  src/Explorers/ProjectExplorer/ProjectExplorer.h
-
-  src/Explorers/ReferenceExplorer/ReferenceExplorer.cpp
-  src/Explorers/ReferenceExplorer/ReferenceExplorer.h
+  #src/ReferenceExplorerPlugins/CallHierarchyPlugin/CallHierarchyPlugin.cpp
+  #src/ReferenceExplorerPlugins/CallHierarchyPlugin/CallHierarchyPlugin.h
 )
 
 target_sources("Multiplier" PRIVATE
@@ -69,15 +51,12 @@ target_link_libraries("Multiplier"
     "mx_builtin_theme"
     "mx_config_manager"
     "mx_cxx_flags"
-    "mx_generator_widget"
+    "mx_explorers"
     "mx_media_manager"
     "mx_multiplier_library"
     "mx_phantomstyle_library"
-    "mx_search_widget"
-    "mx_simple_text_input_dialog"
     "mx_tab_widget"
     "mx_theme_manager"
-    "mx_tree_widget"
 
     #"mx_codeview"
     #"mx_util_component"

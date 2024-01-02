@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/GUI/IReferenceExplorerPlugin.h>
+#include <multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h>
 
 #include <memory>
 
@@ -22,7 +22,7 @@ class CallHierarchyPlugin Q_DECL_FINAL : public IReferenceExplorerPlugin {
  public:
   virtual ~CallHierarchyPlugin(void);
 
-  CallHierarchyPlugin(const Context &context, QObject *parent = nullptr);
+  CallHierarchyPlugin(ConfigManager &config, QObject *parent = nullptr);
 
   std::optional<NamedAction> ActOnMainWindowSecondaryClick(
       QMainWindow *window, const QModelIndex &index) Q_DECL_FINAL;

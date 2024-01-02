@@ -110,7 +110,8 @@ void SearchWidget::InitializeWidgets(void) {
   d->search_input->setClearButtonEnabled(true);
   d->search_input->setPlaceholderText(d->mode == Mode::Search ? tr("Search")
                                                               : tr("Filter"));
-  search_widget_layout->addWidget(d->search_input);
+  search_widget_layout->addWidget(d->search_input, 1);
+  search_widget_layout->addStretch();
 
   if (d->mode == Mode::Search) {
     d->show_prev_result = new QPushButton(d->show_prev_result_icon, "");

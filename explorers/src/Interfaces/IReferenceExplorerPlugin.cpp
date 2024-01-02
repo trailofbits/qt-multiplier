@@ -8,11 +8,10 @@
 
 #include <QAction>
 
+#include <multiplier/GUI/Explorers/ReferenceExplorer.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
-
-#include "../Explorers/ReferenceExplorer/ReferenceExplorer.h"
 
 namespace mx::gui {
 

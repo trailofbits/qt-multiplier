@@ -4,7 +4,7 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "ReferenceExplorer.h"
+#include <multiplier/GUI/Explorers/ReferenceExplorer.h>
 
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h>

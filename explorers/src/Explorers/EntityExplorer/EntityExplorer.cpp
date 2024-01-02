@@ -4,13 +4,12 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include "EntityExplorer.h"
+#include <multiplier/GUI/Explorers/EntityExplorer.h>
 
 #include <QAction>
 #include <QApplication>
 #include <QBrush>
 #include <QCheckBox>
-#include <QLineEdit>
 #include <QListView>
 #include <QMouseEvent>
 #include <QPalette>
@@ -29,6 +28,7 @@
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/GUI/Widgets/LineEditWidget.h>
 #include <multiplier/GUI/Widgets/ListGeneratorWidget.h>
 #include <multiplier/Index.h>
 
@@ -188,7 +188,7 @@ struct EntityExplorer::PrivateData {
 
   QWidget *view{nullptr};
   ListGeneratorWidget *list_widget{nullptr};
-  QLineEdit *search_input{nullptr};
+  LineEditWidget *search_input{nullptr};
   QRadioButton *exact_match_radio{nullptr};
   QRadioButton *containing_radio{nullptr};
 
@@ -231,7 +231,7 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
 
   auto search_parameters_layout = new QVBoxLayout();
 
-  d->search_input = new QLineEdit(d->view);
+  d->search_input = new LineEditWidget(d->view);
   d->search_input->setClearButtonEnabled(true);
   d->search_input->setPlaceholderText(tr("Search"));
 

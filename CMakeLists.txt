@@ -64,6 +64,9 @@ add_subdirectory("interfaces")
 add_subdirectory("managers")
 add_subdirectory("themes")
 add_subdirectory("widgets")
+add_subdirectory("explorers")
+
+
 #add_subdirectory("plugins")
 add_subdirectory("application")
 
