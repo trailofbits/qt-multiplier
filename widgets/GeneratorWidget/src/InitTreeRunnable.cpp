@@ -30,7 +30,7 @@ void InitTreeRunnable::run(void) {
   }
 
   emit NewGeneratedItems(captured_version_number, kInvalidEntityId, items,
-                    depth - 1u);
+                         depth - 1u);
   emit Finished();
 }
 

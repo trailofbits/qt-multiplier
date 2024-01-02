@@ -17,7 +17,7 @@
 namespace mx::gui {
 
 struct TabWidget::PrivateData {
-  std::unordered_map<QWidget *, QTimer> title_update_timers;
+  std::unordered_map<QWidget *, std::pair<int, QTimer>> title_update_timers;
 };
 
 TabWidget::~TabWidget(void) {}
@@ -30,18 +30,28 @@ TabWidget::TabWidget(QWidget *parent)
 
 void TabWidget::TrackTitle(QWidget *widget) {
   auto &timer = d->title_update_timers[widget];
-  connect(&timer, &QTimer::timeout,
+  connect(&(timer.second), &QTimer::timeout,
           [=, this] (void) {
-            d->title_update_timers.erase(widget);
             auto index = indexOf(widget);
             if (index == -1) {
+              d->title_update_timers.erase(widget);
               return;
             }
 
-            setTabText(index, widget->windowTitle());
+            auto &entry = d->title_update_timers[widget];
+            auto title = widget->windowTitle();
+            setTabText(index, title);
+
+            if (title.isEmpty()) {
+              if (++entry.first < 10) {
+                entry.second.start(100);
+              } else {
+                d->title_update_timers.erase(widget);
+              }
+            }
           });
 
-  timer.start(500);
+  timer.second.start(100);
 }
 
 void TabWidget::AddTab(QWidget *widget) {
@@ -57,7 +67,7 @@ void TabWidget::InsertTab(int index, QWidget *widget) {
 
 void TabWidget::RemoveTab(int index) {
   if (auto tab = widget(index)) {
-    d->title_update_timers[tab].stop();
+    d->title_update_timers[tab].second.stop();
     d->title_update_timers.erase(tab);
     removeTab(index);
   }
