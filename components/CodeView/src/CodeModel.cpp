@@ -228,7 +228,7 @@ QVariant CodeModel::data(const QModelIndex &index, int role) const {
       case IModel::EntityRole:
         value.setValue(VariantEntity(d->tokens.tokens[col->token_index]));
         break;
-      case IModel::ModelName:
+      case IModel::ModelIdRole:
         value.setValue(QString("com.trailofbits.model.CodeModel"));
         break;
       case ICodeModel::TokenCategoryRole: value.setValue(col->category); break;

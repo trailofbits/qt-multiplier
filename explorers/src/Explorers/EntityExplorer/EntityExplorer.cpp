@@ -296,7 +296,8 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
 }
 
 void EntityExplorer::ActOnPrimaryClick(const QModelIndex &index) {
-  if (!d->view || index != d->clicked_index || !index.isValid()) {
+  auto clicked_index = std::move(d->clicked_index);
+  if (!d->view || index != clicked_index || !index.isValid()) {
     return;
   }
 
@@ -304,7 +305,9 @@ void EntityExplorer::ActOnPrimaryClick(const QModelIndex &index) {
 }
 
 void EntityExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
-  if (!d->view || index != d->clicked_index || !index.isValid()) {
+  auto clicked_index = std::move(d->clicked_index);
+  if (!d->view || index != clicked_index || !index.isValid() ||
+      !d->view->isVisible()) {
     return;
   }
 
@@ -312,10 +315,12 @@ void EntityExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
 }
 
 void EntityExplorer::OnIndexChanged(const ConfigManager &config_manager) {
+  d->clicked_index = {};
   d->index = config_manager.Index();
 }
 
 void EntityExplorer::QueryParametersChanged(void) {
+  d->clicked_index = {};
   if (!d->list_widget) {
     return;
   }

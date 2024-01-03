@@ -12,10 +12,15 @@ namespace mx::gui {
 
 QVariant ThemedItemModel::data(const QModelIndex &index, int role) const {
   if (role == Qt::BackgroundRole) {
-    return background_color;
-  } else {
-    return this->QIdentityProxyModel::data(index, role);
+    if (background_color.isValid()) {
+      return background_color;
+    }
+  } else if (role == Qt::ForegroundRole) {
+    if (foreground_color.isValid()) {
+      return foreground_color;
+    }
   }
+  return this->QIdentityProxyModel::data(index, role);
 }
 
 }  // namespace mx::gui

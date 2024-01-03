@@ -8,6 +8,7 @@
 
 add_library("mx_explorers"
   include/multiplier/GUI/Explorers/EntityExplorer.h
+  include/multiplier/GUI/Explorers/HighlightExplorer.h
   include/multiplier/GUI/Explorers/ProjectExplorer.h
   include/multiplier/GUI/Explorers/ReferenceExplorer.h
   include/multiplier/GUI/Interfaces/IMainWindowPlugin.h
@@ -19,6 +20,10 @@ add_library("mx_explorers"
   src/Explorers/EntityExplorer/CategoryComboBox.cpp
   src/Explorers/EntityExplorer/CategoryComboBox.h
   src/Explorers/EntityExplorer/EntityExplorer.cpp
+
+  src/Explorers/HighlightExplorer/HighlightExplorer.cpp
+  src/Explorers/HighlightExplorer/HighlightThemeProxy.cpp
+  src/Explorers/HighlightExplorer/HighlightThemeProxy.h
 
   src/Explorers/ProjectExplorer/FileTreeModel.cpp
   src/Explorers/ProjectExplorer/FileTreeModel.h

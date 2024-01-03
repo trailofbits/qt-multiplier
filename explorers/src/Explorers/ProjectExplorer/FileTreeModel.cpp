@@ -257,7 +257,7 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
       }
     }
 
-  } else if (role == IModel::ModelName) {
+  } else if (role == IModel::ModelIdRole) {
     return "com.trailofbits.explorer.ProjectExplorer.FileTreeModel";
   
   } else if (role == IModel::TokenRangeDisplayRole) {

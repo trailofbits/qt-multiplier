@@ -22,7 +22,6 @@
 #include <cassert>
 #include <deque>
 #include <multiplier/GUI/Interfaces/IListGenerator.h>
-#include <multiplier/GUI/Managers/ThemeManager.h>
 #include <unordered_map>
 
 #include "InitTreeRunnable.h"
@@ -107,10 +106,6 @@ struct ListGeneratorModel::PrivateData final {
 
   // Queue of groups of children `IGeneratedItem`s to insert into the model.
   DataBatchQueue data_batch_queue;
-
-  // Current theme.
-  IThemePtr theme;
-  QColor theme_background_color;
 
   inline PrivateData(void)
       : version_number(0u) {}
@@ -286,13 +281,6 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
       value = std::get<QVariant>(data);
     }
 
-  } else if (role == Qt::BackgroundRole) {
-    if (d->theme) {
-      if (auto color = d->theme->EntityBackgroundColor(node->entity)) {
-        return color.value();
-      }
-      return d->theme_background_color;
-    }
     // Tooltip used for hovering. Also, this is used for the copy details.
   } else if (role == Qt::ToolTipRole) {
     QString tooltip = tr("Entity Id: ") + QString::number(entity_key->first);
@@ -312,7 +300,7 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
   } else if (role == IModel::EntityRole) {
     return QVariant::fromValue(node->entity);
 
-  } else if (role == IModel::ModelName) {
+  } else if (role == IModel::ModelIdRole) {
     return "com.trailofbits.model.ListGeneratorModel";
 
   } else if (role == IModel::TokenRangeDisplayRole) {
@@ -528,11 +516,6 @@ void ListGeneratorModel::ProcessDataBatchQueue(void) {
   } else {
     d->import_timer.stop();
   }
-}
-
-void ListGeneratorModel::OnThemeChanged(const ThemeManager &theme_manager) {
-  d->theme = theme_manager.Theme();
-  d->theme_background_color = d->theme->DefaultBackgroundColor();
 }
 
 }  // namespace mx::gui

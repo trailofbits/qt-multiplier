@@ -103,6 +103,10 @@ class ITheme : public QObject {
   //! the value of `Qt::BackgroundRole`.
   virtual std::optional<QColor> EntityBackgroundColor(
       const VariantEntity &entity) const;
+
+  //! Helper to compute a high-contrast foreground color given a background
+  //! color.
+  static QColor ContrastingColor(const QColor &background_color);
  
  signals:
   // Emitted when this theme changes some of its own colors.

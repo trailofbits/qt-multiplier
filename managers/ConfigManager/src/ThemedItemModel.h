@@ -18,6 +18,7 @@ class ThemedItemModel Q_DECL_FINAL : public QIdentityProxyModel {
 
  public:
   QColor background_color;
+  QColor foreground_color;
 
   using QIdentityProxyModel::QIdentityProxyModel;
 

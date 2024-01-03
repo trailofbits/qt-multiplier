@@ -401,7 +401,7 @@ QVariant InformationExplorerModel::data(const QModelIndex &index,
       ret.setValue(QVariant::fromValue(ed->entity));
     }
 
-  } else if (role == IModel::ModelName) {
+  } else if (role == IModel::ModelIdRole) {
     ret.setValue(QString("com.trailofbits.model.EntityExplorerModel"));
 
   } else if (role == EntityIdRole) {

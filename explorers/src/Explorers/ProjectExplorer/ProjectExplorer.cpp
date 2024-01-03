@@ -74,7 +74,8 @@ QWidget *ProjectExplorer::CreateDockWidget(QWidget *parent) {
 }
 
 void ProjectExplorer::ActOnPrimaryClick(const QModelIndex &index) {
-  if (!d->view || d->clicked_index != index || !index.isValid()) {
+  auto clicked_index = std::move(d->clicked_index);
+  if (!d->view || clicked_index != index || !index.isValid()) {
     return;
   }
 
@@ -82,7 +83,9 @@ void ProjectExplorer::ActOnPrimaryClick(const QModelIndex &index) {
 }
 
 void ProjectExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
-  if (!d->view || d->context_index != index || !index.isValid()) {
+  auto context_index = std::move(d->context_index);
+  if (!d->view || context_index != index || !index.isValid() ||
+      !d->view->isVisible()) {
     return;
   }
 

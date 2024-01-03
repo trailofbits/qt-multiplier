@@ -95,8 +95,6 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
 
  public slots:
   void CancelRunningRequest(void);
-
-  void OnThemeChanged(const ThemeManager &theme);
  
  signals:
   //! Emitted when a new request is started

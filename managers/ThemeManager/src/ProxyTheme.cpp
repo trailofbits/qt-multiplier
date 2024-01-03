@@ -17,9 +17,9 @@ ProxyTheme::ProxyTheme(ITheme *current_theme_,
     : ITheme(parent),
       current_theme(current_theme_) {}
 
-void ProxyTheme::Add(std::unique_ptr<IThemeProxy> proxy) {
+void ProxyTheme::Add(IThemeProxyPtr proxy) {
   auto raw_proxy_ptr = proxies.emplace_back(std::move(proxy)).get();
-  proxy->setParent(this);
+  raw_proxy_ptr->setParent(this);
 
   // Forward a proxy change into a theme change.
   connect(raw_proxy_ptr, &IThemeProxy::ThemeProxyChanged,
@@ -30,7 +30,7 @@ void ProxyTheme::Add(std::unique_ptr<IThemeProxy> proxy) {
 }
 
 void ProxyTheme::Remove(IThemeProxy *proxy) {
-  std::vector<std::unique_ptr<IThemeProxy>> new_proxies;
+  std::vector<IThemeProxyPtr> new_proxies;
   for (auto &old_proxy : proxies) {
     if (old_proxy.get() != proxy) {
       new_proxies.emplace_back(std::move(old_proxy));

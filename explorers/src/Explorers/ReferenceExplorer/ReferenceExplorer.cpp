@@ -34,9 +34,6 @@ struct ReferenceExplorer::PrivateData {
   // Launches a reference explorer given a data generator.
   TriggerHandle open_reference_explorer_trigger;
 
-  // Index for the context menu.
-  QModelIndex context_index;
-
   inline PrivateData(ConfigManager &config_manager_,
                      QMainWindow *main_window_)
       : config_manager(config_manager_),
@@ -67,20 +64,15 @@ void ReferenceExplorer::ActOnPrimaryClick(const QModelIndex &index) {
 // Allow a main window plugin to act on, e.g. modify, a context menu.
 void ReferenceExplorer::ActOnContextMenu(
     QMenu *menu, const QModelIndex &index) {
-
-  if (!d->view->isVisible()) {
-    return;
-  }
-
-  this->IMainWindowPlugin::ActOnContextMenu(menu, index);
-
-  auto current = d->view->currentWidget();
-  if (auto tree = dynamic_cast<TreeGeneratorWidget *>(current)) {
-    tree->ActOnContextMenu(menu, index);
-  }
-
   for (const auto &plugin : d->plugins) {
     plugin->ActOnMainWindowContextMenu(d->main_window, menu, index);
+  }
+
+  if (d->view && d->view->isVisible() && index.isValid()) {
+    auto current = d->view->currentWidget();
+    if (auto tree = dynamic_cast<TreeGeneratorWidget *>(current)) {
+      tree->ActOnContextMenu(menu, index);
+    }
   }
 }
 
@@ -192,7 +184,6 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
 
   d->view->InsertTab(0, tree_view);
   d->view->setCurrentIndex(0);
-  d->context_index = {};
 
   emit ShowDockWidget();
 }
@@ -206,8 +197,6 @@ void ReferenceExplorer::AddPlugin(
 
 // Behavior depends on if the code previews are open or not.
 void ReferenceExplorer::OnSelectionChange(const QModelIndex &index) {
-  d->context_index = {};
-
   (void) index;
 }
 

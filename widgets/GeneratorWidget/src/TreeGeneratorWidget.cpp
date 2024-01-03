@@ -16,12 +16,12 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QTreeView>
 
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/FilterSettingsWidget.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
-#include <multiplier/GUI/Widgets/TreeWidget.h>
 
 #include "SearchFilterModelProxy.h"
 #include "TreeGeneratorModel.h"
@@ -37,7 +37,7 @@ struct TreeGeneratorWidget::PrivateData final {
   TreeGeneratorModel *model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
 
-  TreeWidget *tree_widget{nullptr};
+  QTreeView *tree_widget{nullptr};
   SearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *status_widget{nullptr};
@@ -120,7 +120,7 @@ void TreeGeneratorWidget::InitializeWidgets(
   auto &media_manager = config_manager.MediaManager();
 
   // Initialize the tree view
-  d->tree_widget = new TreeWidget(this);
+  d->tree_widget = new QTreeView(this);
   d->tree_widget->setSortingEnabled(true);
   d->tree_widget->sortByColumn(0, Qt::AscendingOrder);
 
@@ -157,7 +157,7 @@ void TreeGeneratorWidget::InitializeWidgets(
   d->tree_widget->viewport()->setMouseTracking(true);
 
   d->tree_widget->setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(d->tree_widget, &TreeWidget::customContextMenuRequested,
+  connect(d->tree_widget, &QTreeView::customContextMenuRequested,
           this, &TreeGeneratorWidget::OnOpenItemContextMenu);
 
   connect(d->tree_widget, &QAbstractItemView::clicked,
@@ -258,8 +258,8 @@ void TreeGeneratorWidget::InitializeWidgets(
 void TreeGeneratorWidget::ActOnContextMenu(
     QMenu *menu, const QModelIndex &index) {
 
-  if (index != d->selected_index) {
-    d->selected_index = {};
+  auto selected_index = std::move(d->selected_index);
+  if (index != selected_index) {
     return;
   }
 
@@ -271,7 +271,6 @@ void TreeGeneratorWidget::ActOnContextMenu(
     connect(copy_details_action, &QAction::triggered,
             [=] (void) {
               qApp->clipboard()->setText(details);
-              d->selected_index = {};
             });
   }
 
@@ -279,8 +278,7 @@ void TreeGeneratorWidget::ActOnContextMenu(
   menu->addAction(open_action);
   connect(open_action, &QAction::triggered,
           [=, this] (void) {
-            emit OpenItem(d->selected_index);
-            d->selected_index = {};
+            emit OpenItem(selected_index);
           });
 
   auto is_duplicate = index.data(TreeGeneratorModel::IsDuplicate);
@@ -292,9 +290,13 @@ void TreeGeneratorWidget::ActOnContextMenu(
       i = 1u;
     }
 
+    QMenu *expand_menu = new QMenu(tr("Expand..."), menu);
+    menu->addMenu(expand_menu);
+
     for (; i < kMaxExpansionLevel; ++i) {
-      auto action = new QAction(tr("Expand &%1 levels").arg(i + 1u), menu);
-      menu->addAction(action);
+      auto action = new QAction(tr("Expand &%1 levels").arg(i + 1u),
+                                expand_menu);
+      expand_menu->addAction(action);
 
       // TODO(alessandro): There's a Qt 6.x bug that prevents the &<N> from
       //                   working correctly, so for now we have to set the
@@ -305,17 +307,15 @@ void TreeGeneratorWidget::ActOnContextMenu(
 
       connect(action, &QAction::triggered,
               [=, this] (void) {
-                d->model->Expand(d->selected_index, i + 1u);
-                d->selected_index = {};
+                d->model->Expand(selected_index, i + 1u);
               });
     }
   } else {
     auto goto_action = new QAction(tr("Goto Original"), menu);
     menu->addAction(goto_action);
     connect(goto_action, &QAction::triggered,
-            [this] (void) {
-              GotoOriginal(d->selected_index);
-              d->selected_index = {};
+            [=, this] (void) {
+              GotoOriginal(selected_index);
             });
   }
 }
@@ -623,7 +623,6 @@ void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
 // NOTE(pag): The config manager handles the item delegate automatically.
 void TreeGeneratorWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   setFont(theme_manager.Theme()->Font());
-  d->model->OnThemeChanged(theme_manager);
 }
 
 void TreeGeneratorWidget::OnModelRequestStarted(void) {

@@ -74,7 +74,7 @@ void ThemeManager::Register(std::unique_ptr<ITheme> theme) {
 //! Add a theme proxy to the manager. This wraps whatever theme or theme
 //! proxies are already present. Ownership of the proxy is given to the
 //! theme manager, which shares ownership back with the creator of the proxy.
-void ThemeManager::AddProxy(std::unique_ptr<IThemeProxy> proxy) {
+void ThemeManager::AddProxy(IThemeProxyPtr proxy) {
   d->proxy_theme->Add(std::move(proxy));
 
   if (!dynamic_cast<ProxyTheme *>(d->current_theme)) {

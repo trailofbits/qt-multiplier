@@ -28,7 +28,7 @@ class IModel : public QAbstractItemModel {
     TokenRangeDisplayRole,
 
     // Returns a `QString` of the model name.
-    ModelName,
+    ModelIdRole,
 
     MultiplierUserRole = Qt::UserRole + 100
   };

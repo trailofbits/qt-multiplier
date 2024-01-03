@@ -42,6 +42,7 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   const qreal line_height;
   const qreal space_width;
   const qreal tab_width;
+  const QColor theme_foreground_color;
   const QColor theme_background_color;
   const QColor theme_highlight_color;
 
@@ -80,12 +81,13 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   //! Paint a token. Specialized for a "measuring" painter.
   template <typename Painter>
   void PaintTokens(Painter *painter, const QStyleOptionViewItem &option,
-                   TokenRange toks) const;
+                   TokenRange toks, const QColor &foreground_override) const;
 
   //! Paint a token. Specialized for a "measuring" painter.
   template <typename Painter>
   void PaintToken(Painter *painter, const QStyleOptionViewItem &option,
-                  Token tok, QPointF &pos_inout) const;
+                  Token tok, const QColor &foreground_override,
+                  QPointF &pos_inout) const;
 
   //! Return the data of `tok`, but possibly adjusted for whitespace.
   std::string_view Characters(const Token &tok) const;

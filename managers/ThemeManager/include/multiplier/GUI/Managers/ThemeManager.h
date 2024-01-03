@@ -39,7 +39,7 @@ class ThemeManager Q_DECL_FINAL : public QObject {
 
   //! Add a theme proxy to the manager. This wraps whatever theme or theme
   //! proxies are already present.
-  void AddProxy(std::unique_ptr<IThemeProxy> proxy);
+  void AddProxy(IThemeProxyPtr proxy);
 
   //! Returns the active theme.
   IThemePtr Theme(void) const;

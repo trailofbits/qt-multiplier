@@ -216,7 +216,9 @@ void ListGeneratorWidget::InitializeWidgets(
 //! Called when we want to act on the context menu.
 void ListGeneratorWidget::ActOnContextMenu(
     QMenu *menu, const QModelIndex &index) {
-  if (index != d->selected_index) {
+  
+  auto selected_index = std::move(d->selected_index);
+  if (index != selected_index) {
     return;
   }
 
@@ -435,7 +437,6 @@ void ListGeneratorWidget::OnGotoOriginalButtonPressed(void) {
 // NOTE(pag): The config manager handles the item delegate automatically.
 void ListGeneratorWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   setFont(theme_manager.Theme()->Font());
-  d->model->OnThemeChanged(theme_manager);
 }
 
 void ListGeneratorWidget::OnModelRequestStarted(void) {

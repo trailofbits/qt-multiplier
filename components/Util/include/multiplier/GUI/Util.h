@@ -121,11 +121,5 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 QString EntityBreadCrumbs(const VariantEntity &ent,
                           bool run_length_encode = true);
 
-//! Returns the constrast for the given color
-float GetColorContrast(const QColor &color);
-
-//! Returns the best foreground color for the given background
-QColor GetBestForegroundColor(const QColor &background_color);
-
 }  // namespace gui
 }  // namespace mx

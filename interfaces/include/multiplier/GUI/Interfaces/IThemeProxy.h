@@ -12,6 +12,10 @@
 
 namespace mx::gui {
 
+class IThemeProxy;
+
+using IThemeProxyPtr = std::unique_ptr<IThemeProxy>;
+
 //! A theme proxy allows one to implement theme-level changes without modifying
 //! an existing theme. For example, they can be used to enact global changes
 //! to the highlighting of specific entities.

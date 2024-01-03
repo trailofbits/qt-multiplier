@@ -17,14 +17,14 @@ class ProxyTheme Q_DECL_FINAL : public ITheme {
 
  public:
 
-  std::vector<std::unique_ptr<IThemeProxy>> proxies;
+  std::vector<IThemeProxyPtr> proxies;
   ITheme *current_theme;
 
   virtual ~ProxyTheme(void);
 
   ProxyTheme(ITheme *current_theme_, QObject *parent);
 
-  void Add(std::unique_ptr<IThemeProxy> proxy);
+  void Add(IThemeProxyPtr proxy);
 
   void Apply(QApplication &application) Q_DECL_FINAL;
 
