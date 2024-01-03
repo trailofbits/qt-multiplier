@@ -6,11 +6,15 @@
 
 #include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
 
+#include <multiplier/AST/NamedDecl.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/ITreeGenerator.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Util.h>
+#include <multiplier/Frontend/DefineMacroDirective.h>
+#include <multiplier/Frontend/MacroParameter.h>
+#include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>
 
 Q_DECLARE_METATYPE(mx::TokenRange);
@@ -208,7 +212,10 @@ std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowSecondaryClick(
     QMainWindow *, const QModelIndex &index) {
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
-  if (std::holds_alternative<NotAnEntity>(entity)) {
+
+  // It's only reasonable to ask for references to named entities.
+  if (!DefineMacroDirective::from(entity) && !MacroParameter::from(entity) &&
+      !NamedDecl::from(entity) && !File::from(entity)) {
     return std::nullopt;
   }
 

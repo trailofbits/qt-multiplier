@@ -89,18 +89,22 @@ void ThemeManager::AddProxy(IThemeProxyPtr proxy) {
 //! Sets the active theme. This is a no-op if `theme` is not owned by this
 //! theme manager.
 void ThemeManager::SetTheme(IThemePtr theme) {
-  if (!theme || theme.get() == d->current_theme ||
+  auto raw_theme_ptr = const_cast<ITheme *>(theme.get());
+  if (!theme || raw_theme_ptr == d->current_theme ||
       theme.get() == d->proxy_theme.get()) {
     return;
   }
 
   for (const auto &owned_theme : d->themes) {
-    if (owned_theme.get() != theme.get()) {
+    if (owned_theme.get() != raw_theme_ptr) {
       continue;
     }
 
-    d->current_theme = const_cast<ITheme *>(theme.get());
-    d->proxy_theme->current_theme = d->current_theme;
+    d->proxy_theme->current_theme = raw_theme_ptr;
+    if (!dynamic_cast<ProxyTheme *>(d->current_theme)) {
+      d->current_theme = raw_theme_ptr;
+    }
+    
     d->current_theme->Apply(d->application);
     emit ThemeChanged(*this);
     break;

@@ -81,13 +81,21 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   //! Paint a token. Specialized for a "measuring" painter.
   template <typename Painter>
   void PaintTokens(Painter *painter, const QStyleOptionViewItem &option,
-                   TokenRange toks, const QColor &foreground_override) const;
+                   TokenRange toks, const QColor &background_color,
+                   const QColor &foreground_override) const;
 
   //! Paint a token. Specialized for a "measuring" painter.
   template <typename Painter>
   void PaintToken(Painter *painter, const QStyleOptionViewItem &option,
-                  Token tok, const QColor &foreground_override,
-                  QPointF &pos_inout) const;
+                  Token tok, const QColor &background_color,
+                  const QColor &foreground_override, QPointF &pos_inout) const;
+
+  //! Paint some text. Specialized for a "measuring" painter.
+  template <typename Painter>
+  void PaintText(
+      Painter *painter, const QStyleOptionViewItem &option,
+      const QString &text, const ITheme::ColorAndStyle &color_and_style,
+      QPointF &pos_inout) const;
 
   //! Return the data of `tok`, but possibly adjusted for whitespace.
   std::string_view Characters(const Token &tok) const;

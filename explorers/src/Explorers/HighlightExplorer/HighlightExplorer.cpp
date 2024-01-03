@@ -9,9 +9,13 @@
 #include <QColor>
 #include <QColorDialog>
 
+#include <multiplier/AST/NamedDecl.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/Frontend/DefineMacroDirective.h>
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Frontend/MacroParameter.h>
 #include <multiplier/Index.h>
 #include <vector>
 
@@ -49,7 +53,10 @@ void HighlightExplorer::ActOnContextMenu(
 
   d->eids.clear();
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
-  if (std::holds_alternative<NotAnEntity>(entity)) {
+
+  // It's only reasonable to add highlights on named entities.
+  if (!DefineMacroDirective::from(entity) && !MacroParameter::from(entity) &&
+      !NamedDecl::from(entity) && !File::from(entity)) {
     return;
   }
 

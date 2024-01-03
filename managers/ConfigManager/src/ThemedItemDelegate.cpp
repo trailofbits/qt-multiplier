@@ -59,10 +59,6 @@ inline static QPointF GetRectPosition(const QRect &rect) {
 }
 #endif
 
-inline static QColor PaletteBackgroundColor(const QPalette &palette) {
-  return palette.color(QPalette::Normal, QPalette::Window);
-}
-
 }  // namespace
 
 ThemedItemDelegate::~ThemedItemDelegate(void) {}
@@ -126,25 +122,46 @@ std::string_view ThemedItemDelegate::Characters(const Token &tok) const {
 template <typename Painter>
 void ThemedItemDelegate::PaintTokens(
     Painter *painter, const QStyleOptionViewItem &option,
-    TokenRange toks, const QColor &foreground_override) const {
+    TokenRange toks, const QColor &background_color,
+    const QColor &foreground_color) const {
   Reset();
   QPointF pos = GetRectPosition(option.rect);
   for (auto token : toks) {
-    PaintToken(painter, option, std::move(token), foreground_override, pos);
+    PaintToken(painter, option, std::move(token), background_color,
+               foreground_color, pos);
   }
 }
 
 template <typename Painter>
 void ThemedItemDelegate::PaintToken(
     Painter *painter, const QStyleOptionViewItem &option,
-    Token token, const QColor &foreground_override, QPointF &pos_inout) const {
+    Token token, const QColor &background_color,
+    const QColor &foreground_color, QPointF &pos_inout) const {
 
   std::string_view tok_data_utf8 = Characters(token);
-  if (tok_data_utf8.empty()) {
+  QString tok_data = QString::fromUtf8(
+      tok_data_utf8.data(), static_cast<qsizetype>(tok_data_utf8.size()));
+
+  auto color_and_style = theme->TokenColorAndStyle(token);
+  if (option.state & QStyle::State_Selected) {
+    color_and_style.foreground_color = foreground_color;
+    color_and_style.background_color = background_color;
+  }
+
+  PaintText(painter, option, tok_data, color_and_style, pos_inout);
+}
+
+//! Paint some text. Specialized for a "measuring" painter.
+template <typename Painter>
+void ThemedItemDelegate::PaintText(
+    Painter *painter, const QStyleOptionViewItem &option,
+    const QString &tok_data, const ITheme::ColorAndStyle &color_and_style,
+    QPointF &pos_inout) const {
+
+  if (tok_data.isEmpty()) {
     return;
   }
 
-  auto color_and_style = theme->TokenColorAndStyle(token);
   painter->setPen(color_and_style.foreground_color);
 
   auto font = theme_font;
@@ -154,28 +171,8 @@ void ThemedItemDelegate::PaintToken(
   font.setWeight(color_and_style.bold ? QFont::DemiBold : QFont::Normal);
   painter->setFont(font);
 
-  // Figure out a background color for this token if it is selected.
-  auto highlight_color = color_and_style.background_color;
-  if (color_and_style.background_color == theme_background_color) {
-    highlight_color = theme_highlight_color;
-    if (!highlight_color.isValid() && option.widget) {
-      highlight_color = option.widget->palette().highlight().color();
-    }
-    if (!highlight_color.isValid()) {
-      highlight_color = qApp->palette().highlight().color();
-    }
-  }
-
-  // Possibly override the foreground color.
-  if (foreground_override.isValid() &&
-      color_and_style.foreground_color == theme_foreground_color) {
-    color_and_style.foreground_color = foreground_override;
-  }
-
   QTextOption to(option.displayAlignment);
 
-  QString tok_data = QString::fromUtf8(
-      tok_data_utf8.data(), static_cast<qsizetype>(tok_data_utf8.size()));
   for (QChar ch : tok_data) {
     QRectF glyph_rect(0.0, 0.0, font_metrics.horizontalAdvance(ch),
                       font_metrics.height());
@@ -188,11 +185,7 @@ void ThemedItemDelegate::PaintToken(
 
     glyph_rect.moveTo(pos_inout);
 
-    if ((option.state & QStyle::State_Selected) == QStyle::State_Selected) {
-      painter->fillRect(glyph_rect, highlight_color);
-    } else {
-      painter->fillRect(glyph_rect, color_and_style.background_color);
-    }
+    painter->fillRect(glyph_rect, color_and_style.background_color);
 
     switch (ch.unicode()) {
       case QChar::Tabulation:
@@ -216,89 +209,41 @@ void ThemedItemDelegate::PaintToken(
 void ThemedItemDelegate::paint(QPainter *painter,
                                const QStyleOptionViewItem &option,
                                const QModelIndex &index) const {
-  auto is_selected = (option.state & QStyle::State_Selected) &&
-                     option.showDecorationSelected;
 
-  QColor background_color;
-  QColor foreground_color;
+  ITheme::ColorAndStyle cs = {};
+  cs.foreground_color = theme_foreground_color;
+  cs.background_color = theme_background_color;
   
   // Highlighted background color.
-  if (is_selected) {
-    background_color = theme_highlight_color;
-
-    if (!background_color.isValid() && option.widget) {
-      background_color = option.widget->palette().highlight().color();
-    }
-
-    if (!background_color.isValid()) {
-      background_color = qApp->palette().highlight().color();
-    }
+  if ((option.state & QStyle::State_Selected) &&
+      option.showDecorationSelected) {
+    cs.background_color = theme_highlight_color;
+    cs.foreground_color = ITheme::ContrastingColor(cs.background_color);
 
   // Entity-specific background, apply to the whole QItem.
   } else if (auto entity_bg
-                 = theme->EntityBackgroundColor(IModel::Entity(index))) {
-    background_color = entity_bg.value();
-    foreground_color = ITheme::ContrastingColor(background_color);
+                 = theme->EntityBackgroundColor(IModel::EntitySkipThroughTokens(index))) {
 
-  // Normal background color.
-  } else {
-    background_color = theme_background_color;
-
-    if (!background_color.isValid() && option.widget) {
-      background_color = PaletteBackgroundColor(option.widget->palette());
-    }
-
-    if (!background_color.isValid()) {
-      background_color = PaletteBackgroundColor(qApp->palette());
-    }
+    cs.background_color = entity_bg.value();
+    cs.foreground_color = ITheme::ContrastingColor(cs.background_color);
   }
   
+  painter->save();
+  painter->fillRect(option.rect, cs.background_color);
+
   if (TokenRange tokens = IModel::TokensToDisplay(index)) {
-    painter->save();
-    painter->fillRect(option.rect, background_color);
-    PaintTokens(painter, option, std::move(tokens), foreground_color);
-    painter->restore();
-    return;
+    PaintTokens(painter, option, std::move(tokens), cs.background_color,
+                cs.foreground_color);
+  } else {
+    QPointF pos = GetRectPosition(option.rect);
+    PaintText(painter, option, index.data(Qt::DisplayRole).toString(),
+              cs, pos);
   }
-
-  // This is pretty evil. The idea is that we want to inject our own model in
-  // front of `index`s model to enforce our own coloring behavior.
-  auto indexed_model = const_cast<QAbstractItemModel *>(index.model());
-  if (indexed_model != model->sourceModel()) {
-    model->setSourceModel(indexed_model);
-  }
-
-  if (!foreground_color.isValid()) {
-    foreground_color = ITheme::ContrastingColor(background_color);
-  }
-
-  model->background_color = background_color;
-  model->foreground_color = foreground_color;
-
-  QStyleOptionViewItem opt = option;
-  opt.index = model->mapFromSource(index);
-  opt.backgroundBrush = background_color;
-
-  // // Force our color in the case of the highlighting too.
-  if (opt.showDecorationSelected) {
-    opt.palette.setColor(QPalette::Inactive, QPalette::HighlightedText, foreground_color);
-    opt.palette.setColor(QPalette::Active, QPalette::HighlightedText, foreground_color);
-    opt.palette.setColor(QPalette::Normal, QPalette::HighlightedText, foreground_color);
-
-    opt.palette.setColor(QPalette::Inactive, QPalette::Highlight, background_color);
-    opt.palette.setColor(QPalette::Active, QPalette::Highlight, background_color);
-    opt.palette.setColor(QPalette::Normal, QPalette::Highlight, background_color);
-  }
-
-  this->QStyledItemDelegate::paint(painter, opt, opt.index);
+  painter->restore();
 }
 
 QSize ThemedItemDelegate::sizeHint(
     const QStyleOptionViewItem &option, const QModelIndex &index) const {
-  TokenRange tokens = IModel::TokensToDisplay(index);
-  if (!tokens) {
-    return this->QStyledItemDelegate::sizeHint(option, index);
-  }
 
   QStyleOptionViewItem opt(option);
   initStyleOption(&opt, index);
@@ -308,8 +253,14 @@ QSize ThemedItemDelegate::sizeHint(
   QRectF empty_rect(pos.x(), pos.y(), space_width, line_height);
   MeasuringPainter painter(empty_rect);
 
-  QColor dummy_foreground;
-  PaintTokens(&painter, option, std::move(tokens), dummy_foreground);
+  QColor dummy_color;
+  if (TokenRange tokens = IModel::TokensToDisplay(index)) {
+    PaintTokens(&painter, option, std::move(tokens), dummy_color, dummy_color);
+  } else {
+    PaintText(&painter, option, index.data(Qt::DisplayRole).toString(),
+              {}, pos);
+  }
+
   return style
       ->sizeFromContents(
           QStyle::ContentsType::CT_ItemViewItem,
