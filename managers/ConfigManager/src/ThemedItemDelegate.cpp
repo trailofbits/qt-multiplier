@@ -268,6 +268,10 @@ void ThemedItemDelegate::paint(QPainter *painter,
     model->setSourceModel(indexed_model);
   }
 
+  if (!foreground_color.isValid()) {
+    foreground_color = ITheme::ContrastingColor(background_color);
+  }
+
   model->background_color = background_color;
   model->foreground_color = foreground_color;
 
@@ -277,6 +281,10 @@ void ThemedItemDelegate::paint(QPainter *painter,
 
   // // Force our color in the case of the highlighting too.
   if (opt.showDecorationSelected) {
+    opt.palette.setColor(QPalette::Inactive, QPalette::HighlightedText, foreground_color);
+    opt.palette.setColor(QPalette::Active, QPalette::HighlightedText, foreground_color);
+    opt.palette.setColor(QPalette::Normal, QPalette::HighlightedText, foreground_color);
+
     opt.palette.setColor(QPalette::Inactive, QPalette::Highlight, background_color);
     opt.palette.setColor(QPalette::Active, QPalette::Highlight, background_color);
     opt.palette.setColor(QPalette::Normal, QPalette::Highlight, background_color);
