@@ -23,6 +23,8 @@ class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
                     QMainWindow *parent = nullptr);
 
   QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
+
+  void ActOnPrimaryClick(const QModelIndex &index) Q_DECL_FINAL;
   void ActOnContextMenu(QMenu *menu, const QModelIndex &index) Q_DECL_FINAL;
 
  private:

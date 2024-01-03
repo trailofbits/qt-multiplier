@@ -1,10 +1,8 @@
-/*
-  Copyright (c) 2023-present, Trail of Bits, Inc.
-  All rights reserved.
-
-  This source code is licensed in accordance with the terms specified in
-  the LICENSE file found in the root directory of this source tree.
-*/
+// Copyright (c) 2024-present, Trail of Bits, Inc.
+// All rights reserved.
+//
+// This source code is licensed in accordance with the terms specified in
+// the LICENSE file found in the root directory of this source tree.
 
 #pragma once
 
@@ -29,6 +27,8 @@ class HighlightThemeProxy Q_DECL_FINAL : public IThemeProxy {
   std::optional<QColor> EntityBackgroundColor(
       std::optional<QColor> theme_color,
       const VariantEntity &entity) const Q_DECL_FINAL;
+
+  void SendUpdate(void);
 };
 
 }  // namespace mx::gui

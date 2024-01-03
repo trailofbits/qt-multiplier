@@ -21,6 +21,8 @@ add_library("mx_explorers"
   src/Explorers/EntityExplorer/CategoryComboBox.h
   src/Explorers/EntityExplorer/EntityExplorer.cpp
 
+  src/Explorers/HighlightExplorer/HighlightedItemsModel.cpp
+  src/Explorers/HighlightExplorer/HighlightedItemsModel.h
   src/Explorers/HighlightExplorer/HighlightExplorer.cpp
   src/Explorers/HighlightExplorer/HighlightThemeProxy.cpp
   src/Explorers/HighlightExplorer/HighlightThemeProxy.h
@@ -47,6 +49,7 @@ target_link_libraries("mx_explorers"
     "mx_theme_manager"
     "mx_tab_widget"
     "mx_tree_widget"
+    "mx_util_component"
 
   PUBLIC
     "mx_gap_library"

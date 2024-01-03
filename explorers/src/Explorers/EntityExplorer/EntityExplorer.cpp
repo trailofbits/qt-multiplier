@@ -30,6 +30,7 @@
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Widgets/LineEditWidget.h>
 #include <multiplier/GUI/Widgets/ListGeneratorWidget.h>
+#include <multiplier/GUI/Util.h>
 #include <multiplier/Index.h>
 
 #include "CategoryComboBox.h"
@@ -123,7 +124,8 @@ gap::generator<IGeneratedItemPtr> EntitySearchGenerator::Roots(
       }
 
       co_yield std::make_shared<EntitySearchResult>(
-          std::move(decl), decl.canonical_declaration(), std::move(name));
+          std::move(decl), decl.canonical_declaration(),
+          NameOfEntity(decl));
 
     // It's a macro.
     } else if (std::holds_alternative<DefineMacroDirective>(result)) {
