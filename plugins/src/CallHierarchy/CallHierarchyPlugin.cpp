@@ -30,8 +30,8 @@ static QString ActionName(const VariantEntity &) {
 
 class CallHierarchyItem final : public IGeneratedItem {
 
-  VariantEntity entity;
-  RawEntityId aliased_entity_id;
+  VariantEntity user_entity;
+  VariantEntity used_entity;
   TokenRange name_tokens;
   QString location;
   QString breadcrumbs;
@@ -39,22 +39,22 @@ class CallHierarchyItem final : public IGeneratedItem {
  public:
   virtual ~CallHierarchyItem(void) = default;
 
-  inline CallHierarchyItem(VariantEntity entity_,
-                           RawEntityId aliased_entity_id_,
+  inline CallHierarchyItem(VariantEntity user_entity_,
+                           VariantEntity used_entity_,
                            TokenRange name_tokens_, QString location_,
                            QString breadcrumbs_)
-      : entity(std::move(entity_)),
-        aliased_entity_id(aliased_entity_id_),
+      : user_entity(std::move(user_entity_)),
+        used_entity(used_entity_),
         name_tokens(std::move(name_tokens_)),
         location(std::move(location_)),
         breadcrumbs(std::move(breadcrumbs_)) {}
 
   VariantEntity Entity(void) const Q_DECL_FINAL {
-    return entity;
+    return user_entity;
   }
 
-  RawEntityId AliasedEntityId(void) const Q_DECL_FINAL {
-    return aliased_entity_id;
+  VariantEntity AliasedEntity(void) const Q_DECL_FINAL {
+    return used_entity;
   }
 
   QVariant Data(int col) const Q_DECL_FINAL {
@@ -70,11 +70,11 @@ class CallHierarchyItem final : public IGeneratedItem {
 };
 
 static IGeneratedItemPtr CreateGeneratedItem(
-    const FileLocationCache &file_location_cache, const VariantEntity &user,
-    const VariantEntity &used, RawEntityId aliased_entity_id=kInvalidEntityId) {
+    const FileLocationCache &file_location_cache,
+    const VariantEntity &user, const VariantEntity &used) {
 
   return std::make_shared<CallHierarchyItem>(
-      user, aliased_entity_id, NameOfEntity(used),
+      user, used, NameOfEntity(used),
       LocationOfEntity(file_location_cache, user), EntityBreadCrumbs(user));
 }
 
@@ -139,11 +139,12 @@ QString CallHierarchyGenerator::Name(
 gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Roots(
     const ITreeGeneratorPtr &self) {
   if (std::holds_alternative<Decl>(root_entity)) {
-    RawEntityId prev_redecl_id = kInvalidEntityId;
+    std::optional<Decl> decl;
     for (Decl redecl : std::get<Decl>(root_entity).redeclarations()) {
-      auto item = CreateGeneratedItem(file_location_cache, redecl, redecl,
-                                      prev_redecl_id);
-      prev_redecl_id = redecl.id().Pack();
+      if (!decl) {
+        decl = redecl;
+      }
+      auto item = CreateGeneratedItem(file_location_cache, redecl, decl.value());
       co_yield item;
     }
 
@@ -177,14 +178,13 @@ gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Children(
     // We might have many uses of a thing, e.g. multiple calls to a function
     // A within a function B, and so we want the Nth call to reference the
     // first call.
-    auto aliased_entity_id = kInvalidEntityId;
     if (std::holds_alternative<Decl>(user)) {
-      aliased_entity_id =
-          std::get<Decl>(user).canonical_declaration().id().Pack();
+      user = std::get<Decl>(user).canonical_declaration();
     }
 
-    co_yield CreateGeneratedItem(file_location_cache, use, user,
-                                 aliased_entity_id);
+    // NOTE(pag): `use` is a *user* of `containing_entity`, and `user` is a
+    //            use of (really, container of) `use`.
+    co_yield CreateGeneratedItem(file_location_cache, use, user);
   }
 }
 

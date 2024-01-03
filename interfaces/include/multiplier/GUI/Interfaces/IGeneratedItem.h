@@ -28,14 +28,14 @@ class IGeneratedItem {
   // NOTE(pag): This must be non-blocking.
   virtual VariantEntity Entity(void) const = 0;
 
-  // Returns the entity aliased by this entity, or `NotAnEntity{}`. This
-  // is a means of communicating equivalence of rows in terms of their
+  // Returns the entity aliased/referenced by this entity, or `NotAnEntity{}`.
+  // This is a means of communicating equivalence of rows in terms of their
   // child sets, but not necessarily in terms of their `Data`.
   //
   // NOTE(pag): If this returns a valid entity ID, then it must be one that was
   //            associated with an item generated prior to this `IGeneratedItem` in
   //            the current tree.
-  virtual RawEntityId AliasedEntityId(void) const;
+  virtual VariantEntity AliasedEntity(void) const;
 
   // Column data for the tree item.
   //

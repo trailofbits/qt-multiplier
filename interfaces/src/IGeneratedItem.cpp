@@ -14,11 +14,8 @@ namespace mx::gui {
 
 IGeneratedItem::~IGeneratedItem(void) {}
 
-// Returns the entity ID aliased by this entity, or `VariantEntity`. This
-// is a means of communicating equivalence of rows in terms of their
-// child sets, but not necessarily in terms of their `Data`.
-RawEntityId IGeneratedItem::AliasedEntityId(void) const {
-  return kInvalidEntityId;
+VariantEntity IGeneratedItem::AliasedEntity(void) const {
+  return NotAnEntity{};
 }
 
 }  // namespace mx::gui

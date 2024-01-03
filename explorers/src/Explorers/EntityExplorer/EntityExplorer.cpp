@@ -40,26 +40,25 @@ namespace {
 class EntitySearchResult Q_DECL_FINAL : public IGeneratedItem {
 
   VariantEntity entity;
-  RawEntityId aliased_entity_id;
+  VariantEntity aliased_entity;
   TokenRange name_tokens;
 
  public:
   virtual ~EntitySearchResult(void) = default;
 
   inline EntitySearchResult(VariantEntity entity_,
-                            RawEntityId aliased_entity_id_,
+                            VariantEntity aliased_entity_,
                             TokenRange name_tokens_)
       : entity(std::move(entity_)),
-        aliased_entity_id(aliased_entity_id_),
+        aliased_entity(aliased_entity_),
         name_tokens(std::move(name_tokens_)) {}
 
   VariantEntity Entity(void) const Q_DECL_FINAL {
     return entity;
   }
 
-  // NOTE(pag): This must be non-blocking.
-  RawEntityId AliasedEntityId(void) const Q_DECL_FINAL {
-    return aliased_entity_id;
+  VariantEntity AliasedEntity(void) const Q_DECL_FINAL {
+    return aliased_entity;
   }
 
   QVariant Data(int col) const Q_DECL_FINAL {
@@ -123,10 +122,8 @@ gap::generator<IGeneratedItemPtr> EntitySearchGenerator::Roots(
         continue;
       }
 
-      RawEntityId aliased_entity_id = decl.canonical_declaration().id().Pack();
-
       co_yield std::make_shared<EntitySearchResult>(
-          std::move(decl), aliased_entity_id, std::move(name));
+          std::move(decl), decl.canonical_declaration(), std::move(name));
 
     // It's a macro.
     } else if (std::holds_alternative<DefineMacroDirective>(result)) {
@@ -142,7 +139,7 @@ gap::generator<IGeneratedItemPtr> EntitySearchGenerator::Roots(
       }
 
       co_yield std::make_shared<EntitySearchResult>(
-          std::move(macro), kInvalidEntityId, std::move(name));
+          std::move(macro), NotAnEntity{}, std::move(name));
     
     // It's a file.
     } else if (std::holds_alternative<File>(result)) {
@@ -172,7 +169,7 @@ gap::generator<IGeneratedItemPtr> EntitySearchGenerator::Roots(
         toks.emplace_back(std::move(tok));
 
         co_yield std::make_shared<EntitySearchResult>(
-            std::move(file), kInvalidEntityId,
+            std::move(file), NotAnEntity{},
             TokenRange::create(std::move(toks)));
       }
     }

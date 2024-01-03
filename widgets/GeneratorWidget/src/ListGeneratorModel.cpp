@@ -43,6 +43,7 @@ struct Node {
 
   // The entity associated with this node.
   VariantEntity entity;
+  VariantEntity aliased_entity;
 
   // The data associated with this node.
   NodeData data;
@@ -281,7 +282,7 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
       value = std::get<QVariant>(data);
     }
 
-    // Tooltip used for hovering. Also, this is used for the copy details.
+  // Tooltip used for hovering. Also, this is used for the copy details.
   } else if (role == Qt::ToolTipRole) {
     QString tooltip = tr("Entity Id: ") + QString::number(entity_key->first);
 
@@ -298,7 +299,7 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
     value.setValue(tooltip);
 
   } else if (role == IModel::EntityRole) {
-    return QVariant::fromValue(node->entity);
+    return QVariant::fromValue(node->aliased_entity);
 
   } else if (role == IModel::ModelIdRole) {
     return "com.trailofbits.model.ListGeneratorModel";
@@ -410,6 +411,11 @@ void ListGeneratorModel::ProcessDataBatchQueue(void) {
         continue;
       }
 
+      auto aliased_entity = item->AliasedEntity();
+      if (std::holds_alternative<NotAnEntity>(aliased_entity)) {
+        aliased_entity = entity;
+      }
+
       // Now create the node key. If this is the first time we're seeing the
       // node, then the node key is in our `entity_to_node` map; otherwise we
       // make a redundant key in `redundant_keys`.
@@ -423,7 +429,7 @@ void ListGeneratorModel::ProcessDataBatchQueue(void) {
         // allow us to reprepresent another form of equivalence to the
         // deduplication mechanism, i.e. that one declaration may be a
         // redeclaration of another one.
-        const RawEntityId aliased_eid = item->AliasedEntityId();
+        const RawEntityId aliased_eid = ::mx::EntityId(aliased_entity).Pack();
         if (aliased_eid != kInvalidEntityId && aliased_eid != eid) {
           NodeKey *&alias_key = d->aliased_entity_to_key[aliased_eid];
 
@@ -453,6 +459,7 @@ void ListGeneratorModel::ProcessDataBatchQueue(void) {
 
       // Copy the entity into the node.
       new_node->entity = std::move(entity);
+      new_node->aliased_entity = std::move(aliased_entity);
 
       // Make the node point to itself, and update the parent child index or
       // previous sibling's next sibling index.
