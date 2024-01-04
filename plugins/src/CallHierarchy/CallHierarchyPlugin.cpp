@@ -23,6 +23,9 @@ namespace mx::gui {
 namespace {
 
 static const QKeySequence kKeySeqX("X");
+static const QKeySequence kExpandSequences[] = {
+  {"1"}, {"2"}, {"3"}, {"4"}, {"5"}, {"6"}, {"7"}, {"8"}, {"9"}
+};
 
 static QString ActionName(const VariantEntity &) {
   return QObject::tr("Show Call Hierarchy");
@@ -81,14 +84,19 @@ static IGeneratedItemPtr CreateGeneratedItem(
 class CallHierarchyGenerator final : public ITreeGenerator {
   const FileLocationCache file_location_cache;
   const VariantEntity root_entity;
+  const unsigned initialize_expansion_depth;
 
  public:
   virtual ~CallHierarchyGenerator(void) = default;
 
   inline CallHierarchyGenerator(FileLocationCache file_location_cache_,
-                                VariantEntity root_entity_)
+                                VariantEntity root_entity_,
+                                unsigned initialize_expansion_depth_=2u)
       : file_location_cache(std::move(file_location_cache_)),
-        root_entity(std::move(root_entity_)) {}
+        root_entity(std::move(root_entity_)),
+        initialize_expansion_depth(initialize_expansion_depth_) {}
+
+  unsigned InitialExpansionDepth(void) const Q_DECL_FINAL;
 
   int NumColumns(void) const Q_DECL_FINAL;
 
@@ -103,6 +111,10 @@ class CallHierarchyGenerator final : public ITreeGenerator {
       const ITreeGeneratorPtr &self,
       const VariantEntity &parent_entity) Q_DECL_FINAL;
 };
+
+unsigned CallHierarchyGenerator::InitialExpansionDepth(void) const {
+  return initialize_expansion_depth;
+}
 
 int CallHierarchyGenerator::NumColumns(void) const {
   return 3;
@@ -230,14 +242,47 @@ std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowSecondaryClick(
 
 // Allow a main window plugin to act on a key sequence.
 std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowKeyPress(
-    QMainWindow *window, const QKeySequence &keys,
-    const QModelIndex &index) {
+    QMainWindow *, const QKeySequence &keys, const QModelIndex &index) {
 
-  if (keys != kKeySeqX) {
+  VariantEntity entity = IModel::EntitySkipThroughTokens(index);
+
+  // It's only reasonable to ask for references to named entities.
+  if (!DefineMacroDirective::from(entity) && !MacroParameter::from(entity) &&
+      !NamedDecl::from(entity) && !File::from(entity)) {
     return std::nullopt;
   }
 
-  return ActOnMainWindowSecondaryClick(window, index);
+  QString action_name;
+
+  auto depth = 1u;
+  if (keys == kKeySeqX) {
+    action_name = ActionName(entity);
+  
+  } else {
+    for (auto expand_seq : kExpandSequences) {
+      if (keys != expand_seq) {
+        ++depth;
+        continue;
+      }
+
+      action_name = tr("Show Call Hierarchy (Depth %1)").arg(depth);
+      break;
+    }
+  }
+
+  if (action_name.isEmpty()) {
+    return std::nullopt;
+  }
+
+  return NamedAction{
+    .name = action_name,
+    .action = d->open_reference_explorer_trigger,
+    .data = QVariant::fromValue<ITreeGeneratorPtr>(
+        std::make_shared<CallHierarchyGenerator>(
+            d->config_manager.FileLocationCache(), std::move(entity),
+            depth + 1u  /* logical depth 1 is physcal depth 1,
+                         * i.e. 1 under a root */))
+  };
 }
 
 }  // namespace mx::gui

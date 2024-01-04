@@ -352,7 +352,8 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
     d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
     RunExpansionThread(new InitTreeRunnable(
-        d->generator, d->version_number, NotAnEntity{}, 2u));
+        d->generator, d->version_number, NotAnEntity{},
+        d->generator->InitialExpansionDepth()));
   }
 }
 

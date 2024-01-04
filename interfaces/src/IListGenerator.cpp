@@ -17,6 +17,11 @@ int IListGenerator::NumColumns(void) const {
   return 1;
 }
 
+// Return the initialize expansion depth (defaults to `1`).
+unsigned IListGenerator::InitialExpansionDepth(void) const {
+  return 1u;
+}
+
 gap::generator<IGeneratedItemPtr> IListGenerator::Children(
     const ITreeGeneratorPtr &, const VariantEntity &) {
   co_return;

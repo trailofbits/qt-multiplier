@@ -27,6 +27,9 @@ class ITreeGenerator : public std::enable_shared_from_this<ITreeGenerator> {
  public:
   virtual ~ITreeGenerator(void) = default;
 
+  // Return the initialize expansion depth (defaults to `2`).
+  virtual unsigned InitialExpansionDepth(void) const;
+
   // Return the number of columns of data.
   //
   // NOTE(pag): This must be non-blocking.

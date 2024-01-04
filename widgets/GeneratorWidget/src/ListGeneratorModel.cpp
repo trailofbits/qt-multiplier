@@ -199,7 +199,7 @@ void ListGeneratorModel::InstallGenerator(IListGeneratorPtr generator_) {
     d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
     auto runnable = new InitTreeRunnable(
-        d->generator, d->version_number, NotAnEntity{}, 2u);
+        d->generator, d->version_number, NotAnEntity{}, 1u);
 
     connect(runnable, &IGenerateTreeRunnable::NewGeneratedItems,
             this, &ListGeneratorModel::OnNewListItems);

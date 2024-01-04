@@ -22,4 +22,10 @@ gap::generator<IGeneratedItemPtr> ITreeGenerator::Roots(
   return Children(self, NotAnEntity{});
 }
 
+
+// Return the initialize expansion depth (defaults to `2`).
+unsigned ITreeGenerator::InitialExpansionDepth(void) const {
+  return 2u;
+}
+
 }  // namespace mx::gui
