@@ -6,15 +6,10 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-#include <multiplier/GUI/Interfaces/ITreeGenerator.h>
-
-#include <multiplier/Index.h>
+#include <multiplier/GUI/Interfaces/IInfoGeneratorItem.h>
 
 namespace mx::gui {
 
-// Return the initialize expansion depth (defaults to `2`).
-unsigned ITreeGenerator::InitialExpansionDepth(void) const {
-  return 2u;
-}
+IInfoGeneratorItem::~IInfoGeneratorItem(void) {}
 
 }  // namespace mx::gui

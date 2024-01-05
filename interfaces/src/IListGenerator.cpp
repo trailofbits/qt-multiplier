@@ -23,7 +23,7 @@ unsigned IListGenerator::InitialExpansionDepth(void) const {
 }
 
 gap::generator<IGeneratedItemPtr> IListGenerator::Children(
-    const ITreeGeneratorPtr &, const VariantEntity &) {
+    ITreeGeneratorPtr, IGeneratedItemPtr) {
   co_return;
 }
 

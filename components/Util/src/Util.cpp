@@ -1167,4 +1167,21 @@ QString EntityBreadCrumbs(const VariantEntity &ent, bool run_length_encode) {
   return {};
 }
 
+// Convert `variant` to a string.
+std::optional<QString> TryConvertToString(const QVariant &data) {
+  if (data.canConvert<QString>()) {
+    return data.toString();
+
+  } else if (data.canConvert<TokenRange>()) {
+    auto tok_range = data.value<TokenRange>();
+    auto tok_data = tok_range.data();
+    if (!tok_data.empty()) {
+      return QString::fromUtf8(
+          tok_data.data(), static_cast<qsizetype>(tok_data.size()));
+    }
+  }
+
+  return QString();
+}
+
 }  // namespace mx::gui

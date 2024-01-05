@@ -11,7 +11,7 @@
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/ITreeGenerator.h>
 
-#include <QList>
+#include <QVector>
 
 namespace mx::gui {
 
@@ -82,7 +82,7 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
 
   //! Notify us when there's a batch of new data to update.
   void OnNewGeneratedItems(uint64_t version_number, RawEntityId parent_entity_id,
-                           QList<IGeneratedItemPtr> child_items,
+                           QVector<IGeneratedItemPtr> child_items,
                            unsigned remaining_depth);
 
   void OnRequestFinished(void);

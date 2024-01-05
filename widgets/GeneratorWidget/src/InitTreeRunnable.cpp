@@ -13,7 +13,7 @@
 namespace mx::gui {
 
 void InitTreeRunnable::run(void) {
-  QList<IGeneratedItemPtr> items;
+  QVector<IGeneratedItemPtr> items;
   for (auto item : generator->Roots(generator)) {
     if (version_number.load() != captured_version_number) {
       emit Finished();
@@ -29,8 +29,8 @@ void InitTreeRunnable::run(void) {
     return;
   }
 
-  emit NewGeneratedItems(captured_version_number, kInvalidEntityId, items,
-                         depth - 1u);
+  emit NewGeneratedItems(captured_version_number, kInvalidEntityId,
+                         std::move(items), depth - 1u);
   emit Finished();
 }
 

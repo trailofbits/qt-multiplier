@@ -11,7 +11,7 @@
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IListGenerator.h>
 
-#include <QList>
+#include <QVector>
 
 namespace mx::gui {
 
@@ -76,7 +76,7 @@ class ListGeneratorModel Q_DECL_FINAL : public IModel {
 
   //! Notify us when there's a batch of new data to update.
   void OnNewListItems(uint64_t version_number, RawEntityId,
-                      QList<IGeneratedItemPtr> child_items,
+                      QVector<IGeneratedItemPtr> child_items,
                       unsigned);
 
   void OnRequestFinished(void);

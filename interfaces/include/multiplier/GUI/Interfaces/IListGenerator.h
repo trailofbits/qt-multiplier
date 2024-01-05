@@ -29,7 +29,7 @@ class IListGenerator : public ITreeGenerator {
   unsigned InitialExpansionDepth(void) const Q_DECL_FINAL;
 
   gap::generator<IGeneratedItemPtr> Children(
-      const ITreeGeneratorPtr &, const VariantEntity &) Q_DECL_FINAL;
+      ITreeGeneratorPtr, IGeneratedItemPtr) Q_DECL_FINAL;
 };
 
 }  // namespace mx::gui

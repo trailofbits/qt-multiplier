@@ -21,7 +21,9 @@
 #include <algorithm>
 #include <cassert>
 #include <deque>
+#include <list>
 #include <multiplier/GUI/Interfaces/IListGenerator.h>
+#include <multiplier/GUI/Util.h>
 #include <unordered_map>
 
 #include "InitTreeRunnable.h"
@@ -35,18 +37,12 @@ static const int kMaxBatchSize{100};
 
 struct Node;
 
-using TextAndTokenRange = std::pair<QString, TokenRange>;
-using NodeData = std::variant<QString, TextAndTokenRange, QVariant>;
 using NodeKey = std::pair<const RawEntityId, Node>;
 
 struct Node {
 
-  // The entity associated with this node.
-  VariantEntity entity;
-  VariantEntity aliased_entity;
-
-  // The data associated with this node.
-  NodeData data;
+  // The generated item associated with this node.
+  IGeneratedItemPtr item;
 
   int row{-1};
 
@@ -57,13 +53,16 @@ struct Node {
 };
 
 struct DataBatch {
-  QList<IGeneratedItemPtr> child_items;
+  std::list<IGeneratedItemPtr> child_items;
 
-  inline DataBatch(QList<IGeneratedItemPtr> child_items_)
-      : child_items(std::move(child_items_)) {}
+  inline DataBatch(QVector<IGeneratedItemPtr> child_items_) {
+    for (auto &item : child_items_) {
+      child_items.emplace_back(std::move(item));
+    }
+  }
 };
 
-using DataBatchQueue = QList<DataBatch>;
+using DataBatchQueue = std::list<DataBatch>;
 
 }  // namespace
 
@@ -199,7 +198,7 @@ void ListGeneratorModel::InstallGenerator(IListGeneratorPtr generator_) {
     d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
     auto runnable = new InitTreeRunnable(
-        d->generator, d->version_number, NotAnEntity{}, 1u);
+        d->generator, d->version_number, {}, 1u);
 
     connect(runnable, &IGenerateTreeRunnable::NewGeneratedItems,
             this, &ListGeneratorModel::OnNewListItems);
@@ -269,48 +268,48 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
 
   Node *node = &(entity_key->second);
 
-  const NodeData &data = node->data;
+    QVariant data = node->item->Data(index.column());
+  if (!data.isValid()) {
+    return data;
+  }
 
   if (role == Qt::DisplayRole) {
-    if (std::holds_alternative<QString>(data)) {
-      value.setValue(std::get<QString>(data));
-
-    } else if (std::holds_alternative<TextAndTokenRange>(data)) {
-      value.setValue(std::get<TextAndTokenRange>(data).first);
-
-    } else {
-      value = std::get<QVariant>(data);
+    if (auto as_str = TryConvertToString(data)) {
+      return as_str.value();
     }
 
+  } else if (role == IModel::TokenRangeDisplayRole) {
+    if (data.canConvert<TokenRange>() &&
+        !data.value<TokenRange>().data().empty()) {
+      return data;
+    }
+  
   // Tooltip used for hovering. Also, this is used for the copy details.
   } else if (role == Qt::ToolTipRole) {
     QString tooltip = tr("Entity Id: ") + QString::number(entity_key->first);
-
-    if (!std::holds_alternative<QVariant>(data) && d->generator) {
-      tooltip += "\n" + d->generator->ColumnTitle(0) + ": ";
-      if (std::holds_alternative<QString>(data)) {
-        tooltip += std::get<QString>(data);
-
-      } else if (std::holds_alternative<TextAndTokenRange>(data)) {
-        tooltip += std::get<TextAndTokenRange>(data).first;
+    if (d->generator) {
+      QVariant col_data = node->item->Data(0);
+      if (auto as_str = TryConvertToString(col_data)) {
+        tooltip += QString("\n%1: %2").arg(d->generator->ColumnTitle(0)).arg(as_str.value());
       }
     }
-
     value.setValue(tooltip);
 
   } else if (role == IModel::EntityRole) {
-    return QVariant::fromValue(node->aliased_entity);
+    auto entity = node->item->AliasedEntity();
+    if (std::holds_alternative<NotAnEntity>(entity)) {
+      entity = node->item->Entity();
+    }
+
+    if (!std::holds_alternative<NotAnEntity>(entity)) {
+      value.setValue(entity);
+    }
 
   } else if (role == IModel::ModelIdRole) {
     return "com.trailofbits.model.ListGeneratorModel";
 
-  } else if (role == IModel::TokenRangeDisplayRole) {
-    if (std::holds_alternative<TextAndTokenRange>(data)) {
-      value.setValue(std::get<TextAndTokenRange>(data).second);
-    }
-
   } else if (role == ListGeneratorModel::IsDuplicate) {
-    value.setValue(static_cast<unsigned>(node->row) != node->alias_index);
+    value.setValue(static_cast<int>(node->alias_index) != node->row);
   }
 
   return value;
@@ -350,34 +349,13 @@ void ListGeneratorModel::CancelRunningRequest(void) {
 //! Notify us when there's a batch of new data to update.
 void ListGeneratorModel::OnNewListItems(
     uint64_t version_number, RawEntityId,
-    QList<IGeneratedItemPtr> child_items, unsigned) {
+    QVector<IGeneratedItemPtr> child_items, unsigned) {
 
   if (version_number != d->version_number.load()) {
     return;
   }
 
-  d->data_batch_queue.emplaceBack(std::move(child_items));
-}
-
-// Go get all of our data for this node.
-void ListGeneratorModel::PrivateData::ImportData(
-    Node *new_node, IGeneratedItemPtr item) {
-
-  QVariant col_data = item->Data(0);
-  if (col_data.canConvert<QString>()) {
-    new_node->data = col_data.toString();
-
-  } else if (col_data.canConvert<TokenRange>()) {
-    TokenRange tok_range = col_data.value<TokenRange>();
-    auto char_data = tok_range.data();
-    new_node->data = TextAndTokenRange{
-        QString::fromUtf8(char_data.data(),
-                          static_cast<qsizetype>(char_data.size())),
-        std::move(tok_range)};
-
-  } else {
-    new_node->data = std::move(col_data);
-  }
+  d->data_batch_queue.emplace_back(std::move(child_items));
 }
 
 void ListGeneratorModel::ProcessDataBatchQueue(void) {
@@ -458,8 +436,7 @@ void ListGeneratorModel::ProcessDataBatchQueue(void) {
       Node *const new_node = &(curr_key->second);
 
       // Copy the entity into the node.
-      new_node->entity = std::move(entity);
-      new_node->aliased_entity = std::move(aliased_entity);
+      new_node->item = std::move(item);
 
       // Make the node point to itself, and update the parent child index or
       // previous sibling's next sibling index.
@@ -471,14 +448,6 @@ void ListGeneratorModel::ProcessDataBatchQueue(void) {
       new_node->alias_index = load_key->second.alias_index;
 
       d->child_keys.emplace_back(curr_key);
-
-      // If this is a new node, then import the data, otherwise reference the
-      // existing data.
-      if (added) {
-        d->ImportData(new_node, std::move(item));
-      } else {
-        new_node->data = load_key->second.data;
-      }
 
       ++num_imported_children;
       ++num_imported;

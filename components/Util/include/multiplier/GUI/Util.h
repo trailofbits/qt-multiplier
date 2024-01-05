@@ -121,5 +121,8 @@ QString TokenBreadCrumbs(const Token &ent, bool run_length_encode = true);
 QString EntityBreadCrumbs(const VariantEntity &ent,
                           bool run_length_encode = true);
 
+// Convert `variant` to a string.
+std::optional<QString> TryConvertToString(const QVariant &variant);
+
 }  // namespace gui
 }  // namespace mx

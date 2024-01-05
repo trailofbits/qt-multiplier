@@ -22,6 +22,7 @@
 #include <cassert>
 #include <deque>
 #include <multiplier/GUI/Interfaces/ITreeGenerator.h>
+#include <multiplier/GUI/Util.h>
 #include <unordered_map>
 
 #include "InitTreeRunnable.h"
@@ -36,8 +37,6 @@ static const int kMaxBatchSize{100};
 
 struct Node;
 
-using TextAndTokenRange = std::pair<QString, TokenRange>;
-using NodeData = std::variant<QString, TextAndTokenRange, QVariant>;
 using NodeKey = std::pair<const RawEntityId, Node>;
 
 enum class NodeState { kUnopened, kOpening, kOpened, kDuplicate };
@@ -51,9 +50,8 @@ struct Node {
   // duplicates.
   NodeState state{NodeState::kUnopened};
 
-  // The entity associated with this node.
-  VariantEntity entity;
-  VariantEntity aliased_entity;
+  // The item that produced the entity/data for this node.
+  IGeneratedItemPtr item;
 
   // The number of children of this node.
   int num_children{0};
@@ -66,11 +64,6 @@ struct Node {
   // Index into `d->child_keys` of the next item sharing `d->parent_key`.
   unsigned sibling_index{0u};
 
-  // Index into `d->node_data`. `d->node_data[d->data_index]` is the data for
-  // first column, `d->node_data[d->data_index + 1]` for the second, ..., and
-  // `d->node_data[d->data_index + d->num_columns - 1]` for the last column.
-  unsigned data_index{0u};
-
   // Index into `d->child_keys`. If this node isn't a duplicate, then this index
   // will reference back to the node itself. Otherwise it will reference the
   // first/original node.
@@ -81,19 +74,23 @@ struct Node {
 
 struct DataBatch {
   NodeKey *parent_key;
-  QList<IGeneratedItemPtr> child_items;
+
+  std::list<IGeneratedItemPtr> child_items;
   unsigned remaining_depth;
   unsigned *index_ptr{nullptr};
 
   inline DataBatch(NodeKey *parent_key_,
-                   QList<IGeneratedItemPtr> child_items_,
+                   QVector<IGeneratedItemPtr> child_items_,
                    unsigned remaining_depth_)
       : parent_key(parent_key_),
-        child_items(std::move(child_items_)),
-        remaining_depth(remaining_depth_) {}
+        remaining_depth(remaining_depth_) {
+    for (auto &item : child_items_) {
+      child_items.emplace_back(std::move(item));
+    }
+  }
 };
 
-using DataBatchQueue = QList<DataBatch>;
+using DataBatchQueue = std::list<DataBatch>;
 
 }  // namespace
 
@@ -111,9 +108,6 @@ struct TreeGeneratorModel::PrivateData final {
   // things into a sibling list, but also know that we shouldn't actually
   // expand underneath something.
   std::deque<NodeKey> redundant_keys;
-
-  // The data for all nodes.
-  std::deque<NodeData> node_data;
 
   // The uniqued nodes of the tree.
   std::unordered_map<RawEntityId, Node> entity_to_node;
@@ -189,8 +183,6 @@ struct TreeGeneratorModel::PrivateData final {
                       const NodeKey *node_key) const;
 
   gap::generator<NodeKey *> Children(Node *node) &;
-
-  void ImportData(Node *new_node, IGeneratedItemPtr item);
 };
 
 // Convert a `node_key` into a `QModelIndex`.
@@ -286,7 +278,7 @@ void TreeGeneratorModel::Expand(const QModelIndex &index, unsigned depth) {
   if (node->state == NodeState::kUnopened) {
     node->state = NodeState::kOpening;
     RunExpansionThread(new ExpandTreeRunnable(
-        d->generator, d->version_number, node->entity, depth));
+        d->generator, d->version_number, node->item, depth));
     return;
   }
 
@@ -304,7 +296,7 @@ void TreeGeneratorModel::Expand(const QModelIndex &index, unsigned depth) {
     if (node->state == NodeState::kUnopened) {
       node->state = NodeState::kOpening;
       RunExpansionThread(new ExpandTreeRunnable(
-          d->generator, d->version_number, node->entity, child_depth));
+          d->generator, d->version_number, node->item, child_depth));
 
     // This node is already open, go and work on its children.
     } else if (node->state == NodeState::kOpened &&
@@ -329,14 +321,13 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
   emit beginResetModel();
   d->version_number.fetch_add(1u);
   d->generator = std::move(generator_);
-  d->node_data.clear();
   d->entity_to_node.clear();
   d->aliased_entity_to_key.clear();
   d->child_keys.clear();
   d->redundant_keys.clear();
   d->num_columns = d->generator ? d->generator->NumColumns() : 0u;
   d->root_node.parent_key = nullptr;
-  d->root_node.data_index = 0u;
+  d->root_node.item.reset();
   d->root_node.child_index = 0u;
   d->root_node.sibling_index = 0u;
   d->root_node.num_children = 0;
@@ -352,7 +343,7 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
     d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
     RunExpansionThread(new InitTreeRunnable(
-        d->generator, d->version_number, NotAnEntity{},
+        d->generator, d->version_number, {},
         d->generator->InitialExpansionDepth()));
   }
 }
@@ -429,53 +420,47 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
 
   Node *node = &(entity_key->second);
 
-  const NodeData &data =
-      d->node_data[node->data_index + static_cast<unsigned>(index.column())];
+  QVariant data = node->item->Data(index.column());
+  if (!data.isValid()) {
+    return data;
+  }
 
   if (role == Qt::DisplayRole) {
-    if (std::holds_alternative<QString>(data)) {
-      value.setValue(std::get<QString>(data));
+    if (auto as_str = TryConvertToString(data)) {
+      return as_str.value();
+    }
 
-    } else if (std::holds_alternative<TextAndTokenRange>(data)) {
-      value.setValue(std::get<TextAndTokenRange>(data).first);
-
-    } else {
-      value = std::get<QVariant>(data);
+  } else if (role == IModel::TokenRangeDisplayRole) {
+    if (data.canConvert<TokenRange>() &&
+        !data.value<TokenRange>().data().empty()) {
+      return data;
     }
   
   // Tooltip used for hovering. Also, this is used for the copy details.
   } else if (role == Qt::ToolTipRole) {
     QString tooltip = tr("Entity Id: ") + QString::number(entity_key->first);
-
     if (d->generator) {
       for (int i = 0; i < d->num_columns; ++i) {
-        const NodeData &col_data =
-            d->node_data[node->data_index + static_cast<unsigned>(i)];
-        if (std::holds_alternative<QVariant>(data)) {
-          continue;
-        }
-
-        tooltip += "\n" + d->generator->ColumnTitle(i) + ": ";
-        if (std::holds_alternative<QString>(col_data)) {
-          tooltip += std::get<QString>(col_data);
-
-        } else if (std::holds_alternative<TextAndTokenRange>(col_data)) {
-          tooltip += std::get<TextAndTokenRange>(col_data).first;
+        QVariant col_data = node->item->Data(i);
+        if (auto as_str = TryConvertToString(col_data)) {
+          tooltip += QString("\n%1: %2").arg(d->generator->ColumnTitle(i)).arg(as_str.value());
         }
       }
     }
     value.setValue(tooltip);
 
   } else if (role == IModel::EntityRole) {
-    return QVariant::fromValue(node->aliased_entity);
+    auto entity = node->item->AliasedEntity();
+    if (std::holds_alternative<NotAnEntity>(entity)) {
+      entity = node->item->Entity();
+    }
+
+    if (!std::holds_alternative<NotAnEntity>(entity)) {
+      value.setValue(entity);
+    }
 
   } else if (role == IModel::ModelIdRole) {
     return "com.trailofbits.model.TreeGeneratorModel";
-
-  } else if (role == IModel::TokenRangeDisplayRole) {
-    if (std::holds_alternative<TextAndTokenRange>(data)) {
-      value.setValue(std::get<TextAndTokenRange>(data).second);
-    }
 
   } else if (role == TreeGeneratorModel::CanBeExpanded) {
     value.setValue(NodeState::kUnopened == node->state);
@@ -513,39 +498,14 @@ void TreeGeneratorModel::CancelRunningRequest() {
 //! Notify us when there's a batch of new data to update.
 void TreeGeneratorModel::OnNewGeneratedItems(
     uint64_t version_number, RawEntityId parent_node_id,
-    QList<IGeneratedItemPtr> child_items, unsigned remaining_depth) {
+    QVector<IGeneratedItemPtr> child_items, unsigned remaining_depth) {
 
   if (version_number != d->version_number.load()) {
     return;
   }
 
-  d->data_batch_queue.emplaceBack(d->NodeKeyFromId(parent_node_id),
-                                  std::move(child_items), remaining_depth);
-}
-
-// Go get all of our data for this node.
-void TreeGeneratorModel::PrivateData::ImportData(
-    Node *new_node, IGeneratedItemPtr item) {
-
-  new_node->data_index = static_cast<unsigned>(node_data.size());
-
-  for (auto i = 0; i < num_columns; ++i) {
-    QVariant col_data = item->Data(i);
-    if (col_data.canConvert<QString>()) {
-      node_data.emplace_back(col_data.toString());
-
-    } else if (col_data.canConvert<TokenRange>()) {
-      TokenRange tok_range = col_data.value<TokenRange>();
-      auto char_data = tok_range.data();
-      node_data.emplace_back(TextAndTokenRange{
-          QString::fromUtf8(char_data.data(),
-                            static_cast<qsizetype>(char_data.size())),
-          std::move(tok_range)});
-
-    } else {
-      node_data.emplace_back(std::move(col_data));
-    }
-  }
+  d->data_batch_queue.emplace_back(d->NodeKeyFromId(parent_node_id),
+                                   std::move(child_items), remaining_depth);
 }
 
 void TreeGeneratorModel::ProcessDataBatchQueue(void) {
@@ -660,8 +620,7 @@ void TreeGeneratorModel::ProcessDataBatchQueue(void) {
       }
 
       // Copy the entity into the node.
-      new_node->entity = std::move(entity);
-      new_node->aliased_entity = std::move(aliased_entity);
+      new_node->item = std::move(item);
 
       // Make the node point to itself, and update the parent child index or
       // previous sibling's next sibling index.
@@ -676,14 +635,6 @@ void TreeGeneratorModel::ProcessDataBatchQueue(void) {
 
       d->child_keys.emplace_back(curr_key);
       batch.index_ptr = &(new_node->sibling_index);
-
-      // If this is a new node, then import the data, otherwise reference the
-      // existing data.
-      if (added) {
-        d->ImportData(new_node, std::move(item));
-      } else {
-        new_node->data_index = load_key->second.data_index;
-      }
 
       ++num_imported_children;
       ++num_imported;
@@ -732,7 +683,7 @@ void TreeGeneratorModel::ProcessDataBatchQueue(void) {
     if (NodeState::kUnopened == new_parent->second.state) {
       new_parent->second.state = NodeState::kOpening;
       RunExpansionThread(new ExpandTreeRunnable(
-          d->generator, d->version_number, new_parent->second.entity,
+          d->generator, d->version_number, new_parent->second.item,
           remaining_depth));
     }
   }

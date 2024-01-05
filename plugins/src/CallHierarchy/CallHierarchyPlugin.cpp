@@ -105,11 +105,10 @@ class CallHierarchyGenerator final : public ITreeGenerator {
   QString Name(const ITreeGeneratorPtr &self) const Q_DECL_FINAL;
 
   gap::generator<IGeneratedItemPtr> Roots(
-      const ITreeGeneratorPtr &self) Q_DECL_FINAL;
+      ITreeGeneratorPtr self) Q_DECL_FINAL;
 
   gap::generator<IGeneratedItemPtr> Children(
-      const ITreeGeneratorPtr &self,
-      const VariantEntity &parent_entity) Q_DECL_FINAL;
+      ITreeGeneratorPtr self, IGeneratedItemPtr parent_item) Q_DECL_FINAL;
 };
 
 unsigned CallHierarchyGenerator::InitialExpansionDepth(void) const {
@@ -149,7 +148,7 @@ QString CallHierarchyGenerator::Name(
 }
 
 gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Roots(
-    const ITreeGeneratorPtr &self) {
+    ITreeGeneratorPtr self) {
   if (std::holds_alternative<Decl>(root_entity)) {
     std::optional<Decl> decl;
     for (Decl redecl : std::get<Decl>(root_entity).redeclarations()) {
@@ -166,8 +165,9 @@ gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Roots(
 }
 
 gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Children(
-    const ITreeGeneratorPtr &self, const VariantEntity &entity) {
+    ITreeGeneratorPtr self, IGeneratedItemPtr parent_item) {
 
+  VariantEntity entity = parent_item->AliasedEntity();
   VariantEntity containing_entity = entity;
   if (!Decl::from(entity)) {
     containing_entity = NamedEntityContaining(entity);

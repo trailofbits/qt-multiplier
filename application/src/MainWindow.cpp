@@ -15,6 +15,7 @@
 
 #include <multiplier/GUI/Explorers/EntityExplorer.h>
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
+#include <multiplier/GUI/Explorers/InformationExplorer.h>
 #include <multiplier/GUI/Explorers/ProjectExplorer.h>
 #include <multiplier/GUI/Explorers/ReferenceExplorer.h>
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
@@ -61,6 +62,7 @@ void MainWindow::InitializePlugins(void) {
 
   d->plugins.emplace_back(new ProjectExplorer(d->config_manager, this));
   d->plugins.emplace_back(new EntityExplorer(d->config_manager, this));
+  d->plugins.emplace_back(new InformationExplorer(d->config_manager, this));
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, this));
   d->plugins.emplace_back(ref_explorer);
 

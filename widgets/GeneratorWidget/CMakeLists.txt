@@ -43,6 +43,7 @@ target_link_libraries("mx_generator_widget"
     "mx_search_widget"
     "mx_theme_manager"
     "mx_tree_widget"
+    "mx_util_component"
 
   PUBLIC
     "mx_interfaces"

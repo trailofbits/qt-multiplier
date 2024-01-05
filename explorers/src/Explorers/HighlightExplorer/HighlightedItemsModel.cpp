@@ -22,7 +22,7 @@ HighlightedItemsModel::HighlightedItemsModel(QObject *parent)
       d(new PrivateData) {}
 
 QModelIndex HighlightedItemsModel::index(int row, int column,
-                                      const QModelIndex &parent) const {
+                                         const QModelIndex &parent) const {
 
   if (!hasIndex(row, column, parent)) {
     return {};

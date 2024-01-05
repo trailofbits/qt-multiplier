@@ -97,13 +97,12 @@ class EntitySearchGenerator : public IListGenerator {
     return "";
   }
 
-  gap::generator<IGeneratedItemPtr> Roots(
-      const ITreeGeneratorPtr &) Q_DECL_FINAL;
+  gap::generator<IGeneratedItemPtr> Roots(ITreeGeneratorPtr) Q_DECL_FINAL;
 };
 
 // Generate the search results.
 gap::generator<IGeneratedItemPtr> EntitySearchGenerator::Roots(
-    const ITreeGeneratorPtr &) {
+    ITreeGeneratorPtr) {
   
   if (query.empty()) {
     co_return;

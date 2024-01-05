@@ -8,31 +8,32 @@
 
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 
-namespace mx {
-enum class TokenCategory : unsigned char;
-}  // namespace mx
 namespace mx::gui {
 
-class EntityExplorer Q_DECL_FINAL : public IMainWindowPlugin {
+class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   Q_OBJECT
 
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
  public:
-  virtual ~EntityExplorer(void);
+  virtual ~InformationExplorer(void);
 
-  EntityExplorer(ConfigManager &config_manager,
-                 QMainWindow *parent = nullptr);
+  InformationExplorer(ConfigManager &config_manager,
+                      QMainWindow *parent = nullptr);
 
   QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
+
   void ActOnPrimaryClick(const QModelIndex &index) Q_DECL_FINAL;
-  void ActOnContextMenu(QMenu *menu, const QModelIndex &index) Q_DECL_FINAL;
+
+  std::optional<NamedAction> ActOnSecondaryClick(
+      const QModelIndex &index) Q_DECL_FINAL;
+
+  std::optional<NamedAction> ActOnKeyPress(
+      const QKeySequence &keys, const QModelIndex &index) Q_DECL_FINAL;
 
  private slots:
-  void QueryParametersChanged(void);
   void OnIndexChanged(const ConfigManager &config_manager);
-  void OnCategoryChanged(std::optional<TokenCategory> token_category);
 };
 
 }  // namespace mx::gui

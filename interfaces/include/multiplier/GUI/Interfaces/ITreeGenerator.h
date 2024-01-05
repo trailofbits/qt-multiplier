@@ -46,8 +46,7 @@ class ITreeGenerator : public std::enable_shared_from_this<ITreeGenerator> {
   virtual QString
   Name(const ITreeGeneratorPtr &self) const = 0;
 
-  // Generate the root / top-level items for the tree. Defaults to
-  // `Children(self, NotAnEntity{})`.
+  // Generate the root / top-level items for the tree.
   //
   // NOTE(pag): These are `shared_ptr`s so that implementations have the
   //            flexibility of having tree items extend the lifetime of
@@ -55,7 +54,7 @@ class ITreeGenerator : public std::enable_shared_from_this<ITreeGenerator> {
   //
   // NOTE(pag): This is allowed to block.
   virtual gap::generator<IGeneratedItemPtr> Roots(
-      const ITreeGeneratorPtr &self);
+      ITreeGeneratorPtr self) = 0;
 
   // Given a parent entity, goes and fetches the tree items for the children
   // of the tree.
@@ -66,7 +65,7 @@ class ITreeGenerator : public std::enable_shared_from_this<ITreeGenerator> {
   //
   // NOTE(pag): This is allowed to block.
   virtual gap::generator<IGeneratedItemPtr> Children(
-      const ITreeGeneratorPtr &self, const VariantEntity &parent_entity) = 0;
+      ITreeGeneratorPtr self, IGeneratedItemPtr parent_item) = 0;
 };
 
 }  // namespace mx::gui

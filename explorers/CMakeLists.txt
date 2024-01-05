@@ -9,11 +9,17 @@
 add_library("mx_explorers"
   include/multiplier/GUI/Explorers/EntityExplorer.h
   include/multiplier/GUI/Explorers/HighlightExplorer.h
+  include/multiplier/GUI/Explorers/InformationExplorer.h
   include/multiplier/GUI/Explorers/ProjectExplorer.h
   include/multiplier/GUI/Explorers/ReferenceExplorer.h
+
+  include/multiplier/GUI/Interfaces/IInfoGenerator.h
+  include/multiplier/GUI/Interfaces/IInfoGeneratorItem.h
   include/multiplier/GUI/Interfaces/IMainWindowPlugin.h
   include/multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h
 
+  src/Interfaces/IInfoGenerator.cpp
+  src/Interfaces/IInfoGeneratorItem.cpp
   src/Interfaces/IMainWindowPlugin.cpp
   src/Interfaces/IReferenceExplorerPlugin.cpp
 
@@ -26,6 +32,12 @@ add_library("mx_explorers"
   src/Explorers/HighlightExplorer/HighlightExplorer.cpp
   src/Explorers/HighlightExplorer/HighlightThemeProxy.cpp
   src/Explorers/HighlightExplorer/HighlightThemeProxy.h
+
+  src/Explorers/InformationExplorer/EntityInformationModel.cpp
+  src/Explorers/InformationExplorer/EntityInformationModel.h
+  src/Explorers/InformationExplorer/EntityInformationRunnable.cpp
+  src/Explorers/InformationExplorer/EntityInformationRunnable.h
+  src/Explorers/InformationExplorer/InformationExplorer.cpp
 
   src/Explorers/ProjectExplorer/FileTreeModel.cpp
   src/Explorers/ProjectExplorer/FileTreeModel.h
@@ -48,7 +60,6 @@ target_link_libraries("mx_explorers"
     "mx_simple_text_input_dialog"
     "mx_theme_manager"
     "mx_tab_widget"
-    "mx_tree_widget"
     "mx_util_component"
 
   PUBLIC

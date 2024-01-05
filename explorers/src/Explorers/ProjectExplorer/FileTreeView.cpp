@@ -13,7 +13,6 @@
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
-#include <multiplier/GUI/Widgets/TreeWidget.h>
 
 #include <QTreeView>
 #include <QVBoxLayout>
@@ -27,7 +26,7 @@ namespace mx::gui {
 namespace {
 
 void SaveExpandedNodeListHelper(std::vector<QModelIndex> &expanded_node_list,
-                                const TreeWidget &tree_view,
+                                const QTreeView &tree_view,
                                 const QModelIndex &root) {
 
   const auto &model = *tree_view.model();
@@ -50,7 +49,7 @@ struct FileTreeView::PrivateData final {
   QSortFilterProxyModel *model_proxy{nullptr};
   std::vector<QModelIndex> expanded_node_list;
 
-  TreeWidget *tree_view{nullptr};
+  QTreeView *tree_view{nullptr};
   SearchWidget *search_widget{nullptr};
   QWidget *alternative_root_warning{nullptr};
 
@@ -74,7 +73,7 @@ void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {
   auto &media_manager = config_manager.MediaManager();
 
   // Setup the tree view
-  d->tree_view = new TreeWidget();
+  d->tree_view = new QTreeView;
   d->tree_view->setHeaderHidden(true);
   d->tree_view->setAlternatingRowColors(false);
 
