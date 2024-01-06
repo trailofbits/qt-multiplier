@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include <multiplier/Frontend/File.h>
-#include <multiplier/Index.h>
 #include <multiplier/GUI/Interfaces/IInfoGenerator.h>
 
 #include <QVector>
@@ -56,8 +54,7 @@ class EntityInformationRunnable Q_DECL_FINAL : public QObject, public QRunnable 
 
  signals:
   void NewGeneratedItems(
-      uint64_t version_number, const QString &category,
-      QVector<IInfoGeneratorItemPtr> child_items);
+      uint64_t version_number, QVector<IInfoGenerator::Item> child_items);
 
   void Finished(void);
 };

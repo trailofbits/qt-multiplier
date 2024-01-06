@@ -26,6 +26,8 @@ class IInformationExplorerPlugin : public QObject {
   Q_OBJECT
 
  public:
+  using QObject::QObject;
+
   virtual ~IInformationExplorerPlugin(void);
 
   virtual gap::generator<IInfoGeneratorPtr> CreateInformationCollectors(

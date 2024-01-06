@@ -29,7 +29,7 @@ struct ReferenceExplorer::PrivateData {
   TabWidget *view{nullptr};
 
   // List of plugins.
-  std::vector<std::unique_ptr<IReferenceExplorerPlugin>> plugins;
+  std::vector<IReferenceExplorerPluginPtr> plugins;
 
   // Launches a reference explorer given a data generator.
   TriggerHandle open_reference_explorer_trigger;
@@ -188,8 +188,7 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
   emit ShowDockWidget();
 }
 
-void ReferenceExplorer::AddPlugin(
-    std::unique_ptr<IReferenceExplorerPlugin> plugin) {
+void ReferenceExplorer::AddPlugin(IReferenceExplorerPluginPtr plugin) {
   if (plugin) {
     d->plugins.emplace_back(std::move(plugin));
   }

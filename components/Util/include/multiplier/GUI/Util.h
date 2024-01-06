@@ -103,7 +103,7 @@ Token FirstFileToken(const VariantEntity &ent);
 TokenRange InjectWhitespace(const TokenRange &toks);
 
 //! Return the name of an entity.
-TokenRange NameOfEntity(const VariantEntity &ent);
+TokenRange NameOfEntity(const VariantEntity &ent, bool qualified=true);
 
 //! Return the name of an entity as a `QString`.
 std::optional<QString> NameOfEntityAsString(const VariantEntity &ent);

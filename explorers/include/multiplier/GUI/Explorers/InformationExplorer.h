@@ -7,6 +7,7 @@
 #pragma once
 
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
+#include <multiplier/GUI/Interfaces/IInformationExplorerPlugin.h>
 
 namespace mx::gui {
 
@@ -31,6 +32,13 @@ class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
   std::optional<NamedAction> ActOnKeyPress(
       const QKeySequence &keys, const QModelIndex &index) Q_DECL_FINAL;
+
+  void AddPlugin(IInformationExplorerPluginPtr plugin);
+
+  template <typename T, typename... Args>
+  inline void EmplacePlugin(Args&&... args) {
+    AddPlugin(IInformationExplorerPluginPtr(new T(std::forward<Args>(args)...)));
+  }
 };
 
 }  // namespace mx::gui

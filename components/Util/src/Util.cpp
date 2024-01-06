@@ -845,26 +845,98 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
 }
 
 //! Return the name of an entity.
-TokenRange NameOfEntity(const VariantEntity &ent) {
+TokenRange NameOfEntity(const VariantEntity &ent, bool qualified) {
 
   const auto VariantEntityVisitor = Overload{
-      [](const Decl &decl) -> TokenRange {
+      [qualified](const Decl &decl) -> TokenRange {
+        Token name_tok;
+
         if (auto named = NamedDecl::from(decl)) {
           std::string_view name = named->name();
-          Token name_tok = named->token();
+          auto maybe_name_tok = named->token();
           if (!name.empty() && name == name_tok.data()) {
-            return name_tok;
-          }
-
-          for (NamedDecl redecl : named->redeclarations()) {
-            name = redecl.name();
-            name_tok = named->token();
-            if (!name.empty() && name == name_tok.data()) {
-              return name_tok;
+            name_tok = std::move(maybe_name_tok);
+          } else {
+            for (NamedDecl redecl : named->redeclarations()) {
+              name = redecl.name();
+              maybe_name_tok = named->token();
+              if (!name.empty() && name == maybe_name_tok.data()) {
+                name_tok = std::move(maybe_name_tok);
+                break;
+              }
             }
           }
         }
-        return TokenRange();
+
+        if (!name_tok) {
+          std::vector<CustomToken> toks;
+          UserToken tok;
+          tok.related_entity = decl;
+          tok.category = Token::categorize(tok.related_entity);
+          tok.kind = TokenKind::IDENTIFIER;
+
+          switch (tok.category) {
+            case TokenCategory::ENUM:
+              tok.data = QObject::tr("(anonymous enum)").toStdString();
+              break;
+
+            case TokenCategory::CLASS:
+              tok.data = QObject::tr("(anonymous class)").toStdString();
+              break;
+
+            case TokenCategory::STRUCT:
+              tok.data = QObject::tr("(anonymous struct)").toStdString();
+              break;
+
+            case TokenCategory::UNION:
+              tok.data = QObject::tr("(anonymous union)").toStdString();
+              break;
+
+            case TokenCategory::INSTANCE_MEMBER:
+              tok.data = QObject::tr("(anonymous field)").toStdString();
+              break;
+
+            case TokenCategory::PARAMETER_VARIABLE:
+              tok.data = QObject::tr("(anonymous parameter)").toStdString();
+              break;
+
+            case TokenCategory::NAMESPACE:
+              tok.data = QObject::tr("(anonymous namespace)").toStdString();
+              break;
+
+            default:
+              tok.data = QObject::tr("(anonymous)").toStdString();
+              break;
+          }
+
+          toks.emplace_back(std::move(tok));
+          name_tok = TokenRange::create(std::move(toks)).front();
+        }
+
+        auto pd = decl.parent_declaration();
+        if (!pd || !qualified) {
+          return TokenRange(name_tok);
+        }
+
+        std::vector<CustomToken> toks;
+
+        for (Token tok : NameOfEntity(pd.value(), qualified)) {
+          toks.emplace_back(std::move(tok));
+        }
+
+        if (toks.empty()) {
+          return TokenRange(name_tok);
+        }
+
+        UserToken tok;
+        tok.category = TokenCategory::PUNCTUATION;
+        tok.kind = TokenKind::COLON_COLON;
+        tok.data = "::";
+        toks.emplace_back(std::move(tok));
+
+        toks.emplace_back(std::move(name_tok));
+
+        return TokenRange::create(std::move(toks));
       },
 
       [](const Stmt &stmt) -> TokenRange {

@@ -7,7 +7,7 @@
 #pragma once
 
 #include <multiplier/GUI/Interfaces/IModel.h>
-#include <multiplier/GUI/Interfaces/IInfoGeneratorItem.h>
+#include <multiplier/GUI/Interfaces/IInfoGenerator.h>
 
 #include "EntityInformationRunnable.h"
 
@@ -22,6 +22,12 @@ class EntityInformationModel Q_DECL_FINAL : public IModel {
   std::unique_ptr<PrivateData> d;
 
  public:
+
+  enum {
+    // Returns `true` if this node should be auto-expanded.
+    AutoExpandRole = IModel::MultiplierUserRole,
+  };
+
   virtual ~EntityInformationModel(void);
 
   EntityInformationModel(const FileLocationCache &cache,
@@ -44,8 +50,8 @@ class EntityInformationModel Q_DECL_FINAL : public IModel {
  public slots:
   void OnIndexChanged(const ConfigManager &config_manager);
 
-  void AddData(uint64_t version_number, const QString &category,
-               QVector<IInfoGeneratorItemPtr> child_items);
+  void AddData(
+      uint64_t version_number, QVector<IInfoGenerator::Item> child_items);
 
   void ProcessData(void);
 };

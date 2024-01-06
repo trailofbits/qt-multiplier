@@ -14,13 +14,11 @@ add_library("mx_explorers"
   include/multiplier/GUI/Explorers/ReferenceExplorer.h
 
   include/multiplier/GUI/Interfaces/IInfoGenerator.h
-  include/multiplier/GUI/Interfaces/IInfoGeneratorItem.h
   include/multiplier/GUI/Interfaces/IInformationExplorerPlugin.h
   include/multiplier/GUI/Interfaces/IMainWindowPlugin.h
   include/multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h
 
   src/Interfaces/IInfoGenerator.cpp
-  src/Interfaces/IInfoGeneratorItem.cpp
   src/Interfaces/IInformationExplorerPlugin.cpp
   src/Interfaces/IMainWindowPlugin.cpp
   src/Interfaces/IReferenceExplorerPlugin.cpp
@@ -42,6 +40,8 @@ add_library("mx_explorers"
   src/Explorers/InformationExplorer/EntityInformationWidget.cpp
   src/Explorers/InformationExplorer/EntityInformationWidget.h
   src/Explorers/InformationExplorer/InformationExplorer.cpp
+  src/Explorers/InformationExplorer/SortFilterProxyModel.cpp
+  src/Explorers/InformationExplorer/SortFilterProxyModel.h
 
   src/Explorers/ProjectExplorer/FileTreeModel.cpp
   src/Explorers/ProjectExplorer/FileTreeModel.h

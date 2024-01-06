@@ -11,8 +11,7 @@ namespace mx::gui {
 EntityInformationRunnable::~EntityInformationRunnable(void) {}
 
 void EntityInformationRunnable::run(void) {
-  QString category = generator->Category();
-  QVector<IInfoGeneratorItemPtr> items;
+  QVector<IInfoGenerator::Item> items;
 
   for (auto item : generator->Items(generator, file_location_cache)) {
     if (version_number->load() != captured_version_number) {
@@ -24,13 +23,12 @@ void EntityInformationRunnable::run(void) {
     items.emplaceBack(std::move(item));
 
     if (static_cast<size_t>(items.size()) >= kMaxBatchSize) {
-      emit NewGeneratedItems(captured_version_number, category,
-                             std::move(items));
+      emit NewGeneratedItems(captured_version_number, std::move(items));
     }
   }
 
   if (version_number->load() == captured_version_number) {
-    emit NewGeneratedItems(captured_version_number, category, std::move(items));
+    emit NewGeneratedItems(captured_version_number, std::move(items));
   }
 
   emit Finished();

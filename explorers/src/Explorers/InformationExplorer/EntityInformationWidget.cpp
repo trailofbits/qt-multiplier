@@ -22,11 +22,25 @@
 
 #include "EntityInformationModel.h"
 #include "EntityInformationRunnable.h"
+#include "SortFilterProxyModel.h"
 
 namespace mx::gui {
 namespace {
 
 static constexpr unsigned kMaxHistorySize = 32;
+
+bool ShouldAutoExpand(const QModelIndex &index) {
+  if (!index.isValid()) {
+    return true;
+  }
+
+  auto auto_expand_var = index.data(EntityInformationModel::AutoExpandRole);
+  if (!auto_expand_var.isValid()) {
+    return true;
+  }
+
+  return auto_expand_var.toBool();
+}
 
 }  // namespace
 
@@ -35,6 +49,7 @@ struct EntityInformationWidget::PrivateData {
   QTreeView * const tree;
   QWidget * const status_widget;
   EntityInformationModel * const model;
+  SortFilterProxyModel * const sort_model;
   HistoryWidget * const history;
   QThreadPool thread_pool;
   VariantEntity current_entity;
@@ -49,6 +64,7 @@ struct EntityInformationWidget::PrivateData {
         status_widget(new QWidget(parent)),
         model(new EntityInformationModel(
             config_manager.FileLocationCache(), version_number, tree)),
+        sort_model(new SortFilterProxyModel(tree)),
         history(
             enable_history ?
             new HistoryWidget(config_manager, kMaxHistorySize, false, parent) :
@@ -63,16 +79,54 @@ EntityInformationWidget::EntityInformationWidget(
     : QWidget(parent),
       d(new PrivateData(config_manager, enable_history, this)) {
 
+  d->sort_model->setRecursiveFilteringEnabled(true);
+  d->sort_model->setSourceModel(d->model);
+
   setWindowTitle(tr("Information Explorer"));
-  d->tree->setModel(d->model);
+  d->tree->setModel(d->sort_model);
   d->tree->setHeaderHidden(true);
   d->tree->setAlternatingRowColors(false);
   d->tree->setSelectionBehavior(QAbstractItemView::SelectRows);
   d->tree->setSelectionMode(QAbstractItemView::SingleSelection);
+  d->tree->setTextElideMode(Qt::TextElideMode::ElideRight);
+
+  d->tree->setSortingEnabled(true);
+  d->tree->sortByColumn(0, Qt::AscendingOrder);
+
+  // The auto scroll takes care of keeping the active item within the
+  // visible viewport region. This is true for mouse clicks but also
+  // keyboard navigation (i.e. arrow keys, page up/down, etc).
+  d->tree->setAutoScroll(false);
+
+  // Smooth scrolling.
+  d->tree->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+  d->tree->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+
+  // We'll potentially have a bunch of columns depending on the configuration,
+  // so make sure they span to use all available space.
+  QHeaderView *header = d->tree->header();
+  header->setStretchLastSection(true);
+
+  // Don't let double click expand things in three; we capture double click so
+  // that we can make it open up the use in the code.
+  d->tree->setExpandsOnDoubleClick(false);
+
+  // Disallow multiple selection. If we have grouping by file enabled, then when
+  // a user clicks on a file name, we instead jump down to the first entry
+  // grouped under that file. This is to make using the up/down arrows easier.
+  d->tree->setSelectionBehavior(QAbstractItemView::SelectRows);
+  d->tree->setSelectionMode(QAbstractItemView::SingleSelection);
   d->tree->setAllColumnsShowFocus(true);
   d->tree->setTreePosition(0);
-  d->tree->setTextElideMode(Qt::TextElideMode::ElideMiddle);
-  d->tree->header()->setStretchLastSection(true);
+
+  d->tree->setContextMenuPolicy(Qt::CustomContextMenu);
+  // connect(d->tree, &QTreeView::customContextMenuRequested,
+  //         this, &TreeGeneratorWidget::OnOpenItemContextMenu);
+
+  // connect(d->tree, &QAbstractItemView::clicked,
+  //         [this] (const QModelIndex &index) {
+  //           OnCurrentItemChanged(index, {});
+  //         });
 
   // Create the status widget
   d->status_widget->setVisible(false);
@@ -134,6 +188,35 @@ EntityInformationWidget::EntityInformationWidget(
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           d->model, &EntityInformationModel::OnIndexChanged);
+
+  connect(d->sort_model, &QAbstractItemModel::rowsInserted,
+          this, &EntityInformationWidget::ExpandAllBelow);
+}
+
+void EntityInformationWidget::ExpandAllBelow(const QModelIndex &parent) {
+  std::vector<QModelIndex> next_queue;
+  next_queue.emplace_back(parent);
+
+  while (!next_queue.empty()) {
+    auto queue = std::move(next_queue);
+    next_queue.clear();
+
+    for (const auto &index : queue) {
+      if (!ShouldAutoExpand(index)) {
+        continue;
+      }
+
+      d->tree->expand(index);
+
+      auto row_count = d->sort_model->rowCount(index);
+      for (int row{}; row < row_count; ++row) {
+        auto child_index = d->sort_model->index(row, 0, index);
+        next_queue.push_back(child_index);
+      }
+    }
+  }
+
+  d->tree->resizeColumnToContents(0);
 }
 
 void EntityInformationWidget::DisplayEntity(

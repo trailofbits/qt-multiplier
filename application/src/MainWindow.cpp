@@ -22,6 +22,7 @@
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h>
 #include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
 #include <multiplier/Index.h>
@@ -60,9 +61,12 @@ void MainWindow::InitializePlugins(void) {
   ref_explorer->EmplacePlugin<CallHierarchyPlugin>(
       d->config_manager, ref_explorer);
 
+  auto info_explorer = new InformationExplorer(d->config_manager, this);
+  info_explorer->EmplacePlugin<BuiltinEntityInformationPlugin>();
+
   d->plugins.emplace_back(new ProjectExplorer(d->config_manager, this));
   d->plugins.emplace_back(new EntityExplorer(d->config_manager, this));
-  d->plugins.emplace_back(new InformationExplorer(d->config_manager, this));
+  d->plugins.emplace_back(info_explorer);
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, this));
   d->plugins.emplace_back(ref_explorer);
 

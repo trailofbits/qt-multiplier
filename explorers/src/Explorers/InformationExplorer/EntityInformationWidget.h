@@ -56,6 +56,8 @@ class EntityInformationWidget Q_DECL_FINAL : public QWidget {
   void OnCancelRunningRequest(void);
   void OnChangeSync(int state);
 
+  void ExpandAllBelow(const QModelIndex &parent);
+
  signals:
   void HistoricalEntitySelected(VariantEntity entity);
 
@@ -64,8 +66,6 @@ class EntityInformationWidget Q_DECL_FINAL : public QWidget {
 
   // TODO(pag): IndexChanged should close the widget if it is a pinned info
   //            explorer.
-
-  // TODO(pag): `DisplayEntity` should take the list of plugins to run.
 
   // TODO(pag): Change the window title based on `entity`.
 };

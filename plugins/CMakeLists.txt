@@ -7,9 +7,11 @@
 #
 
 add_library("mx_plugins"
+  include/multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h
   include/multiplier/GUI/Plugins/CallHierarchyPlugin.h
 
-  src/CallHierarchy/CallHierarchyPlugin.cpp
+  src/BuiltinEntityInformationPlugin.cpp
+  src/CallHierarchyPlugin.cpp
 )
 
 target_link_libraries("mx_plugins"

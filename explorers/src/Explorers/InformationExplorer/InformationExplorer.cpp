@@ -92,4 +92,10 @@ std::optional<NamedAction> InformationExplorer::ActOnKeyPress(
   return std::nullopt;
 }
 
+void InformationExplorer::AddPlugin(IInformationExplorerPluginPtr plugin) {
+  if (plugin) {
+    d->plugins.emplace_back(std::move(plugin));
+  }
+}
+
 }  // namespace mx::gui

@@ -33,7 +33,7 @@ class ReferenceExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void AddPlugin(IReferenceExplorerPluginPtr plugin);
 
   template <typename T, typename... Args>
-  void EmplacePlugin(Args&&... args) {
+  inline void EmplacePlugin(Args&&... args) {
     AddPlugin(IReferenceExplorerPluginPtr(new T(std::forward<Args>(args)...)));
   }
 

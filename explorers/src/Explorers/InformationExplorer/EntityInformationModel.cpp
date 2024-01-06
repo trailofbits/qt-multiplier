@@ -31,7 +31,7 @@ using NodePtrList = std::vector<std::unique_ptr<Node>>;
 
 struct Node {
   QString name;
-  IInfoGeneratorItemPtr item;
+  IInfoGenerator::Item item;
 
   // Parent node.
   Node *parent{nullptr};
@@ -72,7 +72,7 @@ struct EntityInformationModel::PrivateData {
   const AtomicU64Ptr version_number;
   Node root;
   QTimer import_timer;
-  QMap<QString, std::list<std::pair<uint64_t, IInfoGeneratorItemPtr>>>
+  QMap<QString, std::list<std::pair<uint64_t, IInfoGenerator::Item>>>
       insertion_queue;
 
   inline PrivateData(const FileLocationCache &file_location_cache_,
@@ -160,35 +160,39 @@ QVariant EntityInformationModel::data(
   auto node = reinterpret_cast<Node *>(index.internalPointer());
 
   if (role == Qt::DisplayRole) {
-    if (!node->render_name && node->item) {
-      return TokensToString(node->item->Tokens());
+    if (!node->render_name && node->item.tokens) {
+      return TokensToString(node->item.tokens);
     }
     return node->name;
 
   } else if (role == IModel::TokenRangeDisplayRole) {
-    if (!node->render_name && node->item) {
-      return QVariant::fromValue(node->item->Tokens());
+    if (!node->render_name && node->item.tokens) {
+      return QVariant::fromValue(node->item.tokens);
     }
   
   } else if (role == IModel::EntityRole) {
-    if (node->item && !node->is_category) {
-      return QVariant::fromValue(node->item->Entity());
+    if (!node->is_category &&
+        !std::holds_alternative<NotAnEntity>(node->item.entity)) {
+      return QVariant::fromValue(node->item.entity);
     }
+  
+  // Auto-expand the root and the categories, but nothing else.
+  } else if (role == AutoExpandRole) {
+    return {!node->parent || node->parent == &(d->root)};
   }
 
   return {};
 }
 
 void EntityInformationModel::AddData(
-    uint64_t version_number, const QString &category,
-    QVector<IInfoGeneratorItemPtr> items) {
+    uint64_t version_number, QVector<IInfoGenerator::Item> items) {
   if (version_number != d->version_number->load()) {
     return;
   }
 
-  auto &list = d->insertion_queue[category];
   for (auto &item : items) {
-    list.emplace_back(version_number, std::move(item));
+    d->insertion_queue[item.category].emplace_back(
+        version_number, std::move(item));
   }
 
   if (!d->import_timer.isActive()) {
@@ -295,7 +299,7 @@ void EntityInformationModel::ProcessData(void) {
       entity_node->item = std::move(item.second);
       entity_node->is_category = false;
       entity_node->render_name = false;
-      entity_node->name = TokensToString(entity_node->item->Tokens());
+      entity_node->name = TokensToString(entity_node->item.tokens);
 
       // Look to see if another node with the same name exists within
       // `category_node`.
@@ -315,7 +319,7 @@ void EntityInformationModel::ProcessData(void) {
       // A sub-category does exist, we need to place stuff inside of it.
       } else if (prev_data_node->is_category) {
 
-        entity_node->name = entity_node->item->Location();
+        entity_node->name = entity_node->item.location;
         entity_node->render_name = true;
 
         prev_data_node->node_index.insert(
@@ -326,12 +330,13 @@ void EntityInformationModel::ProcessData(void) {
       // category.
       } else {
         auto cloned_node = new Node;
-        cloned_node->name = prev_data_node->item->Location();
+        cloned_node->name = prev_data_node->item.location;
         cloned_node->render_name = true;
         cloned_node->item = prev_data_node->item;
+        cloned_node->item.tokens = {};
         cloned_node->is_category = prev_data_node->is_category;
 
-        entity_node->name = entity_node->item->Location();
+        entity_node->name = entity_node->item.location;
         entity_node->render_name = true;
 
         prev_data_node->is_category = true;
