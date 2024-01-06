@@ -15,11 +15,13 @@ add_library("mx_explorers"
 
   include/multiplier/GUI/Interfaces/IInfoGenerator.h
   include/multiplier/GUI/Interfaces/IInfoGeneratorItem.h
+  include/multiplier/GUI/Interfaces/IInformationExplorerPlugin.h
   include/multiplier/GUI/Interfaces/IMainWindowPlugin.h
   include/multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h
 
   src/Interfaces/IInfoGenerator.cpp
   src/Interfaces/IInfoGeneratorItem.cpp
+  src/Interfaces/IInformationExplorerPlugin.cpp
   src/Interfaces/IMainWindowPlugin.cpp
   src/Interfaces/IReferenceExplorerPlugin.cpp
 
