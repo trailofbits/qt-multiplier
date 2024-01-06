@@ -250,7 +250,6 @@ void EntityInformationModel::ProcessData(void) {
     }
 
     Node *category_node = nullptr;
-    auto category_added = false;
 
     while (!pending_items.empty()) {
 
@@ -285,11 +284,11 @@ void EntityInformationModel::ProcessData(void) {
 
           emit beginInsertRows(QModelIndex(), category_node->row,
                                category_node->row);
-          
           root_node->nodes.emplace_back(category_node);
+          emit endInsertRows();
+
           root_node->node_index.insert(
               category, static_cast<unsigned>(category_node->row));
-          category_added = true;
           ++num_changes;
         }
       }
@@ -330,15 +329,23 @@ void EntityInformationModel::ProcessData(void) {
       // category.
       } else {
         auto cloned_node = new Node;
-        cloned_node->name = prev_data_node->item.location;
-        cloned_node->render_name = true;
         cloned_node->item = prev_data_node->item;
+
+        // Wipe out the tokens in the clone, and make the name of the cloned
+        // node be the location of the original node. The idea is that if we
+        // have "visual duplicates" (i.e. whose token strings match), then we
+        // want to nest them together, and disambiguate via their locations.
+        cloned_node->name = prev_data_node->item.location;
         cloned_node->item.tokens = {};
+
+        cloned_node->render_name = true;
         cloned_node->is_category = prev_data_node->is_category;
 
         entity_node->name = entity_node->item.location;
         entity_node->render_name = true;
 
+        // Clear the entity, and convert to a category.
+        prev_data_node->item.entity = {};
         prev_data_node->is_category = true;
         
         prev_data_node->node_index.insert(
@@ -347,18 +354,18 @@ void EntityInformationModel::ProcessData(void) {
         prev_data_node->node_index.insert(
             entity_node->name, add_child(prev_data_node, entity_node));
 
-        prev_data_node->nodes.emplace_back(cloned_node);
-
-        // If it was already linked into the tree.
+        // Checking if `prev_data_node->parent` is non-null lets us figure out
+        // if it was already linked into the tree. If that node was created
+        // during this batch, then `->parent` would be null.
         if (prev_data_node->parent) {
 
-          // NOTE(pag): We `std::move(prev_data_node->item)` into the child
-          //            `cloned_node`, and so we emit `dataChanged` because the
-          //            `IModel::EntityRole` will now return something
-          //            different, which could affect row highlighting when
-          //            using the `ThemedItemDelegate` in conjunction with a
+          // NOTE(pag): We clear `prev_data_node->item.entity` above, which may
+          //            have previously satisfied `IModel::EntityRole` data
+          //            requests, will now return something different. This
+          //            could affect row highlighting when using the
+          //            `ThemedItemDelegate` in conjunction with a
           //            `HighlightExplorer`-added theme proxy (to color-
-          //            highlight stuff).
+          //            highlight stuff), so we need to signal a `dataChanged`.
           auto node_index = createIndex(prev_data_node->row, 0, prev_data_node);
           emit dataChanged(node_index, node_index);
         }
@@ -368,47 +375,34 @@ void EntityInformationModel::ProcessData(void) {
 
       ++num_changes;
     }
+  }
 
-    if (category_added) {
-      for (auto parent_node : ordered_pending_inserts) {
-        Q_ASSERT(parent_node->is_category);
+  for (auto parent_node : ordered_pending_inserts) {
+    Q_ASSERT(parent_node->is_category);
+    Q_ASSERT(parent_node->parent != nullptr);
 
-        for (auto &child_node_ptr : pending_inserts[parent_node]) {
-          child_node_ptr->parent = parent_node;
-          parent_node->nodes.emplace_back(std::move(child_node_ptr));
-        }
-      }
-
-      emit endInsertRows();
+    auto &children = pending_inserts[parent_node];
+    auto num_new_children = static_cast<int>(children.size());
+    if (!num_new_children) {
       continue;
     }
 
-    for (auto parent_node : ordered_pending_inserts) {
-      Q_ASSERT(parent_node->is_category);
-
-      QModelIndex parent_index;
-      if (parent_node->parent == root_node) {
-        parent_index = index(parent_node->row, 0, QModelIndex());
-      } else {
-        parent_index = createIndex(parent_node->row, 0, parent_node);
-      }
-
-      auto &children = pending_inserts[parent_node];
-      auto num_curr_children = static_cast<int>(parent_node->nodes.size());
-      auto num_new_children = static_cast<int>(children.size());
-      Q_ASSERT(0 < num_new_children);
-
-      emit beginInsertRows(
-          parent_index, num_curr_children,
-          num_curr_children + num_new_children - 1);
-
-      for (auto &child_node_ptr : children) {
-        child_node_ptr->parent = parent_node;
-        parent_node->nodes.emplace_back(std::move(child_node_ptr));
-      }
-
-      emit endInsertRows();
+    QModelIndex parent_index;
+    if (parent_node != root_node) {
+      parent_index = createIndex(parent_node->row, 0, parent_node);
     }
+
+    auto num_curr_children = static_cast<int>(parent_node->nodes.size());
+    emit beginInsertRows(
+        parent_index, num_curr_children,
+        num_curr_children + num_new_children - 1);
+
+    for (auto &child_node_ptr : children) {
+      child_node_ptr->parent = parent_node;
+      parent_node->nodes.emplace_back(std::move(child_node_ptr));
+    }
+
+    emit endInsertRows();
   }
 
   // If there's still anything left then restart the timer to import more.

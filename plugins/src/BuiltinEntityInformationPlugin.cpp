@@ -8,6 +8,8 @@
 
 #include <multiplier/AST/CXXMethodDecl.h>
 #include <multiplier/AST/DeclKind.h>
+#include <multiplier/AST/EnumDecl.h>
+#include <multiplier/AST/EnumConstantDecl.h>
 #include <multiplier/AST/FieldDecl.h>
 #include <multiplier/AST/RecordDecl.h>
 #include <multiplier/AST/VarDecl.h>
@@ -56,24 +58,26 @@ static void FillLocation(const FileLocationCache &file_location_cache,
   item.location = QObject::tr("Entity ID: %1").arg(EntityId(item.entity).Pack());
 }
 
-// Generates information about `RecordDecl`s.
-class RecordInfoGenerator Q_DECL_FINAL : public IInfoGenerator {
+// Generates information about `T`s.
+template <typename T>
+class EntityInfoGenerator Q_DECL_FINAL : public IInfoGenerator {
  public:
-  const RecordDecl entity;
+  const T entity;
 
-  virtual ~RecordInfoGenerator(void) = default;
+  virtual ~EntityInfoGenerator(void) = default;
 
-  inline RecordInfoGenerator(RecordDecl entity_)
+  inline EntityInfoGenerator(T entity_)
       : entity(std::move(entity_)) {}
 
   gap::generator<IInfoGenerator::Item> Items(
       IInfoGeneratorPtr, FileLocationCache file_location_cache) Q_DECL_FINAL;
 };
 
-gap::generator<IInfoGenerator::Item> RecordInfoGenerator::Items(
+// Generate information about records. This primarily focuses on fields and
+// their byte offsets.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
     IInfoGeneratorPtr, FileLocationCache file_location_cache) {
-
-  qDebug() << "RecordInfoGenerator::Items";
 
   uint64_t max_offset = 0u;
   uint64_t all_offset = 0u;
@@ -192,6 +196,186 @@ gap::generator<IInfoGenerator::Item> RecordInfoGenerator::Items(
   }
 }
 
+// Generate information about files. This primarily focuses on top-level
+// entities in the file.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
+    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
+  
+  std::vector<CustomToken> toks;
+  UserToken tok;
+  IInfoGenerator::Item item;
+
+  for (IncludeLikeMacroDirective inc : IncludeLikeMacroDirective::in(entity)) {
+    if (std::optional<File> file = inc.included_file()) {
+      item.category = QObject::tr("Includes");
+      item.tokens = inc.use_tokens().strip_whitespace();
+      item.entity = std::move(inc);
+      FillLocation(file_location_cache, item);
+      co_yield std::move(item);
+    }
+  }
+
+  for (Reference ref : Reference::to(entity)) {
+    auto inc = IncludeLikeMacroDirective::from(ref.as_macro());
+    if (!inc) {
+      continue;
+    }
+
+    // Find the file containing the `#include`, then build up a bunch of
+    // `TokenRange`s that contain `file:line:column` triples for the location
+    // of the actual `#include` itself.
+    auto file = File::containing(inc.value());
+    if (!file) {
+      continue;
+    }
+
+    auto loc = inc->use_tokens().front().location(file_location_cache);
+    if (!loc) {
+      continue;
+    }
+
+    item.category = QObject::tr("Included By");
+    item.entity = std::move(inc.value());
+    FillLocation(file_location_cache, item);
+
+    tok.category = TokenCategory::FILE_NAME;
+    tok.kind = TokenKind::HEADER_NAME;
+    tok.related_entity = file.value();
+    for (std::filesystem::path file_path : file->paths()) {
+      tok.data = file_path.generic_string();
+      break;
+    }
+    toks.emplace_back(std::move(tok));
+
+    tok.category = TokenCategory::PUNCTUATION;
+    tok.kind = TokenKind::COLON;
+    tok.data = ":";
+    toks.emplace_back(std::move(tok));
+
+    tok.category = TokenCategory::LINE_NUMBER;
+    tok.kind = TokenKind::NUMERIC_CONSTANT;
+    tok.data = std::to_string(loc->first);
+    toks.emplace_back(std::move(tok));
+
+    tok.category = TokenCategory::PUNCTUATION;
+    tok.kind = TokenKind::COLON;
+    tok.data = ":";
+    toks.emplace_back(std::move(tok));
+
+    tok.category = TokenCategory::LINE_NUMBER;
+    tok.kind = TokenKind::NUMERIC_CONSTANT;
+    tok.data = std::to_string(loc->second);
+    toks.emplace_back(std::move(tok));
+
+    item.tokens = TokenRange::create(std::move(toks));
+    co_yield std::move(item);
+  }
+
+  std::vector<Decl> work_list;
+
+  // Find the top-level entities in this file.
+  for (Fragment frag : entity.fragments()) {
+    for (DefineMacroDirective def : DefineMacroDirective::in(frag)) {
+      item.category = QObject::tr("Defined Macros");
+      item.tokens = def.name();
+      item.entity = std::move(def);
+      FillLocation(file_location_cache, item);
+      co_yield std::move(item);
+    }
+
+    work_list.clear();
+    for (Decl decl : frag.top_level_declarations()) {
+      work_list.emplace_back(std::move(decl));
+    }
+
+    for (auto i = 0ull; i < work_list.size(); ++i) {
+      auto decl = std::move(work_list[i]);
+      auto nd = NamedDecl::from(decl);
+      if (!nd) {
+        continue;
+      }
+
+      switch (Token::categorize(decl)) {
+        case TokenCategory::ENUM:
+          item.category = QObject::tr("Enums");
+          break;
+        case TokenCategory::ENUMERATOR:
+          item.category = QObject::tr("Enumerators");
+          break;
+        case TokenCategory::CLASS:
+          item.category = QObject::tr("Classes");
+          break;
+        case TokenCategory::STRUCT:
+          item.category = QObject::tr("Structures");
+          break;
+        case TokenCategory::UNION:
+          item.category = QObject::tr("Unions");
+          break;
+        case TokenCategory::CONCEPT:
+          item.category = QObject::tr("Concepts");
+          break;
+        case TokenCategory::INTERFACE:
+          item.category = QObject::tr("Interfaces");
+          break;
+        case TokenCategory::TYPE_ALIAS:
+          item.category = QObject::tr("Types");
+          break;
+        case TokenCategory::FUNCTION:
+        case TokenCategory::CLASS_METHOD:
+          item.category = QObject::tr("Functions");
+          break;
+        case TokenCategory::LOCAL_VARIABLE:
+          Q_ASSERT(false);  // Strange.
+        case TokenCategory::GLOBAL_VARIABLE:
+        case TokenCategory::CLASS_MEMBER:
+          item.category = QObject::tr("Global Variables");
+          break;
+        default:
+          item.category = QObject::tr("Top Level Entities");
+          break;
+      }
+
+      // Descend into enums.
+      if (auto ed = EnumDecl::from(decl)) {
+        if (ed->is_definition()) {
+          for (auto enumerator : ed->enumerators()) {
+            work_list.emplace_back(std::move(enumerator));
+          }
+        }
+      }
+
+      // Descend into records.
+      if (auto rd = RecordDecl::from(decl)) {
+        if (rd->is_definition()) {
+          for (auto nested_decl : rd->declarations_in_context()) {
+            switch (Token::categorize(nested_decl)) {
+              case TokenCategory::ENUM:
+              case TokenCategory::CLASS_METHOD:
+              case TokenCategory::GLOBAL_VARIABLE:
+              case TokenCategory::CLASS:
+              case TokenCategory::STRUCT:
+              case TokenCategory::UNION:
+              case TokenCategory::CONCEPT:
+              case TokenCategory::INTERFACE:
+              case TokenCategory::TYPE_ALIAS:
+                work_list.emplace_back(std::move(nested_decl));
+                break;
+              default:
+                break;
+            }
+          }
+        }
+      }
+
+      item.entity = std::move(decl);
+      FillLocation(file_location_cache, item);
+      item.tokens = NameOfEntity(nd.value());
+      co_yield std::move(item);
+    }
+  }
+}
+
 }  // namespace
 
 BuiltinEntityInformationPlugin::~BuiltinEntityInformationPlugin(void) {}
@@ -200,9 +384,15 @@ gap::generator<IInfoGeneratorPtr>
 BuiltinEntityInformationPlugin::CreateInformationCollectors(
     VariantEntity entity) {
 
+  if (auto file = File::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<File>>(
+        std::move(file.value()));
+    co_return;
+  }
+
   if (auto record = RecordDecl::from(entity)) {
-    qDebug() << "Making a RecordInfoGenerator";
-    co_yield std::make_shared<RecordInfoGenerator>(std::move(record.value()));
+    co_yield std::make_shared<EntityInfoGenerator<RecordDecl>>(
+        std::move(record.value()));
   }
 }
 
