@@ -6,7 +6,6 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
-
 #include <multiplier/GUI/Interfaces/IInfoGenerator.h>
 
 namespace mx::gui {

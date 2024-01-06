@@ -418,9 +418,13 @@ void EntityInformationModel::ProcessData(void) {
 
 void EntityInformationModel::OnIndexChanged(
     const ConfigManager &config_manager) {
+  d->file_location_cache = config_manager.FileLocationCache();
+  Clear();
+}
+
+void EntityInformationModel::Clear(void) {
   emit beginResetModel();
   d->version_number->fetch_add(1u);
-  d->file_location_cache = config_manager.FileLocationCache();
   d->insertion_queue.clear();
   d->root.node_index.clear();
   d->root.nodes.clear();

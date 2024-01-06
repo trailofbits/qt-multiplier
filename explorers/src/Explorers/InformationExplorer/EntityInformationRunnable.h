@@ -28,13 +28,6 @@ class EntityInformationRunnable Q_DECL_FINAL : public QObject, public QRunnable 
   Q_OBJECT
 
  protected:
-  // The category of this information, e.g. `Callers`, or `Fields`.
-  const QString category;
-
-  // The entity for which we want to generate the information. We'll pass this
-  // to the `generator->Children`.
-  const VariantEntity entity;
-
   // The genenerator for this category of entity information.
   const IInfoGeneratorPtr generator;
 
@@ -49,12 +42,10 @@ class EntityInformationRunnable Q_DECL_FINAL : public QObject, public QRunnable 
   virtual ~EntityInformationRunnable(void);
   
   inline explicit EntityInformationRunnable(
-      const QString &category_, VariantEntity entity_,
-      IInfoGeneratorPtr generator_, FileLocationCache file_location_cache_,
+      IInfoGeneratorPtr generator_,
+      FileLocationCache file_location_cache_,
       AtomicU64Ptr version_number_)
-      : category(category_),
-        entity(std::move(entity_)),
-        generator(std::move(generator_)),
+      : generator(std::move(generator_)),
         file_location_cache(std::move(file_location_cache_)),
         version_number(std::move(version_number_)),
         captured_version_number(version_number->load()) {

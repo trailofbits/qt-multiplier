@@ -10,11 +10,19 @@
 
 #include <QWidget>
 
+#include <multiplier/GUI/Interfaces/IInformationExplorerPlugin.h>
+#include <multiplier/Index.h>
+#include <vector>
+
 #include "EntityInformationRunnable.h"
 
 QT_BEGIN_NAMESPACE
 class QTreeView;
 QT_END_NAMESPACE
+
+namespace mx {
+class FileLocationCache;
+}  // namespace mx
 
 namespace mx::gui {
 
@@ -37,11 +45,20 @@ class EntityInformationWidget Q_DECL_FINAL : public QWidget {
   //! Destructor
   virtual ~EntityInformationWidget(void);
 
- public slots:
   //! Requests the internal model to display the specified entity
-  void DisplayEntity(const QVariant &entity);
+  void DisplayEntity(
+      VariantEntity entity, const FileLocationCache &file_location_cache,
+      const std::vector<IInformationExplorerPluginPtr> &plugins,
+      bool is_explicit_request, bool add_to_history);
+
+ private slots:
+  void OnAllDataFound(void);
+  void OnCancelRunningRequest(void);
+  void OnChangeSync(int state);
 
  signals:
+  void HistoricalEntitySelected(VariantEntity entity);
+
   //! Forwards the internal InformationExplorer::SelectedItemChanged signal
   void SelectedItemChanged(const QModelIndex &current_index);
 

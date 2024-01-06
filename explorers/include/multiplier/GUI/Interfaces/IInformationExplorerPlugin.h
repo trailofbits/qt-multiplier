@@ -9,6 +9,7 @@
 #include <QObject>
 
 #include <multiplier/Index.h>
+#include <memory>
 
 #include "IInfoGenerator.h"
 
@@ -16,6 +17,9 @@ namespace mx {
 class FileLocationCache;
 }  // namespace mx
 namespace mx::gui {
+
+class IInformationExplorerPlugin;
+using IInformationExplorerPluginPtr = std::unique_ptr<IInformationExplorerPlugin>;
 
 //! Interface that information explorer plugins must follow.
 class IInformationExplorerPlugin : public QObject {
@@ -25,7 +29,6 @@ class IInformationExplorerPlugin : public QObject {
   virtual ~IInformationExplorerPlugin(void);
 
   virtual gap::generator<IInfoGeneratorPtr> CreateInformationCollectors(
-      FileLocationCache file_location_cache,
       VariantEntity entity) = 0;
 };
 

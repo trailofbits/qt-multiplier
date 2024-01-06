@@ -39,6 +39,8 @@ class EntityInformationModel Q_DECL_FINAL : public IModel {
 
   QVariant data(const QModelIndex &index, int role) const Q_DECL_FINAL;
 
+  void Clear(void);
+
  public slots:
   void OnIndexChanged(const ConfigManager &config_manager);
 

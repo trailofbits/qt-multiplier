@@ -11,7 +11,9 @@ namespace mx::gui {
 EntityInformationRunnable::~EntityInformationRunnable(void) {}
 
 void EntityInformationRunnable::run(void) {
+  QString category = generator->Category();
   QVector<IInfoGeneratorItemPtr> items;
+
   for (auto item : generator->Items(generator, file_location_cache)) {
     if (version_number->load() != captured_version_number) {
       emit Finished();
