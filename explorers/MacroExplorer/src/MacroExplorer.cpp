@@ -282,13 +282,13 @@ MacroExplorer::MacroExplorer(const Index &index,
   scroll_area->setContentsMargins(0, 0, 0, 0);
   scroll_area->setWidgetResizable(true);
 
-  d->scroll_layout = new QVBoxLayout();
+  d->scroll_layout = new QVBoxLayout(this);
   d->scroll_layout->setContentsMargins(0, 0, 0, 0);
 
   auto widget = new QWidget(this);
   widget->setLayout(d->scroll_layout);
 
-  auto layout = new QVBoxLayout();
+  auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
   scroll_area->setWidget(widget);

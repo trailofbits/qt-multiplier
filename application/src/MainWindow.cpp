@@ -94,6 +94,9 @@ void MainWindow::InitializePlugins(void) {
     connect(plugin.get(), &IMainWindowPlugin::RequestContextMenu,
             this, &MainWindow::OnRequestContextMenu);
 
+    connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
+            this, &MainWindow::OnRequestPrimaryClick);
+
     // connect(
     //     plugin.get(), &IMainWindowPlugin::PopupOpened,
     //     [this] (QWidget *popup) {
@@ -191,6 +194,13 @@ void MainWindow::OnRequestContextMenu(const QModelIndex &index) {
     plugin->ActOnContextMenu(&menu, index);
   }
   menu.exec(QCursor::pos());
+}
+
+//! Invoked on an index whose underlying model follows the `IModel` interface.
+void MainWindow::OnRequestPrimaryClick(const QModelIndex &index) {
+  for (const auto &plugin : d->plugins) {
+    plugin->ActOnPrimaryClick(index);
+  }
 }
 
 }  // namespace mx::gui

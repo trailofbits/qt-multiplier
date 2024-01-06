@@ -31,9 +31,6 @@ class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
   std::optional<NamedAction> ActOnKeyPress(
       const QKeySequence &keys, const QModelIndex &index) Q_DECL_FINAL;
-
- private slots:
-  void OnIndexChanged(const ConfigManager &config_manager);
 };
 
 }  // namespace mx::gui

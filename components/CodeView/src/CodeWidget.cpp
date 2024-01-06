@@ -80,7 +80,7 @@ void CodeWidget::InitializeWidgets(const Index &index,
   connect(d->code_view, &ICodeView::TokenTriggered, this,
           &CodeWidget::OnTokenTriggered);
 
-  auto layout = new QVBoxLayout();
+  auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->code_view);
   setLayout(layout);

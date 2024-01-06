@@ -423,7 +423,7 @@ void GeneratorView::InitializeWidgets() {
   // Setup the internal layout
   setContentsMargins(0, 0, 0, 0);
 
-  auto layout = new QVBoxLayout();
+  auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(model_view);
   layout->addStretch();

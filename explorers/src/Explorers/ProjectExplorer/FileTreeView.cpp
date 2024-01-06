@@ -107,7 +107,7 @@ void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {
   connect(root_warning_label, &QLabel::linkActivated,
           this, &FileTreeView::OnDisableCustomRootLinkClicked);
 
-  auto root_warning_layout = new QHBoxLayout();
+  auto root_warning_layout = new QHBoxLayout(this);
   root_warning_layout->setContentsMargins(0, 0, 0, 0);
   root_warning_layout->addWidget(root_warning_label);
   root_warning_layout->addStretch();
@@ -118,7 +118,7 @@ void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {
   // Setup the main layout
   setContentsMargins(0, 0, 0, 0);
 
-  auto layout = new QVBoxLayout();
+  auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->tree_view, 1);
   layout->addStretch();

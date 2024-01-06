@@ -10,6 +10,7 @@
 
 #include <QAction>
 #include <QClipboard>
+#include <QElapsedTimer>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListView>
@@ -43,6 +44,7 @@ struct ListGeneratorWidget::PrivateData final {
   QIcon goto_item_icon;
 
   QModelIndex selected_index;
+  QElapsedTimer selection_timer;
 };
 
 ListGeneratorWidget::~ListGeneratorWidget(void) {}
@@ -52,6 +54,7 @@ ListGeneratorWidget::ListGeneratorWidget(
     : QWidget(parent),
       d(new PrivateData) {
 
+  d->selection_timer.start();
   d->model = new ListGeneratorModel(this);
   InitializeWidgets(config_manager);
   InstallModel();
@@ -370,11 +373,18 @@ void ListGeneratorWidget::OnDataChanged(void) {
 
 void ListGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
                                                const QModelIndex &) {
-  d->selected_index = d->model_proxy->mapToSource(current_index);
-  if (!d->selected_index.isValid()) {
+  auto new_index = d->model_proxy->mapToSource(current_index);
+  if (!new_index.isValid()) {
+    return;
+  }
+  
+  // Suppress likely duplicate events.
+  if (d->selection_timer.restart() < 100 &&
+      d->selected_index == new_index) {
     return;
   }
 
+  d->selected_index = new_index;
   emit SelectedItemChanged(d->selected_index);
 }
 

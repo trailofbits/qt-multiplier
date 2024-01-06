@@ -37,6 +37,8 @@ add_library("mx_explorers"
   src/Explorers/InformationExplorer/EntityInformationModel.h
   src/Explorers/InformationExplorer/EntityInformationRunnable.cpp
   src/Explorers/InformationExplorer/EntityInformationRunnable.h
+  src/Explorers/InformationExplorer/EntityInformationWidget.cpp
+  src/Explorers/InformationExplorer/EntityInformationWidget.h
   src/Explorers/InformationExplorer/InformationExplorer.cpp
 
   src/Explorers/ProjectExplorer/FileTreeModel.cpp
@@ -54,6 +56,7 @@ target_link_libraries("mx_explorers"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_generator_widget"
+    "mx_history_widget"
     "mx_line_edit_widget"
     "mx_media_manager"
     "mx_search_widget"

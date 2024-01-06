@@ -399,14 +399,14 @@ void CodeView::InitializeWidgets() {
           &CodeView::OnShowSearchResult);
 
   // Layout for the gutter and code view
-  auto code_layout = new QHBoxLayout();
+  auto code_layout = new QHBoxLayout(this);
   code_layout->setContentsMargins(0, 0, 0, 0);
   code_layout->setSpacing(0);
   code_layout->addWidget(d->gutter);
   code_layout->addWidget(d->text_edit);
 
   // Main layout
-  auto main_layout = new QVBoxLayout();
+  auto main_layout = new QVBoxLayout(this);
   main_layout->setContentsMargins(0, 0, 0, 0);
   main_layout->setSpacing(0);
   main_layout->addItem(code_layout);

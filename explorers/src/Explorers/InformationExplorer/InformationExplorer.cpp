@@ -8,12 +8,22 @@
 
 #include <QThreadPool>
 
+#include <multiplier/GUI/Managers/ActionManager.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
+
 #include "EntityInformationRunnable.h"
+#include "EntityInformationWidget.h"
 
 namespace mx::gui {
 
 struct InformationExplorer::PrivateData {
-  QThreadPool thread_pool;
+  ConfigManager &config_manager;
+
+  EntityInformationModel *model{nullptr};
+  EntityInformationWidget *view{nullptr};
+
+  inline PrivateData(ConfigManager &config_manager_)
+      : config_manager(config_manager_) {}
 };
 
 InformationExplorer::~InformationExplorer(void) {}
@@ -21,11 +31,19 @@ InformationExplorer::~InformationExplorer(void) {}
 InformationExplorer::InformationExplorer(ConfigManager &config_manager,
                                          QMainWindow *parent)
     : IMainWindowPlugin(config_manager, parent),
-      d(new PrivateData) {}
+      d(new PrivateData(config_manager)) {}
 
 QWidget *InformationExplorer::CreateDockWidget(QWidget *parent) {
-  (void) parent;
-  return nullptr;
+  if (d->view) {
+    return d->view;
+  }
+
+  d->view = new EntityInformationWidget(d->config_manager, true, parent);
+  d->config_manager.ActionManager().Register(
+      d->view, "com.trailofbits.action.OpenEntity",
+      &EntityInformationWidget::DisplayEntity);
+
+  return d->view;
 }
 
 void InformationExplorer::ActOnPrimaryClick(const QModelIndex &index) {
@@ -43,10 +61,6 @@ std::optional<NamedAction> InformationExplorer::ActOnKeyPress(
   (void) keys;
   (void) index;
   return std::nullopt;
-}
-
-void InformationExplorer::OnIndexChanged(const ConfigManager &config_manager) {
-  (void) config_manager;
 }
 
 }  // namespace mx::gui

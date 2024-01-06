@@ -46,7 +46,7 @@ MacroExplorerItem::MacroExplorerItem(
     label += "<BR /><small><i>" + opt_location_label.value() + "</i></small>";
   }
 
-  auto layout = new QHBoxLayout();
+  auto layout = new QHBoxLayout(this);
   layout->addWidget(new QLabel(label));
 
   d->delete_button = new QPushButton(QIcon(), "");

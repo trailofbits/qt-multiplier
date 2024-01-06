@@ -41,7 +41,7 @@ void GoToLineWidget::InitializeWidgets(QWidget *parent) {
   d->line_number_validator = new QIntValidator(0, 0, this);
   d->line_number_edit->setValidator(d->line_number_validator);
 
-  auto layout = new QVBoxLayout();
+  auto layout = new QVBoxLayout(this);
   layout->addWidget(d->line_number_edit);
   setLayout(layout);
 

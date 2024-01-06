@@ -10,6 +10,7 @@
 
 #include <QAction>
 #include <QClipboard>
+#include <QElapsedTimer>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -55,6 +56,7 @@ struct TreeGeneratorWidget::PrivateData final {
   QIcon expand_item_icon_n[kMaxExpansionLevel];
 
   QModelIndex selected_index;
+  QElapsedTimer selection_timer;
 };
 
 TreeGeneratorWidget::~TreeGeneratorWidget(void) {}
@@ -64,6 +66,7 @@ TreeGeneratorWidget::TreeGeneratorWidget(
     : QWidget(parent),
       d(new PrivateData) {
 
+  d->selection_timer.start();
   d->model = new TreeGeneratorModel(this);
   InitializeWidgets(config_manager);
   InstallModel();
@@ -532,11 +535,18 @@ void TreeGeneratorWidget::OnRowsInserted(const QModelIndex &parent, int, int) {
 
 void TreeGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
                                                const QModelIndex &) {
-  d->selected_index = d->model_proxy->mapToSource(current_index);
-  if (!d->selected_index.isValid()) {
+  auto new_index = d->model_proxy->mapToSource(current_index);
+  if (!new_index.isValid()) {
+    return;
+  }
+  
+  // Suppress likely duplicate events.
+  if (d->selection_timer.restart() < 100 &&
+      d->selected_index == new_index) {
     return;
   }
 
+  d->selected_index = new_index;
   emit SelectedItemChanged(d->selected_index);
 }
 

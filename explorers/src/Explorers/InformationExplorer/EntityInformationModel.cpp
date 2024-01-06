@@ -12,6 +12,7 @@
 
 #include <list>
 #include <multiplier/GUI/Interfaces/IInfoGenerator.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/Index.h>
 #include <unordered_map>
 #include <vector>
@@ -67,7 +68,7 @@ static QString TokensToString(TokenRange tokens) {
 }  // namespace
 
 struct EntityInformationModel::PrivateData {
-  const FileLocationCache file_location_cache;
+  FileLocationCache file_location_cache;
   const AtomicU64Ptr version_number;
   Node root;
   QTimer import_timer;
@@ -413,6 +414,17 @@ void EntityInformationModel::ProcessData(void) {
       return;
     }
   }
+}
+
+void EntityInformationModel::OnIndexChanged(
+    const ConfigManager &config_manager) {
+  emit beginResetModel();
+  d->version_number->fetch_add(1u);
+  d->file_location_cache = config_manager.FileLocationCache();
+  d->insertion_queue.clear();
+  d->root.node_index.clear();
+  d->root.nodes.clear();
+  emit endResetModel();
 }
 
 }  // namespace mx::gui

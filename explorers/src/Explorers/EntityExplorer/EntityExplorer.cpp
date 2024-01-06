@@ -227,7 +227,7 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
   d->view = new QWidget(parent);
   d->view->setWindowTitle(tr("Entity Explorer"));
 
-  auto search_parameters_layout = new QVBoxLayout();
+  auto search_parameters_layout = new QVBoxLayout;
 
   d->search_input = new LineEditWidget(d->view);
   d->search_input->setClearButtonEnabled(true);
@@ -245,7 +245,7 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
 
   search_parameters_layout->addWidget(d->search_input);
 
-  auto query_mode_layout = new QHBoxLayout();
+  auto query_mode_layout = new QHBoxLayout;
   d->exact_match_radio = new QRadioButton(tr("Exact Match"), d->view);
 
   d->containing_radio = new QRadioButton(tr("Containing"), d->view);
@@ -262,14 +262,14 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
 
   search_parameters_layout->addLayout(query_mode_layout);
 
-  auto layout = new QVBoxLayout();
+  auto layout = new QVBoxLayout;
   layout->setContentsMargins(0, 0, 0, 0);
 
   auto category_combo_box = new CategoryComboBox(d->view);
   connect(category_combo_box, &CategoryComboBox::CategoryChanged,
           this, &EntityExplorer::OnCategoryChanged);
 
-  d->list_widget = new ListGeneratorWidget(d->config_manager);
+  d->list_widget = new ListGeneratorWidget(d->config_manager, d->view);
   connect(d->list_widget, &ListGeneratorWidget::RequestContextMenu,
           [this] (const QModelIndex &index) {
             d->context_index = index;

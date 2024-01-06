@@ -97,7 +97,7 @@ void CategoryComboBox::Reset() {
 }
 
 void CategoryComboBox::InitializeWidgets(void) {
-  auto layout = new QVBoxLayout();
+  auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
   d->combo_box = new QComboBox(this);

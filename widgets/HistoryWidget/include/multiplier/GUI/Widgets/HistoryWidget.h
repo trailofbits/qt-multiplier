@@ -22,6 +22,7 @@ class FileLocationCache;
 }  // namespace mx
 namespace mx::gui {
 
+class ConfigManager;
 class MediaManager;
 
 //! \todo Hide the implementation details
@@ -39,8 +40,7 @@ class HistoryWidget final : public QWidget {
  public:
   //! Constructor
   //! \param parent The parent widget, where the shortcuts will be installed
-  HistoryWidget(const MediaManager &media_manager_,
-                const FileLocationCache &file_cache_,
+  HistoryWidget(const ConfigManager &config_manager,
                 unsigned max_history_size,
                 bool install_global_shortcuts,
                 QWidget *parent = nullptr);
@@ -98,6 +98,9 @@ class HistoryWidget final : public QWidget {
 
   //! Called when we have computed a name for the history item.
   void OnLabelForItem(std::uint64_t item_id, const QString &label);
+
+  //! Called when the index changes.
+  void OnIndexChanged(const ConfigManager &config_manager);
 };
 
 }  // namespace mx::gui

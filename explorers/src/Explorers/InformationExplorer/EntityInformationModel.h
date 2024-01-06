@@ -13,6 +13,8 @@
 
 namespace mx::gui {
 
+class ConfigManager;
+
 class EntityInformationModel Q_DECL_FINAL : public IModel {
   Q_OBJECT
 
@@ -38,6 +40,8 @@ class EntityInformationModel Q_DECL_FINAL : public IModel {
   QVariant data(const QModelIndex &index, int role) const Q_DECL_FINAL;
 
  public slots:
+  void OnIndexChanged(const ConfigManager &config_manager);
+
   void AddData(uint64_t version_number, const QString &category,
                QVector<IInfoGeneratorItemPtr> child_items);
 

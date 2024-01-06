@@ -55,7 +55,7 @@ InformationExplorer::InformationExplorer(InformationExplorerModel *model,
 
 void InformationExplorer::InitializeWidgets(InformationExplorerModel *model,
                                             const bool &enable_history) {
-  auto layout = new QVBoxLayout();
+  auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
   if (enable_history) {

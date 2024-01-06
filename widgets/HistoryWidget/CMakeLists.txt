@@ -16,6 +16,7 @@ add_library("mx_history_widget"
 
 target_link_libraries("mx_history_widget"
   PRIVATE
+    "mx_config_manager"
     "mx_cxx_flags"
     "mx_media_manager"
     "mx_util_component"

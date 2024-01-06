@@ -11,6 +11,7 @@
 #include <multiplier/AST/Decl.h>
 #include <multiplier/Frontend/Compilation.h>
 #include <multiplier/Frontend/File.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 
 #include <QHBoxLayout>
@@ -30,6 +31,7 @@
 namespace mx::gui {
 namespace {
 
+// Global next item IDs. There will never be repeats.
 static std::atomic<uint64_t> gNextItemId(0);
 
 static const char *const kBackButtonToolTip =
@@ -57,7 +59,7 @@ using ItemList = std::list<Item>;
 }  // namespace
 
 struct HistoryWidget::PrivateData {
-  const FileLocationCache file_cache;
+  FileLocationCache file_cache;
 
   const unsigned max_history_size;
   ItemList item_list;
@@ -97,24 +99,22 @@ struct HistoryWidget::PrivateData {
   void NavigateForwardToHistoryItem(ItemList::iterator next_item_it);
 };
 
-HistoryWidget::HistoryWidget(const MediaManager &media_manager_,
-                             const FileLocationCache &file_cache_,
+HistoryWidget::HistoryWidget(const ConfigManager &config_manager,
                              unsigned max_history_size,
                              bool install_global_shortcuts,
                              QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData(file_cache_, max_history_size)) {
-
-  // Since we install the keyboard shortcuts on the widget, the parent
-  // parameters must always be valid
-  Q_ASSERT(parent != nullptr);
+      d(new PrivateData(config_manager.FileLocationCache(), max_history_size)) {
 
   InitializeWidgets(parent, install_global_shortcuts);
 
-  OnIconsChanged(media_manager_);
-  
-  connect(&media_manager_, &MediaManager::IconsChanged,
+  auto &media_manager = config_manager.MediaManager();
+  OnIconsChanged(media_manager);
+  connect(&media_manager, &MediaManager::IconsChanged,
           this, &HistoryWidget::OnIconsChanged);
+
+  connect(&config_manager, &ConfigManager::IndexChanged,
+          this, &HistoryWidget::OnIndexChanged);
 }
 
 HistoryWidget::~HistoryWidget(void) {}
@@ -263,6 +263,10 @@ void HistoryWidget::InitializeWidgets(QWidget *parent,
   QWidget *shortcut_parent{nullptr};
   Qt::ShortcutContext shortcut_context{};
   if (install_global_shortcuts) {
+    // Since we install the keyboard shortcuts on the widget, the parent
+    // parameters must always be valid
+    Q_ASSERT(parent != nullptr);
+
     shortcut_parent = parent;
     shortcut_context = Qt::ApplicationShortcut;
 
@@ -465,6 +469,14 @@ void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
   emit GoToEntity(std::move(original_entity), std::move(canonical_entity));
 }
 
+void HistoryWidget::OnIndexChanged(const ConfigManager &config_manager) {
+  d->file_cache = config_manager.FileLocationCache();
+  d->item_list.clear();
+  d->next_item.reset();
+  d->current_item_it = d->item_list.end();
+  d->back_button->setEnabled(false);
+  d->forward_button->setEnabled(false);
+}
 
 void HistoryWidget::PrivateData::NavigateBackToHistoryItem(
     ItemList::iterator next_item_it) {
