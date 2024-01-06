@@ -13,6 +13,8 @@
 #include <multiplier/AST/FieldDecl.h>
 #include <multiplier/AST/RecordDecl.h>
 #include <multiplier/AST/VarDecl.h>
+#include <multiplier/Frontend/MacroExpansion.h>
+#include <multiplier/Frontend/MacroParameter.h>
 #include <multiplier/GUI/Util.h>
 #include <multiplier/Index.h>
 
@@ -376,6 +378,79 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
   }
 }
 
+// Generate information about macros. This primarily focuses on expansions of
+// defined macros.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<Macro>::Items(
+    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
+
+  auto def = DefineMacroDirective::from(entity);
+  if (!def) {
+    co_return;
+  }
+
+  std::vector<CustomToken> toks;
+  UserToken tok;
+  IInfoGenerator::Item item;
+
+  // Tell us where the macro is defined.
+  item.category = QObject::tr("Definitions");
+  item.tokens = def->name();
+  item.entity = std::move(entity);
+  FillLocation(file_location_cache, item);
+  co_yield std::move(item);
+
+  // Find the macro parameters.
+  for (const MacroOrToken &mt : def->parameters()) {
+    if (!std::holds_alternative<Macro>(mt)) {
+      continue;
+    }
+
+    auto mp = MacroParameter::from(std::get<Macro>(mt));
+    if (!mp) {
+      continue;
+    }
+
+    TokenRange tokens = mp->use_tokens();
+    if (Token name_tok = mp->name()) {
+      if (def->is_variadic()) {
+        item.tokens = std::move(tokens);
+      } else {
+        item.tokens = std::move(name_tok);
+      }
+
+    } else if (def->is_variadic()) {
+      tok.category = TokenCategory::MACRO_PARAMETER_NAME;
+      tok.kind = TokenKind::IDENTIFIER;
+      tok.data = "__VA_ARGS__";
+      tok.related_entity = mp.value();
+      toks.emplace_back(std::move(tok));
+
+      item.tokens = TokenRange::create(std::move(toks));
+    }
+
+    item.category = QObject::tr("Parameters");
+    item.entity = std::move(mp.value());
+    FillLocation(file_location_cache, item);
+    co_yield std::move(item);
+  }
+
+  // Look for expansions of the macro.
+  for (Reference ref : Reference::to(def.value())) {
+    auto exp = MacroExpansion::from(ref.as_macro());
+    if (!exp) {
+      continue;
+    }
+
+    TokenRange tokens = exp->use_tokens();
+    item.category = QObject::tr("Expansions");
+    item.tokens = InjectWhitespace(tokens.strip_whitespace());
+    item.entity = std::move(exp.value());
+    FillLocation(file_location_cache, item);
+    co_yield std::move(item);
+  }
+}
+
 }  // namespace
 
 BuiltinEntityInformationPlugin::~BuiltinEntityInformationPlugin(void) {}
@@ -387,6 +462,12 @@ BuiltinEntityInformationPlugin::CreateInformationCollectors(
   if (auto file = File::from(entity)) {
     co_yield std::make_shared<EntityInfoGenerator<File>>(
         std::move(file.value()));
+    co_return;
+  }
+
+  if (auto macro = Macro::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<Macro>>(
+        std::move(macro.value()));
     co_return;
   }
 

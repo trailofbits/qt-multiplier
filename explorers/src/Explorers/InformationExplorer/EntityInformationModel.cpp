@@ -377,6 +377,8 @@ void EntityInformationModel::ProcessData(void) {
     }
   }
 
+  // Emit the signals to mutate the tree with the updates produced by this
+  // batch.
   for (auto parent_node : ordered_pending_inserts) {
     Q_ASSERT(parent_node->is_category);
     Q_ASSERT(parent_node->parent != nullptr);
