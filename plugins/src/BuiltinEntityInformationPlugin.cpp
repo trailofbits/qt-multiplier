@@ -720,6 +720,19 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<VarDecl>::Items(
   }
 }
 
+// Generate the type of a value decl.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<ValueDecl>::Items(
+    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
+
+  IInfoGenerator::Item item;
+  item.category = QObject::tr("Type");
+  item.tokens = InjectWhitespace(entity.type().tokens());
+  item.entity = std::move(entity);
+  FillLocation(file_location_cache, item);
+  co_yield std::move(item);
+}
+
 // Generate information about named declarations.
 template <>
 gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
@@ -768,10 +781,11 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
           break;
         }
 
+        auto tokens = InjectWhitespace(exp->use_tokens().strip_whitespace());
         item.category = QObject::tr("Macros Used");
         item.entity = std::move(exp.value());
         FillLocation(file_location_cache, item);
-        item.tokens = InjectWhitespace(exp->use_tokens().strip_whitespace());
+        item.tokens = std::move(tokens);
         break;
       }
     }
@@ -821,6 +835,11 @@ BuiltinEntityInformationPlugin::CreateInformationCollectors(
   if (auto vd = VarDecl::from(entity)) {
     co_yield std::make_shared<EntityInfoGenerator<VarDecl>>(
         std::move(vd.value()));
+  }
+
+  if (auto xd = ValueDecl::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<ValueDecl>>(
+        std::move(xd.value()));
   }
 
   if (auto nd = NamedDecl::from(entity)) {

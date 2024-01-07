@@ -722,7 +722,7 @@ static bool ForceLeadingWhitespace(bool prev_is_first, TokenKind prev, TokenKind
     return true;
   }
   (void) prev_is_first;
-  return false;
+  return prev == TokenKind::COMMA || prev == TokenKind::SEMI;
 }
 
 }  // namespace
