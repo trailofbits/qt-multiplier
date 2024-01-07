@@ -18,7 +18,20 @@
 #include <QTreeView>
 #include <QVBoxLayout>
 
+#include <multiplier/AST/AddrLabelExpr.h>
+#include <multiplier/AST/CallExpr.h>
+#include <multiplier/AST/DeclRefExpr.h>
+#include <multiplier/AST/FunctionDecl.h>
+#include <multiplier/AST/LabelDecl.h>
+#include <multiplier/AST/LabelStmt.h>
+#include <multiplier/AST/MemberExpr.h>
+#include <multiplier/Frontend/DefineMacroDirective.h>
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Frontend/MacroExpansion.h>
+#include <multiplier/Frontend/Token.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/HistoryWidget.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
 
@@ -47,19 +60,58 @@ bool ShouldAutoExpand(const QModelIndex &index) {
 }  // namespace
 
 struct EntityInformationWidget::PrivateData {
+  
+  // Used kind of like a semaphore to signal to info-fetching runnables
+  // (executing in `thread_pool`) that they should stop early because their
+  // results are going to be ignored / now out-of-date w.r.t. the current
+  // entity being shown.
   const AtomicU64Ptr version_number;
+
+  // Tree of entity info.
   QTreeView * const tree;
+
+  // Status indicator. Shown when `num_requests` is greater than zero.
   QWidget * const status;
+
+  // Model that manages the tree of data for this entity information widget.
   EntityInformationModel * const model;
+
+  // Model that enables filtering. Works with the `search` widget.
   SortFilterProxyModel * const sort_model;
+
+  // Toolbar of buttons.
+  QToolBar * const toolbar;
+
+  // Widget keeping track of the history of the entity information browser. May
+  // be `nullptr`.
   HistoryWidget * const history;
+
+  // Used to pop out a copy of the current entity info into a pinned info
+  // browser. May be `nullptr`.
+  QPushButton * const pop_out_button;
+
+  // Used to search through info results.
   SearchWidget * const search;
+
+  // Thread pool on which the information fetching runnables run.
   QThreadPool thread_pool;
+
+  // Current entity being shown by this widget.
   VariantEntity current_entity;
+
+  // Should we show a checkbox and synchronize this info explorer with
   bool sync{true};
 
+  // Number of open/pending requests. This helps us decide whether or not to
+  // show the `Updating...` status indicator and the `Cancel` button.
   int num_requests{0};
 
+  // Trigger to open some info in a pinned explorer.
+  TriggerHandle pinned_entity_info_trigger;
+
+  // The most recently selected `QModelIndex`, as well as a timer from
+  // preventing us from raising duplicate signals, e.g. from `clicked` vs.
+  // `selectionChanged`.
   QModelIndex selected_index;
   QElapsedTimer selection_timer;
 
@@ -71,12 +123,16 @@ struct EntityInformationWidget::PrivateData {
         model(new EntityInformationModel(
             config_manager.FileLocationCache(), version_number, tree)),
         sort_model(new SortFilterProxyModel(tree)),
+        toolbar(enable_history ? new QToolBar(parent) : nullptr),
         history(
             enable_history ?
-            new HistoryWidget(config_manager, kMaxHistorySize, false, parent) :
+            new HistoryWidget(config_manager, kMaxHistorySize, false, toolbar) :
             nullptr),
+        pop_out_button(enable_history ? new QPushButton(toolbar) : nullptr),
         search(new SearchWidget(config_manager.MediaManager(),
-                                SearchWidget::Mode::Filter, parent)) {}
+                                SearchWidget::Mode::Filter, parent)),
+        pinned_entity_info_trigger(config_manager.ActionManager().Find(
+            "com.trailofbits.action.OpenPinnedEntityInfo")) {}
 };
 
 EntityInformationWidget::~EntityInformationWidget(void) {}
@@ -162,19 +218,27 @@ EntityInformationWidget::EntityInformationWidget(
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
-  if (d->history) {
-    auto toolbar = new QToolBar(this);
-    toolbar->addWidget(d->history);
-    toolbar->setIconSize(QSize(16, 16));
+  if (d->toolbar) {
+    d->toolbar->addWidget(d->history);
+    d->toolbar->setIconSize(QSize(16, 16));
+    d->history->SetIconSize(d->toolbar->iconSize());
 
-    d->history->SetIconSize(toolbar->iconSize());
+    // Add a popout icon, to pop the current info into a pinned browser.
+    auto &media_manager = config_manager.MediaManager();
+    OnIconsChanged(media_manager);
+    d->toolbar->addWidget(new QLabel(" "));
+    d->toolbar->addWidget(d->pop_out_button);
+    d->pop_out_button->setEnabled(false);
+    d->pop_out_button->setToolTip(
+        tr("Duplicate this information into a pinned info explorer"));
 
-    toolbar->addWidget(new QLabel(" "));
-
+    // Create a sync checkbox that tells us whether or not to keep this entity
+    // information explorer up-to-date with user clicks.
     auto sync = new QCheckBox(tr("Sync"), this);
     sync->setTristate(false);
     sync->setCheckState(Qt::Checked);
-    toolbar->addWidget(sync);
+    d->toolbar->addWidget(new QLabel(" "));
+    d->toolbar->addWidget(sync);
 
 #ifndef QT_NO_TOOLTIP
     sync->setToolTip(tr("Keep in sync with clicks in other views"));
@@ -188,7 +252,13 @@ EntityInformationWidget::EntityInformationWidget(
     connect(sync, &QCheckBox::stateChanged,
             this, &EntityInformationWidget::OnChangeSync);
 
-    layout->addWidget(toolbar);
+    connect(&media_manager, &MediaManager::IconsChanged,
+            this, &EntityInformationWidget::OnIconsChanged);
+
+    connect(d->pop_out_button, &QPushButton::pressed,
+            this, &EntityInformationWidget::OnPopOutPressed);
+
+    layout->addWidget(d->toolbar);
   }
 
   connect(d->search, &SearchWidget::SearchParametersChanged,
@@ -209,6 +279,24 @@ EntityInformationWidget::EntityInformationWidget(
 
   connect(d->sort_model, &QAbstractItemModel::rowsInserted,
           this, &EntityInformationWidget::ExpandAllBelow);
+}
+
+void EntityInformationWidget::OnPopOutPressed(void) {
+  d->pinned_entity_info_trigger.Trigger(QVariant::fromValue(d->current_entity));
+}
+
+void EntityInformationWidget::OnIconsChanged(
+    const MediaManager &media_manager) {
+  QIcon pop_out_icon;
+  pop_out_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.PopOut"),
+                                              QIcon::Normal, QIcon::On);
+  
+  pop_out_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.PopOut",
+                                              ITheme::IconStyle::DISABLED),
+                                              QIcon::Disabled, QIcon::On);
+
+  d->pop_out_button->setIcon(pop_out_icon);
+  d->pop_out_button->setIconSize(d->toolbar->iconSize());
 }
 
 void EntityInformationWidget::OnSearchParametersChange(void) {
@@ -281,6 +369,45 @@ void EntityInformationWidget::DisplayEntity(
     return;
   }
 
+  if (auto tok = Token::from(entity)) {
+    auto re = tok->related_entity();
+    if (!std::holds_alternative<NotAnEntity>(re)) {
+      entity = std::move(re);
+
+    } else if (auto file = File::containing(tok.value())) {
+      entity = std::move(file.value());
+    }
+  }
+
+  // Follow through references. This isn't exactly pleasant, and doesn't quite
+  // work right.
+  //
+  // TODO(pag): Generalize this.
+  if (auto exp = MacroExpansion::from(entity)) {
+    if (auto def = exp->definition()) {
+      entity = std::move(def.value());
+    }
+  
+  } else if (auto dre = DeclRefExpr::from(entity)) {
+    entity = dre->declaration();
+  
+  } else if (auto me = MemberExpr::from(entity)) {
+    entity = me->member_declaration();
+
+  } else if (auto ale = AddrLabelExpr::from(entity)) {
+    entity = ale->label();
+  
+  } else if (auto ls = LabelStmt::from(entity)) {
+    entity = ls->declaration();
+
+  } else if (auto ce = CallExpr::from(entity)) {
+    if (auto dc = ce->direct_callee()) {
+      entity = std::move(dc.value());
+    }
+  }
+
+  d->pop_out_button->setEnabled(true);
+
   // Canonicalize decls so that we can dedup check.
   if (std::holds_alternative<Decl>(entity)) {
     entity = std::get<Decl>(entity).canonical_declaration();
@@ -291,20 +418,27 @@ void EntityInformationWidget::DisplayEntity(
     return;
   }
 
-  // If we're showing the history widget then keep track of the history.
-  if (add_to_history && d->history) {
-    d->history->SetCurrentLocation(d->current_entity);
-    d->history->CommitCurrentLocationToHistory();
-  }
-
-  d->current_entity = entity;
-  d->model->Clear();
+  auto found = false;
 
   for (const auto &plugin : plugins) {
     auto category_generators = plugin->CreateInformationCollectors(entity);
     for (auto category_generator : category_generators) {
       if (!category_generator) {
         continue;
+      }
+
+      // Only clear the current view if one of the generators produces
+      // something.
+      if (!found) {
+        found = true;
+        d->current_entity = entity;
+        d->model->Clear();
+
+        // If we're showing the history widget then keep track of the history.
+        if (add_to_history && d->history) {
+          d->history->SetCurrentLocation(d->current_entity);
+          d->history->CommitCurrentLocationToHistory();
+        }
       }
 
       auto runnable = new EntityInformationRunnable(

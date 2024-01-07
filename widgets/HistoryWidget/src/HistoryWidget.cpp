@@ -381,8 +381,25 @@ void HistoryWidget::UpdateMenus(void) {
 }
 
 void HistoryWidget::OnIconsChanged(const MediaManager &media_manager) {
-  d->back_icon = media_manager.Pixmap("com.trailofbits.icon.Back");
-  d->forward_icon = media_manager.Pixmap("com.trailofbits.icon.Forward");
+
+  QIcon back_icon;
+  back_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.Back"),
+                                           QIcon::Normal, QIcon::On);
+  
+  back_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.Back",
+                                           ITheme::IconStyle::DISABLED),
+                                           QIcon::Disabled, QIcon::On);
+
+  QIcon forward_icon;
+  forward_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.Forward"),
+                                              QIcon::Normal, QIcon::On);
+  
+  forward_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.Forward",
+                                              ITheme::IconStyle::DISABLED),
+                                              QIcon::Disabled, QIcon::On);
+
+  d->back_icon = std::move(back_icon);
+  d->forward_icon = std::move(forward_icon);
 
   d->back_button->setIcon(d->back_icon);
   d->forward_button->setIcon(d->forward_icon);

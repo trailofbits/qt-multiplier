@@ -14,10 +14,17 @@
 #include <multiplier/Index.h>
 #include <vector>
 
+#include "EntityInformationModel.h"
 #include "EntityInformationRunnable.h"
 #include "EntityInformationWidget.h"
 
 namespace mx::gui {
+namespace {
+
+static const QKeySequence kKeySeqI("I");
+static const QKeySequence kKeySeqShiftI("Shift+I");
+
+}  // namespace
 
 struct InformationExplorer::PrivateData {
   ConfigManager &config_manager;
@@ -28,6 +35,10 @@ struct InformationExplorer::PrivateData {
 
   // Open the relevant entity.
   TriggerHandle open_entity_trigger;
+
+  // Open an entity's information.
+  TriggerHandle entity_info_trigger;
+  TriggerHandle pinned_entity_info_trigger;
 
   inline PrivateData(ConfigManager &config_manager_)
       : config_manager(config_manager_),
@@ -40,7 +51,16 @@ InformationExplorer::~InformationExplorer(void) {}
 InformationExplorer::InformationExplorer(ConfigManager &config_manager,
                                          QMainWindow *parent)
     : IMainWindowPlugin(config_manager, parent),
-      d(new PrivateData(config_manager)) {}
+      d(new PrivateData(config_manager)) {
+  
+  d->entity_info_trigger = config_manager.ActionManager().Register(
+      this, "com.trailofbits.action.OpenEntityInfo",
+      &InformationExplorer::OpenInfo);
+  
+  d->pinned_entity_info_trigger = config_manager.ActionManager().Register(
+      this, "com.trailofbits.action.OpenPinnedEntityInfo",
+      &InformationExplorer::OpenPinnedInfo);
+}
 
 QWidget *InformationExplorer::CreateDockWidget(QWidget *parent) {
   if (d->view) {
@@ -86,22 +106,80 @@ void InformationExplorer::ActOnPrimaryClick(const QModelIndex &index) {
 
 std::optional<NamedAction> InformationExplorer::ActOnSecondaryClick(
     const QModelIndex &index) {
-  (void) index;
-  return std::nullopt;
+
+  // Don't allow us to open info from entities shown in the info browser itself.
+  // In practice, there isn't a good separation between the entity and the
+  // referenced entity, e.g. we show a call (the entity), but it logically
+  // references the called function. There may be no way to actually get to
+  // the referenced entity.
+  //
+  // TODO(pag): Consider adding a `.referenced_entity` field to the info
+  //            `Item`s.
+  if (index.data(IModel::ModelIdRole) ==
+      EntityInformationModel::ConstantModelId()) {
+    return std::nullopt;
+  }
+
+  auto entity = IModel::Entity(index);
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return std::nullopt;
+  }
+
+  return NamedAction{tr("Open Information"), d->entity_info_trigger,
+                     QVariant::fromValue(entity)};
 }
 
+// Expose an action on key press.
 std::optional<NamedAction> InformationExplorer::ActOnKeyPress(
     const QKeySequence &keys, const QModelIndex &index) {
 
-  // if (!data.isValid() || !data.canConvert<VariantEntity>()) {
-  //   return;
-  // }
+  TriggerHandle *handle = nullptr;
+  QString name;
 
-  // auto entity = data.value<VariantEntity>();
+  if (keys == kKeySeqI) {
+    handle = &(d->entity_info_trigger);
+    name = tr("Open Entity Info");
 
-  (void) keys;
-  (void) index;
-  return std::nullopt;
+  } else if (keys == kKeySeqShiftI) {
+    handle = &(d->pinned_entity_info_trigger);
+    name = tr("Open Pinned Entity Info");
+
+  } else {
+    return std::nullopt;
+  }
+
+  auto entity = IModel::Entity(index);
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return std::nullopt;
+  }
+
+  return NamedAction{name, *handle, QVariant::fromValue(entity)};
+}
+
+void InformationExplorer::OpenInfo(const QVariant &data) {
+  if (!data.isValid() || !data.canConvert<VariantEntity>()) {
+    return;
+  }
+
+  auto entity = data.value<VariantEntity>();
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
+
+  d->view->DisplayEntity(
+      std::move(entity), d->config_manager.FileLocationCache(), d->plugins,
+      false  /* implicit (click) request */, true  /* add to history */);
+}
+
+void InformationExplorer::OpenPinnedInfo(const QVariant &data) {
+  if (!data.isValid() || !data.canConvert<VariantEntity>()) {
+    return;
+  }
+
+  auto entity = data.value<VariantEntity>();
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
 }
 
 void InformationExplorer::AddPlugin(IInformationExplorerPluginPtr plugin) {

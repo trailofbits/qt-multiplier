@@ -29,6 +29,7 @@ namespace mx::gui {
 class ConfigManager;
 class EntityInformationModel;
 class HistoryWidget;
+class MediaManager;
 
 //! A component that wraps an InformationExplorer widget with its model
 class EntityInformationWidget Q_DECL_FINAL : public QWidget {
@@ -59,6 +60,8 @@ class EntityInformationWidget Q_DECL_FINAL : public QWidget {
   void ExpandAllBelow(const QModelIndex &parent);
   void OnCurrentItemChanged(const QModelIndex &current_index, const QModelIndex &);
   void OnOpenItemContextMenu(const QPoint &point);
+  void OnIconsChanged(const MediaManager &media_manager);
+  void OnPopOutPressed(void);
 
  signals:
   void HistoricalEntitySelected(VariantEntity entity);

@@ -583,13 +583,13 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
 
     switch (brk.value()) {
       case BuiltinReferenceKind::CALLS:
-        item.category = QObject::tr("Caller Ofs");
+        item.category = QObject::tr("Callers");
         break;
       case BuiltinReferenceKind::TAKES_ADDRESS:
         item.category = QObject::tr("Address Ofs");
         break;
       default:
-        item.category = QObject::tr("User Ofs");
+        item.category = QObject::tr("Users");
         break;
     }
 

@@ -28,7 +28,7 @@ static const QKeySequence kExpandSequences[] = {
 };
 
 static QString ActionName(const VariantEntity &) {
-  return QObject::tr("Show Call Hierarchy");
+  return QObject::tr("Open Call Hierarchy");
 }
 
 class CallHierarchyItem final : public IGeneratedItem {
@@ -265,7 +265,7 @@ std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowKeyPress(
         continue;
       }
 
-      action_name = tr("Show Call Hierarchy (Depth %1)").arg(depth);
+      action_name = tr("Open Call Hierarchy (Depth %1)").arg(depth);
       break;
     }
   }

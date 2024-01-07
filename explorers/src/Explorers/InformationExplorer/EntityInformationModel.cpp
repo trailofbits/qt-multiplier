@@ -176,7 +176,10 @@ QVariant EntityInformationModel::data(
         !std::holds_alternative<NotAnEntity>(node->item.entity)) {
       return QVariant::fromValue(node->item.entity);
     }
-  
+
+  } else if (role == IModel::ModelIdRole) {
+    return ConstantModelId();
+
   // Auto-expand the root and the categories, but nothing else.
   } else if (role == AutoExpandRole) {
     return {!node->parent || node->parent == &(d->root)};

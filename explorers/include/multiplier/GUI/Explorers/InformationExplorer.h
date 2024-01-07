@@ -39,6 +39,10 @@ class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   inline void EmplacePlugin(Args&&... args) {
     AddPlugin(IInformationExplorerPluginPtr(new T(std::forward<Args>(args)...)));
   }
+
+ private:
+  void OpenInfo(const QVariant &data);
+  void OpenPinnedInfo(const QVariant &data);
 };
 
 }  // namespace mx::gui

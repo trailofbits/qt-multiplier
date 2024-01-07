@@ -47,6 +47,10 @@ class EntityInformationModel Q_DECL_FINAL : public IModel {
 
   void Clear(void);
 
+  inline static QString ConstantModelId(void) {
+    return "com.trailofbits.explorer.InformationExplorer.EntityInformationModel";
+  }
+
  public slots:
   void OnIndexChanged(const ConfigManager &config_manager);
 
