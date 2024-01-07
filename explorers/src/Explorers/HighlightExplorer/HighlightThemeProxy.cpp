@@ -14,15 +14,14 @@ namespace mx::gui {
 HighlightThemeProxy::~HighlightThemeProxy(void) {}
 
 ITheme::ColorAndStyle HighlightThemeProxy::TokenColorAndStyle(
-    ITheme::ColorAndStyle theme_color_and_style,
-    const Token &token) const {
+    ITheme::ColorAndStyle cs, const Token &token) const {
 
   auto eid = token.related_entity_id().Pack();
   if (auto color_it = color_map.find(eid); color_it != color_map.end()) {
-    theme_color_and_style.foreground_color = color_it->second.first;
-    theme_color_and_style.background_color = color_it->second.second;
+    cs.foreground_color = color_it->second.first;
+    cs.background_color = color_it->second.second;
   }
-  return theme_color_and_style;
+  return cs;
 }
 
 std::optional<QColor> HighlightThemeProxy::EntityBackgroundColor(

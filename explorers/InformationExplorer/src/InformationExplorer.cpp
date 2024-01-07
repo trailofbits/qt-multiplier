@@ -165,10 +165,6 @@ void InformationExplorer::OnHighlightModelDataChange(const QModelIndex &,
 void InformationExplorer::OnSearchParametersChange(
     const ISearchWidget::SearchParameters &search_parameters) {
 
-  QRegularExpression::PatternOptions options{
-      QRegularExpression::NoPatternOption};
-
-
 }
 
 void InformationExplorer::OnCurrentItemChanged(const QModelIndex &current_index,

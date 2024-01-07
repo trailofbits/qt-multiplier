@@ -127,11 +127,11 @@ QColor ProxyTheme::CurrentEntityBackgroundColor(
 }
 
 ITheme::ColorAndStyle ProxyTheme::TokenColorAndStyle(const Token &token) const {
-  auto color = current_theme->TokenColorAndStyle(token);
+  auto cs = current_theme->TokenColorAndStyle(token);
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->TokenColorAndStyle(std::move(color), token);
+    cs = (*it)->TokenColorAndStyle(std::move(cs), token);
   }
-  return color;
+  return cs;
 }
 
 std::optional<QColor> ProxyTheme::EntityBackgroundColor(
