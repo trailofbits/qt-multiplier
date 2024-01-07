@@ -845,26 +845,40 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
 }
 
 //! Return the name of an entity.
-TokenRange NameOfEntity(const VariantEntity &ent, bool qualified) {
+TokenRange NameOfEntity(const VariantEntity &ent,
+                        bool qualified, bool scan_redecls) {
 
   const auto VariantEntityVisitor = Overload{
-      [qualified](const Decl &decl) -> TokenRange {
+      [qualified, scan_redecls](const Decl &decl) -> TokenRange {
         Token name_tok;
 
         if (auto named = NamedDecl::from(decl)) {
-          std::string_view name = named->name();
+          std::string_view orig_name = named->name();
+          std::string_view name = orig_name;
           auto maybe_name_tok = named->token();
-          if (!name.empty() && name == name_tok.data()) {
+          if (!name.empty() && name == maybe_name_tok.data()) {
             name_tok = std::move(maybe_name_tok);
-          } else {
+          
+          } else if (scan_redecls) {
             for (NamedDecl redecl : named->redeclarations()) {
               name = redecl.name();
-              maybe_name_tok = named->token();
+              maybe_name_tok = redecl.token();
               if (!name.empty() && name == maybe_name_tok.data()) {
                 name_tok = std::move(maybe_name_tok);
                 break;
               }
             }
+          }
+
+          if (!orig_name.empty() && !name_tok) {
+            Q_ASSERT(false);
+            std::vector<CustomToken> toks;
+            UserToken tok;
+            tok.related_entity = decl;
+            tok.category = Token::categorize(tok.related_entity);
+            tok.kind = TokenKind::IDENTIFIER;
+            tok.data.insert(tok.data.end(), orig_name.begin(), orig_name.end());
+            name_tok = TokenRange::create(std::move(toks)).front();
           }
         }
 
@@ -920,7 +934,7 @@ TokenRange NameOfEntity(const VariantEntity &ent, bool qualified) {
 
         std::vector<CustomToken> toks;
 
-        for (Token tok : NameOfEntity(pd.value(), qualified)) {
+        for (Token tok : NameOfEntity(pd.value(), qualified, scan_redecls)) {
           toks.emplace_back(std::move(tok));
         }
 
@@ -995,8 +1009,9 @@ TokenRange NameOfEntity(const VariantEntity &ent, bool qualified) {
 }
 
 //! Return the name of an entity as a `QString`.
-std::optional<QString> NameOfEntityAsString(const VariantEntity &ent) {
-  if (auto name = NameOfEntity(ent)) {
+std::optional<QString> NameOfEntityAsString(const VariantEntity &ent,
+                                            bool qualified) {
+  if (auto name = NameOfEntity(ent, qualified)) {
     std::string_view data = name.data();
     if (!data.empty()) {
       return QString::fromUtf8(data.data(),

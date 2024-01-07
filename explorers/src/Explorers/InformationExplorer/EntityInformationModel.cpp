@@ -13,6 +13,7 @@
 #include <list>
 #include <multiplier/GUI/Interfaces/IInfoGenerator.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Util.h>
 #include <multiplier/Index.h>
 #include <unordered_map>
 #include <vector>
@@ -299,6 +300,18 @@ void EntityInformationModel::ProcessData(void) {
       entity_node->is_category = false;
       entity_node->render_name = false;
       entity_node->name = TokensToString(entity_node->item.tokens);
+
+      // If the name is empty, then get it from the entity.
+      if (entity_node->name.isEmpty()) {
+        if (auto name = NameOfEntityAsString(entity_node->item.entity)) {
+          entity_node->name = std::move(name.value());
+        }
+      }
+
+      // If name is empty, then go for the location.
+      if (entity_node->name.isEmpty()) {
+        entity_node->name = entity_node->item.location;
+      }
 
       // Look to see if another node with the same name exists within
       // `category_node`.

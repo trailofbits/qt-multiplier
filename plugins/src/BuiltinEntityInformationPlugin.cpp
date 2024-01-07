@@ -6,12 +6,16 @@
 
 #include <multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h>
 
+#include <multiplier/AST/CallExpr.h>
+#include <multiplier/AST/CastExpr.h>
 #include <multiplier/AST/CXXMethodDecl.h>
 #include <multiplier/AST/DeclKind.h>
 #include <multiplier/AST/EnumDecl.h>
 #include <multiplier/AST/EnumConstantDecl.h>
 #include <multiplier/AST/FieldDecl.h>
 #include <multiplier/AST/RecordDecl.h>
+#include <multiplier/AST/TypeTraitExpr.h>
+#include <multiplier/AST/UnaryExprOrTypeTraitExpr.h>
 #include <multiplier/AST/VarDecl.h>
 #include <multiplier/Frontend/MacroExpansion.h>
 #include <multiplier/Frontend/MacroParameter.h>
@@ -64,7 +68,7 @@ static void FillLocation(const FileLocationCache &file_location_cache,
 template <typename T>
 class EntityInfoGenerator Q_DECL_FINAL : public IInfoGenerator {
  public:
-  const T entity;
+  T entity;
 
   virtual ~EntityInfoGenerator(void) = default;
 
@@ -378,16 +382,12 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
   }
 }
 
-// Generate information about macros. This primarily focuses on expansions of
-// defined macros.
+// Generate information about macro definitions. This primarily focuses on
+// expansions of those macros.
 template <>
-gap::generator<IInfoGenerator::Item> EntityInfoGenerator<Macro>::Items(
+gap::generator<IInfoGenerator::Item>
+EntityInfoGenerator<DefineMacroDirective>::Items(
     IInfoGeneratorPtr, FileLocationCache file_location_cache) {
-
-  auto def = DefineMacroDirective::from(entity);
-  if (!def) {
-    co_return;
-  }
 
   std::vector<CustomToken> toks;
   UserToken tok;
@@ -395,13 +395,13 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<Macro>::Items(
 
   // Tell us where the macro is defined.
   item.category = QObject::tr("Definitions");
-  item.tokens = def->name();
-  item.entity = std::move(entity);
+  item.tokens = entity.name();
+  item.entity = entity;
   FillLocation(file_location_cache, item);
   co_yield std::move(item);
 
   // Find the macro parameters.
-  for (const MacroOrToken &mt : def->parameters()) {
+  for (const MacroOrToken &mt : entity.parameters()) {
     if (!std::holds_alternative<Macro>(mt)) {
       continue;
     }
@@ -413,13 +413,13 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<Macro>::Items(
 
     TokenRange tokens = mp->use_tokens();
     if (Token name_tok = mp->name()) {
-      if (def->is_variadic()) {
+      if (entity.is_variadic()) {
         item.tokens = std::move(tokens);
       } else {
         item.tokens = std::move(name_tok);
       }
 
-    } else if (def->is_variadic()) {
+    } else if (entity.is_variadic()) {
       tok.category = TokenCategory::MACRO_PARAMETER_NAME;
       tok.kind = TokenKind::IDENTIFIER;
       tok.data = "__VA_ARGS__";
@@ -436,18 +436,345 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<Macro>::Items(
   }
 
   // Look for expansions of the macro.
-  for (Reference ref : Reference::to(def.value())) {
+  for (Reference ref : Reference::to(entity)) {
     auto exp = MacroExpansion::from(ref.as_macro());
     if (!exp) {
       continue;
     }
 
-    TokenRange tokens = exp->use_tokens();
     item.category = QObject::tr("Expansions");
-    item.tokens = InjectWhitespace(tokens.strip_whitespace());
+    item.tokens = InjectWhitespace(exp->use_tokens().strip_whitespace());
     item.entity = std::move(exp.value());
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
+  }
+}
+
+
+// Generate information about type decls. This focuses on their size and
+// alignment, and uses.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
+    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
+  auto type = entity.type_for_declaration();
+  if (!type) {
+    co_return;
+  }
+
+  IInfoGenerator::Item item;
+
+  if (auto size = type->size_in_bits()) {
+    item.category = QObject::tr("Size");
+    if (!(size.value() % 8u)) {
+      item.location = QObject::tr("Size %1 (bytes)").arg(size.value() / 8u);
+    } else {
+      item.location = QObject::tr("Size %1 (bits)").arg(size.value());
+    }
+    co_yield std::move(item);
+  }
+
+  if (auto align = type->alignment()) {
+    item.category = QObject::tr("Size");
+    item.location = QObject::tr("Alignment %1 (bytes)").arg(align.value());
+    co_yield std::move(item);
+  }
+
+  for (Reference ref : Reference::to(entity)) {
+    if (!ref.builtin_reference_kind()) {
+      continue;
+    }
+
+    auto context = ref.context();
+
+    if (auto du = Decl::from(context)) {
+      item.category = QObject::tr("Declaration Uses");
+      item.entity = std::move(context);
+      FillLocation(file_location_cache, item);
+
+      if (FunctionDecl::from(du.value())) {
+        item.tokens = NameOfEntity(du.value());
+      } else {
+        item.tokens = InjectWhitespace(du->tokens().strip_whitespace());
+      }
+
+      co_yield std::move(item);
+
+    } else if (auto ce = CastExpr::from(context)) {
+      item.category = QObject::tr("Type Casts");
+      item.entity = std::move(context);
+      FillLocation(file_location_cache, item);
+
+      item.tokens = InjectWhitespace(ce->tokens().strip_whitespace());
+      co_yield std::move(item);
+
+    } else if (auto tte = TypeTraitExpr::from(context)) {
+      item.category = QObject::tr("Trait Uses");
+      item.entity = std::move(context);
+      FillLocation(file_location_cache, item);
+      
+      item.tokens = InjectWhitespace(tte->tokens().strip_whitespace());
+      co_yield std::move(item);
+
+    } else if (auto uett = UnaryExprOrTypeTraitExpr::from(context)) {
+      switch (uett->keyword_kind()) {
+        case UnaryExprOrTypeTrait::SIZE_OF:
+          item.category = QObject::tr("Size Ofs");
+          break;
+        case UnaryExprOrTypeTrait::ALIGN_OF:
+        case UnaryExprOrTypeTrait::PREFERRED_ALIGN_OF:
+          item.category = QObject::tr("Align Ofs");
+          break;
+        case UnaryExprOrTypeTrait::POINTER_AUTH_TYPE_DISCRIMINATOR:
+        case UnaryExprOrTypeTrait::XNU_TYPE_SIGNATURE:
+        case UnaryExprOrTypeTrait::XNU_TYPE_SUMMARY:
+        case UnaryExprOrTypeTrait::TMO_TYPE_GET_METADATA:
+          item.category = QObject::tr("Security Type Traits");
+          break;
+        case UnaryExprOrTypeTrait::VEC_STEP:
+        case UnaryExprOrTypeTrait::OPEN_MP_REQUIRED_SIMD_ALIGN:
+          item.category = QObject::tr("Vector Type Traits");
+          break;
+      }
+      item.entity = std::move(context);
+      FillLocation(file_location_cache, item);
+      
+      item.tokens = InjectWhitespace(tte->tokens().strip_whitespace());
+      co_yield std::move(item);
+
+    } else if (auto s = Stmt::from(context)) {
+      item.category = QObject::tr("Statement Uses");
+      item.entity = std::move(context);
+      FillLocation(file_location_cache, item);
+      
+      item.tokens = InjectWhitespace(s->tokens().strip_whitespace());
+      co_yield std::move(item);
+    }
+  }
+}
+
+// Generate information about enums. This focuses on their enumerators.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<EnumDecl>::Items(
+    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
+
+  IInfoGenerator::Item item;
+
+  for (mx::EnumConstantDecl ec : entity.canonical_declaration().enumerators()) {
+    item.category = QObject::tr("Enumerators");
+    item.tokens = ec.token();
+    item.entity = std::move(ec);
+    FillLocation(file_location_cache, item);
+    co_yield std::move(item);
+  }
+}
+
+// Generate information about functions. This focuses on their enumerators.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
+    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
+
+  IInfoGenerator::Item item;
+
+  for (Reference ref : Reference::to(entity)) {
+    auto brk = ref.builtin_reference_kind();
+    if (!brk) {
+      continue;
+    }
+
+    switch (brk.value()) {
+      case BuiltinReferenceKind::CALLS:
+        item.category = QObject::tr("Caller Ofs");
+        break;
+      case BuiltinReferenceKind::TAKES_ADDRESS:
+        item.category = QObject::tr("Address Ofs");
+        break;
+      default:
+        item.category = QObject::tr("User Ofs");
+        break;
+    }
+
+    item.entity = ref.context();
+    if (std::holds_alternative<NotAnEntity>(item.entity)) {
+      item.entity = ref.as_variant();
+    }
+
+    item.tokens = Tokens(item.entity);
+    FillLocation(file_location_cache, item);
+    co_yield std::move(item);
+  }
+
+  // Find the callees. Slightly annoying as we kind of have to invent a join.
+  //
+  // TODO(pag): Make `::in(entity)` work for all entities, not just files
+  //            and fragments.
+  Fragment frag = Fragment::containing(entity);
+  for (CallExpr call : CallExpr::in(frag)) {
+
+    for (Reference ref : Reference::from(call)) {
+      auto brk = ref.builtin_reference_kind();
+      if (!brk || brk.value() != BuiltinReferenceKind::CALLS) {
+        continue;
+      }
+
+      auto callee = FunctionDecl::from(ref.as_variant());
+      if (!callee) {
+        continue;
+      }
+
+      item.category = QObject::tr("Callees");
+      item.entity = std::move(callee.value());
+      FillLocation(file_location_cache, item);
+      item.tokens = NameOfEntity(item.entity);
+      item.entity = call;  // Yes, overwrite.
+      co_yield std::move(item);
+    }
+  }
+
+  // Find the local variables.
+  for (const mx::Decl &decl : entity.declarations_in_context()) {
+    std::optional<VarDecl> vd = mx::VarDecl::from(decl);
+    if (!vd) {
+      continue;
+    }
+
+    if (vd->kind() == DeclKind::PARM_VAR) {
+      item.category = QObject::tr("Parameters");
+    } else {
+      if (vd->tsc_spec() != ThreadStorageClassSpecifier::UNSPECIFIED) {
+        item.category = QObject::tr("Thread Local Variables");
+
+      } else if (vd->storage_duration() == StorageDuration::STATIC) {
+        item.category = QObject::tr("Static Local Variables");
+
+      } else {
+        item.category = QObject::tr("Local Variables");
+      }
+    }
+    item.tokens = NameOfEntity(decl, false  /* don't fully qualify name */);
+    item.entity = std::move(vd.value());
+    FillLocation(file_location_cache, item);
+    co_yield std::move(item);
+  }
+}
+
+// Generate information about functions. This focuses on their enumerators.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<VarDecl>::Items(
+    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
+
+  IInfoGenerator::Item item;
+
+  for (Reference ref : Reference::to(entity)) {
+    auto brk = ref.builtin_reference_kind();
+    if (!brk) {
+      continue;
+    }
+
+    switch (brk.value()) {
+      case BuiltinReferenceKind::CASTS_WITH_TYPE:
+        item.category = QObject::tr("Casted By");
+        break;
+      case BuiltinReferenceKind::COPIES_VALUE:
+        item.category = QObject::tr("Copied Into");
+        break;
+      case BuiltinReferenceKind::TESTS_VALUE:
+        item.category = QObject::tr("Tested By");
+        break;
+      case BuiltinReferenceKind::WRITES_VALUE:
+        item.category = QObject::tr("Written By");
+        break;
+      case BuiltinReferenceKind::UPDATES_VALUE:
+        item.category = QObject::tr("Updated By");
+        break;
+      case BuiltinReferenceKind::ACCESSES_VALUE:
+        item.category = QObject::tr("Dereferenced By");
+        break;
+      case BuiltinReferenceKind::TAKES_VALUE:
+        item.category = QObject::tr("Passed As Argument To");
+        break;
+      case BuiltinReferenceKind::CALLS:
+        item.category = QObject::tr("Called By");
+        break;
+      case BuiltinReferenceKind::TAKES_ADDRESS:
+        item.category = QObject::tr("Address Taken By");
+        break;
+      case BuiltinReferenceKind::USES_VALUE:
+      default:
+        item.category = QObject::tr("Used By");
+        break;
+    }
+
+    item.entity = ref.context();
+    if (std::holds_alternative<NotAnEntity>(item.entity)) {
+      item.entity = ref.as_variant();
+    }
+
+    if (auto stmt = Stmt::from(item.entity)) {
+      item.tokens = InjectWhitespace(stmt->tokens().strip_whitespace());
+    } else {
+      item.tokens = Tokens(item.entity);
+    }
+
+    FillLocation(file_location_cache, item);
+    co_yield std::move(item);
+  }
+}
+
+// Generate information about named declarations.
+template <>
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
+    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
+
+  std::vector<PackedMacroId> seen;
+  IInfoGenerator::Item item;
+
+  entity = entity.canonical_declaration();
+
+  // Fill all redeclarations.
+  for (NamedDecl redecl : entity.redeclarations()) {
+    if (redecl.is_definition()) {
+      item.category = QObject::tr("Definitions");
+    } else {
+      item.category = QObject::tr("Declarations");
+    }
+
+    item.entity = redecl;
+    FillLocation(file_location_cache, item);
+
+    item.tokens = NameOfEntity(item.entity, true  /* qualify */,
+                               false  /* don't scan redecls */);
+    co_yield std::move(item);
+
+    for (Token tok : redecl.tokens()) {
+      for (Macro macro : Macro::containing(tok)) {
+        macro = macro.root();
+        if (macro.kind() != MacroKind::EXPANSION) {
+          break;
+        }
+
+        PackedMacroId macro_id = macro.id();
+        if (std::find(seen.begin(), seen.end(), macro_id) != seen.end()) {
+          break;
+        }
+
+        seen.push_back(macro_id);
+        std::optional<MacroExpansion> exp = MacroExpansion::from(macro);
+        if (!exp) {
+          break;
+        }
+
+        auto def = exp->definition();
+        if (!def) {
+          break;
+        }
+
+        item.category = QObject::tr("Macros Used");
+        item.entity = std::move(exp.value());
+        FillLocation(file_location_cache, item);
+        item.tokens = InjectWhitespace(exp->use_tokens().strip_whitespace());
+        break;
+      }
+    }
   }
 }
 
@@ -465,15 +792,40 @@ BuiltinEntityInformationPlugin::CreateInformationCollectors(
     co_return;
   }
 
-  if (auto macro = Macro::from(entity)) {
-    co_yield std::make_shared<EntityInfoGenerator<Macro>>(
-        std::move(macro.value()));
+  if (auto dmd = DefineMacroDirective::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<DefineMacroDirective>>(
+        std::move(dmd.value()));
     co_return;
   }
 
-  if (auto record = RecordDecl::from(entity)) {
+  if (auto td = TypeDecl::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<TypeDecl>>(
+        std::move(td.value()));
+  }
+
+  if (auto rd = RecordDecl::from(entity)) {
     co_yield std::make_shared<EntityInfoGenerator<RecordDecl>>(
-        std::move(record.value()));
+        std::move(rd.value()));
+  }
+
+  if (auto ed = EnumDecl::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<EnumDecl>>(
+        std::move(ed.value()));
+  }
+
+  if (auto fd = FunctionDecl::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<FunctionDecl>>(
+        std::move(fd.value()));
+  }
+
+  if (auto vd = VarDecl::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<VarDecl>>(
+        std::move(vd.value()));
+  }
+
+  if (auto nd = NamedDecl::from(entity)) {
+    co_yield std::make_shared<EntityInfoGenerator<NamedDecl>>(
+        std::move(nd.value()));
   }
 }
 
