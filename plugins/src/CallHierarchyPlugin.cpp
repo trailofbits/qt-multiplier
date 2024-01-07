@@ -221,7 +221,7 @@ CallHierarchyPlugin::CallHierarchyPlugin(
       d(new PrivateData(config_manager)) {}
 
 std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowSecondaryClick(
-    QMainWindow *, const QModelIndex &index) {
+    IWindowManager *, const QModelIndex &index) {
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
 
@@ -242,7 +242,7 @@ std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowSecondaryClick(
 
 // Allow a main window plugin to act on a key sequence.
 std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowKeyPress(
-    QMainWindow *, const QKeySequence &keys, const QModelIndex &index) {
+    IWindowManager *, const QKeySequence &keys, const QModelIndex &index) {
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
 

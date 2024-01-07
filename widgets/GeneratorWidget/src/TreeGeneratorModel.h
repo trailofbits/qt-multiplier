@@ -90,9 +90,6 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
   //! Processes the entire data batch queue
   void ProcessDataBatchQueue(void);
 
-  //! Called when the tree title has been resolved.
-  void OnNameResolved(void);
-
  public slots:
   void CancelRunningRequest(void);
  
@@ -102,9 +99,6 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
 
   //! Emitted when a request has finished
   void RequestFinished(void);
-
-  //! Emitted when the tree's name has change.
-  void NameChanged(QString new_name);
 };
 
 }  // namespace mx::gui

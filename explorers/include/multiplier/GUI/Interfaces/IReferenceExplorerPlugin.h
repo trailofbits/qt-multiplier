@@ -19,6 +19,7 @@ namespace mx::gui {
 class ConfigManager;
 class IMainWindowPlugin;
 class IReferenceExplorerPlugin;
+class IWindowManager;
 class MediaManager;
 class ThemeManager;
 
@@ -42,29 +43,31 @@ class IReferenceExplorerPlugin : public QObject {
           create_plugin);
 
   virtual void ActOnMainWindowPrimaryClick(
-      QMainWindow *window, const QModelIndex &index);
+      IWindowManager *manager, const QModelIndex &index);
 
   virtual std::optional<NamedAction> ActOnMainWindowSecondaryClick(
-      QMainWindow *window, const QModelIndex &index);
+      IWindowManager *manager, const QModelIndex &index);
 
   virtual std::vector<NamedAction> ActOnMainWindowSecondaryClickEx(
-      QMainWindow *window, const QModelIndex &index);
+      IWindowManager *manager, const QModelIndex &index);
 
   virtual void ActOnMainWindowContextMenu(
-      QMainWindow *window, QMenu *menu, const QModelIndex &index);
+      IWindowManager *manager, QMenu *menu, const QModelIndex &index);
 
   // Allow a main window plugin to act on a long hover over something.
   virtual void ActOnMainWindowLongHover(
-      QMainWindow *window, const QModelIndex &index);
+      IWindowManager *manager, const QModelIndex &index);
 
   // Allow a main window plugin to act on a key sequence.
   virtual std::optional<NamedAction> ActOnMainWindowKeyPress(
-      QMainWindow *window, const QKeySequence &keys, const QModelIndex &index);
+      IWindowManager *manager, const QKeySequence &keys,
+      const QModelIndex &index);
 
   // Allow a main window plugin to provide one of several actions to be
   // performed on a key press.
   virtual std::vector<NamedAction> ActOnMainWindowKeyPressEx(
-      QMainWindow *window, const QKeySequence &keys, const QModelIndex &index);
+      IWindowManager *manager, const QKeySequence &keys,
+      const QModelIndex &index);
 
  public slots:
   virtual void OnThemeChanged(const ThemeManager &theme_manager);

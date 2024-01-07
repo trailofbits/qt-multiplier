@@ -69,9 +69,9 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   void paint(QPainter *painter, const QStyleOptionViewItem &option,
              const QModelIndex &index) const Q_DECL_FINAL;
 
-  //! Returns the size hint for the specified model index
-  QSize sizeHint(const QStyleOptionViewItem &option,
-                 const QModelIndex &index) const Q_DECL_FINAL;
+  // //! Returns the size hint for the specified model index
+  // QSize sizeHint(const QStyleOptionViewItem &option,
+  //                const QModelIndex &index) const Q_DECL_FINAL;
 
   //! Triggered when the user tries to edit the QTreeView item
   bool editorEvent(QEvent *event, QAbstractItemModel *model,

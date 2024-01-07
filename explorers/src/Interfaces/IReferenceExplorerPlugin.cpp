@@ -53,20 +53,20 @@ bool IReferenceExplorerPlugin::Register(
 // is a "normal" click, however, if browse mode is off, then this is a meta-
 // click.
 void IReferenceExplorerPlugin::ActOnMainWindowPrimaryClick(
-    QMainWindow *, const QModelIndex &) {}
+    IWindowManager *, const QModelIndex &) {}
 
 // Allow a main window to add an a named action to a context menu.
 std::optional<NamedAction> IReferenceExplorerPlugin::ActOnMainWindowSecondaryClick(
-    QMainWindow *, const QModelIndex &) {
+    IWindowManager *, const QModelIndex &) {
   return std::nullopt;
 }
 
 // Allow a main window to add an arbitrary number of named actions to a
 // context menu.
 std::vector<NamedAction> IReferenceExplorerPlugin::ActOnMainWindowSecondaryClickEx(
-    QMainWindow *window, const QModelIndex &index) {
+    IWindowManager *manager, const QModelIndex &index) {
   std::vector<NamedAction> ret;
-  if (auto maybe_named_action = ActOnMainWindowSecondaryClick(window, index)) {
+  if (auto maybe_named_action = ActOnMainWindowSecondaryClick(manager, index)) {
     ret.emplace_back(std::move(maybe_named_action.value()));
   }
   return ret;
@@ -74,8 +74,8 @@ std::vector<NamedAction> IReferenceExplorerPlugin::ActOnMainWindowSecondaryClick
 
 // Allow a main window plugin to act on, e.g. modify, a context menu.
 void IReferenceExplorerPlugin::ActOnMainWindowContextMenu(
-    QMainWindow *window, QMenu *menu, const QModelIndex &index) {
-  for (auto named_action : ActOnMainWindowSecondaryClickEx(window, index)) {
+    IWindowManager *manager, QMenu *menu, const QModelIndex &index) {
+  for (auto named_action : ActOnMainWindowSecondaryClickEx(manager, index)) {
     auto action = new QAction(named_action.name, menu);
     connect(
         action, &QAction::triggered,
@@ -89,20 +89,20 @@ void IReferenceExplorerPlugin::ActOnMainWindowContextMenu(
 
 // Allow a main window plugin to act on a long hover over something.
 void IReferenceExplorerPlugin::ActOnMainWindowLongHover(
-    QMainWindow *, const QModelIndex &) {}
+    IWindowManager *, const QModelIndex &) {}
 
 // Allow a main window plugin to act on a key sequence.
 std::optional<NamedAction> IReferenceExplorerPlugin::ActOnMainWindowKeyPress(
-    QMainWindow *, const QKeySequence &, const QModelIndex &) {
+    IWindowManager *, const QKeySequence &, const QModelIndex &) {
   return std::nullopt;
 }
 
 // Allow a main window plugin to provide one of several actions to be
 // performed on a key press.
 std::vector<NamedAction> IReferenceExplorerPlugin::ActOnMainWindowKeyPressEx(
-    QMainWindow *window, const QKeySequence &keys, const QModelIndex &index) {
+    IWindowManager *manager, const QKeySequence &keys, const QModelIndex &index) {
   std::vector<NamedAction> ret;
-  if (auto maybe_named_action = ActOnMainWindowKeyPress(window, keys, index)) {
+  if (auto maybe_named_action = ActOnMainWindowKeyPress(manager, keys, index)) {
     ret.emplace_back(std::move(maybe_named_action.value()));
   }
   return ret;

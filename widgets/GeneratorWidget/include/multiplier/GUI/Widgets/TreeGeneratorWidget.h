@@ -13,15 +13,17 @@
 #include <QWidget>
 
 #include <multiplier/GUI/Interfaces/ITreeGenerator.h>
+#include <multiplier/GUI/Interfaces/IWindowWidget.h>
 
 namespace mx::gui {
 
 class ConfigManager;
+class IWindowManager;
 class MediaManager;
 class ThemeManager;
 
 //! A concrete implementation for the IGeneratorView interface
-class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
+class TreeGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
   Q_OBJECT
 
   struct PrivateData;
@@ -41,7 +43,8 @@ class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
                       QWidget *parent = nullptr);
 
   //! Called when we want to act on the context menu.
-  void ActOnContextMenu(QMenu *menu, const QModelIndex &index);
+  void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
+                        const QModelIndex &index);
 
   //! Install a new generator.
   void InstallGenerator(ITreeGeneratorPtr generator);
@@ -111,12 +114,6 @@ class TreeGeneratorWidget Q_DECL_FINAL : public QWidget {
  signals:
   //! The open button is clicked.
   void OpenItem(const QModelIndex &index);
-
-  //! This tells us when a specific item in the tree is selected.
-  void SelectedItemChanged(const QModelIndex &index);
-
-  //! This tells parent plugins when the context menu is being requested.
-  void RequestContextMenu(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

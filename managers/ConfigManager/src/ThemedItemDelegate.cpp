@@ -242,33 +242,33 @@ void ThemedItemDelegate::paint(QPainter *painter,
   painter->restore();
 }
 
-QSize ThemedItemDelegate::sizeHint(
-    const QStyleOptionViewItem &option, const QModelIndex &index) const {
+// QSize ThemedItemDelegate::sizeHint(
+//     const QStyleOptionViewItem &option, const QModelIndex &index) const {
 
-  QStyleOptionViewItem opt(option);
-  initStyleOption(&opt, index);
-  QStyle *style = opt.widget ? opt.widget->style() : qApp->style();
+//   QStyleOptionViewItem opt(option);
+//   initStyleOption(&opt, index);
+//   QStyle *style = opt.widget ? opt.widget->style() : qApp->style();
 
-  QPointF pos = GetRectPosition(option.rect);
-  QRectF empty_rect(pos.x(), pos.y(), space_width, line_height);
-  MeasuringPainter painter(empty_rect);
+//   QPointF pos = GetRectPosition(option.rect);
+//   QRectF empty_rect(pos.x(), pos.y(), space_width, line_height);
+//   MeasuringPainter painter(empty_rect);
 
-  QColor dummy_color;
-  if (TokenRange tokens = IModel::TokensToDisplay(index)) {
-    PaintTokens(&painter, option, std::move(tokens), dummy_color, dummy_color);
-  } else {
-    PaintText(&painter, option, index.data(Qt::DisplayRole).toString(),
-              {}, pos);
-  }
+//   QColor dummy_color;
+//   if (TokenRange tokens = IModel::TokensToDisplay(index)) {
+//     PaintTokens(&painter, option, std::move(tokens), dummy_color, dummy_color);
+//   } else {
+//     PaintText(&painter, option, index.data(Qt::DisplayRole).toString(),
+//               {}, pos);
+//   }
 
-  return style
-      ->sizeFromContents(
-          QStyle::ContentsType::CT_ItemViewItem,
-          &opt,
-          QSizeF(painter.area.width(), painter.area.height()).toSize(),
-          opt.widget)
-      .grownBy(QMargins(0, 0, static_cast<int>(space_width), 0));
-}
+//   return style
+//       ->sizeFromContents(
+//           QStyle::ContentsType::CT_ItemViewItem,
+//           &opt,
+//           QSizeF(painter.area.width(), painter.area.height()).toSize(),
+//           opt.widget)
+//       .grownBy(QMargins(0, 0, static_cast<int>(space_width), 0));
+// }
 
 bool ThemedItemDelegate::editorEvent(QEvent *, QAbstractItemModel *,
                                      const QStyleOptionViewItem &,

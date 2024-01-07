@@ -42,7 +42,7 @@ class ITreeGenerator : public std::enable_shared_from_this<ITreeGenerator> {
 
   // Return the name of this tree.
   //
-  // NOTE(pag): This is allowed to block.
+  // NOTE(pag): This must be non-blocking.
   virtual QString
   Name(const ITreeGeneratorPtr &self) const = 0;
 

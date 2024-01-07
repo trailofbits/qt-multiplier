@@ -9,6 +9,7 @@
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h>
 #include <multiplier/GUI/Interfaces/ITreeGenerator.h>
+#include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
@@ -17,16 +18,16 @@
 
 #include <QDialog>
 #include <QTabBar>
+#include <QVBoxLayout>
 
 namespace mx::gui {
 
 struct ReferenceExplorer::PrivateData {
   ConfigManager &config_manager;
 
-  QMainWindow * const main_window;
-
   // The tabbed reference explorer widget docked inside of the main window.
   TabWidget *view{nullptr};
+  IWindowWidget *dock{nullptr};
 
   // List of plugins.
   std::vector<IReferenceExplorerPluginPtr> plugins;
@@ -34,64 +35,68 @@ struct ReferenceExplorer::PrivateData {
   // Launches a reference explorer given a data generator.
   TriggerHandle open_reference_explorer_trigger;
 
-  inline PrivateData(ConfigManager &config_manager_,
-                     QMainWindow *main_window_)
-      : config_manager(config_manager_),
-        main_window(main_window_) {}
+  inline PrivateData(ConfigManager &config_manager_)
+      : config_manager(config_manager_) {}
 };
 
 ReferenceExplorer::~ReferenceExplorer(void) {}
 
 ReferenceExplorer::ReferenceExplorer(ConfigManager &config_manager,
-                                     QMainWindow *parent)
+                                     IWindowManager *parent)
     : IMainWindowPlugin(config_manager, parent),
-      d(new PrivateData(config_manager, parent)) {
+      d(new PrivateData(config_manager)) {
 
   d->open_reference_explorer_trigger = config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenReferenceExplorer",
       &ReferenceExplorer::OnOpenReferenceExplorer);
+
+  CreateDockWidget(parent);
 }
 
 // Act on a primary click. For example, if browse mode is enabled, then this
 // is a "normal" click, however, if browse mode is off, then this is a meta-
 // click.
-void ReferenceExplorer::ActOnPrimaryClick(const QModelIndex &index) {
+void ReferenceExplorer::ActOnPrimaryClick(
+    IWindowManager *manager, const QModelIndex &index) {
   for (const auto &plugin : d->plugins) {
-    plugin->ActOnMainWindowPrimaryClick(d->main_window, index);
+    plugin->ActOnMainWindowPrimaryClick(manager, index);
   }
 }
 
 // Allow a main window plugin to act on, e.g. modify, a context menu.
 void ReferenceExplorer::ActOnContextMenu(
-    QMenu *menu, const QModelIndex &index) {
+    IWindowManager *manager, QMenu *menu, const QModelIndex &index) {
   for (const auto &plugin : d->plugins) {
-    plugin->ActOnMainWindowContextMenu(d->main_window, menu, index);
+    plugin->ActOnMainWindowContextMenu(manager, menu, index);
   }
 
   if (d->view && d->view->isVisible() && index.isValid()) {
     auto current = d->view->currentWidget();
     if (auto tree = dynamic_cast<TreeGeneratorWidget *>(current)) {
-      tree->ActOnContextMenu(menu, index);
+      tree->ActOnContextMenu(manager, menu, index);
     }
   }
 }
 
 // Allow a main window plugin to act on a long hover over something.
-void ReferenceExplorer::ActOnLongHover(const QModelIndex &index) {
+void ReferenceExplorer::ActOnLongHover(
+    IWindowManager *manager, const QModelIndex &index) {
   for (const auto &plugin : d->plugins) {
-    plugin->ActOnMainWindowLongHover(d->main_window, index);
+    plugin->ActOnMainWindowLongHover(manager, index);
   }
 }
 
 // Allow a main window plugin to provide one of several actions to be
 // performed on a key press.
 std::vector<NamedAction> ReferenceExplorer::ActOnKeyPressEx(
-    const QKeySequence &keys, const QModelIndex &index) {
+    IWindowManager *manager, const QKeySequence &keys,
+    const QModelIndex &index) {
+
   std::vector<NamedAction> actions;
 
   for (const auto &plugin : d->plugins) {
     auto plugin_actions = 
-        plugin->ActOnMainWindowKeyPressEx(d->main_window, keys, index);
+        plugin->ActOnMainWindowKeyPressEx(manager, keys, index);
 
     actions.insert(actions.end(),
                  std::make_move_iterator(plugin_actions.begin()),
@@ -101,13 +106,12 @@ std::vector<NamedAction> ReferenceExplorer::ActOnKeyPressEx(
   return actions;
 }
 
-QWidget *ReferenceExplorer::CreateDockWidget(QWidget *parent) {
-  if (d->view) {
-    return d->view;
-  }
+void ReferenceExplorer::CreateDockWidget(IWindowManager *manager) {
+  d->dock = new IWindowWidget;
+  d->dock->setWindowTitle(tr("Reference Explorer"));
+  d->dock->setContentsMargins(0, 0, 0, 0);
 
-  d->view = new TabWidget(parent);
-  d->view->setWindowTitle(tr("Reference Explorer"));
+  d->view = new TabWidget(d->dock);
   d->view->setDocumentMode(true);
   d->view->setTabsClosable(true);
 
@@ -117,29 +121,30 @@ QWidget *ReferenceExplorer::CreateDockWidget(QWidget *parent) {
   connect(d->view->tabBar(), &QTabBar::tabBarDoubleClicked,
           this, &ReferenceExplorer::OnTabBarDoubleClick);
 
-  return d->view;
+  auto dock_layout = new QVBoxLayout(d->dock);
+  dock_layout->setContentsMargins(0, 0, 0, 0);
+  dock_layout->addWidget(d->view, 1);
+  dock_layout->addStretch();
+  d->dock->setLayout(dock_layout);
+
+  IWindowManager::DockConfig config;
+  config.id = "com.trailofbits.dock.ReferenceExplorer";
+  config.location = IWindowManager::DockLocation::Bottom;
+  config.app_menu_location = {tr("View"), tr("Explorers")};
+  manager->AddDockWidget(d->dock, config);
 }
 
 void ReferenceExplorer::OnTabBarClose(int i) {
-  if (!d->view) {
-    return;
-  }
-
   auto widget = d->view->widget(i);
   d->view->RemoveTab(i);
-
   widget->close();
 
   if (!d->view->count()) {
-    emit HideDockWidget();
+    d->dock->hide();
   }
 }
 
 void ReferenceExplorer::OnTabBarDoubleClick(int i) {
-  if (!d->view) {
-    return;
-  }
-
   auto current_tab_name = d->view->tabText(i);
 
   SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,
@@ -174,18 +179,17 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
   connect(tree_view, &TreeGeneratorWidget::OpenItem,
           this, &IMainWindowPlugin::RequestPrimaryClick);
 
-  connect(tree_view, &TreeGeneratorWidget::RequestContextMenu,
-          this, &IMainWindowPlugin::RequestContextMenu);
+  connect(tree_view, &TreeGeneratorWidget::RequestSecondaryClick,
+          this, &IMainWindowPlugin::RequestSecondaryClick);
 
-  connect(tree_view, &TreeGeneratorWidget::SelectedItemChanged,
+  connect(tree_view, &TreeGeneratorWidget::RequestPrimaryClick,
           this, &ReferenceExplorer::OnSelectionChange);
 
   tree_view->InstallGenerator(std::move(generator));
 
   d->view->InsertTab(0, tree_view);
   d->view->setCurrentIndex(0);
-
-  emit ShowDockWidget();
+  d->dock->show();
 }
 
 void ReferenceExplorer::AddPlugin(IReferenceExplorerPluginPtr plugin) {

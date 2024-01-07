@@ -19,6 +19,8 @@
 namespace mx::gui {
 
 class ConfigManager;
+class IWindowManager;
+class IWindowWidget;
 class MediaManager;
 class ThemeManager;
 
@@ -28,47 +30,43 @@ class IMainWindowPlugin : public QObject {
  public:
   virtual ~IMainWindowPlugin(void);
 
-  IMainWindowPlugin(ConfigManager &config, QMainWindow *parent = nullptr);
+  IMainWindowPlugin(ConfigManager &config, IWindowManager *parent = nullptr);
 
   //! Act on a primary click. For example, if browse mode is enabled, then this
   //! is a "normal" click, however, if browse mode is off, then this is a meta-
   //! click.
-  virtual void ActOnPrimaryClick(const QModelIndex &index);
+  virtual void ActOnPrimaryClick(
+      IWindowManager *manager, const QModelIndex &index);
 
   //! Allow a main window to add an a named action to a context menu.
   virtual std::optional<NamedAction> ActOnSecondaryClick(
-      const QModelIndex &index);
+      IWindowManager *manager, const QModelIndex &index);
 
   //! Allow a main window to add an arbitrary number of named actions to a
   //! context menu.
   virtual std::vector<NamedAction> ActOnSecondaryClickEx(
-      const QModelIndex &index);
+      IWindowManager *manager, const QModelIndex &index);
 
   //! Allow a main window plugin to act on, e.g. modify, a context menu.
-  virtual void ActOnContextMenu(QMenu *menu, const QModelIndex &index);
+  virtual void ActOnContextMenu(
+      IWindowManager *manager, QMenu *menu, const QModelIndex &index);
 
   //! Allow a main window plugin to act on a long hover over something.
-  virtual void ActOnLongHover(const QModelIndex &index);
+  virtual void ActOnLongHover(
+      IWindowManager *manager, const QModelIndex &index);
 
   //! Allow a main window plugin to act on a key sequence.
   virtual std::optional<NamedAction> ActOnKeyPress(
-      const QKeySequence &keys, const QModelIndex &index);
+      IWindowManager *manager, const QKeySequence &keys,
+      const QModelIndex &index);
 
   //! Allow a main window plugin to provide one of several actions to be
   //! performed on a key press.
   virtual std::vector<NamedAction> ActOnKeyPressEx(
-      const QKeySequence &keys, const QModelIndex &index);
-
-  //! Requests a dock wiget from this plugin. Can return `nullptr`.
-  virtual QWidget *CreateDockWidget(QWidget *parent);
+      IWindowManager *manager, const QKeySequence &keys,
+      const QModelIndex &index);
 
  signals:
-  void HideDockWidget(void);
-  void ShowDockWidget(void);
-
-  //! Signal emitted when this plugin opens a popup. This provides the main
-  //! window with visibility into the current set of open popups.
-  void PopupOpened(QWidget *);
 
   //! Signal emitted when some nested plugin widget wants to signal a click
   //! action for a `QModelIndex` whose model follows the `IModel` interface, and
@@ -78,7 +76,7 @@ class IMainWindowPlugin : public QObject {
   //! Signal emitted when some nested plugin widget wants to open a context
   //! menu for a `QModelIndex` whose model follows the `IModel` interface, and
   //! thus could benefit from allowing other plugins to see the index.
-  void RequestContextMenu(const QModelIndex &index);
+  void RequestSecondaryClick(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

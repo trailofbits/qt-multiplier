@@ -10,7 +10,6 @@
 
 #include <QColor>
 #include <QApplication>
-#include <QFutureWatcher>
 #include <QThreadPool>
 #include <QTimer>
 #include <QPalette>
@@ -97,10 +96,6 @@ struct ListGeneratorModel::PrivateData final {
   // Thread pool for all expansion runnables.
   QThreadPool thread_pool;
 
-  //! Future used to resolve the name of the tree.
-  QFuture<QString> tree_name_future;
-  QFutureWatcher<QString> tree_name_future_watcher;
-
   //! A timer used to import data from the data batch queue
   QTimer import_timer;
 
@@ -150,11 +145,6 @@ struct ListGeneratorModel::PrivateData final {
 ListGeneratorModel::ListGeneratorModel(QObject *parent)
     : IModel(parent),
       d(new PrivateData) {
-
-  connect(&(d->tree_name_future_watcher),
-          &QFutureWatcher<QFuture<QString>>::finished, this,
-          &ListGeneratorModel::OnNameResolved);
-
   connect(&d->import_timer, &QTimer::timeout, this,
           &ListGeneratorModel::ProcessDataBatchQueue);
 }
@@ -192,10 +182,6 @@ void ListGeneratorModel::InstallGenerator(IListGeneratorPtr generator_) {
   // Start a request to fetch the data.
   if (d->generator) {
     d->num_pending_requests += 1;
-
-    d->tree_name_future = QtConcurrent::run(
-        [gen = d->generator](void) -> QString { return gen->Name(gen); });
-    d->tree_name_future_watcher.setFuture(d->tree_name_future);
 
     auto runnable = new InitTreeRunnable(
         d->generator, d->version_number, {}, 1u);
@@ -315,15 +301,6 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
   return value;
 }
 
-//! Called when the tree title has been resolved.
-void ListGeneratorModel::OnNameResolved(void) {
-  if (d->tree_name_future.isCanceled()) {
-    return;
-  }
-
-  emit NameChanged(d->tree_name_future.takeResult());
-}
-
 void ListGeneratorModel::OnRequestFinished(void) {
   d->num_pending_requests -= 1;
   Q_ASSERT(d->num_pending_requests >= 0);
@@ -333,10 +310,6 @@ void ListGeneratorModel::OnRequestFinished(void) {
 }
 
 void ListGeneratorModel::CancelRunningRequest(void) {
-  d->tree_name_future.cancel();
-  d->tree_name_future.waitForFinished();
-  d->tree_name_future = {};
-
   if (!d->num_pending_requests && d->data_batch_queue.empty()) {
     return;
   }

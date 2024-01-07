@@ -35,6 +35,9 @@ add_executable("Multiplier" ${executable_type}
   
   src/MultiplierStyle.h
   src/MultiplierStyle.cpp
+  
+  src/WindowManager.h
+  src/WindowManager.cpp
 )
 
 target_sources("Multiplier" PRIVATE
@@ -49,6 +52,7 @@ target_link_libraries("Multiplier"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_explorers"
+    "mx_interfaces"
     "mx_media_manager"
     "mx_multiplier_library"
     "mx_phantomstyle_library"

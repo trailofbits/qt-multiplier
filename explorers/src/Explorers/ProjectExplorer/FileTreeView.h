@@ -14,6 +14,7 @@
 #include <QWidget>
 
 #include <multiplier/Types.h>
+#include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <vector>
 
 namespace mx::gui {
@@ -23,7 +24,7 @@ class FileTreeModel;
 class MediaManager;
 class ThemeManager;
 
-class FileTreeView Q_DECL_FINAL : public QWidget {
+class FileTreeView Q_DECL_FINAL : public IWindowWidget {
   Q_OBJECT
 
   struct PrivateData;
@@ -85,10 +86,6 @@ class FileTreeView Q_DECL_FINAL : public QWidget {
 
   //! Called by the theme manager
   void OnThemeChanged(const ThemeManager &theme_manager);
- 
- signals:
-  void RequestPrimaryClick(const QModelIndex &index);
-  void RequestContextMenu(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

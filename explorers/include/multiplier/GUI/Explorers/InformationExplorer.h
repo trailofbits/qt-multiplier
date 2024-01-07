@@ -21,17 +21,17 @@ class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   virtual ~InformationExplorer(void);
 
   InformationExplorer(ConfigManager &config_manager,
-                      QMainWindow *parent = nullptr);
+                      IWindowManager *parent = nullptr);
 
-  QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
-
-  void ActOnPrimaryClick(const QModelIndex &index) Q_DECL_FINAL;
+  void ActOnPrimaryClick(
+      IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
 
   std::optional<NamedAction> ActOnSecondaryClick(
-      const QModelIndex &index) Q_DECL_FINAL;
+      IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
 
   std::optional<NamedAction> ActOnKeyPress(
-      const QKeySequence &keys, const QModelIndex &index) Q_DECL_FINAL;
+      IWindowManager *manager, const QKeySequence &keys,
+      const QModelIndex &index) Q_DECL_FINAL;
 
   void AddPlugin(IInformationExplorerPluginPtr plugin);
 
@@ -41,6 +41,7 @@ class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   }
 
  private:
+  void CreateDockWidget(IWindowManager *manager);
   void OpenInfo(const QVariant &data);
   void OpenPinnedInfo(const QVariant &data);
 };

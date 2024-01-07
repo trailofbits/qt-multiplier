@@ -140,7 +140,7 @@ EntityInformationWidget::~EntityInformationWidget(void) {}
 EntityInformationWidget::EntityInformationWidget(
     const ConfigManager &config_manager, bool enable_history,
     QWidget *parent)
-    : QWidget(parent),
+    : IWindowWidget(parent),
       d(new PrivateData(config_manager, enable_history, this)) {
 
   d->selection_timer.start();
@@ -506,7 +506,7 @@ void EntityInformationWidget::OnOpenItemContextMenu(const QPoint &point) {
     return;
   }
 
-  emit RequestContextMenu(d->selected_index);
+  emit RequestSecondaryClick(d->selected_index);
 }
 
 }  // namespace mx::gui

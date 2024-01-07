@@ -63,7 +63,7 @@ TreeGeneratorWidget::~TreeGeneratorWidget(void) {}
 
 TreeGeneratorWidget::TreeGeneratorWidget(
     const ConfigManager &config_manager, QWidget *parent)
-    : QWidget(parent),
+    : IWindowWidget(parent),
       d(new PrivateData) {
 
   d->selection_timer.start();
@@ -77,15 +77,11 @@ TreeGeneratorWidget::TreeGeneratorWidget(
 
 //! Install a new generator.
 void TreeGeneratorWidget::InstallGenerator(ITreeGeneratorPtr generator) {
+  setWindowTitle(generator->Name(generator));
   d->model->InstallGenerator(std::move(generator));
 }
 
 void TreeGeneratorWidget::InstallModel(void) {
-  connect(d->model, &TreeGeneratorModel::NameChanged,
-          [=] (QString new_name) {
-            setWindowTitle(new_name);
-          });
-
   d->model_proxy = new SearchFilterModelProxy(this);
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);
@@ -259,7 +255,7 @@ void TreeGeneratorWidget::InitializeWidgets(
 
 //! Called when we want to act on the context menu.
 void TreeGeneratorWidget::ActOnContextMenu(
-    QMenu *menu, const QModelIndex &index) {
+    IWindowManager *, QMenu *menu, const QModelIndex &index) {
 
   auto selected_index = std::move(d->selected_index);
   if (index != selected_index) {
@@ -547,7 +543,7 @@ void TreeGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
   }
 
   d->selected_index = new_index;
-  emit SelectedItemChanged(d->selected_index);
+  emit RequestPrimaryClick(d->selected_index);
 }
 
 void TreeGeneratorWidget::OnOpenItemContextMenu(const QPoint &point) {
@@ -557,7 +553,7 @@ void TreeGeneratorWidget::OnOpenItemContextMenu(const QPoint &point) {
     return;
   }
 
-  emit RequestContextMenu(d->selected_index);
+  emit RequestSecondaryClick(d->selected_index);
 }
 
 void TreeGeneratorWidget::OnSearchParametersChange(void) {

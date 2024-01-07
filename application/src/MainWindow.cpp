@@ -8,7 +8,6 @@
 
 #include <QCommandLineOption>
 #include <QCommandLineParser>
-#include <QDockWidget>
 #include <QFileDialog>
 #include <QMenu>
 #include <QMenuBar>
@@ -28,6 +27,8 @@
 #include <multiplier/Index.h>
 #include <vector>
 
+#include "WindowManager.h"
+
 namespace mx::gui {
 
 struct MainWindow::PrivateData {
@@ -40,8 +41,11 @@ struct MainWindow::PrivateData {
   QMenu *view_explorers_menu{nullptr};
   QMenu *view_theme_menu{nullptr};
 
-  inline PrivateData(QApplication &application, QMainWindow *main_window)
-      : config_manager(application, main_window) {}
+  WindowManager * const window_manager;
+
+  inline PrivateData(QApplication &application, MainWindow *main_window)
+      : config_manager(application, main_window),
+        window_manager(new WindowManager(main_window)) {}
 };
 
 MainWindow::~MainWindow(void) {}
@@ -57,62 +61,33 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 }
 
 void MainWindow::InitializePlugins(void) {
-  auto ref_explorer = new ReferenceExplorer(d->config_manager, this);
+  auto wm = d->window_manager;
+
+  d->plugins.emplace_back(new ProjectExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new EntityExplorer(d->config_manager, wm));
+  
+  auto info_explorer = new InformationExplorer(d->config_manager, wm);
+  info_explorer->EmplacePlugin<BuiltinEntityInformationPlugin>();
+  d->plugins.emplace_back(info_explorer);
+
+  auto ref_explorer = new ReferenceExplorer(d->config_manager, wm);
   ref_explorer->EmplacePlugin<CallHierarchyPlugin>(
       d->config_manager, ref_explorer);
-
-  auto info_explorer = new InformationExplorer(d->config_manager, this);
-  info_explorer->EmplacePlugin<BuiltinEntityInformationPlugin>();
-
-  d->plugins.emplace_back(new ProjectExplorer(d->config_manager, this));
-  d->plugins.emplace_back(new EntityExplorer(d->config_manager, this));
-  d->plugins.emplace_back(info_explorer);
-  d->plugins.emplace_back(new HighlightExplorer(d->config_manager, this));
   d->plugins.emplace_back(ref_explorer);
 
+  d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
+
   for (const auto &plugin : d->plugins) {
-    QWidget *dockable_widget = plugin->CreateDockWidget(this);
-    if (!dockable_widget) {
-      continue;
-    }
-
-    auto dock = new QDockWidget(dockable_widget->windowTitle(), this);
-    dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-    dock->setWidget(dockable_widget);
-
-    d->view_menu->addAction(dock->toggleViewAction());
-    addDockWidget(Qt::LeftDockWidgetArea, dock);
-
-    connect(
-        plugin.get(), &IMainWindowPlugin::ShowDockWidget,
-        [=] (void) {
-          dock->show();
-        });
-
-    connect(
-        plugin.get(), &IMainWindowPlugin::HideDockWidget,
-        [=] (void) {
-          dock->hide();
-        });
-
-    connect(plugin.get(), &IMainWindowPlugin::RequestContextMenu,
-            this, &MainWindow::OnRequestContextMenu);
+    connect(plugin.get(), &IMainWindowPlugin::RequestSecondaryClick,
+            this, &MainWindow::OnRequestSecondaryClick);
 
     connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
             this, &MainWindow::OnRequestPrimaryClick);
-
-    // connect(
-    //     plugin.get(), &IMainWindowPlugin::PopupOpened,
-    //     [this] (QWidget *popup) {
-    //       popup->installEventFilter(this);
-    //       d->popup_widget_list.push_back(popup);
-    //     });
   }
 }
 
 void MainWindow::InitializeMenus(void) {
-  d->view_menu = new QMenu(tr("View"));
-  d->view_explorers_menu = new QMenu(tr("Explorers"));
+  d->view_menu = d->window_manager->Menu(tr("View"));
   d->view_theme_menu = new QMenu(tr("Themes"));
   d->view_menu->addMenu(d->view_theme_menu);
 
@@ -149,12 +124,7 @@ void MainWindow::OnThemeListChanged(const ThemeManager &theme_manager) {
 }
 
 void MainWindow::InitializeDocks(void) {
-  setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
-  setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
-  setTabPosition(Qt::RightDockWidgetArea, QTabWidget::East);
-  setTabPosition(Qt::TopDockWidgetArea, QTabWidget::North);
-  setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
-  setDocumentMode(false);
+  
 }
 
 void MainWindow::InitializeIndex(QApplication &application) {
@@ -192,10 +162,10 @@ void MainWindow::InitializeIndex(QApplication &application) {
 }
 
 //! Invoked on an index whose underlying model follows the `IModel` interface.
-void MainWindow::OnRequestContextMenu(const QModelIndex &index) {
+void MainWindow::OnRequestSecondaryClick(const QModelIndex &index) {
   QMenu menu(tr("Context Menu"));
   for (const auto &plugin : d->plugins) {
-    plugin->ActOnContextMenu(&menu, index);
+    plugin->ActOnContextMenu(d->window_manager, &menu, index);
   }
   menu.exec(QCursor::pos());
 }
@@ -203,7 +173,7 @@ void MainWindow::OnRequestContextMenu(const QModelIndex &index) {
 //! Invoked on an index whose underlying model follows the `IModel` interface.
 void MainWindow::OnRequestPrimaryClick(const QModelIndex &index) {
   for (const auto &plugin : d->plugins) {
-    plugin->ActOnPrimaryClick(index);
+    plugin->ActOnPrimaryClick(d->window_manager, index);
   }
 }
 

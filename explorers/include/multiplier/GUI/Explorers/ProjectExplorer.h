@@ -20,11 +20,16 @@ class ProjectExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   virtual ~ProjectExplorer(void);
 
   ProjectExplorer(ConfigManager &config_manager,
-                  QMainWindow *parent = nullptr);
+                  IWindowManager *parent = nullptr);
 
-  QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
-  void ActOnPrimaryClick(const QModelIndex &index) Q_DECL_FINAL;
-  void ActOnContextMenu(QMenu *menu, const QModelIndex &index) Q_DECL_FINAL;
+  void ActOnPrimaryClick(
+      IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
+
+  void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
+                        const QModelIndex &index) Q_DECL_FINAL;
+
+ private:
+  void CreateDockWidget(IWindowManager *manager);
 
  private slots:
   void OnIndexChanged(const ConfigManager &config_manager);

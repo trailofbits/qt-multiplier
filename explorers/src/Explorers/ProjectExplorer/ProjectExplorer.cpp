@@ -11,6 +11,7 @@
 #include <QClipboard>
 
 #include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 
@@ -24,9 +25,6 @@ struct ProjectExplorer::PrivateData {
   FileTreeModel *model{nullptr};
   FileTreeView *view{nullptr};
 
-  QModelIndex context_index;
-  QModelIndex clicked_index;
-
   // Action for opening an entity when the selection is changed.
   const TriggerHandle open_entity_trigger;
 
@@ -39,52 +37,44 @@ struct ProjectExplorer::PrivateData {
 ProjectExplorer::~ProjectExplorer(void) {}
 
 ProjectExplorer::ProjectExplorer(ConfigManager &config_manager,
-                                 QMainWindow *parent)
+                                 IWindowManager *parent)
     : IMainWindowPlugin(config_manager, parent),
       d(new PrivateData(config_manager)) {
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &ProjectExplorer::OnIndexChanged);
+
+  CreateDockWidget(parent);
 }
 
-QWidget *ProjectExplorer::CreateDockWidget(QWidget *parent) {
-  if (d->view) {
-    return d->view;
-  }
-
+void ProjectExplorer::CreateDockWidget(IWindowManager *manager) {
   d->model = new FileTreeModel(this);
-  d->view = new FileTreeView(d->config_manager, d->model, parent);
+  d->view = new FileTreeView(d->config_manager, d->model);
 
   d->view->setWindowTitle(tr("Project Explorer"));
   OnIndexChanged(d->config_manager);
 
-  connect(d->view, &FileTreeView::RequestContextMenu,
-          [this] (const QModelIndex &index) {
-            d->context_index = index;
-            emit RequestContextMenu(d->context_index);
-          });
-
-  connect(d->view, &FileTreeView::RequestPrimaryClick,
-          [this] (const QModelIndex &index) {
-            d->clicked_index = index;
-            emit RequestPrimaryClick(d->clicked_index);
-          });
-
-  return d->view;
+  IWindowManager::DockConfig config;
+  config.id = "com.trailofbits.dock.ProjectExplorer";
+  config.tabify = true;
+  config.app_menu_location = {tr("View"), tr("Explorers")};
+  manager->AddDockWidget(d->view, config);
 }
 
-void ProjectExplorer::ActOnPrimaryClick(const QModelIndex &index) {
-  auto clicked_index = std::move(d->clicked_index);
-  if (!d->view || clicked_index != index || !index.isValid()) {
+void ProjectExplorer::ActOnPrimaryClick(
+    IWindowManager *, const QModelIndex &index) {
+
+  if (!d->view || !index.isValid() || index.model() != d->model) {
     return;
   }
 
   d->open_entity_trigger.Trigger(index.data(IModel::EntityRole));
 }
 
-void ProjectExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
-  auto context_index = std::move(d->context_index);
-  if (!d->view || context_index != index || !index.isValid() ||
+void ProjectExplorer::ActOnContextMenu(
+    IWindowManager *, QMenu *menu, const QModelIndex &index) {
+
+  if (!d->view || !index.isValid() || index.model() != d->model ||
       !d->view->isVisible()) {
     return;
   }

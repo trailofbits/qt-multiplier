@@ -96,7 +96,7 @@ void InformationExplorerPlugin::OpenSecondary(const QVariant &input) {
 // A right-click menu option is added that lets us open up an entity in the
 // primary information explorer.
 std::optional<NamedAction> InformationExplorerPlugin::ActOnSecondaryClick(
-    const QModelIndex &index) {
+    IWindowManager *, const QModelIndex &index) {
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
   if (std::holds_alternative<NotAnEntity>(entity)) {
@@ -114,7 +114,7 @@ std::optional<NamedAction> InformationExplorerPlugin::ActOnSecondaryClick(
 // explorer. If `Shift-I` is pressed, then we open up the entity in the
 // secondary information explorer.
 std::optional<NamedAction> InformationExplorerPlugin::ActOnKeyPress(
-    const QKeySequence &keys, const QModelIndex &index) {
+    IWindowManager *, const QKeySequence &keys, const QModelIndex &index) {
 
   const TriggerHandle *trigger = nullptr;
   if (keys == kKeySeqI) {

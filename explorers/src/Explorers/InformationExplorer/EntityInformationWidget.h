@@ -11,6 +11,7 @@
 #include <QWidget>
 
 #include <multiplier/GUI/Interfaces/IInformationExplorerPlugin.h>
+#include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/Index.h>
 #include <vector>
 
@@ -32,7 +33,7 @@ class HistoryWidget;
 class MediaManager;
 
 //! A component that wraps an InformationExplorer widget with its model
-class EntityInformationWidget Q_DECL_FINAL : public QWidget {
+class EntityInformationWidget Q_DECL_FINAL : public IWindowWidget {
   Q_OBJECT
 
   struct PrivateData;
@@ -65,11 +66,7 @@ class EntityInformationWidget Q_DECL_FINAL : public QWidget {
 
  signals:
   void HistoricalEntitySelected(VariantEntity entity);
-
-  //! Forwards the internal InformationExplorer::SelectedItemChanged signal
-  void SelectedItemChanged(const QModelIndex &current_index);
-
-  void RequestContextMenu(const QModelIndex &current_index);
+  void SelectedItemChanged(const QModelIndex &index);
 
   // TODO(pag): IndexChanged should close the widget if it is a pinned info
   //            explorer.

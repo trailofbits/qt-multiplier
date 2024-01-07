@@ -21,14 +21,21 @@ class ReferenceExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
   virtual ~ReferenceExplorer(void);
 
-  ReferenceExplorer(ConfigManager &config_manager, QMainWindow *parent);
+  ReferenceExplorer(ConfigManager &config_manager,
+                    IWindowManager *parent = nullptr);
 
-  void ActOnPrimaryClick(const QModelIndex &index) Q_DECL_FINAL;
-  void ActOnContextMenu(QMenu *menu, const QModelIndex &index) Q_DECL_FINAL;
-  void ActOnLongHover(const QModelIndex &index) Q_DECL_FINAL;
+  void ActOnPrimaryClick(
+      IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
+
+  void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
+                        const QModelIndex &index) Q_DECL_FINAL;
+
+  void ActOnLongHover(IWindowManager *manager,
+                      const QModelIndex &index) Q_DECL_FINAL;
+
   std::vector<NamedAction> ActOnKeyPressEx(
-      const QKeySequence &keys, const QModelIndex &index) Q_DECL_FINAL;
-  QWidget *CreateDockWidget(QWidget *parent) Q_DECL_FINAL;
+      IWindowManager *manager, const QKeySequence &keys,
+      const QModelIndex &index) Q_DECL_FINAL;
 
   void AddPlugin(IReferenceExplorerPluginPtr plugin);
 
@@ -38,6 +45,7 @@ class ReferenceExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   }
 
  private:
+  void CreateDockWidget(IWindowManager *parent);
   friend class IReferenceExplorerPlugin;
 
   void OnOpenReferenceExplorer(const QVariant &data);

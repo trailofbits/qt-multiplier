@@ -10,7 +10,6 @@
 
 #include <QColor>
 #include <QApplication>
-#include <QFutureWatcher>
 #include <QThreadPool>
 #include <QTimer>
 #include <QPalette>
@@ -131,10 +130,6 @@ struct TreeGeneratorModel::PrivateData final {
   // Thread pool for all expansion runnables.
   QThreadPool thread_pool;
 
-  //! Future used to resolve the name of the tree.
-  QFuture<QString> tree_name_future;
-  QFutureWatcher<QString> tree_name_future_watcher;
-
   //! A timer used to import data from the data batch queue
   QTimer import_timer;
 
@@ -215,10 +210,6 @@ gap::generator<NodeKey *> TreeGeneratorModel::PrivateData::Children(
 TreeGeneratorModel::TreeGeneratorModel(QObject *parent)
     : IModel(parent),
       d(new PrivateData) {
-
-  connect(&(d->tree_name_future_watcher),
-          &QFutureWatcher<QFuture<QString>>::finished, this,
-          &TreeGeneratorModel::OnNameResolved);
 
   connect(&d->import_timer, &QTimer::timeout, this,
           &TreeGeneratorModel::ProcessDataBatchQueue);
@@ -337,11 +328,6 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
   emit endResetModel();
 
   if (d->generator) {
-    // Start a request to fetch the name of this tree.
-    d->tree_name_future = QtConcurrent::run(
-        [gen = d->generator](void) -> QString { return gen->Name(gen); });
-    d->tree_name_future_watcher.setFuture(d->tree_name_future);
-
     RunExpansionThread(new InitTreeRunnable(
         d->generator, d->version_number, {},
         d->generator->InitialExpansionDepth()));
@@ -472,20 +458,7 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
   return value;
 }
 
-//! Called when the tree title has been resolved.
-void TreeGeneratorModel::OnNameResolved(void) {
-  if (d->tree_name_future.isCanceled()) {
-    return;
-  }
-
-  emit NameChanged(d->tree_name_future.takeResult());
-}
-
 void TreeGeneratorModel::CancelRunningRequest() {
-  d->tree_name_future.cancel();
-  d->tree_name_future.waitForFinished();
-  d->tree_name_future = {};
-
   if (!d->num_pending_requests && d->data_batch_queue.empty()) {
     return;
   }

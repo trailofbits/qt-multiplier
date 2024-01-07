@@ -25,6 +25,8 @@
 #include <multiplier/Frontend/TokenCategory.h>
 #include <multiplier/Frontend/TokenKind.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Interfaces/IWindowManager.h>
+#include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
@@ -184,7 +186,7 @@ struct EntityExplorer::PrivateData {
 
   const ConfigManager &config_manager;
 
-  QWidget *view{nullptr};
+  IWindowWidget *view{nullptr};
   ListGeneratorWidget *list_widget{nullptr};
   LineEditWidget *search_input{nullptr};
   QRadioButton *exact_match_radio{nullptr};
@@ -207,7 +209,7 @@ struct EntityExplorer::PrivateData {
 EntityExplorer::~EntityExplorer(void) {}
 
 EntityExplorer::EntityExplorer(ConfigManager &config_manager,
-                               QMainWindow *parent)
+                               IWindowManager *parent)
     : IMainWindowPlugin(config_manager, parent),
       d(new PrivateData(config_manager)) {
 
@@ -215,16 +217,13 @@ EntityExplorer::EntityExplorer(ConfigManager &config_manager,
           this, &EntityExplorer::OnIndexChanged);
 
   OnIndexChanged(d->config_manager);
+  CreateDockWidget(parent);
 }
 
-QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
-  if (d->view) {
-    return d->view;
-  }
-
+void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
   auto &theme_manager = d->config_manager.ThemeManager();
 
-  d->view = new QWidget(parent);
+  d->view = new IWindowWidget;
   d->view->setWindowTitle(tr("Entity Explorer"));
 
   auto search_parameters_layout = new QVBoxLayout;
@@ -270,16 +269,16 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
           this, &EntityExplorer::OnCategoryChanged);
 
   d->list_widget = new ListGeneratorWidget(d->config_manager, d->view);
-  connect(d->list_widget, &ListGeneratorWidget::RequestContextMenu,
-          [this] (const QModelIndex &index) {
+  connect(d->list_widget, &ListGeneratorWidget::RequestSecondaryClick,
+          [=, this] (const QModelIndex &index) {
             d->context_index = index;
-            emit RequestContextMenu(d->context_index);
+            manager->SecondaryClick(d->context_index);
           });
 
-  connect(d->list_widget, &ListGeneratorWidget::SelectedItemChanged,
-          [this] (const QModelIndex &index) {
+  connect(d->list_widget, &ListGeneratorWidget::RequestPrimaryClick,
+          [=, this] (const QModelIndex &index) {
             d->clicked_index = index;
-            emit RequestPrimaryClick(d->clicked_index);
+            manager->PrimaryClick(d->clicked_index);
           });
 
   layout->addLayout(search_parameters_layout);
@@ -290,10 +289,15 @@ QWidget *EntityExplorer::CreateDockWidget(QWidget *parent) {
   d->view->setContentsMargins(0, 0, 0, 0);
   d->view->setLayout(layout);
 
-  return d->view;
+  IWindowManager::DockConfig config;
+  config.id = "com.trailofbits.dock.EntityExplorer";
+  config.app_menu_location = {tr("View"), tr("Explorers")};
+  manager->AddDockWidget(d->view, config);
 }
 
-void EntityExplorer::ActOnPrimaryClick(const QModelIndex &index) {
+void EntityExplorer::ActOnPrimaryClick(
+    IWindowManager *, const QModelIndex &index) {
+
   auto clicked_index = std::move(d->clicked_index);
   if (!d->view || index != clicked_index || !index.isValid()) {
     return;
@@ -302,14 +306,15 @@ void EntityExplorer::ActOnPrimaryClick(const QModelIndex &index) {
   d->open_entity_trigger.Trigger(index.data(IModel::EntityRole));
 }
 
-void EntityExplorer::ActOnContextMenu(QMenu *menu, const QModelIndex &index) {
+void EntityExplorer::ActOnContextMenu(IWindowManager *manager, QMenu *menu,
+                                      const QModelIndex &index) {
   auto clicked_index = std::move(d->clicked_index);
   if (!d->view || index != clicked_index || !index.isValid() ||
       !d->view->isVisible()) {
     return;
   }
 
-  d->list_widget->ActOnContextMenu(menu, index);
+  d->list_widget->ActOnContextMenu(manager, menu, index);
 }
 
 void EntityExplorer::OnIndexChanged(const ConfigManager &config_manager) {

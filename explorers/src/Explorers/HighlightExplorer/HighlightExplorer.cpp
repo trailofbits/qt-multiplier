@@ -10,9 +10,12 @@
 #include <QColorDialog>
 #include <QListView>
 #include <QPoint>
+#include <QVBoxLayout>
 
 #include <multiplier/AST/NamedDecl.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Interfaces/IWindowManager.h>
+#include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
@@ -36,6 +39,7 @@ struct HighlightExplorer::PrivateData {
   std::vector<RawEntityId> eids;
   HighlightedItemsModel *model{nullptr};
   QListView *view{nullptr};
+  IWindowWidget *dock{nullptr};
 
   inline PrivateData(ConfigManager &config_manager_)
       : config_manager(config_manager_),
@@ -47,21 +51,23 @@ struct HighlightExplorer::PrivateData {
 HighlightExplorer::~HighlightExplorer(void) {}
 
 HighlightExplorer::HighlightExplorer(ConfigManager &config_manager,
-                                     QMainWindow *parent)
+                                     IWindowManager *parent)
     : IMainWindowPlugin(config_manager, parent),
       d(new PrivateData(config_manager)) {
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &HighlightExplorer::OnIndexChanged);
+
+  CreateDockWidget(parent);
 }
 
-QWidget *HighlightExplorer::CreateDockWidget(QWidget *parent) {
-  if (d->view) {
-    return d->view;
-  }
+void HighlightExplorer::CreateDockWidget(IWindowManager *manager) {
 
-  d->view = new QListView(parent);
-  d->view->setWindowTitle(tr("Highlight Explorer"));
+  d->dock = new IWindowWidget;
+  d->dock->setWindowTitle(tr("Highlight Explorer"));
+  d->dock->setContentsMargins(0, 0, 0, 0);
+
+  d->view = new QListView(d->dock);
 
   // Install an `IModel`-compatible model listing only our highlighted entities.
   d->model = new HighlightedItemsModel(d->view);
@@ -73,10 +79,10 @@ QWidget *HighlightExplorer::CreateDockWidget(QWidget *parent) {
   // Enable context menus on the list itself.
   d->view->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(d->view, &QListView::customContextMenuRequested,
-          [this] (const QPoint &point) {
+          [=, this] (const QPoint &point) {
             auto index = d->view->indexAt(point);
             if (index.isValid()) {
-              emit RequestContextMenu(index);
+              manager->SecondaryClick(index);
             }
           });
 
@@ -86,11 +92,22 @@ QWidget *HighlightExplorer::CreateDockWidget(QWidget *parent) {
   connect(d->view->selectionModel(), &QItemSelectionModel::currentChanged,
           this, &IMainWindowPlugin::RequestPrimaryClick);
 
-  return d->view;
+  auto dock_layout = new QVBoxLayout(d->dock);
+  dock_layout->setContentsMargins(0, 0, 0, 0);
+  dock_layout->addWidget(d->view, 1);
+  dock_layout->addStretch();
+  d->dock->setLayout(dock_layout);
+
+  IWindowManager::DockConfig config;
+  config.tabify = true;
+  config.id = "com.trailofbits.dock.HighlightExplorer";
+  config.app_menu_location = {tr("View"), tr("Explorers")};
+  manager->AddDockWidget(d->dock, config);
 }
 
 // When clicked, open the entity.
-void HighlightExplorer::ActOnPrimaryClick(const QModelIndex &index) {
+void HighlightExplorer::ActOnPrimaryClick(
+    IWindowManager *, const QModelIndex &index) {
   d->entity = {};
 
   if (!d->model || index.model() != d->model) {
@@ -107,7 +124,7 @@ void HighlightExplorer::ActOnPrimaryClick(const QModelIndex &index) {
 }
 
 void HighlightExplorer::ActOnContextMenu(
-    QMenu *menu, const QModelIndex &index) {
+    IWindowManager *, QMenu *menu, const QModelIndex &index) {
 
   if (!d->view) {
     return;

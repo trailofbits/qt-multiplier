@@ -61,7 +61,7 @@ FileTreeView::~FileTreeView(void) {}
 FileTreeView::FileTreeView(const ConfigManager &config_manager,
                            FileTreeModel *model,
                            QWidget *parent)
-    : QWidget(parent),
+    : IWindowWidget(parent),
       d(new PrivateData) {
 
   InitializeWidgets(config_manager);
@@ -201,7 +201,7 @@ void FileTreeView::OnFileTreeItemClicked(const QModelIndex &index) {
     return;
   }
 
-  d->requested_index = d->model_proxy->mapToSource(index);
+  d->requested_index = index;
   emit RequestPrimaryClick(d->requested_index);
 }
 
@@ -252,13 +252,13 @@ void FileTreeView::SortDescending(void) {
 }
 
 void FileTreeView::OnOpenItemContextMenu(const QPoint &point) {
-  auto index = d->model_proxy->mapToSource(d->tree_view->indexAt(point));
+  auto index = d->tree_view->indexAt(point);
   d->requested_index = index;
   if (!d->requested_index.isValid()) {
     return;
   }
 
-  emit RequestContextMenu(d->requested_index);
+  emit RequestSecondaryClick(d->requested_index);
 }
 
 void FileTreeView::OnModelReset(void) {

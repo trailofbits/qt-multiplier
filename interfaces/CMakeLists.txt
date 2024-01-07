@@ -14,6 +14,8 @@ add_library("mx_interfaces"
   include/multiplier/GUI/Interfaces/ITheme.h
   include/multiplier/GUI/Interfaces/IThemeProxy.h
   include/multiplier/GUI/Interfaces/ITreeGenerator.h
+  include/multiplier/GUI/Interfaces/IWindowManager.h
+  include/multiplier/GUI/Interfaces/IWindowWidget.h
 
   src/IAction.cpp
   src/IGeneratedItem.cpp
@@ -22,6 +24,8 @@ add_library("mx_interfaces"
   src/ITheme.cpp
   src/IThemeProxy.cpp
   src/ITreeGenerator.cpp
+  src/IWindowManager.cpp
+  src/IWindowWidget.cpp
 )
 
 target_link_libraries("mx_interfaces"

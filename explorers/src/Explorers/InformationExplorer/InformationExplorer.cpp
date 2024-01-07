@@ -9,6 +9,7 @@
 #include <QThreadPool>
 
 #include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/Index.h>
@@ -49,7 +50,7 @@ struct InformationExplorer::PrivateData {
 InformationExplorer::~InformationExplorer(void) {}
 
 InformationExplorer::InformationExplorer(ConfigManager &config_manager,
-                                         QMainWindow *parent)
+                                         IWindowManager *parent)
     : IMainWindowPlugin(config_manager, parent),
       d(new PrivateData(config_manager)) {
   
@@ -60,14 +61,12 @@ InformationExplorer::InformationExplorer(ConfigManager &config_manager,
   d->pinned_entity_info_trigger = config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenPinnedEntityInfo",
       &InformationExplorer::OpenPinnedInfo);
+
+  CreateDockWidget(parent);
 }
 
-QWidget *InformationExplorer::CreateDockWidget(QWidget *parent) {
-  if (d->view) {
-    return d->view;
-  }
-
-  d->view = new EntityInformationWidget(d->config_manager, true, parent);
+void InformationExplorer::CreateDockWidget(IWindowManager *manager) {
+  d->view = new EntityInformationWidget(d->config_manager, true);
 
   // When the user navigates the history, make sure that we change what the
   // view shows.
@@ -79,9 +78,6 @@ QWidget *InformationExplorer::CreateDockWidget(QWidget *parent) {
                 false  /* add to history */);
           });
 
-  connect(d->view, &EntityInformationWidget::RequestContextMenu,
-          this, &IMainWindowPlugin::RequestContextMenu);
-
   connect(d->view, &EntityInformationWidget::SelectedItemChanged,
           [this] (const QModelIndex &index) {
             auto entity = IModel::Entity(index);
@@ -89,11 +85,19 @@ QWidget *InformationExplorer::CreateDockWidget(QWidget *parent) {
               d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
             }
           });
-
-  return d->view;
+  
+  IWindowManager::DockConfig config;
+  config.id = "com.trailofbits.dock.InformationExplorer";
+  config.app_menu_location = {tr("View"), tr("Explorers")};
+  manager->AddDockWidget(d->view, config);
 }
 
-void InformationExplorer::ActOnPrimaryClick(const QModelIndex &index) {
+void InformationExplorer::ActOnPrimaryClick(
+    IWindowManager *, const QModelIndex &index) {
+  if (!d->view->isVisible()) {
+    return;
+  }
+
   auto entity = IModel::EntitySkipThroughTokens(index);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     return;
@@ -105,7 +109,7 @@ void InformationExplorer::ActOnPrimaryClick(const QModelIndex &index) {
 }
 
 std::optional<NamedAction> InformationExplorer::ActOnSecondaryClick(
-    const QModelIndex &index) {
+    IWindowManager *, const QModelIndex &index) {
 
   // Don't allow us to open info from entities shown in the info browser itself.
   // In practice, there isn't a good separation between the entity and the
@@ -131,7 +135,7 @@ std::optional<NamedAction> InformationExplorer::ActOnSecondaryClick(
 
 // Expose an action on key press.
 std::optional<NamedAction> InformationExplorer::ActOnKeyPress(
-    const QKeySequence &keys, const QModelIndex &index) {
+    IWindowManager *, const QKeySequence &keys, const QModelIndex &index) {
 
   TriggerHandle *handle = nullptr;
   QString name;
@@ -166,6 +170,7 @@ void InformationExplorer::OpenInfo(const QVariant &data) {
     return;
   }
 
+  d->view->show();
   d->view->DisplayEntity(
       std::move(entity), d->config_manager.FileLocationCache(), d->plugins,
       false  /* implicit (click) request */, true  /* add to history */);
