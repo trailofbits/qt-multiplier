@@ -58,8 +58,7 @@ class InformationExplorer final : public QWidget {
                                   const QList<int> &roles);
 
   //! Called by the ISearchWidget component whenever search options change
-  void OnSearchParametersChange(
-      const ISearchWidget::SearchParameters &search_parameters);
+  
 
   //! Called when the seletion in the tree view changes
   void OnCurrentItemChanged(const QModelIndex &current_index,

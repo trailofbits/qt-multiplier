@@ -68,8 +68,15 @@ FilterSettingsWidget::~FilterSettingsWidget(void) {}
 std::vector<bool> FilterSettingsWidget::GetColumnFilterStateList() {
   std::vector<bool> state_list;
 
-  for (const auto &checkbox : d->checkbox_list) {
-    state_list.push_back(checkbox->isChecked());
+  int column_count = std::max(0, d->model->columnCount({}));
+  if (column_count) {
+    if (1 == column_count) {
+      state_list.push_back(true);
+    } else {
+      for (auto checkbox : d->checkbox_list) {
+        state_list.push_back(checkbox->isChecked());
+      }
+    }
   }
 
   return state_list;
@@ -86,8 +93,10 @@ void FilterSettingsWidget::InitializeWidgets(void) {
   d->layout->addWidget(new QLabel(tr("Filter: ")));
   d->checkbox_list.clear();
 
-  QModelIndex root_index;
-  int column_count = std::max(0, d->model->columnCount(root_index));
+  int column_count = std::max(0, d->model->columnCount({}));
+  if (1 >= column_count) {
+    hide();
+  }
 
   for (auto i = 0; i < column_count; ++i) {
     QString column_name;
@@ -139,7 +148,7 @@ void FilterSettingsWidget::ResetCheckboxes(void) {
   EmitColumnFilterStateListChanged();
 }
 
-void FilterSettingsWidget::EmitColumnFilterStateListChanged() {
+void FilterSettingsWidget::EmitColumnFilterStateListChanged(void) {
   emit ColumnFilterStateListChanged(GetColumnFilterStateList());
 }
 

@@ -55,7 +55,7 @@ class EntityInformationWidget Q_DECL_FINAL : public QWidget {
   void OnAllDataFound(void);
   void OnCancelRunningRequest(void);
   void OnChangeSync(int state);
-
+  void OnSearchParametersChange(void);
   void ExpandAllBelow(const QModelIndex &parent);
 
  signals:

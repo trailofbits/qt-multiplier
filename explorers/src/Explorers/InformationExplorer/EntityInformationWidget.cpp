@@ -19,6 +19,7 @@
 
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Widgets/HistoryWidget.h>
+#include <multiplier/GUI/Widgets/SearchWidget.h>
 
 #include "EntityInformationModel.h"
 #include "EntityInformationRunnable.h"
@@ -47,10 +48,11 @@ bool ShouldAutoExpand(const QModelIndex &index) {
 struct EntityInformationWidget::PrivateData {
   const AtomicU64Ptr version_number;
   QTreeView * const tree;
-  QWidget * const status_widget;
+  QWidget * const status;
   EntityInformationModel * const model;
   SortFilterProxyModel * const sort_model;
   HistoryWidget * const history;
+  SearchWidget * const search;
   QThreadPool thread_pool;
   VariantEntity current_entity;
   bool sync{true};
@@ -61,14 +63,16 @@ struct EntityInformationWidget::PrivateData {
                      QWidget *parent)
       : version_number(std::make_shared<AtomicU64>()),
         tree(new QTreeView(parent)),
-        status_widget(new QWidget(parent)),
+        status(new QWidget(parent)),
         model(new EntityInformationModel(
             config_manager.FileLocationCache(), version_number, tree)),
         sort_model(new SortFilterProxyModel(tree)),
         history(
             enable_history ?
             new HistoryWidget(config_manager, kMaxHistorySize, false, parent) :
-            nullptr) {}
+            nullptr),
+        search(new SearchWidget(config_manager.MediaManager(),
+                                SearchWidget::Mode::Filter, parent)) {}
 };
 
 EntityInformationWidget::~EntityInformationWidget(void) {}
@@ -129,21 +133,21 @@ EntityInformationWidget::EntityInformationWidget(
   //         });
 
   // Create the status widget
-  d->status_widget->setVisible(false);
+  d->status->setVisible(false);
 
-  auto status_widget_layout = new QHBoxLayout(this);
-  status_widget_layout->setContentsMargins(0, 0, 0, 0);
+  auto status_layout = new QHBoxLayout(this);
+  status_layout->setContentsMargins(0, 0, 0, 0);
 
-  status_widget_layout->addWidget(new QLabel(tr("Updating..."), this));
-  status_widget_layout->addStretch();
+  status_layout->addWidget(new QLabel(tr("Updating..."), this));
+  status_layout->addStretch();
 
   auto cancel_button = new QPushButton(tr("Cancel"), this);
-  status_widget_layout->addWidget(cancel_button);
+  status_layout->addWidget(cancel_button);
 
   connect(cancel_button, &QPushButton::pressed,
           this, &EntityInformationWidget::OnCancelRunningRequest);
 
-  d->status_widget->setLayout(status_widget_layout);
+  d->status->setLayout(status_layout);
 
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
@@ -177,8 +181,15 @@ EntityInformationWidget::EntityInformationWidget(
     layout->addWidget(toolbar);
   }
 
+  connect(d->search, &SearchWidget::SearchParametersChanged,
+          this, &EntityInformationWidget::OnSearchParametersChange);
+
   layout->addWidget(d->tree, 1);
   layout->addStretch();
+  layout->addWidget(d->status);
+  layout->addWidget(d->search);
+
+  setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
 
   config_manager.InstallItemDelegate(d->tree);
@@ -191,6 +202,35 @@ EntityInformationWidget::EntityInformationWidget(
 
   connect(d->sort_model, &QAbstractItemModel::rowsInserted,
           this, &EntityInformationWidget::ExpandAllBelow);
+}
+
+void EntityInformationWidget::OnSearchParametersChange(void) {
+  
+  QRegularExpression::PatternOptions options{
+      QRegularExpression::NoPatternOption};
+
+  auto &search_parameters = d->search->Parameters();
+  if (!search_parameters.case_sensitive) {
+    options |= QRegularExpression::CaseInsensitiveOption;
+  }
+
+  auto pattern = QString::fromStdString(search_parameters.pattern);
+
+  if (search_parameters.type == SearchWidget::SearchParameters::Type::Text) {
+    pattern = QRegularExpression::escape(pattern);
+    if (search_parameters.whole_word) {
+      pattern = "\\b" + pattern + "\\b";
+    }
+  }
+
+  QRegularExpression regex(pattern, options);
+
+  // The regex is already validated by the search widget
+  Q_ASSERT(regex.isValid());
+
+  d->sort_model->setFilterRegularExpression(regex);
+  d->tree->expandRecursively(QModelIndex());
+  d->tree->resizeColumnToContents(0);
 }
 
 void EntityInformationWidget::ExpandAllBelow(const QModelIndex &parent) {
@@ -272,8 +312,8 @@ void EntityInformationWidget::DisplayEntity(
 
       // Show the status widget (allowing us to cancel the request) if there
       // are any outstanding background requests.
-      if (!d->status_widget->isVisible()) {
-        d->status_widget->setVisible(true);
+      if (!d->status->isVisible()) {
+        d->status->setVisible(true);
       }
 
       ++d->num_requests;
@@ -286,14 +326,14 @@ void EntityInformationWidget::OnAllDataFound(void) {
   --d->num_requests;
 
   if (!d->num_requests) {
-    d->status_widget->setVisible(false);
+    d->status->setVisible(false);
   }
 
   Q_ASSERT(d->num_requests >= 0);
 }
 
 void EntityInformationWidget::OnCancelRunningRequest(void) {
-  d->status_widget->setVisible(false);
+  d->status->setVisible(false);
   d->version_number->fetch_add(1u);
 }
 

@@ -20,7 +20,6 @@
 
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
-#include <multiplier/GUI/Widgets/FilterSettingsWidget.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
 
 #include "SearchFilterModelProxy.h"
@@ -34,7 +33,6 @@ struct ListGeneratorWidget::PrivateData final {
 
   QListView *list_widget{nullptr};
   SearchWidget *search_widget{nullptr};
-  FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *status_widget{nullptr};
 
   bool updating_buttons{false};
@@ -78,11 +76,6 @@ void ListGeneratorWidget::InstallModel(void) {
   d->model_proxy->setRecursiveFilteringEnabled(true);
   d->model_proxy->setSourceModel(d->model);
   d->model_proxy->setDynamicSortFilter(true);
-
-  connect(d->filter_settings_widget,
-          &FilterSettingsWidget::ColumnFilterStateListChanged,
-          d->model_proxy,
-          &SearchFilterModelProxy::OnColumnFilterStateListChange);
 
   d->list_widget->setModel(d->model_proxy);
 
@@ -156,15 +149,6 @@ void ListGeneratorWidget::InitializeWidgets(
   connect(d->search_widget, &SearchWidget::SearchParametersChanged,
           this, &ListGeneratorWidget::OnSearchParametersChange);
 
-  // Create the search widget addon
-  d->filter_settings_widget = new FilterSettingsWidget(d->model, this);
-
-  connect(d->search_widget, &SearchWidget::Activated,
-          d->filter_settings_widget, &FilterSettingsWidget::Activate);
-
-  connect(d->search_widget, &SearchWidget::Deactivated,
-          d->filter_settings_widget, &FilterSettingsWidget::Deactivate);
-
   // Create the status widget
   d->status_widget = new QWidget(this);
   d->status_widget->setVisible(false);
@@ -197,7 +181,6 @@ void ListGeneratorWidget::InitializeWidgets(
   layout->addWidget(d->list_widget, 1);
   layout->addStretch();
   layout->addWidget(d->status_widget);
-  layout->addWidget(d->filter_settings_widget);
   layout->addWidget(d->search_widget);
   setLayout(layout);
 

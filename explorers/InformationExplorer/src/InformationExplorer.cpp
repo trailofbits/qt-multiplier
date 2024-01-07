@@ -168,29 +168,7 @@ void InformationExplorer::OnSearchParametersChange(
   QRegularExpression::PatternOptions options{
       QRegularExpression::NoPatternOption};
 
-  if (!search_parameters.case_sensitive) {
-    options |= QRegularExpression::CaseInsensitiveOption;
-  }
 
-  auto pattern = QString::fromStdString(search_parameters.pattern);
-
-  if (search_parameters.type == ISearchWidget::SearchParameters::Type::Text) {
-    pattern = QRegularExpression::escape(pattern);
-    if (search_parameters.whole_word) {
-      pattern = "\\b" + pattern + "\\b";
-    }
-  }
-
-  QRegularExpression regex(pattern, options);
-
-  // The regex is already validated by the search widget
-  Assert(regex.isValid(),
-         "Invalid regex found in CodeView::OnSearchParametersChange");
-
-  d->model_proxy->setFilterRegularExpression(regex);
-
-  d->tree_view->expandRecursively(QModelIndex());
-  d->tree_view->resizeColumnToContents(0);
 }
 
 void InformationExplorer::OnCurrentItemChanged(const QModelIndex &current_index,

@@ -39,6 +39,12 @@ void SearchFilterModelProxy::setSourceModel(QAbstractItemModel *source_model) {
     disconnect(d->data_changed_connection);
   }
 
+  // Initialize the filter list if it was missing.
+  auto num_cols = source_model->columnCount({});
+  if (d->column_filter_state_list.size() != static_cast<size_t>(num_cols)) {
+    d->column_filter_state_list.clear();
+  }
+
   QSortFilterProxyModel::setSourceModel(source_model);
 
   d->data_changed_connection =
@@ -54,6 +60,17 @@ bool SearchFilterModelProxy::filterAcceptsRow(
     return true;
   }
 
+  auto source_model = sourceModel();
+
+  // Initialize the filter list if it was missing.
+  if (d->column_filter_state_list.empty()) {
+    auto num_cols = source_model->columnCount({});
+    d->column_filter_state_list.clear();
+    for (auto i = 0; i < num_cols; ++i) {
+      d->column_filter_state_list.push_back(true);
+    }
+  }
+
   std::size_t enabled_filter_count{0};
   for (const auto &filter : d->column_filter_state_list) {
     if (filter) {
@@ -61,12 +78,11 @@ bool SearchFilterModelProxy::filterAcceptsRow(
     }
   }
 
-  // Accept all rows if there are no filters enabled
-  if (enabled_filter_count == 0) {
+  // Accept all rows if there are no filters enabled.
+  if (!enabled_filter_count) {
     return true;
   }
 
-  auto source_model = sourceModel();
   auto filter_role = filterRole();
 
   for (auto col = 0u; col < d->column_filter_state_list.size(); ++col) {

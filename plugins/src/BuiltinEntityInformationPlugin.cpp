@@ -598,7 +598,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
       item.entity = ref.as_variant();
     }
 
-    item.tokens = Tokens(item.entity);
+    item.tokens = InjectWhitespace(Tokens(item.entity));
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
   }
@@ -728,7 +728,6 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<ValueDecl>::Items(
   IInfoGenerator::Item item;
   item.category = QObject::tr("Type");
   item.tokens = InjectWhitespace(entity.type().tokens());
-  item.entity = std::move(entity);
   FillLocation(file_location_cache, item);
   co_yield std::move(item);
 }
