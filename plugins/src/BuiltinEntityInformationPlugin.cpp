@@ -785,8 +785,19 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
         item.entity = std::move(exp.value());
         FillLocation(file_location_cache, item);
         item.tokens = std::move(tokens);
+        co_yield std::move(item);
         break;
       }
+    }
+  }
+
+  if (entity.parent_declaration()) {
+    for (std::optional<Decl> pd = entity; pd; pd = pd->parent_declaration()) {
+      item.category = QObject::tr("Parentage");
+      item.entity = pd.value();
+      FillLocation(file_location_cache, item);
+      item.tokens = NameOfEntity(item.entity, false  /* don't qualify */);
+      co_yield std::move(item);
     }
   }
 }

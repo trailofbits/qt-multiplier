@@ -9,6 +9,7 @@
 #include "EntityInformationWidget.h"
 
 #include <QCheckBox>
+#include <QElapsedTimer>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
@@ -59,6 +60,9 @@ struct EntityInformationWidget::PrivateData {
 
   int num_requests{0};
 
+  QModelIndex selected_index;
+  QElapsedTimer selection_timer;
+
   inline PrivateData(const ConfigManager &config_manager, bool enable_history,
                      QWidget *parent)
       : version_number(std::make_shared<AtomicU64>()),
@@ -82,6 +86,8 @@ EntityInformationWidget::EntityInformationWidget(
     QWidget *parent)
     : QWidget(parent),
       d(new PrivateData(config_manager, enable_history, this)) {
+
+  d->selection_timer.start();
 
   d->sort_model->setRecursiveFilteringEnabled(true);
   d->sort_model->setSourceModel(d->model);
@@ -124,13 +130,17 @@ EntityInformationWidget::EntityInformationWidget(
   d->tree->setTreePosition(0);
 
   d->tree->setContextMenuPolicy(Qt::CustomContextMenu);
-  // connect(d->tree, &QTreeView::customContextMenuRequested,
-  //         this, &TreeGeneratorWidget::OnOpenItemContextMenu);
+  connect(d->tree, &QTreeView::customContextMenuRequested,
+          this, &EntityInformationWidget::OnOpenItemContextMenu);
 
-  // connect(d->tree, &QAbstractItemView::clicked,
-  //         [this] (const QModelIndex &index) {
-  //           OnCurrentItemChanged(index, {});
-  //         });
+  connect(d->tree, &QAbstractItemView::clicked,
+          [this] (const QModelIndex &index) {
+            OnCurrentItemChanged(index, {});
+          });
+
+  auto tree_selection_model = d->tree->selectionModel();
+  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
+          this, &EntityInformationWidget::OnCurrentItemChanged);
 
   // Create the status widget
   d->status->setVisible(false);
@@ -193,9 +203,6 @@ EntityInformationWidget::EntityInformationWidget(
   setLayout(layout);
 
   config_manager.InstallItemDelegate(d->tree);
-
-  // connect(info_explorer, &InformationExplorer::SelectedItemChanged, this,
-  //         &EntityInformationWidget::SelectedItemChanged);
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           d->model, &EntityInformationModel::OnIndexChanged);
@@ -339,6 +346,33 @@ void EntityInformationWidget::OnCancelRunningRequest(void) {
 
 void EntityInformationWidget::OnChangeSync(int state) {
   d->sync = Qt::Checked == state;
+}
+
+void EntityInformationWidget::OnCurrentItemChanged(
+    const QModelIndex &current_index, const QModelIndex &) {
+  auto new_index = d->sort_model->mapToSource(current_index);
+  if (!new_index.isValid()) {
+    return;
+  }
+  
+  // Suppress likely duplicate events.
+  if (d->selection_timer.restart() < 100 &&
+      d->selected_index == new_index) {
+    return;
+  }
+
+  d->selected_index = new_index;
+  emit SelectedItemChanged(d->selected_index);
+}
+
+void EntityInformationWidget::OnOpenItemContextMenu(const QPoint &point) {
+  auto index = d->tree->indexAt(point);
+  d->selected_index = d->sort_model->mapToSource(index);
+  if (!d->selected_index.isValid()) {
+    return;
+  }
+
+  emit RequestContextMenu(d->selected_index);
 }
 
 }  // namespace mx::gui

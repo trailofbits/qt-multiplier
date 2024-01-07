@@ -57,12 +57,16 @@ class EntityInformationWidget Q_DECL_FINAL : public QWidget {
   void OnChangeSync(int state);
   void OnSearchParametersChange(void);
   void ExpandAllBelow(const QModelIndex &parent);
+  void OnCurrentItemChanged(const QModelIndex &current_index, const QModelIndex &);
+  void OnOpenItemContextMenu(const QPoint &point);
 
  signals:
   void HistoricalEntitySelected(VariantEntity entity);
 
   //! Forwards the internal InformationExplorer::SelectedItemChanged signal
   void SelectedItemChanged(const QModelIndex &current_index);
+
+  void RequestContextMenu(const QModelIndex &current_index);
 
   // TODO(pag): IndexChanged should close the widget if it is a pinned info
   //            explorer.

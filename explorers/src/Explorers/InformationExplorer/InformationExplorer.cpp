@@ -26,8 +26,13 @@ struct InformationExplorer::PrivateData {
 
   EntityInformationWidget *view{nullptr};
 
+  // Open the relevant entity.
+  TriggerHandle open_entity_trigger;
+
   inline PrivateData(ConfigManager &config_manager_)
-      : config_manager(config_manager_) {}
+      : config_manager(config_manager_),
+        open_entity_trigger(config_manager.ActionManager().Find(
+            "com.trailofbits.action.OpenEntity")) {}
 };
 
 InformationExplorer::~InformationExplorer(void) {}
@@ -54,9 +59,16 @@ QWidget *InformationExplorer::CreateDockWidget(QWidget *parent) {
                 false  /* add to history */);
           });
 
-  // d->config_manager.ActionManager().Register(
-  //     this, "com.trailofbits.action.OpenEntity",
-  //     &InformationExplorer::DisplayEntity);
+  connect(d->view, &EntityInformationWidget::RequestContextMenu,
+          this, &IMainWindowPlugin::RequestContextMenu);
+
+  connect(d->view, &EntityInformationWidget::SelectedItemChanged,
+          [this] (const QModelIndex &index) {
+            auto entity = IModel::Entity(index);
+            if (!std::holds_alternative<NotAnEntity>(entity)) {
+              d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
+            }
+          });
 
   return d->view;
 }
