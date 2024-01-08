@@ -28,8 +28,35 @@ class IInfoGenerator : public std::enable_shared_from_this<IInfoGenerator> {
   struct Item {
     QString category;
     VariantEntity entity;
+    VariantEntity referenced_entity;
     TokenRange tokens;
-    QString location; 
+    QString location;
+
+    Item(void) = default;
+
+    inline Item(Item &&that) noexcept
+        : category(that.category),
+          entity(std::move(that.entity)),
+          referenced_entity(std::move(that.referenced_entity)),
+          tokens(std::move(that.tokens)),
+          location(std::move(that.location)) {
+      that.entity = NotAnEntity{};
+      that.referenced_entity = NotAnEntity{};
+      that.tokens = TokenRange();
+      that.location = {};
+    }
+
+    inline Item &operator=(Item &&that_) noexcept {
+      Item that(std::move(that_));
+      entity = std::move(that.entity);
+      referenced_entity = std::move(that.referenced_entity);
+      tokens = std::move(that.tokens);
+      location = std::move(that.location);
+      return *this;
+    }
+
+    Item(const Item &that) noexcept = default;
+    Item &operator=(const Item &that_) noexcept = default;
   };
 
   // Generate the information items for this category.

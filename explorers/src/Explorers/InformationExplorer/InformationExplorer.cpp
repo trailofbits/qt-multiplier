@@ -12,6 +12,7 @@
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Util.h>
 #include <multiplier/Index.h>
 #include <vector>
 
@@ -41,6 +42,8 @@ struct InformationExplorer::PrivateData {
   TriggerHandle entity_info_trigger;
   TriggerHandle pinned_entity_info_trigger;
 
+  IWindowManager *window_manager{nullptr};
+
   inline PrivateData(ConfigManager &config_manager_)
       : config_manager(config_manager_),
         open_entity_trigger(config_manager.ActionManager().Find(
@@ -62,6 +65,7 @@ InformationExplorer::InformationExplorer(ConfigManager &config_manager,
       this, "com.trailofbits.action.OpenPinnedEntityInfo",
       &InformationExplorer::OpenPinnedInfo);
 
+  d->window_manager = parent;
   CreateDockWidget(parent);
 }
 
@@ -111,20 +115,24 @@ void InformationExplorer::ActOnPrimaryClick(
 std::optional<NamedAction> InformationExplorer::ActOnSecondaryClick(
     IWindowManager *, const QModelIndex &index) {
 
+  auto entity = IModel::Entity(index);
+
   // Don't allow us to open info from entities shown in the info browser itself.
   // In practice, there isn't a good separation between the entity and the
   // referenced entity, e.g. we show a call (the entity), but it logically
   // references the called function. There may be no way to actually get to
   // the referenced entity.
-  //
-  // TODO(pag): Consider adding a `.referenced_entity` field to the info
-  //            `Item`s.
   if (index.data(IModel::ModelIdRole) ==
       EntityInformationModel::ConstantModelId()) {
-    return std::nullopt;
+    
+    auto rel_var = index.data(EntityInformationModel::ReferencedEntityRole);
+    if (!rel_var.isValid() || !rel_var.canConvert<VariantEntity>()) {
+      return std::nullopt;
+    }
+
+    entity = rel_var.value<VariantEntity>();
   }
 
-  auto entity = IModel::Entity(index);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     return std::nullopt;
   }
@@ -142,11 +150,11 @@ std::optional<NamedAction> InformationExplorer::ActOnKeyPress(
 
   if (keys == kKeySeqI) {
     handle = &(d->entity_info_trigger);
-    name = tr("Open Entity Info");
+    name = tr("Open Information");
 
   } else if (keys == kKeySeqShiftI) {
     handle = &(d->pinned_entity_info_trigger);
-    name = tr("Open Pinned Entity Info");
+    name = tr("Open Pinned Information");
 
   } else {
     return std::nullopt;
@@ -185,6 +193,24 @@ void InformationExplorer::OpenPinnedInfo(const QVariant &data) {
   if (std::holds_alternative<NotAnEntity>(entity)) {
     return;
   }
+
+  auto view = new EntityInformationWidget(
+      d->config_manager, false  /* no history */);
+
+  if (auto name = NameOfEntityAsString(entity)) {
+    view->setWindowTitle(
+        tr("Information about `%1`").arg(name.value()));
+  }
+
+  view->show();
+  view->DisplayEntity(
+      std::move(entity), d->config_manager.FileLocationCache(), d->plugins,
+      true  /* explicit request */, false  /* don't add to history */);
+
+  IWindowManager::DockConfig config;
+  config.location = IWindowManager::DockLocation::Right;
+  config.delete_on_close = true;
+  d->window_manager->AddDockWidget(view, config);
 }
 
 void InformationExplorer::AddPlugin(IInformationExplorerPluginPtr plugin) {

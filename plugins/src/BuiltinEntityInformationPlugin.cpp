@@ -121,6 +121,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
 
       item.tokens = vd->token();
       item.entity = std::move(vd.value());
+      item.referenced_entity = item.entity;
       FillLocation(file_location_cache, item);
       co_yield std::move(item);
 
@@ -129,6 +130,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
 
       item.category = QObject::tr("Members");
       item.entity = fd.value();
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
 
       // Make the field have `NNN.N` offsets as bit and byte offsets.
@@ -191,6 +194,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
 
       item.tokens = md->token();
       item.entity = std::move(md.value());
+      item.referenced_entity = item.entity;
       FillLocation(file_location_cache, item);
       co_yield std::move(item);
 
@@ -217,6 +221,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
       item.category = QObject::tr("Includes");
       item.tokens = inc.use_tokens().strip_whitespace();
       item.entity = std::move(inc);
+      item.referenced_entity = NotAnEntity{};
       FillLocation(file_location_cache, item);
       co_yield std::move(item);
     }
@@ -243,11 +248,13 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
 
     item.category = QObject::tr("Included By");
     item.entity = std::move(inc.value());
+    item.referenced_entity = file.value();
+    item.tokens = TokenRange();
     FillLocation(file_location_cache, item);
 
     tok.category = TokenCategory::FILE_NAME;
     tok.kind = TokenKind::HEADER_NAME;
-    tok.related_entity = file.value();
+    tok.related_entity = item.referenced_entity;
     for (std::filesystem::path file_path : file->paths()) {
       tok.data = file_path.generic_string();
       break;
@@ -286,6 +293,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
       item.category = QObject::tr("Defined Macros");
       item.tokens = def.name();
       item.entity = std::move(def);
+      item.referenced_entity = item.entity;
       FillLocation(file_location_cache, item);
       co_yield std::move(item);
     }
@@ -375,6 +383,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
       }
 
       item.entity = std::move(decl);
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
       item.tokens = NameOfEntity(nd.value());
       co_yield std::move(item);
@@ -397,6 +407,7 @@ EntityInfoGenerator<DefineMacroDirective>::Items(
   item.category = QObject::tr("Definitions");
   item.tokens = entity.name();
   item.entity = entity;
+  item.referenced_entity = item.entity;
   FillLocation(file_location_cache, item);
   co_yield std::move(item);
 
@@ -431,6 +442,7 @@ EntityInfoGenerator<DefineMacroDirective>::Items(
 
     item.category = QObject::tr("Parameters");
     item.entity = std::move(mp.value());
+    item.referenced_entity = NotAnEntity{};
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
   }
@@ -445,11 +457,11 @@ EntityInfoGenerator<DefineMacroDirective>::Items(
     item.category = QObject::tr("Expansions");
     item.tokens = InjectWhitespace(exp->use_tokens().strip_whitespace());
     item.entity = std::move(exp.value());
+    item.referenced_entity = NotAnEntity{};
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
   }
 }
-
 
 // Generate information about type decls. This focuses on their size and
 // alignment, and uses.
@@ -489,6 +501,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
     if (auto du = Decl::from(context)) {
       item.category = QObject::tr("Declaration Uses");
       item.entity = std::move(context);
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
 
       if (FunctionDecl::from(du.value())) {
@@ -502,6 +516,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
     } else if (auto ce = CastExpr::from(context)) {
       item.category = QObject::tr("Type Casts");
       item.entity = std::move(context);
+      item.referenced_entity = NotAnEntity{};
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
 
       item.tokens = InjectWhitespace(ce->tokens().strip_whitespace());
@@ -510,6 +526,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
     } else if (auto tte = TypeTraitExpr::from(context)) {
       item.category = QObject::tr("Trait Uses");
       item.entity = std::move(context);
+      item.referenced_entity = NotAnEntity{};
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
       
       item.tokens = InjectWhitespace(tte->tokens().strip_whitespace());
@@ -536,6 +554,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
           break;
       }
       item.entity = std::move(context);
+      item.referenced_entity = NotAnEntity{};
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
       
       item.tokens = InjectWhitespace(tte->tokens().strip_whitespace());
@@ -544,6 +564,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
     } else if (auto s = Stmt::from(context)) {
       item.category = QObject::tr("Statement Uses");
       item.entity = std::move(context);
+      item.referenced_entity = NotAnEntity{};
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
       
       item.tokens = InjectWhitespace(s->tokens().strip_whitespace());
@@ -563,6 +585,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<EnumDecl>::Items(
     item.category = QObject::tr("Enumerators");
     item.tokens = ec.token();
     item.entity = std::move(ec);
+    item.referenced_entity = item.entity;
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
   }
@@ -623,6 +646,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
 
       item.category = QObject::tr("Callees");
       item.entity = std::move(callee.value());
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
       item.tokens = NameOfEntity(item.entity);
       item.entity = call;  // Yes, overwrite.
@@ -652,6 +677,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
     }
     item.tokens = NameOfEntity(decl, false  /* don't fully qualify name */);
     item.entity = std::move(vd.value());
+    item.referenced_entity = item.entity;
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
   }
@@ -751,6 +777,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
     }
 
     item.entity = redecl;
+    item.referenced_entity = item.entity;
+    item.tokens = TokenRange();
     FillLocation(file_location_cache, item);
 
     item.tokens = NameOfEntity(item.entity, true  /* qualify */,
@@ -783,6 +811,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
         auto tokens = InjectWhitespace(exp->use_tokens().strip_whitespace());
         item.category = QObject::tr("Macros Used");
         item.entity = std::move(exp.value());
+        item.referenced_entity = def.value();
+        item.tokens = TokenRange();
         FillLocation(file_location_cache, item);
         item.tokens = std::move(tokens);
         co_yield std::move(item);
@@ -795,6 +825,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
     for (std::optional<Decl> pd = entity; pd; pd = pd->parent_declaration()) {
       item.category = QObject::tr("Parentage");
       item.entity = pd.value();
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
       item.tokens = NameOfEntity(item.entity, false  /* don't qualify */);
       co_yield std::move(item);

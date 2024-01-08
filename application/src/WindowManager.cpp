@@ -141,12 +141,7 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
 
   // If the dock wants to be removed when closed then delete it.
   if (config.delete_on_close) {
-    connect(dock_widget, &QDockWidget::visibilityChanged,
-            [=, this] (bool visible) {
-              if (!visible) {
-                RemoveDockWidget(dock_widget);
-              }
-            });
+    dock_widget->setAttribute(Qt::WA_DeleteOnClose);
   }
 
   // Keep the dock title up-to-date w.r.t. the contained widget.

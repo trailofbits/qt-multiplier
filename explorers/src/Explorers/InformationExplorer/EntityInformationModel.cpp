@@ -183,6 +183,14 @@ QVariant EntityInformationModel::data(
   // Auto-expand the root and the categories, but nothing else.
   } else if (role == AutoExpandRole) {
     return {!node->parent || node->parent == &(d->root)};
+  
+  // Referenced entity. Used to enable info browser to open itself on its
+  // own items.
+  } else if (role == ReferencedEntityRole) {
+    if (!node->is_category &&
+        !std::holds_alternative<NotAnEntity>(node->item.referenced_entity)) {
+      return QVariant::fromValue(node->item.referenced_entity);
+    }
   }
 
   return {};

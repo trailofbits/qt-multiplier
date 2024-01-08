@@ -26,6 +26,8 @@ class EntityInformationModel Q_DECL_FINAL : public IModel {
   enum {
     // Returns `true` if this node should be auto-expanded.
     AutoExpandRole = IModel::MultiplierUserRole,
+
+    ReferencedEntityRole,
   };
 
   virtual ~EntityInformationModel(void);

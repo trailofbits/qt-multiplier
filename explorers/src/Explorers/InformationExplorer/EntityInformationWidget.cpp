@@ -287,6 +287,10 @@ void EntityInformationWidget::OnPopOutPressed(void) {
 
 void EntityInformationWidget::OnIconsChanged(
     const MediaManager &media_manager) {
+  if (!d->pop_out_button) {
+    return;
+  }
+
   QIcon pop_out_icon;
   pop_out_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.PopOut"),
                                               QIcon::Normal, QIcon::On);
@@ -406,8 +410,6 @@ void EntityInformationWidget::DisplayEntity(
     }
   }
 
-  d->pop_out_button->setEnabled(true);
-
   // Canonicalize decls so that we can dedup check.
   if (std::holds_alternative<Decl>(entity)) {
     entity = std::get<Decl>(entity).canonical_declaration();
@@ -433,6 +435,10 @@ void EntityInformationWidget::DisplayEntity(
         found = true;
         d->current_entity = entity;
         d->model->Clear();
+
+        if (d->pop_out_button) {
+          d->pop_out_button->setEnabled(true);
+        }
 
         // If we're showing the history widget then keep track of the history.
         if (add_to_history && d->history) {
