@@ -65,6 +65,7 @@ target_link_libraries("mx_explorers"
     "mx_simple_text_input_dialog"
     "mx_theme_manager"
     "mx_tab_widget"
+    "mx_tree_widget"
     "mx_util_component"
 
   PUBLIC

@@ -34,6 +34,7 @@
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/HistoryWidget.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
+#include <multiplier/GUI/Widgets/TreeWidget.h>
 
 #include "EntityInformationModel.h"
 #include "EntityInformationRunnable.h"
@@ -68,7 +69,7 @@ struct EntityInformationWidget::PrivateData {
   const AtomicU64Ptr version_number;
 
   // Tree of entity info.
-  QTreeView * const tree;
+  TreeWidget * const tree;
 
   // Status indicator. Shown when `num_requests` is greater than zero.
   QWidget * const status;
@@ -118,7 +119,7 @@ struct EntityInformationWidget::PrivateData {
   inline PrivateData(const ConfigManager &config_manager, bool enable_history,
                      QWidget *parent)
       : version_number(std::make_shared<AtomicU64>()),
-        tree(new QTreeView(parent)),
+        tree(new TreeWidget(parent)),
         status(new QWidget(parent)),
         model(new EntityInformationModel(
             config_manager.FileLocationCache(), version_number, tree)),
@@ -150,49 +151,16 @@ EntityInformationWidget::EntityInformationWidget(
 
   setWindowTitle(tr("Information Explorer"));
   d->tree->setModel(d->sort_model);
-  d->tree->setHeaderHidden(true);
-  d->tree->setAlternatingRowColors(false);
-  d->tree->setSelectionBehavior(QAbstractItemView::SelectRows);
-  d->tree->setSelectionMode(QAbstractItemView::SingleSelection);
-  d->tree->setTextElideMode(Qt::TextElideMode::ElideRight);
 
   d->tree->setSortingEnabled(true);
   d->tree->sortByColumn(0, Qt::AscendingOrder);
 
-  // The auto scroll takes care of keeping the active item within the
-  // visible viewport region. This is true for mouse clicks but also
-  // keyboard navigation (i.e. arrow keys, page up/down, etc).
-  d->tree->setAutoScroll(false);
-
-  // Smooth scrolling.
-  d->tree->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-  d->tree->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-
-  // We'll potentially have a bunch of columns depending on the configuration,
-  // so make sure they span to use all available space.
-  QHeaderView *header = d->tree->header();
-  header->setStretchLastSection(true);
-
-  // Don't let double click expand things in three; we capture double click so
-  // that we can make it open up the use in the code.
-  d->tree->setExpandsOnDoubleClick(false);
-
-  // Disallow multiple selection. If we have grouping by file enabled, then when
-  // a user clicks on a file name, we instead jump down to the first entry
-  // grouped under that file. This is to make using the up/down arrows easier.
-  d->tree->setSelectionBehavior(QAbstractItemView::SelectRows);
-  d->tree->setSelectionMode(QAbstractItemView::SingleSelection);
-  d->tree->setAllColumnsShowFocus(true);
-  d->tree->setTreePosition(0);
-
   d->tree->setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(d->tree, &QTreeView::customContextMenuRequested,
+  connect(d->tree, &TreeWidget::customContextMenuRequested,
           this, &EntityInformationWidget::OnOpenItemContextMenu);
 
   connect(d->tree, &QAbstractItemView::clicked,
-          [this] (const QModelIndex &index) {
-            OnCurrentItemChanged(index, {});
-          });
+          this, &EntityInformationWidget::OnCurrentItemChanged);
 
   auto tree_selection_model = d->tree->selectionModel();
   connect(tree_selection_model, &QItemSelectionModel::currentChanged,
@@ -489,7 +457,11 @@ void EntityInformationWidget::OnChangeSync(int state) {
 }
 
 void EntityInformationWidget::OnCurrentItemChanged(
-    const QModelIndex &current_index, const QModelIndex &) {
+    const QModelIndex &current_index) {
+
+  // auto [time_diff, event_kind] = d->tree->GetLastMouseEvent();
+  // qDebug() << time_diff << event_kind;
+
   auto new_index = d->sort_model->mapToSource(current_index);
   if (!new_index.isValid()) {
     return;

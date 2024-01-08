@@ -59,7 +59,7 @@ class EntityInformationWidget Q_DECL_FINAL : public IWindowWidget {
   void OnChangeSync(int state);
   void OnSearchParametersChange(void);
   void ExpandAllBelow(const QModelIndex &parent);
-  void OnCurrentItemChanged(const QModelIndex &current_index, const QModelIndex &);
+  void OnCurrentItemChanged(const QModelIndex &current_index);
   void OnOpenItemContextMenu(const QPoint &point);
   void OnIconsChanged(const MediaManager &media_manager);
   void OnPopOutPressed(void);
