@@ -140,6 +140,10 @@ QModelIndex EntityInformationModel::parent(const QModelIndex &child) const {
 }
 
 int EntityInformationModel::rowCount(const QModelIndex &parent) const {
+  if (parent.column() >= 1) {
+    return 0;
+  }
+
   Node *parent_node = &(d->root);
   if (parent.isValid()) {
     parent_node = reinterpret_cast<Node *>(parent.internalPointer());

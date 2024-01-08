@@ -221,7 +221,7 @@ QModelIndex FileTreeModel::parent(const QModelIndex &child) const {
 }
 
 int FileTreeModel::rowCount(const QModelIndex &parent) const {
-  if (parent.column() > 1) {
+  if (parent.column() >= 1) {
     return 0;
   }
 

@@ -7,7 +7,6 @@
 #include "WindowManager.h"
 
 #include <QDockWidget>
-#include <QElapsedTimer>
 #include <QMap>
 #include <QMenu>
 #include <QMenuBar>
@@ -40,9 +39,6 @@ struct WindowManager::PrivateData {
 
   QMap<QString, QMenu *> app_menus;
 
-  QElapsedTimer primary_click_timer;
-  QElapsedTimer secondary_click_timer;
-
   inline PrivateData(MainWindow *parent)
       : window(parent) {}
 };
@@ -52,9 +48,6 @@ WindowManager::~WindowManager(void) {}
 WindowManager::WindowManager(MainWindow *window)
     : IWindowManager(window),
       d(new PrivateData(window)) {
-
-  d->primary_click_timer.start();
-  d->secondary_click_timer.start();
 
   window->setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
   window->setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);

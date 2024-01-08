@@ -19,6 +19,8 @@
 #include <QScrollBar>
 #include <QTreeView>
 
+// #include <QAbstractItemModelTester>
+
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/FilterSettingsWidget.h>
@@ -68,6 +70,10 @@ TreeGeneratorWidget::TreeGeneratorWidget(
 
   d->selection_timer.start();
   d->model = new TreeGeneratorModel(this);
+
+  // (void) new QAbstractItemModelTester(
+  //     d->model, QAbstractItemModelTester::FailureReportingMode::Fatal, this);
+
   InitializeWidgets(config_manager);
   InstallModel();
 

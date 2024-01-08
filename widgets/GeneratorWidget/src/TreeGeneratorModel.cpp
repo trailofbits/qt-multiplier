@@ -48,6 +48,17 @@ struct Node {
   // When unopened, this is `nullptr`. When opened, this is itself. When it's
   // a duplicate, it points to the duplicate.
   Node *self_or_duplicate{nullptr};
+
+  Node *Deduplicate(void) {
+    auto node = this;
+    if (self_or_duplicate) {
+      while (node->self_or_duplicate && node->self_or_duplicate != node) {
+        node = node->self_or_duplicate;
+      }
+      self_or_duplicate = node;
+    }
+    return node;
+  }
 };
 
 struct QueuedItem {
@@ -142,11 +153,7 @@ QModelIndex TreeGeneratorModel::Deduplicate(const QModelIndex &index) {
     return {};
   }
 
-  // It's a duplicate of something else; deduplicate.
-  while (node->self_or_duplicate && node->self_or_duplicate != node) {
-    node = node->self_or_duplicate;
-  }
-
+  node = node->Deduplicate();
   return createIndex(node->row, index.column(), node);
 }
 
@@ -172,13 +179,8 @@ void TreeGeneratorModel::Expand(const QModelIndex &index, unsigned depth) {
 
   // Run through the worklist to recursively expand.
   for (auto i = 0ul; i < todo.size(); ++i) {
-    node = todo[i].first;
+    node = todo[i].first->Deduplicate();
     depth = todo[i].second;
-
-    // It's a duplicate of something else; deduplicate.
-    while (node->self_or_duplicate && node->self_or_duplicate != node) {
-      node = node->self_or_duplicate;
-    }
 
     // Never been expanded; try to expand it.
     if (!node->self_or_duplicate) {
@@ -255,7 +257,7 @@ QModelIndex TreeGeneratorModel::index(int row, int column,
 }
 
 QModelIndex TreeGeneratorModel::parent(const QModelIndex &child) const {
-  if (!child.isValid() || child.column() != 0) {
+  if (!child.isValid()) {
     return {};
   }
 
@@ -269,6 +271,10 @@ QModelIndex TreeGeneratorModel::parent(const QModelIndex &child) const {
 }
 
 int TreeGeneratorModel::rowCount(const QModelIndex &parent) const {
+  if (parent.column() >= 1) {
+    return 0;
+  }
+
   Node *parent_node = &(d->root);
   if (parent.isValid()) {
     parent_node = reinterpret_cast<Node *>(parent.internalPointer());
@@ -472,6 +478,7 @@ void TreeGeneratorModel::ProcessData(void) {
 
     if (!is_duplicate && entry.remaining_depth) {
       Q_ASSERT(!entity_node->self_or_duplicate);
+      Q_ASSERT(entity_node->Deduplicate() == entity_node);
       entity_node->self_or_duplicate = entity_node;
       RunExpansionThread(new ExpandTreeRunnable(
           d->generator, d->version_number, entity_node->item,
@@ -482,12 +489,11 @@ void TreeGeneratorModel::ProcessData(void) {
   // Emit the signals to mutate the tree with the updates produced by this
   // batch.
   for (auto parent_node : ordered_pending_inserts) {
-    Q_ASSERT(parent_node->self_or_duplicate == parent_node);
+    Q_ASSERT(parent_node->Deduplicate() == parent_node);
     Q_ASSERT(parent_node->parent != nullptr);
 
-    auto &children = pending_inserts[parent_node];
-    auto num_new_children = static_cast<int>(children.size());
-    if (!num_new_children) {
+    auto children = std::move(pending_inserts[parent_node]);
+    if (children.empty()) {
       continue;
     }
 
@@ -496,14 +502,21 @@ void TreeGeneratorModel::ProcessData(void) {
       parent_index = createIndex(parent_node->row, 0, parent_node);
     }
 
+    auto num_new_children = static_cast<int>(children.size());
     auto num_curr_children = static_cast<int>(parent_node->nodes.size());
+      
+    Q_ASSERT(0 < num_new_children);
+
     emit beginInsertRows(
         parent_index, num_curr_children,
         num_curr_children + num_new_children - 1);
 
-    for (auto &child_node_ptr : children) {
-      child_node_ptr->parent = parent_node;
-      parent_node->nodes.emplace_back(std::move(child_node_ptr));
+    for (auto child_node : children) {
+      Q_ASSERT(!child_node->parent);
+      Q_ASSERT(static_cast<unsigned>(child_node->row) ==
+               parent_node->nodes.size());
+      child_node->parent = parent_node;
+      parent_node->nodes.emplace_back(child_node);
     }
 
     emit endInsertRows();
