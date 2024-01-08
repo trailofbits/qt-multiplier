@@ -24,6 +24,7 @@
 #include <multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h>
 #include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
+#include <multiplier/GUI/Widgets/CodeWidget.h>
 #include <multiplier/Index.h>
 #include <vector>
 
@@ -53,11 +54,16 @@ MainWindow::~MainWindow(void) {}
 MainWindow::MainWindow(QApplication &application, QWidget *parent)
     : QMainWindow(parent),
       d(new PrivateData(application, this)) {
+
   InitializeMenus();
   InitializeThemes();
   InitializeIndex(application);
   InitializeDocks();
   InitializePlugins();
+  auto file = d->config_manager.Index().file(1152921504606847251ull);
+  auto code = new CodeWidget(this);
+  code->SetTokenTree(TokenTree::from(file.value()));
+  setCentralWidget(code);
 }
 
 void MainWindow::InitializePlugins(void) {

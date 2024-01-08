@@ -56,11 +56,11 @@ WindowManager::WindowManager(MainWindow *window)
   window->setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
   window->setDocumentMode(false);
 
-  auto tab_widget = new TabWidget(window);
-  tab_widget->setTabsClosable(true);
-  tab_widget->setDocumentMode(true);
-  tab_widget->setTabBarAutoHide(false);
-  window->setCentralWidget(tab_widget);
+  // auto tab_widget = new TabWidget(window);
+  // tab_widget->setTabsClosable(true);
+  // tab_widget->setDocumentMode(true);
+  // tab_widget->setTabBarAutoHide(false);
+  // window->setCentralWidget(tab_widget);
 }
 
 void WindowManager::AddDockWidget(IWindowWidget *widget,

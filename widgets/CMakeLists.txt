@@ -6,6 +6,7 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
+add_subdirectory("CodeWidget")
 add_subdirectory("DockWidget")
 add_subdirectory("FilterSettingsWidget")
 add_subdirectory("HistoryWidget")

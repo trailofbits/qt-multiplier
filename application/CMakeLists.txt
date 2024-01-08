@@ -49,6 +49,7 @@ target_link_libraries("Multiplier"
   PRIVATE
     "mx_action_manager"
     "mx_builtin_theme"
+    "mx_code_widget"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_explorers"
