@@ -96,7 +96,7 @@ EntityInformationModel::EntityInformationModel(
 
 QModelIndex EntityInformationModel::index(
     int row, int column, const QModelIndex &parent) const {
-  
+
   if (!hasIndex(row, column, parent)) {
     return {};
   }
@@ -105,7 +105,7 @@ QModelIndex EntityInformationModel::index(
     return {};
   }
 
-  Node *parent_node = &d->root;
+  Node *parent_node = &(d->root);
   if (parent.isValid()) {
     parent_node = reinterpret_cast<Node *>(parent.internalPointer());
   }
@@ -140,7 +140,7 @@ QModelIndex EntityInformationModel::parent(const QModelIndex &child) const {
 }
 
 int EntityInformationModel::rowCount(const QModelIndex &parent) const {
-  Node *parent_node = &d->root;
+  Node *parent_node = &(d->root);
   if (parent.isValid()) {
     parent_node = reinterpret_cast<Node *>(parent.internalPointer());
   }

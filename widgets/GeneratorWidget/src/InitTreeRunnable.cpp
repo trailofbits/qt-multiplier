@@ -20,8 +20,14 @@ void InitTreeRunnable::run(void) {
       return;
     }
 
-    // TODO(pag): Add batching.
     items.emplaceBack(std::move(item));
+
+    // Send out a batch.
+    if (items.size() >= kMaxBatchSize) {
+      emit NewGeneratedItems(captured_version_number, kInvalidEntityId,
+                             std::move(items), depth - 1u);
+      items.clear();
+    }
   }
 
   if (version_number.load() != captured_version_number) {

@@ -394,6 +394,12 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
   d->goto_->setVisible(false);
   d->expand->setVisible(false);
 
+  // Disable the buttons while the model is updating.
+  if (!d->model_proxy->dynamicSortFilter()) {
+    d->updating_buttons = false;
+    return;
+  }
+
   // It is important to double check the leave event; it is sent
   // even if the mouse is still inside our treeview item but
   // above the hovering button (which steals the focus)
@@ -609,8 +615,11 @@ void TreeGeneratorWidget::GotoOriginal(const QModelIndex &index) {
   }
 
   auto dedup = d->model->Deduplicate(index);
+  Q_ASSERT(dedup != index);
+
   dedup = d->model_proxy->mapFromSource(dedup);
   if (!dedup.isValid()) {
+    // TODO(pag): This seems to happen and I don't know why.
     return;
   }
 

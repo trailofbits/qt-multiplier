@@ -20,6 +20,9 @@
 
 namespace mx::gui {
 
+static constexpr int kBatchIntervalTime{150};
+static constexpr int kMaxBatchSize{150};
+
 class ITreeGenerator;
 
 class IGenerateTreeRunnable : public QObject, public QRunnable {

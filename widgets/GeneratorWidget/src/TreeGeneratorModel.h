@@ -81,14 +81,15 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
  private slots:
 
   //! Notify us when there's a batch of new data to update.
-  void OnNewGeneratedItems(uint64_t version_number, RawEntityId parent_entity_id,
-                           QVector<IGeneratedItemPtr> child_items,
-                           unsigned remaining_depth);
+  void AddData(uint64_t version_number, RawEntityId parent_entity_id,
+               QVector<IGeneratedItemPtr> child_items,
+               unsigned remaining_depth);
 
+  //! Processes the entire data batch queue.
+  void ProcessData(void);
+
+  //! When an expansion thread is done sending data, we get this.
   void OnRequestFinished(void);
-
-  //! Processes the entire data batch queue
-  void ProcessDataBatchQueue(void);
 
  public slots:
   void CancelRunningRequest(void);

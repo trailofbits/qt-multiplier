@@ -13,6 +13,8 @@
 namespace mx::gui {
 
 void ExpandTreeRunnable::run(void) {
+  auto parent_entity_id = EntityId(parent_item->Entity()).Pack();
+
   QVector<IGeneratedItemPtr> items;
   for (auto item : generator->Children(generator, parent_item)) {
     if (version_number.load() != captured_version_number) {
@@ -20,8 +22,14 @@ void ExpandTreeRunnable::run(void) {
       return;
     }
 
-    // TODO(pag): Add batching.
     items.emplaceBack(std::move(item));
+
+    // Send out a batch.
+    if (items.size() >= kMaxBatchSize) {
+      emit NewGeneratedItems(captured_version_number, parent_entity_id,
+                             std::move(items), depth - 1u);
+      items.clear();
+    }
   }
 
   if (version_number.load() != captured_version_number) {
@@ -30,7 +38,7 @@ void ExpandTreeRunnable::run(void) {
   }
 
   emit NewGeneratedItems(
-      captured_version_number, EntityId(parent_item->Entity()).Pack(),
+      captured_version_number, parent_entity_id,
       std::move(items), depth - 1u);
   emit Finished();
 }

@@ -30,10 +30,6 @@
 namespace mx::gui {
 namespace {
 
-static const int kFirstUpdateInterval{500};
-static const int kImportInterval{1500};
-static const int kMaxBatchSize{100};
-
 struct Node;
 
 using NodeKey = std::pair<const RawEntityId, Node>;
@@ -192,7 +188,7 @@ void ListGeneratorModel::InstallGenerator(IListGeneratorPtr generator_) {
     connect(runnable, &IGenerateTreeRunnable::Finished,
             this, &ListGeneratorModel::OnRequestFinished);
 
-    d->import_timer.start(kFirstUpdateInterval);
+    d->import_timer.start(kBatchIntervalTime);
     emit RequestStarted();
 
     d->thread_pool.start(runnable);
@@ -456,10 +452,10 @@ void ListGeneratorModel::ProcessDataBatchQueue(void) {
                        0 < d->num_pending_requests;
 
   // Restart the timer, so that the import procedure will fire again
-  // in kImportInterval msecs from the end of the previous batch.
+  // in kBatchIntervalTime msecs from the end of the previous batch.
   if (has_remaining) {
     if (!d->import_timer.isActive()) {
-      d->import_timer.start(kImportInterval);
+      d->import_timer.start(kBatchIntervalTime);
     }
 
   } else {
