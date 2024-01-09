@@ -61,7 +61,7 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
   InitializeDocks();
   InitializePlugins();
   auto file = d->config_manager.Index().file(1152921504606847251ull);
-  auto code = new CodeWidget(this);
+  auto code = new CodeWidget(d->config_manager, this);
   code->SetTokenTree(TokenTree::from(file.value()));
   setCentralWidget(code);
 }

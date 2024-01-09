@@ -15,6 +15,22 @@
 
 namespace mx::gui {
 
+class ConfigManager;
+class MediaManager;
+class ThemeManager;
+
+// TODO: Have a class that one can connect to with signals, where the signals
+//       trigger things like macro expansion
+//
+//       A code widget owns an instance of this class, and will git out a
+//       pointer to it for those that want to selectively expand macros.
+//
+// TODO: Code plugin owns things like macro expansions, the global code preview
+//       miniwindow (and an event like `com.trailofbits.action.PreviewEntity`)
+//       (which can also pop out pinned previews, just like info browser), and
+//       asks the main layout to add main widgets (files), which the window
+//       manager manages as tabs.
+
 class CodeWidget Q_DECL_FINAL : public QWidget {
   Q_OBJECT
 
@@ -24,9 +40,14 @@ class CodeWidget Q_DECL_FINAL : public QWidget {
  public:
   virtual ~CodeWidget(void);
 
-  CodeWidget(QWidget *parent = nullptr);
+  CodeWidget(const ConfigManager &config_manager, QWidget *parent = nullptr);
 
   void SetTokenTree(TokenTree range);
+
+ private slots:
+  void OnIndexChanged(const ConfigManager &);
+  void OnThemeChanged(const ThemeManager &);
+  void OnIconsChanged(const MediaManager &);
 };
 
 }  // namespace mx::gui

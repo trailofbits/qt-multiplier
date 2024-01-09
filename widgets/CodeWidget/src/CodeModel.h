@@ -10,12 +10,15 @@
 
 #include <memory>
 #include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Interfaces/ITheme.h>
 #include <multiplier/Frontend/TokenTree.h>
 
 QT_BEGIN_NAMESPACE
 class QTextDocument;
 QT_END_NAMESPACE
 namespace mx::gui {
+
+class ThemeManager;
 
 class CodeModel Q_DECL_FINAL : public QObject {
   Q_OBJECT
@@ -28,7 +31,10 @@ class CodeModel Q_DECL_FINAL : public QObject {
 
   CodeModel(QObject *parent = nullptr);
 
-  QTextDocument *Import(TokenTree tokens);
+  QTextDocument *Set(TokenTree tokens, const ITheme *theme);
+  QTextDocument *Reset(void);
+
+  void ChangeTheme(const ITheme *theme);
 };
 
 }  // namespace mx::gui
