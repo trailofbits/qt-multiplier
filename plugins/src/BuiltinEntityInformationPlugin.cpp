@@ -558,7 +558,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
       item.tokens = TokenRange();
       FillLocation(file_location_cache, item);
       
-      item.tokens = InjectWhitespace(tte->tokens().strip_whitespace());
+      item.tokens = InjectWhitespace(uett->tokens().strip_whitespace());
       co_yield std::move(item);
 
     } else if (auto s = Stmt::from(context)) {
