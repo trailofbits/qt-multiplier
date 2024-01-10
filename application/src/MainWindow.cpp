@@ -12,6 +12,7 @@
 #include <QMenu>
 #include <QMenuBar>
 
+#include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Explorers/EntityExplorer.h>
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
 #include <multiplier/GUI/Explorers/InformationExplorer.h>
@@ -61,8 +62,8 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
   InitializeDocks();
   InitializePlugins();
   auto file = d->config_manager.Index().file(1152921504606847251ull);
-  auto code = new CodeWidget(d->config_manager, this);
-  code->SetTokenTree(TokenTree::from(file.value()));
+  auto code = new CodeWidget(d->config_manager, TokenTree::from(file.value()),
+                             this);
   setCentralWidget(code);
 }
 

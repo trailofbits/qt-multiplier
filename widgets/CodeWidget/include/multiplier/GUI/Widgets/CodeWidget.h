@@ -11,8 +11,10 @@
 #include <QWidget>
 
 #include <memory>
-#include <multiplier/Frontend/TokenTree.h>
 
+namespace mx {
+class TokenTree;
+}  // namespace mx
 namespace mx::gui {
 
 class ConfigManager;
@@ -40,10 +42,12 @@ class CodeWidget Q_DECL_FINAL : public QWidget {
  public:
   virtual ~CodeWidget(void);
 
-  CodeWidget(const ConfigManager &config_manager, QWidget *parent = nullptr);
+  CodeWidget(const ConfigManager &config_manager,
+             const TokenTree &token_tree,
+             QWidget *parent = nullptr);
 
-  void SetTokenTree(TokenTree range);
-
+  
+  
  private slots:
   void OnIndexChanged(const ConfigManager &);
   void OnThemeChanged(const ThemeManager &);

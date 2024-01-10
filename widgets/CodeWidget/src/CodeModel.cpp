@@ -26,37 +26,44 @@
 namespace mx::gui {
 namespace {
 
-// Keep track of the before, between, and after of the macro. This way we can
-// selectively show or hide stuff in the `[before, between)` or
-// `[between, after)` ranges.
-struct MacroRange {
-  SubstitutionTokenTreeNode node;
-  RawEntityId macro_id;
-  int before;
-  int between;
-  int after;
+struct ChoiceRange;
+struct MacroRange;
+struct TextRange;
 
-  inline MacroRange(SubstitutionTokenTreeNode node_)
-      : node(std::move(node_)) {}
+class Range {
+  virtual ~Range(void) = default;
+
+  // Updated 
+  int begin{-1};
+  int end{-1};
+
+  virtual void Update()
+
+
+  RawEntityId id;
+  RawEntityId parent_id;
 };
 
 // A choice between multiple fragments.
-struct ChoiceRange {
-  ChoiceTokenTreeNode node;
-  std::vector<int> choices;
+struct ChoiceRange Q_DECL_FINAL : public Range {
 
-  inline ChoiceRange(ChoiceTokenTreeNode node_)
-      : node(std::move(node_)) {}
+};
+
+struct FragmentRange {
+
+};
+
+// A choice between expansions.
+struct MacroRange Q_DECL_FINAL : public Range {
+  Range *before{nullptr};
+  Range *after{nullptr};
 };
 
 // Range of text of a token.
-struct TextRange {
+struct TextRange Q_DECL_FINAL : public Range {
   Token token;
-  int before;
-  int after;
+  QString text;
 };
-
-using Range = std::variant<MacroRange *, ChoiceRange *, TextRange *>;
 
 }  // namespace
 
@@ -66,34 +73,36 @@ struct CodeModel::PrivateData {
 
   const QTextFrameFormat default_format;
 
+  // All data in all versions/variants of the code. 
+  QString data;
+
   // Allocation management for choice nodes.
   std::deque<ChoiceRange> choices;
-
-  // Allocation management for tokens text data.
+  std::deque<MacroRange> macros;
   std::deque<TextRange> tokens;
 
-  // Maps token related entity IDs to text fragments.
-  std::unordered_multimap<RawEntityId, TextRange *> entities;
+  // Maps IDs to token text.
+  std::unordered_multimap<RawEntityId, TextRange *> id_to_token;
 
-  // Maps macro substitution IDs to the ranges of the macros.
-  std::unordered_map<RawEntityId, MacroRange> substitutions;
+  // Maps macro IDs to macro ranges.
+  std::unordered_map<RawEntityId, MacroRange *> id_to_macro;
 
   // Maps fragment IDs to the specific choice within a choice range.
-  std::unordered_map<RawEntityId, std::pair<ChoiceRange *, unsigned>> fragments;
+  std::unordered_map<RawEntityId, std::pair<ChoiceRange *, unsigned>>
+      id_to_choice;
 
-  // Sorted vector of positions to the ranges starting at that position. The
-  // positions correspond to `QTextCursor::position()` values.
-  std::vector<std::pair<int, Range>> position_to_range;
+  // Sorted vector of positions to the ranges starting at that position.
+  std::vector<std::pair<int, Range *>> position_to_range;
 
-  void ImportChoiceNode(ChoiceTokenTreeNode node);
+  void ImportChoiceNode(int depth, ChoiceTokenTreeNode node);
 
-  void ImportSubstitutionNode(SubstitutionTokenTreeNode node);
+  void ImportSubstitutionNode(int depth, SubstitutionTokenTreeNode node);
 
-  void ImportSequenceNode(bool &block_added, SequenceTokenTreeNode node);
+  void ImportSequenceNode(int depth, SequenceTokenTreeNode node);
 
-  void ImportTokenNode(bool &block_added, TokenTokenTreeNode node);
+  void ImportTokenNode(int depth, TokenTokenTreeNode node);
 
-  void ImportNode(bool &block_added, TokenTreeNode node);
+  void ImportNode(int depth, TokenTreeNode node);
 };
 
 CodeModel::~CodeModel(void) {}
@@ -116,12 +125,13 @@ QTextDocument *CodeModel::Set(TokenTree tokens, const ITheme *theme) {
 }
 
 QTextDocument *CodeModel::Reset(void) {
-  d->document->clear();
-  d->choices.clear();;
-  d->substitutions.clear();
+  d->data.clear();
+  d->choices.clear();
+  d->macros.clear();
   d->tokens.clear();
-  d->entities.clear();
-  d->fragments.clear();
+  d->id_to_text.clear();
+  d->id_to_macro.clear();
+  d->id_to_choice.clear();
   d->position_to_range.clear();
   return d->document;
 }
@@ -132,16 +142,20 @@ void CodeModel::PrivateData::ImportChoiceNode(ChoiceTokenTreeNode node) {
   QTextCursor cursor(document);
   cursor.movePosition(QTextCursor::End);
 
-  auto &range = choices.emplace_back(std::move(node));
-  position_to_range.emplace_back(cursor.position(), &range);
+  auto &range = choices.emplace_back();
 
   auto i = 0u;
   for (auto &item : range.node.children()) {
-    cursor.movePosition(QTextCursor::End);
-    range.choices.emplace_back(cursor.position());
-    fragments.try_emplace(item.first.id().Pack(), &range, i++);
+    auto fragment_id = item.first.id().Pack();
+    range.fragments.emplace_back(fragment_id);
+    range.choices.emplace_back(static_cast<int>(data.size()));
+    fragments.try_emplace(fragment_id, &range, i++);
     bool block_added = false;
     ImportNode(block_added, std::move(item.second));
+  }
+
+  if (!i) {
+
   }
   
   // Always add a last one so that we can know the bounds on the last fragment.
@@ -153,32 +167,35 @@ void CodeModel::PrivateData::ImportChoiceNode(ChoiceTokenTreeNode node) {
 void CodeModel::PrivateData::ImportSubstitutionNode(
     SubstitutionTokenTreeNode node) {
 
-  QTextCursor cursor(document);
-  cursor.movePosition(QTextCursor::End);
+
   
+
+  auto after_pos = static_cast<int>(data.size());
+
+  MacroRange *range = nullptr;
+
   // Figure out the macro ID.
-  auto macro_id = kInvalidEntityId;
-  auto macro = node.macro();
-  if (std::holds_alternative<MacroSubstitution>(macro)) {
-    macro_id = std::get<MacroSubstitution>(macro).id().Pack();
+  std::optional<Macro> macro;
+  auto sub = node.macro();
+  if (std::holds_alternative<MacroSubstitution>(sub)) {
+    macro = std::get<MacroSubstitution>(sub);
   } else {
-    macro_id = std::get<MacroVAOpt>(macro).id().Pack();
+    macro = std::get<MacroVAOpt>(sub);
   }
 
-  auto &range = substitutions.emplace(macro_id, std::move(node)).first->second;
-  position_to_range.emplace_back(cursor.position(), &range);
+  auto &range = substitutions.emplace(
+      macro->id().Pack(), std::move(macro.value())).first->second;
 
-  // Get the bounds between children.
-  range.before = cursor.position();
+  range.before = static_cast<int>(data.size());
+  ImportNode(range.node.before());
 
-  bool block_added = false;
-  ImportNode(block_added, range.node.before());
-  cursor.movePosition(QTextCursor::End);
+  position_to_range.emplace_back(range.before, &range);
+
   range.between = cursor.position();
+  ImportNode(range.node.after());
 
-  block_added = false;
-  ImportNode(block_added, range.node.after());
-  cursor.movePosition(QTextCursor::End);
+  position_to_range.emplace_back(range.between, &range);
+
   range.after = cursor.position();
 }
 
@@ -240,6 +257,9 @@ void CodeModel::PrivateData::ImportTokenNode(
       case QChar::ParagraphSeparator:
       case QChar::LineFeed:
       case QChar::LineSeparator: {
+
+        data.append(QChar::LineSeparator);  // What `QPainter::paintText` likes.
+
         add_and_clear_data();        
         cursor.insertBlock();
         cursor.movePosition(QTextCursor::End);

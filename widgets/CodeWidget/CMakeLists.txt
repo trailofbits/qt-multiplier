@@ -9,8 +9,8 @@
 add_library("mx_code_widget"
   include/multiplier/GUI/Widgets/CodeWidget.h
 
-  src/CodeModel.cpp
-  src/CodeModel.h
+  #src/CodeModel.cpp
+  #src/CodeModel.h
   src/CodeWidget.cpp
 )
 

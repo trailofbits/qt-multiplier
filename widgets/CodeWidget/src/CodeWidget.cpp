@@ -8,44 +8,71 @@
 
 #include <multiplier/GUI/Widgets/CodeWidget.h>
 
+#include <QHBoxLayout>
 #include <QPalette>
-#include <QPlainTextEdit>
+#include <QPainter>
+#include <QScrollBar>
+#include <QSpacerItem>
 #include <QVBoxLayout>
 
+#include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 
-#include "CodeModel.h"
+// #include "CodeModel.h"
 
 namespace mx::gui {
 
 struct CodeWidget::PrivateData {
-  CodeModel *model{nullptr};
-  QPlainTextEdit *view{nullptr};
+  // CodeModel *model{nullptr};
+  // QPlainTextEdit *view{nullptr};
+
+  const TokenTree token_tree;
   IThemePtr theme;
+
+  QScrollBar *horizontal_scrollbar{nullptr};
+  QScrollBar *vertical_scrollbar{nullptr};
+
+  inline PrivateData(const TokenTree &token_tree_)
+      : token_tree(token_tree_) {}
 };
 
 CodeWidget::~CodeWidget(void) {}
 
-CodeWidget::CodeWidget(const ConfigManager &config_manager, QWidget *parent)
+CodeWidget::CodeWidget(const ConfigManager &config_manager,
+                       const TokenTree &token_tree,
+                       QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData) {
+      d(new PrivateData(token_tree)) {
 
-  d->model = new CodeModel(this);
-  d->view = new QPlainTextEdit(this);
-  d->view->setReadOnly(true);
-  d->view->setOverwriteMode(false);
-  d->view->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  d->view->setContextMenuPolicy(Qt::CustomContextMenu);
+  d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
+  d->vertical_scrollbar->setSingleStep(1);
+  // connect(d->vertical_scrollbar, &QScrollBar::valueChanged, this,
+  //         &TextView::onScrollBarValueChange);
 
-  auto layout = new QVBoxLayout(this);
-  layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(d->view, 1);
-  layout->addStretch();
+  d->horizontal_scrollbar = new QScrollBar(Qt::Horizontal, this);
+  d->horizontal_scrollbar->setSingleStep(1);
+  // connect(d->horizontal_scrollbar, &QScrollBar::valueChanged, this,
+  //         &TextView::onScrollBarValueChange);
 
+  auto vertical_layout = new QVBoxLayout(this);
+  vertical_layout->setContentsMargins(0, 0, 0, 0);
+  vertical_layout->setSpacing(0);
+  vertical_layout->addSpacerItem(
+      new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Expanding));
+
+  vertical_layout->addWidget(d->horizontal_scrollbar);
+  
+  auto horizontal_layout = new QHBoxLayout();
+  horizontal_layout->setContentsMargins(0, 0, 0, 0);
+  horizontal_layout->setSpacing(0);
+  horizontal_layout->addLayout(vertical_layout);
+  horizontal_layout->addWidget(d->vertical_scrollbar);
+
+  setLayout(horizontal_layout);
   setContentsMargins(0, 0, 0, 0);
-  setLayout(layout);
+  setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
   auto &media_manager = config_manager.MediaManager();
   auto &theme_manager = config_manager.ThemeManager();
@@ -63,12 +90,8 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager, QWidget *parent)
           this, &CodeWidget::OnIconsChanged);
 }
 
-void CodeWidget::SetTokenTree(TokenTree tree) {
-  d->view->setDocument(d->model->Set(std::move(tree), d->theme.get()));
-}
-
 void CodeWidget::OnIndexChanged(const ConfigManager &config_manager) {
-  d->model->Reset();
+  // d->model->Reset();
 
   (void) config_manager;
 }
@@ -76,18 +99,18 @@ void CodeWidget::OnIndexChanged(const ConfigManager &config_manager) {
 void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   d->theme = theme_manager.Theme();
 
-  d->view->setFont(d->theme->Font());
+  // d->view->setFont(d->theme->Font());
 
   auto theme = d->theme.get();
-  auto palette = d->view->palette();
-  palette.setColor(QPalette::Window, theme->DefaultBackgroundColor());
-  palette.setColor(QPalette::WindowText, theme->DefaultForegroundColor());
-  palette.setColor(QPalette::Base, theme->DefaultBackgroundColor());
-  palette.setColor(QPalette::Text, theme->DefaultForegroundColor());
-  palette.setColor(QPalette::AlternateBase, theme->DefaultBackgroundColor());
-  d->view->setPalette(palette);
+  QPalette p = palette();
+  p.setColor(QPalette::Window, theme->DefaultBackgroundColor());
+  p.setColor(QPalette::WindowText, theme->DefaultForegroundColor());
+  p.setColor(QPalette::Base, theme->DefaultBackgroundColor());
+  p.setColor(QPalette::Text, theme->DefaultForegroundColor());
+  p.setColor(QPalette::AlternateBase, theme->DefaultBackgroundColor());
+  setPalette(p);
 
-  d->model->ChangeTheme(theme);
+  // d->model->ChangeTheme(theme);
 }
 
 void CodeWidget::OnIconsChanged(const MediaManager &media_manager) {
