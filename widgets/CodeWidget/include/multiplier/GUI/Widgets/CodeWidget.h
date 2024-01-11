@@ -8,9 +8,21 @@
 
 #pragma once
 
+#include <QMap>
+#include <QSet>
+#include <QString>
 #include <QWidget>
 
 #include <memory>
+#include <multiplier/Index.h>
+
+QT_BEGIN_NAMESPACE
+class QMouseEvent;
+class QPaintEvent;
+class QResizeEvent;
+QT_END_NAMESPACE
+
+Q_DECLARE_METATYPE(mx::VariantEntity)
 
 namespace mx {
 class TokenTree;
@@ -46,12 +58,29 @@ class CodeWidget Q_DECL_FINAL : public QWidget {
              const TokenTree &token_tree,
              QWidget *parent = nullptr);
 
-  
-  
+ protected:
+  void resizeEvent(QResizeEvent *event) Q_DECL_FINAL;
+  void paintEvent(QPaintEvent *event) Q_DECL_FINAL;
+  void mousePressEvent(QMouseEvent *event) Q_DECL_FINAL;
+
  private slots:
   void OnIndexChanged(const ConfigManager &);
   void OnThemeChanged(const ThemeManager &);
   void OnIconsChanged(const MediaManager &);
+
+  void OnVerticalScroll(int change);
+  void OnHorizontalScroll(int change);
+
+ public slots:
+
+  // Invoked when the set of macros to be expanded changes.
+  void OnExpandMacros(const QSet<RawEntityId> &macros_to_expand);
+
+  // Invoked when the set of entities to be renamed changes.
+  void OnRenameEntities(const QMap<RawEntityId, QString> &new_entity_names);
+
+  // Invoked when we want to scroll to a specific entity.
+  void OnGoToEntity(const VariantEntity &entity);
 };
 
 }  // namespace mx::gui

@@ -30,40 +30,42 @@ struct ChoiceRange;
 struct MacroRange;
 struct TextRange;
 
-class Range {
-  virtual ~Range(void) = default;
+// class Range {
+//   virtual ~Range(void) = default;
 
-  // Updated 
-  int begin{-1};
-  int end{-1};
+//   // Updated 
+//   int begin{-1};
+//   int end{-1};
 
-  virtual void Update()
+//   virtual void Update()
 
 
-  RawEntityId id;
-  RawEntityId parent_id;
-};
+//   RawEntityId id;
+//   RawEntityId parent_id;
+// };
 
-// A choice between multiple fragments.
-struct ChoiceRange Q_DECL_FINAL : public Range {
+// class EmptyRange Q_DECL_FINAL : public Range {};
 
-};
+// // A choice between multiple fragments.
+// struct ChoiceRange Q_DECL_FINAL : public Range {
 
-struct FragmentRange {
+// };
 
-};
+// struct FragmentRange {
 
-// A choice between expansions.
-struct MacroRange Q_DECL_FINAL : public Range {
-  Range *before{nullptr};
-  Range *after{nullptr};
-};
+// };
 
-// Range of text of a token.
-struct TextRange Q_DECL_FINAL : public Range {
-  Token token;
-  QString text;
-};
+// // A choice between expansions.
+// struct MacroRange Q_DECL_FINAL : public Range {
+//   Range *before{nullptr};
+//   Range *after{nullptr};
+// };
+
+// // Range of text of a token.
+// struct TextRange Q_DECL_FINAL : public Range {
+//   Token token;
+//   QString text;
+// };
 
 }  // namespace
 
@@ -134,187 +136,6 @@ QTextDocument *CodeModel::Reset(void) {
   d->id_to_choice.clear();
   d->position_to_range.clear();
   return d->document;
-}
-
-// Import a choice node.
-void CodeModel::PrivateData::ImportChoiceNode(ChoiceTokenTreeNode node) {
-
-  QTextCursor cursor(document);
-  cursor.movePosition(QTextCursor::End);
-
-  auto &range = choices.emplace_back();
-
-  auto i = 0u;
-  for (auto &item : range.node.children()) {
-    auto fragment_id = item.first.id().Pack();
-    range.fragments.emplace_back(fragment_id);
-    range.choices.emplace_back(static_cast<int>(data.size()));
-    fragments.try_emplace(fragment_id, &range, i++);
-    bool block_added = false;
-    ImportNode(block_added, std::move(item.second));
-  }
-
-  if (!i) {
-
-  }
-  
-  // Always add a last one so that we can know the bounds on the last fragment.
-  cursor.movePosition(QTextCursor::End);
-  range.choices.emplace_back(cursor.position());
-}
-
-// Import a substitution node.
-void CodeModel::PrivateData::ImportSubstitutionNode(
-    SubstitutionTokenTreeNode node) {
-
-
-  
-
-  auto after_pos = static_cast<int>(data.size());
-
-  MacroRange *range = nullptr;
-
-  // Figure out the macro ID.
-  std::optional<Macro> macro;
-  auto sub = node.macro();
-  if (std::holds_alternative<MacroSubstitution>(sub)) {
-    macro = std::get<MacroSubstitution>(sub);
-  } else {
-    macro = std::get<MacroVAOpt>(sub);
-  }
-
-  auto &range = substitutions.emplace(
-      macro->id().Pack(), std::move(macro.value())).first->second;
-
-  range.before = static_cast<int>(data.size());
-  ImportNode(range.node.before());
-
-  position_to_range.emplace_back(range.before, &range);
-
-  range.between = cursor.position();
-  ImportNode(range.node.after());
-
-  position_to_range.emplace_back(range.between, &range);
-
-  range.after = cursor.position();
-}
-
-// Import a sequence of nodes.
-void CodeModel::PrivateData::ImportSequenceNode(
-    bool &block_added, SequenceTokenTreeNode node) {
-  for (auto child_node : node.children()) {
-    ImportNode(block_added, std::move(child_node));
-  }
-}
-
-// Import a node containing a token.
-void CodeModel::PrivateData::ImportTokenNode(
-    bool &block_added, TokenTokenTreeNode node) {
-
-  // Get the data of this token in Qt's native format.
-  auto token = node.token();
-  auto utf8_data = token.data();
-  if (utf8_data.empty()) {
-    return;
-  }
-
-  auto utf16_data = QString::fromUtf8(
-      utf8_data.data(), static_cast<qsizetype>(utf8_data.size()));
-
-  QTextCursor cursor(document);
-  cursor.movePosition(QTextCursor::End);
-
-  auto &range = tokens.emplace_back();
-  range.token = std::move(token);
-  range.before = cursor.position();
-
-  QString data;
-
-  auto add_and_clear_data = [&] (void) {
-    if (!data.isEmpty()) {
-      if (!block_added) {
-        cursor.insertBlock();
-        cursor.movePosition(QTextCursor::End);
-        block_added = true;
-      }
-      cursor.insertText(data);
-      cursor.movePosition(QTextCursor::End);
-      data.clear();
-    }
-  };
-
-  for (QChar ch : utf16_data) {
-    switch (ch.unicode()) {
-      case QChar::Tabulation:
-        data.append(QChar::Tabulation);
-        break;
-
-      case QChar::Space:
-      case QChar::Nbsp:
-        data.append(QChar::Space);
-        break;
-
-      case QChar::ParagraphSeparator:
-      case QChar::LineFeed:
-      case QChar::LineSeparator: {
-
-        data.append(QChar::LineSeparator);  // What `QPainter::paintText` likes.
-
-        add_and_clear_data();        
-        cursor.insertBlock();
-        cursor.movePosition(QTextCursor::End);
-        block_added = true;  // Force true if `data` was empty.
-        break;
-      }
-
-      case QChar::CarriageReturn:
-        continue;
-
-      // TODO(pag): Consult with QFontMetrics or something else to determine
-      //            if this character is visible?
-      default:
-        data.append(ch);
-        break;
-    }
-  }
-
-  add_and_clear_data();
-
-  range.after = cursor.position();
-
-  // E.g. a unitary newline.
-  if (range.before == range.after) {
-    tokens.pop_back();
-    return;
-  }
-
-  position_to_range.emplace_back(range.before, &range);
-}
-
-// Import a generic node, dispatching to the relevant node.
-void CodeModel::PrivateData::ImportNode(bool &block_added, TokenTreeNode node) {
-  switch (node.kind()) {
-    case TokenTreeNodeKind::EMPTY:
-      break; 
-    case TokenTreeNodeKind::TOKEN:
-      ImportTokenNode(
-          block_added,
-          std::move(reinterpret_cast<TokenTokenTreeNode &&>(node)));
-      break;
-    case TokenTreeNodeKind::CHOICE:
-      ImportChoiceNode(
-          std::move(reinterpret_cast<ChoiceTokenTreeNode &&>(node)));
-      break;
-    case TokenTreeNodeKind::SUBSTITUTION:
-      ImportSubstitutionNode(
-          std::move(reinterpret_cast<SubstitutionTokenTreeNode &&>(node)));
-      break;
-    case TokenTreeNodeKind::SEQUENCE:
-      ImportSequenceNode(
-          block_added,
-          std::move(reinterpret_cast<SequenceTokenTreeNode &&>(node)));
-      break;
-  }
 }
 
 void CodeModel::ChangeTheme(const ITheme *theme) {
