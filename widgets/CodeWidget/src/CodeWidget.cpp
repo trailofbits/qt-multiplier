@@ -50,10 +50,12 @@ struct Entity {
   qreal x;
   qreal y;
 
-  // Index of this entity's data in `Scene::token_data`.
-  unsigned data_index;
+  // Index of this entity's data in `Scene::token_data`. The low two bits are
+  // the "configuration" of this entity, i.e. selects which bounding rect
+  // applies. These low two bits get updated by the painter.
+  unsigned data_index_and_config;
 
-  // Index of htis entity's token in `Scene::tokens`.
+  // Index of this entity's token in `Scene::tokens`.
   unsigned token_index;
 
   // The logical (one-indexed) line number of this token.
@@ -67,6 +69,15 @@ struct Entity {
   // }
 
   // bool operator==(const Entity &that) const noexcept = default;
+};
+
+struct Data {
+  QString text;
+
+  bool bounding_rect_valid[4u];
+
+  // Normal, bold, italic, and bold+italic.
+  QRectF bounding_rect[4u];
 };
 
 // struct DecisionRange {
@@ -88,10 +99,14 @@ struct Scene {
   // `(Entity::x, Entity::y)` positions.
   std::vector<Entity> entities;
 
+  // For logical (one-based) line number `N`, `logical_line_index[N - 1]` is
+  // the index into `entities` of the first entity on that line.
+  std::vector<unsigned> logical_line_index;
+
   // A linear representation of the token data. If a token spans multiple lines
   // then it is split into multiple entries in `token_data`. If a token only
   // contributes pure whitespace then it is not included in `token_data`.
-  std::vector<QString> token_data;
+  std::vector<Data> data;
 
   // The underlying tokens.
   std::vector<Token> tokens;
@@ -101,14 +116,100 @@ struct Scene {
 
   // Number of logical lines in this scene.
   unsigned num_lines{1u};
+};
 
-  void AddEntity(unsigned column_number, QString data) {
-    auto &e = entities.emplace_back();
-    e.logical_line_number = num_lines;
-    e.logical_column_number = column_number;
-    e.data_index = static_cast<unsigned>(token_data.size());
-    e.token_index = static_cast<unsigned>(tokens.size());
-    token_data.emplace_back(std::move(data));
+// The scene builder helps to populate a given `Scene`. It keeps track of state
+// that doesn't need to persist past the creation of a `Scene`.
+struct SceneBuilder {
+  Scene scene;
+
+  // Maps unique `QString`s to an index in `Scene::data`.
+  QMap<QString, unsigned> data_to_index;
+
+  unsigned logical_column_number{1u};
+  unsigned token_start_column{0u};
+  unsigned token_length{0u};
+  unsigned token_index{0u};
+  bool added_anything{false};
+
+  QString token_data;
+
+  inline SceneBuilder(void) {
+    scene.logical_line_index.emplace_back(0u);
+  }
+
+  void AddColumn(unsigned num_columns = 1u) {
+    if (token_length) {
+      AddEntity();
+    }
+    logical_column_number += num_columns;
+  }
+
+  void AddNewLine(void) {
+    if (token_length) {
+      AddEntity();
+    }
+
+    logical_column_number = 1u;
+    scene.num_lines += 1u;
+    scene.logical_line_index.emplace_back(
+        static_cast<unsigned>(scene.entities.size()));
+  }
+
+  void AddChar(QChar ch) {
+    if (!token_start_column) {
+      token_start_column = logical_column_number;
+    }
+    token_data += ch;
+    token_length += 1u;
+    logical_column_number += 1u;
+    added_anything = true;
+  }
+
+  void EndToken(Token tok) {
+    AddEntity();
+    if (added_anything) {
+      scene.tokens.emplace_back(std::move(tok));
+      added_anything = false;
+      token_index += 1u;
+    }
+  }
+
+  void AddEntity(void) {
+    if (!token_length) {
+      return;
+    }
+
+    scene.max_logical_columns = std::max(
+        scene.max_logical_columns, token_start_column + token_length);
+
+    // Get or create an index in `Scene::data` for the actual token data.
+    auto data_index_it = data_to_index.find(token_data);
+    unsigned data_index = 0u;
+    if (data_index_it == data_to_index.end()) {
+      data_index = static_cast<unsigned>(scene.data.size());
+
+      Data &d = scene.data.emplace_back();
+      d.text = std::move(token_data);
+
+    } else {
+      data_index = data_index_it.value();
+    }
+    token_data.clear();
+
+    // Add the entity.
+    Entity &e = scene.entities.emplace_back();
+    e.logical_line_number = scene.num_lines;
+    e.logical_column_number = token_start_column;
+    e.data_index_and_config = data_index << 2u;
+    e.token_index = token_index;
+
+    token_start_column = 0u;
+    token_length = 0u;
+  }
+
+  Scene TakeScene(void) & {
+    return std::move(scene);
   }
 };
 
@@ -149,21 +250,20 @@ struct CodeWidget::PrivateData {
   void UpdateScrollbars(void);
   void ResetScene(void);
   void ResetCanvas(void);
-  void ImportChoiceNode(Scene &s, unsigned &logical_column_number,
+  void ImportChoiceNode(SceneBuilder &b,
                         ChoiceTokenTreeNode node);
-  void ImportSubstitutionNode(Scene &s, unsigned &logical_column_number,
+  void ImportSubstitutionNode(SceneBuilder &b,
                               SubstitutionTokenTreeNode node);
-  void ImportSequenceNode(Scene &s, unsigned &logical_column_number,
+  void ImportSequenceNode(SceneBuilder &b,
                           SequenceTokenTreeNode node);
-  void ImportTokenNode(Scene &s, unsigned &logical_column_number,
+  void ImportTokenNode(SceneBuilder &b,
                        TokenTokenTreeNode node);
-  void ImportNode(Scene &s, unsigned &logical_column_number,
-                  TokenTreeNode node);
+  void ImportNode(SceneBuilder &b, TokenTreeNode node);
 };
 
 // Import a choice node.
 void CodeWidget::PrivateData::ImportChoiceNode(
-    Scene &s, unsigned &logical_column_number, ChoiceTokenTreeNode node) {
+    SceneBuilder &b, ChoiceTokenTreeNode node) {
 
   std::optional<TokenTreeNode> chosen_node;
 
@@ -176,13 +276,13 @@ void CodeWidget::PrivateData::ImportChoiceNode(
   }
 
   if (chosen_node) {
-    ImportNode(s, logical_column_number, std::move(chosen_node.value()));
+    ImportNode(b, std::move(chosen_node.value()));
   }
 }
 
 // Import a substitution node.
 void CodeWidget::PrivateData::ImportSubstitutionNode(
-    Scene &s, unsigned &logical_column_number, SubstitutionTokenTreeNode node) {
+    SceneBuilder &b, SubstitutionTokenTreeNode node) {
 
   RawEntityId macro_id = kInvalidEntityId;
   auto sub = node.macro();
@@ -193,23 +293,23 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
   }
 
   if (macros_to_expand.contains(macro_id)) {
-    ImportNode(s, logical_column_number, node.after());
+    ImportNode(b, node.after());
   } else {
-    ImportNode(s, logical_column_number, node.before());
+    ImportNode(b, node.before());
   }
 }
 
 // Import a sequence of nodes.
 void CodeWidget::PrivateData::ImportSequenceNode(
-    Scene &s, unsigned &logical_column_number, SequenceTokenTreeNode node) {
+    SceneBuilder &b, SequenceTokenTreeNode node) {
   for (auto child_node : node.children()) {
-    ImportNode(s, logical_column_number, std::move(child_node));
+    ImportNode(b, std::move(child_node));
   }
 }
 
 // Import a node containing a token.
 void CodeWidget::PrivateData::ImportTokenNode(
-    Scene &s, unsigned &logical_column_number, TokenTokenTreeNode node) {
+    SceneBuilder &b, TokenTokenTreeNode node) {
 
   // Get the data of this token in Qt's native format.
   Token token = node.token();
@@ -236,89 +336,58 @@ void CodeWidget::PrivateData::ImportTokenNode(
     return;
   }
 
-  QString data;
-  bool seen_non_whitespace = false;
-
-  auto start_x = logical_column_number;
-
-  auto add_entity = [&] (void) {
-    if (!data.isEmpty()) {
-      s.max_logical_columns = std::max(
-          s.max_logical_columns, start_x + static_cast<unsigned>(data.size()));
-      s.AddEntity(start_x, std::move(data));  // Reads `s.num_lines`.
-      data.clear();
-      seen_non_whitespace = true;
-    }
-    start_x = logical_column_number;
-  };
-
   for (QChar ch : utf16_data) {
     switch (ch.unicode()) {
 
       // TODO(pag): Configurable tab width; tab stops
       case QChar::Tabulation:
-        logical_column_number += kTabWidth;
-        add_entity();
+        b.AddColumn(kTabWidth);
         break;
 
       case QChar::Space:
       case QChar::Nbsp:
-        logical_column_number += 1;
-        add_entity();
+        b.AddColumn();
         break;
 
       case QChar::ParagraphSeparator:
       case QChar::LineFeed:
       case QChar::LineSeparator: {
-        logical_column_number = 1;
-        add_entity();
-        s.num_lines += 1u;
+        b.AddNewLine();
         break;
       }
 
       case QChar::CarriageReturn:
-        add_entity();
         continue;
 
       default:
-        logical_column_number += 1;
-        data.append(ch);
+        b.AddChar(ch);
         break;
     }
   }
 
-  add_entity();
-
-  if (seen_non_whitespace) {
-    s.tokens.emplace_back(std::move(token));
-  }
+  b.EndToken(std::move(token));
 }
 
 // Import a generic node, dispatching to the relevant node.
-void CodeWidget::PrivateData::ImportNode(
-    Scene &s, unsigned &logical_column_number, TokenTreeNode node) {
+void CodeWidget::PrivateData::ImportNode(SceneBuilder &b, TokenTreeNode node) {
   switch (node.kind()) {
     case TokenTreeNodeKind::EMPTY:
       break; 
     case TokenTreeNodeKind::TOKEN:
       ImportTokenNode(
-          s, logical_column_number,
-          std::move(reinterpret_cast<TokenTokenTreeNode &&>(node)));
+          b, std::move(reinterpret_cast<TokenTokenTreeNode &&>(node)));
       break;
     case TokenTreeNodeKind::CHOICE:
       ImportChoiceNode(
-          s, logical_column_number,
-          std::move(reinterpret_cast<ChoiceTokenTreeNode &&>(node)));
+          b, std::move(reinterpret_cast<ChoiceTokenTreeNode &&>(node)));
       break;
     case TokenTreeNodeKind::SUBSTITUTION:
       ImportSubstitutionNode(
-          s, logical_column_number,
-          std::move(reinterpret_cast<SubstitutionTokenTreeNode &&>(node)));
+          b, std::move(reinterpret_cast<SubstitutionTokenTreeNode &&>(node)));
       break;
     case TokenTreeNodeKind::SEQUENCE:
       ImportSequenceNode(
-          s, logical_column_number,
-          std::move(reinterpret_cast<SequenceTokenTreeNode &&>(node)));
+          b, std::move(reinterpret_cast<SequenceTokenTreeNode &&>(node)));
       break;
   }
 }
@@ -408,17 +477,15 @@ void CodeWidget::PrivateData::UpdateScrollbars(void) {
 }
 
 void CodeWidget::PrivateData::ResetScene(void) {
-  Scene s;
-  unsigned logical_column_number = 1;
-  ImportNode(s, logical_column_number, token_tree.root());
-  scene = std::move(s);
+  SceneBuilder builder;  
+  ImportNode(builder, token_tree.root());
+  scene = builder.TakeScene();
 }
 
 void CodeWidget::PrivateData::ResetCanvas(void) {
   ResetScene();
 
   QFont font = theme->Font();
-
   font.setStyleStrategy(QFont::NoSubpixelAntialias);
 
   QFont bold_font = font;
@@ -445,8 +512,7 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
        font_metrics_i.horizontalAdvance("W"),
        font_metrics.horizontalAdvance("W")})));
 
-  qreal space_width = font_metrics.horizontalAdvance(QChar::Space);
-
+  QTextOption to(Qt::AlignLeft);
   QRect canvas_rect(
       0, 0,
       (max_char_width * static_cast<int>(scene.max_logical_columns)) + 100,
@@ -456,19 +522,31 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
 
   QPixmap c(canvas_rect.width(), canvas_rect.height());
   QPainter blitter(&c);
-  // blitter.setRenderHint(QPainter::Antialiasing);
-  blitter.setRenderHint(QPainter::SmoothPixmapTransform);
+  blitter.setRenderHints(QPainter::TextAntialiasing | QPainter::Antialiasing |
+                         QPainter::SmoothPixmapTransform);
   blitter.fillRect(canvas_rect, QBrush(theme->DefaultBackgroundColor()));
+
+  blitter.setFont(font);
+
+  QString monospace = " ";
+  QRectF space_rect = blitter.boundingRect(canvas_rect, monospace, to);
+  qreal space_width = space_rect.width();
 
   qreal x = 0;
   qreal y = 0;
   unsigned logical_column_number = 1;
   unsigned logical_line_number = 1;
 
+  // Try to detect if the font is monospaced.
+  bool is_monospaced =
+      font_metrics_bi.maxWidth() == font_metrics.maxWidth() &&
+      font_metrics_bi.horizontalAdvance(".") == font_metrics_bi.maxWidth();
+
   for (Entity &e : scene.entities) {
-    const QString &data = scene.token_data[e.data_index];
+    Data &data = scene.data[e.data_index_and_config >> 2u];
     const Token &token = scene.tokens[e.token_index];
-    auto cs = theme->TokenColorAndStyle(token);
+
+    Q_ASSERT(!data.text.isEmpty());
 
     // Synchronize our logical and physical positions. This ends up accounting
     // for whitespace.
@@ -489,24 +567,54 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
     e.x = x;
     e.y = y;
 
-    QPointF token_pos(x, y);
-
+    ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
     font.setItalic(cs.italic);
     font.setUnderline(cs.underline);
     font.setStrikeOut(cs.strikeout);
     font.setWeight(cs.bold ? QFont::DemiBold : QFont::Normal);
-
     blitter.setPen(cs.foreground_color);
     blitter.setFont(font);
 
-    QRectF token_rect = blitter.boundingRect(canvas_rect, Qt::AlignLeft, data);
-    token_rect.moveTo(token_pos);
+    // Figure out the configuration for this entity, and update it in place.
+    unsigned rect_config = (cs.bold ? 2u : 0u) | (cs.italic ? 1u : 0u);
+    e.data_index_and_config |= rect_config;
 
-    blitter.fillRect(token_rect, cs.background_color);
-    blitter.drawText(token_rect, Qt::AlignLeft, data);
+    QRectF &token_rect = data.bounding_rect[rect_config];
+    bool &token_rect_valid = data.bounding_rect_valid[rect_config];
 
-    x += token_rect.width();
-    logical_column_number += static_cast<unsigned>(data.size());
+    // blitter.fillRect(token_rect, cs.background_color);
+
+    // Draw one character at a time. That results in better alignment across
+    // lines.
+    if (is_monospaced) {
+      if (!token_rect_valid) {
+        token_rect = space_rect;
+        token_rect.setWidth(space_width * data.text.size());
+        token_rect_valid = true;
+      }
+
+      QRectF glyph_rect = space_rect;
+
+      for (QChar ch : data.text) {
+        monospace[0] = ch;
+
+        glyph_rect.moveTo(QPointF(x, y));
+        blitter.drawText(glyph_rect, monospace, to);
+        x += space_width;
+      }
+
+    // Draw it as one word.
+    } else {
+      if (!token_rect_valid) {
+        token_rect = blitter.boundingRect(canvas_rect, data.text, to);
+        token_rect_valid = true;
+      }
+
+      blitter.drawText(token_rect, data.text, to);
+      x += token_rect.width();
+    }
+
+    logical_column_number += static_cast<unsigned>(data.text.size());
   }
 
   blitter.end();
