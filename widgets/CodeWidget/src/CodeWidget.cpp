@@ -224,7 +224,10 @@ struct CodeWidget::PrivateData {
   const TokenTree token_tree;
 
   // Size of the visible viewport area for this widget.
-  QSize viewport_size;
+  QRect viewport;
+  int max_rendered_viewport_width{0};
+  int max_rendered_viewport_height{0};
+  bool viewport_changed{true};
 
   // Current scroll x/y positions.
   int scroll_x{0};
@@ -237,6 +240,9 @@ struct CodeWidget::PrivateData {
 
   // Actual "picture" of what is rendered.
   QImage canvas;
+
+  // Actual "picture" of what is rendered.
+  QImage painted_canvas;
 
   // Sets of entities that configure what gets shown from `token_tree`.
   QSet<RawEntityId> macros_to_expand;
@@ -450,17 +456,51 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
 }
 
 void CodeWidget::resizeEvent(QResizeEvent *event) {
-  d->viewport_size = event->size();
-  d->UpdateScrollbars();
-  
+  QSize new_size = event->size();
 
+  d->viewport.setWidth(new_size.width());
+  d->viewport.setHeight(new_size.height());
+
+  if (new_size.width() > d->max_rendered_viewport_width) {
+    d->viewport_changed = true;
+  }
+
+  if (new_size.height() > d->max_rendered_viewport_height) {
+    d->viewport_changed = true;
+  }
+
+  d->UpdateScrollbars();
 }
 
-void CodeWidget::paintEvent(QPaintEvent *event) {
-  QPainter painter(this);
-  painter.drawImage(0, 0, d->canvas);
+void CodeWidget::paintEvent(QPaintEvent *) {
 
-  (void) event;
+  if (d->viewport_changed) {
+
+    // Not alpha channel on the canvas because we'll always be filling in
+    // background colors.
+    auto dpi_ratio = qApp->devicePixelRatio();
+    d->painted_canvas = QImage(
+        static_cast<int>(d->viewport.width() * dpi_ratio),
+        static_cast<int>(d->viewport.height() * dpi_ratio),
+        QImage::Format_RGBX8888);
+    d->painted_canvas.setDevicePixelRatio(dpi_ratio);
+
+    QPainter painter(&(d->painted_canvas));
+
+    // Fill in the background color of the viewport.
+    painter.fillRect(d->viewport, QBrush(d->theme->DefaultBackgroundColor()));
+    d->max_rendered_viewport_width = d->viewport.width();
+    d->max_rendered_viewport_height = d->viewport.height();
+    d->viewport_changed = false;
+
+    // Render the code on top.
+    painter.drawImage(0, 0, d->canvas);
+    painter.end();
+  }
+
+  QPainter blitter(this);
+  blitter.drawImage(0, 0, d->painted_canvas);
+  blitter.end();
 }
 
 void CodeWidget::mousePressEvent(QMouseEvent *event) {
@@ -482,6 +522,9 @@ void CodeWidget::PrivateData::ResetScene(void) {
   SceneBuilder builder;  
   ImportNode(builder, token_tree.root());
   scene = builder.TakeScene();
+
+  // Force a change.
+  viewport_changed = true;
 }
 
 void CodeWidget::PrivateData::ResetCanvas(void) {
@@ -509,15 +552,30 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
        font_metrics_i.height(), font_metrics.height()})));
 
   auto max_char_width = static_cast<int>(std::ceil(std::max(
-      {font_metrics_bi.horizontalAdvance("W"),
-       font_metrics_b.horizontalAdvance("W"),
-       font_metrics_i.horizontalAdvance("W"),
-       font_metrics.horizontalAdvance("W")})));
+      {font_metrics_bi.maxWidth(), font_metrics_b.maxWidth(),
+       font_metrics_i.maxWidth(), font_metrics.maxWidth()})));
 
+  // Use a painter for also figuring out the maximum character size, as a
+  // bounding rect from a painter could be bigger.
   QTextOption to(Qt::AlignLeft);
+  {
+    QPainter p;
+    p.setFont(bold_italic_font);
+    max_char_width = std::max(
+        max_char_width,
+        static_cast<int>(std::ceil(
+            p.boundingRect(
+                QRectF(max_char_width, line_height,
+                       max_char_width * 4, line_height * 4),
+                "W", to).width())));
+  }
+
+  // Figure out the canvas size. This is the maximum number of characters we
+  // have, plus a margin for one on the left and one on the right, to allow for
+  // italic text to "lean in" and spill over into those margins.
   QRect canvas_rect(
       0, 0,
-      (max_char_width * static_cast<int>(scene.max_logical_columns)) + 100,
+      (max_char_width * static_cast<int>(scene.max_logical_columns + 2)),
       line_height * static_cast<int>(std::max(1u, scene.num_lines)));
 
   qDebug() << scene.num_lines << scene.max_logical_columns << canvas_rect;
@@ -525,15 +583,12 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
   auto dpi_ratio = qApp->devicePixelRatio();
   QImage c(static_cast<int>(canvas_rect.width() * dpi_ratio),
            static_cast<int>(canvas_rect.height() * dpi_ratio),
-           QImage::Format_ARGB32);
+           QImage::Format_RGBA8888);
   c.setDevicePixelRatio(dpi_ratio);
 
   QPainter blitter(&c);
   blitter.setRenderHints(QPainter::TextAntialiasing | QPainter::Antialiasing |
                          QPainter::SmoothPixmapTransform);
-
-  // TODO(pag): Remove this.
-  blitter.fillRect(canvas_rect, QBrush(theme->DefaultBackgroundColor()));
 
   blitter.setFont(font);
 
@@ -541,7 +596,9 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
   QRectF space_rect = blitter.boundingRect(canvas_rect, monospace, to);
   qreal space_width = space_rect.width();
 
-  qreal x = 0;
+  // Start new lines indented with a single space. This helps us account for
+  // italic character writing outside of their minimum-sized bounding box.
+  qreal x = space_width;
   qreal y = 0;
   unsigned logical_column_number = 1;
   unsigned logical_line_number = 1;
@@ -561,7 +618,7 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
     // for whitespace.
     while (logical_line_number < e.logical_line_number) {
       y += line_height;
-      x = 0;
+      x = space_width;
       logical_line_number += 1;
       logical_column_number = 1;
     }
