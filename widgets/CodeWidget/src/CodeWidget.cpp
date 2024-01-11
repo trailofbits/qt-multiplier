@@ -8,8 +8,10 @@
 
 #include <multiplier/GUI/Widgets/CodeWidget.h>
 
+#include <QApplication>
 #include <QFontMetricsF>
 #include <QHBoxLayout>
+#include <QImage>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QPainter>
@@ -234,7 +236,7 @@ struct CodeWidget::PrivateData {
   Scene scene;
 
   // Actual "picture" of what is rendered.
-  QPixmap canvas;
+  QImage canvas;
 
   // Sets of entities that configure what gets shown from `token_tree`.
   QSet<RawEntityId> macros_to_expand;
@@ -456,7 +458,7 @@ void CodeWidget::resizeEvent(QResizeEvent *event) {
 
 void CodeWidget::paintEvent(QPaintEvent *event) {
   QPainter painter(this);
-  painter.drawPixmap(0, 0, d->canvas);
+  painter.drawImage(0, 0, d->canvas);
 
   (void) event;
 }
@@ -520,10 +522,17 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
 
   qDebug() << scene.num_lines << scene.max_logical_columns << canvas_rect;
 
-  QPixmap c(canvas_rect.width(), canvas_rect.height());
+  auto dpi_ratio = qApp->devicePixelRatio();
+  QImage c(static_cast<int>(canvas_rect.width() * dpi_ratio),
+           static_cast<int>(canvas_rect.height() * dpi_ratio),
+           QImage::Format_ARGB32);
+  c.setDevicePixelRatio(dpi_ratio);
+
   QPainter blitter(&c);
   blitter.setRenderHints(QPainter::TextAntialiasing | QPainter::Antialiasing |
                          QPainter::SmoothPixmapTransform);
+
+  // TODO(pag): Remove this.
   blitter.fillRect(canvas_rect, QBrush(theme->DefaultBackgroundColor()));
 
   blitter.setFont(font);
