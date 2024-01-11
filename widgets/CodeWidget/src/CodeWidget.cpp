@@ -22,6 +22,7 @@
 #include <QScrollBar>
 #include <QSpacerItem>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 
 #include <cmath>
 #include <multiplier/Frontend/MacroSubstitution.h>
@@ -229,6 +230,9 @@ struct CodeWidget::PrivateData {
   int max_rendered_viewport_height{0};
   bool viewport_changed{true};
 
+  // The current DPI ratio for the app.
+  qreal dpi_ratio{1.0};
+
   // Current scroll x/y positions.
   int scroll_x{0};
   int scroll_y{0};
@@ -253,7 +257,8 @@ struct CodeWidget::PrivateData {
   QScrollBar *vertical_scrollbar{nullptr};
 
   inline PrivateData(const TokenTree &token_tree_)
-      : token_tree(token_tree_) {}
+      : token_tree(token_tree_),
+        dpi_ratio(qApp->devicePixelRatio()) {}
 
   void UpdateScrollbars(void);
   void ResetScene(void);
@@ -472,34 +477,85 @@ void CodeWidget::resizeEvent(QResizeEvent *event) {
   d->UpdateScrollbars();
 }
 
+void CodeWidget::wheelEvent(QWheelEvent *event) {
+
+  int vertical_pixel_delta = 0;
+  int horizontal_pixel_delta = 0;
+
+  if (auto pixel_delta_point = event->pixelDelta(); !pixel_delta_point.isNull()) {
+    vertical_pixel_delta = pixel_delta_point.y();
+    horizontal_pixel_delta = pixel_delta_point.x();
+
+  // High resolution gaming mice are capable of returning fractions of what is
+  // usually considered a single mouse wheel turn.
+  } else {
+    auto vertical_angle_delta = event->angleDelta().y();
+    auto horizontal_angle_delta = event->angleDelta().x();
+
+    auto line_height = QFontMetrics(d->theme->Font(), this).height();
+
+    vertical_pixel_delta =
+        line_height * static_cast<int>(vertical_angle_delta * 1.0 / 120.0);
+
+    horizontal_pixel_delta =
+      line_height * static_cast<int>(horizontal_angle_delta * 1.0 / 120.0);
+  }
+
+  vertical_pixel_delta *= -1;
+  horizontal_pixel_delta *= -1;
+
+  auto c_width = static_cast<int>(d->canvas.width() / d->dpi_ratio);
+  auto c_height = static_cast<int>(d->canvas.height() / d->dpi_ratio);
+
+  auto v_width = d->viewport.width();
+  auto v_height = d->viewport.height();
+
+  if (c_width > v_width) {
+    d->scroll_x = std::min(
+        std::max(0, d->scroll_x + horizontal_pixel_delta),
+        c_width - v_width);
+
+  } else {
+    d->scroll_x = 0;
+  }
+
+  if (c_height > v_height) {
+    d->scroll_y = std::min(
+        std::max(0, d->scroll_y + vertical_pixel_delta),
+        c_height - v_height);
+
+  } else {
+    d->scroll_y = 0;
+  }
+
+  d->UpdateScrollbars();
+  update();
+}
+
 void CodeWidget::paintEvent(QPaintEvent *) {
 
   if (d->viewport_changed) {
-
-    // Not alpha channel on the canvas because we'll always be filling in
-    // background colors.
-    auto dpi_ratio = qApp->devicePixelRatio();
-    d->painted_canvas = QImage(
-        static_cast<int>(d->viewport.width() * dpi_ratio),
-        static_cast<int>(d->viewport.height() * dpi_ratio),
-        QImage::Format_RGBX8888);
-    d->painted_canvas.setDevicePixelRatio(dpi_ratio);
+    d->painted_canvas = QImage(d->canvas.size(), QImage::Format_RGBX8888);
+    d->painted_canvas.setDevicePixelRatio(d->dpi_ratio);
 
     QPainter painter(&(d->painted_canvas));
 
-    // Fill in the background color of the viewport.
-    painter.fillRect(d->viewport, QBrush(d->theme->DefaultBackgroundColor()));
-    d->max_rendered_viewport_width = d->viewport.width();
-    d->max_rendered_viewport_height = d->viewport.height();
-    d->viewport_changed = false;
+    // Set a base layer from the theme behind the code itself.
+    painter.fillRect(d->canvas.rect(),
+                     d->theme->DefaultBackgroundColor());
 
     // Render the code on top.
     painter.drawImage(0, 0, d->canvas);
     painter.end();
   }
 
+  d->max_rendered_viewport_width = d->viewport.width();
+  d->max_rendered_viewport_height = d->viewport.height();
+  d->viewport_changed = false;
+
   QPainter blitter(this);
-  blitter.drawImage(0, 0, d->painted_canvas);
+  blitter.fillRect(d->viewport, QBrush(d->theme->DefaultBackgroundColor()));
+  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->painted_canvas);
   blitter.end();
 }
 
@@ -580,7 +636,6 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
 
   qDebug() << scene.num_lines << scene.max_logical_columns << canvas_rect;
 
-  auto dpi_ratio = qApp->devicePixelRatio();
   QImage c(static_cast<int>(canvas_rect.width() * dpi_ratio),
            static_cast<int>(canvas_rect.height() * dpi_ratio),
            QImage::Format_RGBA8888);

@@ -20,6 +20,7 @@ QT_BEGIN_NAMESPACE
 class QMouseEvent;
 class QPaintEvent;
 class QResizeEvent;
+class QWheelEvent;
 QT_END_NAMESPACE
 
 Q_DECLARE_METATYPE(mx::VariantEntity)
@@ -62,6 +63,7 @@ class CodeWidget Q_DECL_FINAL : public QWidget {
   void resizeEvent(QResizeEvent *event) Q_DECL_FINAL;
   void paintEvent(QPaintEvent *event) Q_DECL_FINAL;
   void mousePressEvent(QMouseEvent *event) Q_DECL_FINAL;
+  void wheelEvent(QWheelEvent *event) Q_DECL_FINAL;
 
  private slots:
   void OnIndexChanged(const ConfigManager &);
