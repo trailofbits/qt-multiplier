@@ -35,6 +35,7 @@
 // #include "CodeModel.h"
 
 namespace mx::gui {
+namespace {
 
 // TODO(pag): Don't hardcode this. Investigate `QStackTextEngine`, the
 //            `QPainter` uses this internally. It seems that
@@ -216,6 +217,8 @@ struct SceneBuilder {
   }
 };
 
+}  // namespace
+
 struct CodeWidget::PrivateData {
 
   // The theme being used.
@@ -282,6 +285,41 @@ struct CodeWidget::PrivateData {
   void ImportNode(SceneBuilder &b, TokenTreeNode node);
 
   void ScrollBy(int horizontal_pixel_delta, int vertical_pixel_delta);
+
+  Entity *EntityUnderCursor(QPointF point) {
+    if (scene.entities.empty()) {
+      return nullptr;
+    }
+
+    auto x = scroll_x + point.x();
+    auto y = scroll_y + point.y();
+
+    auto line_index = static_cast<unsigned>(std::floor(y / line_height));
+    if (line_index >= scene.logical_line_index.size()) {
+      return nullptr;
+    }
+
+    auto i = scene.logical_line_index[line_index];
+    auto max_i = scene.logical_line_index[line_index + 1];
+
+    for (; i < max_i; ++i) {
+      Entity &e = scene.entities[i];
+      if (e.x > x) {
+        continue;
+      }
+
+      Data &data = scene.data[e.data_index_and_config >> 2u];
+      QRectF r = data.bounding_rect[e.data_index_and_config & 0b11u];
+
+      r.moveTo(QPointF(e.x, e.y));
+      if (r.contains(QPointF(x, y))) {
+        qDebug() << "!!!" << data.text;
+        return &e;
+      }
+    }
+
+    return nullptr;
+  }
 };
 
 // Import a choice node.
@@ -582,6 +620,8 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   auto x = d->scroll_x + rel_position.x();
   auto y = d->scroll_y + rel_position.y();
 
+
+
   // Calculate the index of the current line.
   if (event->buttons() & Qt::LeftButton) {
     auto new_current_line_index = static_cast<int>(std::floor(y / d->line_height));
@@ -592,6 +632,8 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   }
 
   update();
+
+  d->EntityUnderCursor(rel_position);
 
   (void) x;
   // QPointF mouse_position(static_cast<qreal>(event->x() + d->viewport.x()),
