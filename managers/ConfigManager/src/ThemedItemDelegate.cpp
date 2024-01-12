@@ -28,6 +28,8 @@
 namespace mx::gui {
 namespace {
 
+static const QString kSpace = " ";
+
 class MeasuringPainter {
  public:
   QRectF area;
@@ -41,7 +43,7 @@ class MeasuringPainter {
     area = area.united(rect);
   }
 
-  inline void drawText(const QRectF &rect, QChar, const QTextOption &) {
+  inline void drawText(const QRectF &rect, const QString &, const QTextOption &) {
     area = area.united(rect);
   }
 
@@ -180,38 +182,48 @@ void ThemedItemDelegate::PaintText(
   painter->setFont(font);
 
   QTextOption to(option.displayAlignment);
+  QRectF baseline_rect(0, 0, 2 * font_metrics.maxWidth() * tok_data.size(),
+                       2 * font_metrics.height());
+  auto base_rect = painter->boundingRect(baseline_rect, kSpace);
+  auto rect = painter->boundingRect(baseline_rect, tok_data);
 
-  for (QChar ch : tok_data) {
-    QRectF glyph_rect(0.0, 0.0, font_metrics.horizontalAdvance(ch),
-                      font_metrics.height());
+  rect.moveTo(pos_inout);
+  painter->fillRect(rect, color_and_style.background_color);
+  painter->drawText(rect, tok_data, to);
 
-    // NOTE(pag): Fixup prior to `->fillRect`, as the measuring painter will
-    //            need to see how we calculate tab width.
-    if (ch == QChar::Tabulation) {
-      glyph_rect.setWidth(tab_width);
-    }
+  pos_inout = rect.bottomRight() - QPointF(0, base_rect.height());
 
-    glyph_rect.moveTo(pos_inout);
+  // for (QChar ch : tok_data) {
+  //   QRectF glyph_rect(0.0, 0.0, font_metrics.horizontalAdvance(ch),
+  //                     font_metrics.height());
 
-    painter->fillRect(glyph_rect, color_and_style.background_color);
+  //   // NOTE(pag): Fixup prior to `->fillRect`, as the measuring painter will
+  //   //            need to see how we calculate tab width.
+  //   if (ch == QChar::Tabulation) {
+  //     glyph_rect.setWidth(tab_width);
+  //   }
 
-    switch (ch.unicode()) {
-      case QChar::Tabulation:
-      case QChar::Space:
-      case QChar::Nbsp: pos_inout.setX(glyph_rect.right()); break;
-      case QChar::ParagraphSeparator:
-      case QChar::LineFeed:
-      case QChar::LineSeparator:
-        pos_inout.setX(option.rect.x());
-        pos_inout.setY(glyph_rect.bottom());
-        break;
-      case QChar::CarriageReturn: continue;
-      default:
-        painter->drawText(glyph_rect, ch, to);
-        pos_inout.setX(glyph_rect.right());
-        break;
-    }
-  }
+  //   glyph_rect.moveTo(pos_inout);
+
+  //   painter->fillRect(glyph_rect, color_and_style.background_color);
+
+  //   switch (ch.unicode()) {
+  //     case QChar::Tabulation:
+  //     case QChar::Space:
+  //     case QChar::Nbsp: pos_inout.setX(glyph_rect.right()); break;
+  //     case QChar::ParagraphSeparator:
+  //     case QChar::LineFeed:
+  //     case QChar::LineSeparator:
+  //       pos_inout.setX(option.rect.x());
+  //       pos_inout.setY(glyph_rect.bottom());
+  //       break;
+  //     case QChar::CarriageReturn: continue;
+  //     default:
+  //       painter->drawText(glyph_rect, ch, to);
+  //       pos_inout.setX(glyph_rect.right());
+  //       break;
+  //   }
+  // }
 }
 
 void ThemedItemDelegate::paint(QPainter *painter,

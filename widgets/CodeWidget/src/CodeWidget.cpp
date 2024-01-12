@@ -54,7 +54,6 @@ struct Entity {
   //
   // NOTE(pag): These are overwritten by the painter.
   qreal x;
-  qreal y;
 
   // Index of this entity's data in `Scene::token_data`. The low two bits are
   // the "configuration" of this entity, i.e. selects which bounding rect
@@ -594,7 +593,9 @@ const Entity *CodeWidget::PrivateData::EntityUnderCursor(QPointF point) const {
     const Data &data = scene.data[e.data_index_and_config >> 2u];
     QRectF r = data.bounding_rect[e.data_index_and_config & 0b11u];
 
-    r.moveTo(QPointF(e.x, e.y));
+    qreal e_y = static_cast<qreal>(line_index) * line_height;
+
+    r.moveTo(QPointF(e.x, e_y));
     if (r.contains(QPointF(x, y))) {
       return &e;
     }
@@ -738,7 +739,10 @@ void CodeWidget::paintEvent(QPaintEvent *) {
         const Data &data = d->scene.data[e.data_index_and_config >> 2u];
         unsigned rect_config = e.data_index_and_config & 0b11u;
         QRectF rect = data.bounding_rect[rect_config];
-        rect.moveTo(QPointF(e.x - d->scroll_x, e.y - d->scroll_y));
+
+        qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
+                    d->line_height;
+        rect.moveTo(QPointF(e.x - d->scroll_x, e_y - d->scroll_y));
         blitter.fillRect(rect, highlight_color);
       }
     }
@@ -762,8 +766,10 @@ void CodeWidget::paintEvent(QPaintEvent *) {
       cs.background_color = QColor();
       cs.foreground_color = highlight_foreground_color;
 
+      qreal e_y = static_cast<qreal>(e.logical_line_number - 1) * d->line_height;
       qreal x = e.x - d->scroll_x;
-      qreal y = e.y - d->scroll_y;
+      qreal y = e_y - d->scroll_y;
+
       d->PaintToken(blitter, dummy_bg_painter, data, rect_config, cs, x, y);
     }
   }
@@ -1007,10 +1013,9 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
       x += space_width;
     }
 
-    // NOTE(pag): Mutate these in-place so that we always know where each
+    // NOTE(pag): Mutate this in-place so that we always know where each
     //            entity is. This is required for click and selection managent.
     e.x = x;
-    e.y = y;
 
     ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
 
