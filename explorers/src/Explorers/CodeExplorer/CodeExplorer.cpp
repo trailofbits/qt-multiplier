@@ -94,6 +94,12 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
               d->opened_windows.erase(id);
             });
 
+    connect(code_widget, &CodeWidget::RequestPrimaryClick,
+            d->manager, &IWindowManager::OnPrimaryClick);
+
+    connect(code_widget, &CodeWidget::RequestSecondaryClick,
+            d->manager, &IWindowManager::OnSecondaryClick);
+
     IWindowManager::CentralConfig config;
     d->manager->AddCentralWidget(code_widget, config);
   } else {

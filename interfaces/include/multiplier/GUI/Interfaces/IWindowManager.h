@@ -70,17 +70,20 @@ class IWindowManager : public QObject {
   virtual void AddDockWidget(IWindowWidget *widget,
                              const DockConfig &config) = 0;
 
-  //! Invoked when a primary click happens on an `IModel`-compatible index.
-  virtual void PrimaryClick(const QModelIndex &index) = 0;
-
-  //! Invoked when a secondary click happens on an `IModel`-compatible index.
-  virtual void SecondaryClick(const QModelIndex &index) = 0;
-
   //! Return the main window of the application.
   virtual QMainWindow *Window(void) const noexcept = 0;
 
   //! Return the application-level menu for a given menu name.
   virtual QMenu *Menu(const QString &menu_name) = 0;
+
+ public slots:
+
+  //! Invoked when a primary click happens on an `IModel`-compatible index.
+  virtual void OnPrimaryClick(const QModelIndex &index) = 0;
+
+  //! Invoked when a secondary click happens on an `IModel`-compatible index.
+  virtual void OnSecondaryClick(const QModelIndex &index) = 0;
+
 };
 
 }  // namespace mx::gui

@@ -272,13 +272,13 @@ void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
   connect(d->list_widget, &ListGeneratorWidget::RequestSecondaryClick,
           [=, this] (const QModelIndex &index) {
             d->context_index = index;
-            manager->SecondaryClick(d->context_index);
+            manager->OnSecondaryClick(d->context_index);
           });
 
   connect(d->list_widget, &ListGeneratorWidget::RequestPrimaryClick,
           [=, this] (const QModelIndex &index) {
             d->clicked_index = index;
-            manager->PrimaryClick(d->clicked_index);
+            manager->OnPrimaryClick(d->clicked_index);
           });
 
   layout->addLayout(search_parameters_layout);

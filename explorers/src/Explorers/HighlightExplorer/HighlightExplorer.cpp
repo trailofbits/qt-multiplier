@@ -82,7 +82,7 @@ void HighlightExplorer::CreateDockWidget(IWindowManager *manager) {
           [=, this] (const QPoint &point) {
             auto index = d->view->indexAt(point);
             if (index.isValid()) {
-              manager->SecondaryClick(index);
+              manager->OnSecondaryClick(index);
             }
           });
 

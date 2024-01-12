@@ -213,12 +213,12 @@ void WindowManager::RemoveDockWidget(QDockWidget *dock_widget) {
 }
 
 //! Invoked when a primary click happens on an `IModel`-compatible index.
-void WindowManager::PrimaryClick(const QModelIndex &index) {
+void WindowManager::OnPrimaryClick(const QModelIndex &index) {
   d->window->OnRequestPrimaryClick(index);
 }
 
 //! Invoked when a secondary click happens on an `IModel`-compatible index.
-void WindowManager::SecondaryClick(const QModelIndex &index) {
+void WindowManager::OnSecondaryClick(const QModelIndex &index) {
   d->window->OnRequestSecondaryClick(index);
 }
 

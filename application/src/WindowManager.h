@@ -34,8 +34,8 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
   void AddDockWidget(IWindowWidget *widget,
                      const DockConfig &config) Q_DECL_FINAL;
 
-  void PrimaryClick(const QModelIndex &index) Q_DECL_FINAL;
-  void SecondaryClick(const QModelIndex &index) Q_DECL_FINAL;
+  void OnPrimaryClick(const QModelIndex &index) Q_DECL_FINAL;
+  void OnSecondaryClick(const QModelIndex &index) Q_DECL_FINAL;
   
   QMainWindow *Window(void) const noexcept Q_DECL_FINAL;
 
