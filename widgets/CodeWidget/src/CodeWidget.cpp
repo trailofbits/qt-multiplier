@@ -62,10 +62,10 @@ struct Entity {
   unsigned token_index;
 
   // The logical (one-indexed) line number of this token.
-  unsigned logical_line_number;
+  int logical_line_number;
 
   // The logical (one-indexed) column number of this token.
-  unsigned logical_column_number;
+  int logical_column_number;
 
   // inline auto operator<=>(const Entity &that) const noexcept {
   //   return position <=> that.position;
@@ -115,10 +115,10 @@ struct Scene {
   std::vector<Token> tokens;
 
   // Maximum number of characters on any given line.
-  unsigned max_logical_columns{1u};
+  int max_logical_columns{1};
 
   // Number of logical lines in this scene.
-  unsigned num_lines{1u};
+  int num_lines{1};
 };
 
 // The scene builder helps to populate a given `Scene`. It keeps track of state
@@ -129,9 +129,9 @@ struct SceneBuilder {
   // Maps unique `QString`s to an index in `Scene::data`.
   QMap<QString, unsigned> data_to_index;
 
-  unsigned logical_column_number{1u};
-  unsigned token_start_column{0u};
-  unsigned token_length{0u};
+  int logical_column_number{1};
+  int token_start_column{0};
+  int token_length{0};
   unsigned token_index{0u};
   bool added_anything{false};
 
@@ -154,7 +154,7 @@ struct SceneBuilder {
     }
 
     logical_column_number = 1u;
-    scene.num_lines += 1u;
+    scene.num_lines += 1;
     scene.logical_line_index.emplace_back(
         static_cast<unsigned>(scene.entities.size()));
   }
@@ -164,7 +164,7 @@ struct SceneBuilder {
       token_start_column = logical_column_number;
     }
     token_data += ch;
-    token_length += 1u;
+    token_length += 1;
     logical_column_number += 1u;
     added_anything = true;
   }
@@ -208,7 +208,7 @@ struct SceneBuilder {
     e.token_index = token_index;
 
     token_start_column = 0u;
-    token_length = 0u;
+    token_length = 0;
   }
 
   Scene TakeScene(void) & {
@@ -228,6 +228,9 @@ struct CodeWidget::PrivateData {
   QRect viewport;
   int max_rendered_viewport_width{0};
   int max_rendered_viewport_height{0};
+
+  bool scene_changed{true};
+  bool canvas_changed{true};
   bool viewport_changed{true};
 
   // The current DPI ratio for the app.
@@ -237,6 +240,14 @@ struct CodeWidget::PrivateData {
   int scroll_x{0};
   int scroll_y{0};
 
+  // Determined during painting.
+  int line_height{0};
+  int max_char_width{0};
+  bool is_monospaced{false};
+
+  // The index of the current line to highlight.
+  int current_line_index{-1};
+
   // Data structure keeping track of the logical things to render, and
   // where to render them. The act of rendering updates `Entity`s in the
   // scene to keep track of their physical locations within `canvas`.
@@ -244,9 +255,6 @@ struct CodeWidget::PrivateData {
 
   // Actual "picture" of what is rendered.
   QImage canvas;
-
-  // Actual "picture" of what is rendered.
-  QImage painted_canvas;
 
   // Sets of entities that configure what gets shown from `token_tree`.
   QSet<RawEntityId> macros_to_expand;
@@ -261,8 +269,8 @@ struct CodeWidget::PrivateData {
         dpi_ratio(qApp->devicePixelRatio()) {}
 
   void UpdateScrollbars(void);
-  void ResetScene(void);
-  void ResetCanvas(void);
+  void RecomputeScene(void);
+  void RecomputeCanvas(void);
   void ImportChoiceNode(SceneBuilder &b,
                         ChoiceTokenTreeNode node);
   void ImportSubstitutionNode(SceneBuilder &b,
@@ -272,6 +280,8 @@ struct CodeWidget::PrivateData {
   void ImportTokenNode(SceneBuilder &b,
                        TokenTokenTreeNode node);
   void ImportNode(SceneBuilder &b, TokenTreeNode node);
+
+  void ScrollBy(int horizontal_pixel_delta, int vertical_pixel_delta);
 };
 
 // Import a choice node.
@@ -405,6 +415,34 @@ void CodeWidget::PrivateData::ImportNode(SceneBuilder &b, TokenTreeNode node) {
   }
 }
 
+void CodeWidget::PrivateData::ScrollBy(
+    int horizontal_pixel_delta, int vertical_pixel_delta) {
+
+  auto c_width = static_cast<int>(canvas.width() / dpi_ratio);
+  auto c_height = static_cast<int>(canvas.height() / dpi_ratio);
+
+  auto v_width = viewport.width();
+  auto v_height = viewport.height();
+
+  if (c_width > v_width) {
+    scroll_x = std::min(
+        std::max(0, scroll_x + horizontal_pixel_delta),
+        c_width - v_width);
+
+  } else {
+    scroll_x = 0;
+  }
+
+  if (c_height > v_height) {
+    scroll_y = std::min(
+        std::max(0, scroll_y + vertical_pixel_delta),
+        c_height - v_height);
+
+  } else {
+    scroll_y = 0;
+  }
+}
+
 CodeWidget::~CodeWidget(void) {}
 
 CodeWidget::CodeWidget(const ConfigManager &config_manager,
@@ -447,7 +485,7 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   auto &media_manager = config_manager.MediaManager();
   auto &theme_manager = config_manager.ThemeManager();
 
-  OnThemeChanged(theme_manager);  // Calls `ResetScene`.
+  OnThemeChanged(theme_manager);  // Calls `RecomputeScene`.
   OnIconsChanged(media_manager);
 
   connect(&config_manager, &ConfigManager::IndexChanged,
@@ -501,53 +539,13 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
       line_height * static_cast<int>(horizontal_angle_delta * 1.0 / 120.0);
   }
 
-  vertical_pixel_delta *= -1;
-  horizontal_pixel_delta *= -1;
-
-  auto c_width = static_cast<int>(d->canvas.width() / d->dpi_ratio);
-  auto c_height = static_cast<int>(d->canvas.height() / d->dpi_ratio);
-
-  auto v_width = d->viewport.width();
-  auto v_height = d->viewport.height();
-
-  if (c_width > v_width) {
-    d->scroll_x = std::min(
-        std::max(0, d->scroll_x + horizontal_pixel_delta),
-        c_width - v_width);
-
-  } else {
-    d->scroll_x = 0;
-  }
-
-  if (c_height > v_height) {
-    d->scroll_y = std::min(
-        std::max(0, d->scroll_y + vertical_pixel_delta),
-        c_height - v_height);
-
-  } else {
-    d->scroll_y = 0;
-  }
-
+  d->ScrollBy(horizontal_pixel_delta * -1, vertical_pixel_delta * -1);
   d->UpdateScrollbars();
   update();
 }
 
 void CodeWidget::paintEvent(QPaintEvent *) {
-
-  if (d->viewport_changed) {
-    d->painted_canvas = QImage(d->canvas.size(), QImage::Format_RGBX8888);
-    d->painted_canvas.setDevicePixelRatio(d->dpi_ratio);
-
-    QPainter painter(&(d->painted_canvas));
-
-    // Set a base layer from the theme behind the code itself.
-    painter.fillRect(d->canvas.rect(),
-                     d->theme->DefaultBackgroundColor());
-
-    // Render the code on top.
-    painter.drawImage(0, 0, d->canvas);
-    painter.end();
-  }
+  d->RecomputeCanvas();
 
   d->max_rendered_viewport_width = d->viewport.width();
   d->max_rendered_viewport_height = d->viewport.height();
@@ -555,36 +553,120 @@ void CodeWidget::paintEvent(QPaintEvent *) {
 
   QPainter blitter(this);
   blitter.fillRect(d->viewport, QBrush(d->theme->DefaultBackgroundColor()));
-  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->painted_canvas);
+
+  // Render current line within the canvas.
+  if (d->current_line_index != -1) {
+    QRectF current_line(
+        0, (d->current_line_index * d->line_height) - d->scroll_y,
+        d->viewport.width(), d->line_height);
+    current_line.setWidth(d->viewport.width());
+    blitter.fillRect(current_line, d->theme->CurrentLineBackgroundColor());
+  }
+
+  // Draw the code layer.
+  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->canvas);
+
   blitter.end();
+}
+
+void CodeWidget::mouseMoveEvent(QMouseEvent *event) {
+  if (event->buttons() & Qt::LeftButton) {
+    mousePressEvent(event);
+    return;
+  }
 }
 
 void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
-  qDebug() << event;
-
   QPointF rel_position = event->position();
-  (void) rel_position;
+  auto x = d->scroll_x + rel_position.x();
+  auto y = d->scroll_y + rel_position.y();
+
+  // Calculate the index of the current line.
+  if (event->buttons() & Qt::LeftButton) {
+    auto new_current_line_index = static_cast<int>(std::floor(y / d->line_height));
+    if (new_current_line_index != d->current_line_index) {
+      d->current_line_index = new_current_line_index;
+      d->viewport_changed = true;
+    }
+  }
+
+  update();
+
+  (void) x;
   // QPointF mouse_position(static_cast<qreal>(event->x() + d->viewport.x()),
   //                        static_cast<qreal>(event->y() + d->viewport.y()));
   // (void) mouse_position;
+}
+
+void CodeWidget::keyPressEvent(QKeyEvent *event) {
+  switch (event->key()) {
+
+    // Pressing the up arrow moves the current line up, and maybe triggers
+    // a scroll.
+    case Qt::Key_Up:
+      d->viewport_changed = true;
+      d->current_line_index = std::max(0, d->current_line_index - 1);
+
+      // Detect if we need to scroll up to follow the current line.
+      if ((d->current_line_index * d->line_height) < d->scroll_y) {
+        d->ScrollBy(0, -d->line_height);
+      }
+
+      break;
+
+    // Pressing the down arrow moves the current line down, and maybe triggers
+    // a scroll.
+    case Qt::Key_Down:
+      d->viewport_changed = true;
+      d->current_line_index = std::min(
+          d->scene.num_lines - 1, d->current_line_index + 1);
+
+      // Detect if we need to scroll down to follow the current line.
+      if (((d->current_line_index + 1) * d->line_height) >
+          (d->scroll_y + d->viewport.height())) {
+        d->ScrollBy(0, d->line_height);
+      }
+
+      break;
+    case Qt::Key_Left:
+    case Qt::Key_Right:
+      break;
+    default:
+      break;
+  }
+
+  if (d->viewport_changed) {
+    update();
+  }
 }
 
 void CodeWidget::PrivateData::UpdateScrollbars(void) {
 
 }
 
-void CodeWidget::PrivateData::ResetScene(void) {
+void CodeWidget::PrivateData::RecomputeScene(void) {
+  if (!scene_changed) {
+    return;
+  }
+
   SceneBuilder builder;  
   ImportNode(builder, token_tree.root());
   scene = builder.TakeScene();
+  scene_changed = false;
 
   // Force a change.
-  viewport_changed = true;
+  canvas_changed = true;
 }
 
-void CodeWidget::PrivateData::ResetCanvas(void) {
-  ResetScene();
+void CodeWidget::PrivateData::RecomputeCanvas(void) {
+  RecomputeScene();
+
+  if (!canvas_changed) {
+    return;
+  }
+
+  canvas_changed = false;
 
   QFont font = theme->Font();
   font.setStyleStrategy(QFont::NoSubpixelAntialias);
@@ -603,11 +685,11 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
   QFontMetricsF font_metrics_b(bold_font);
   QFontMetricsF font_metrics_i(italic_font);
 
-  int line_height = static_cast<int>(std::ceil(std::max(
+  line_height = static_cast<int>(std::ceil(std::max(
       {font_metrics_bi.height(), font_metrics_b.height(),
        font_metrics_i.height(), font_metrics.height()})));
 
-  auto max_char_width = static_cast<int>(std::ceil(std::max(
+  max_char_width = static_cast<int>(std::ceil(std::max(
       {font_metrics_bi.maxWidth(), font_metrics_b.maxWidth(),
        font_metrics_i.maxWidth(), font_metrics.maxWidth()})));
 
@@ -632,9 +714,7 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
   QRect canvas_rect(
       0, 0,
       (max_char_width * static_cast<int>(scene.max_logical_columns + 2)),
-      line_height * static_cast<int>(std::max(1u, scene.num_lines)));
-
-  qDebug() << scene.num_lines << scene.max_logical_columns << canvas_rect;
+      line_height * std::max(1, scene.num_lines));
 
   QImage c(static_cast<int>(canvas_rect.width() * dpi_ratio),
            static_cast<int>(canvas_rect.height() * dpi_ratio),
@@ -655,11 +735,11 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
   // italic character writing outside of their minimum-sized bounding box.
   qreal x = space_width;
   qreal y = 0;
-  unsigned logical_column_number = 1;
-  unsigned logical_line_number = 1;
+  int logical_column_number = 1;
+  int logical_line_number = 1;
 
   // Try to detect if the font is monospaced.
-  bool is_monospaced =
+  is_monospaced =
       font_metrics_bi.maxWidth() == font_metrics.maxWidth() &&
       font_metrics_bi.horizontalAdvance(".") == font_metrics_bi.maxWidth();
 
@@ -735,11 +815,13 @@ void CodeWidget::PrivateData::ResetCanvas(void) {
       x += token_rect.width();
     }
 
-    logical_column_number += static_cast<unsigned>(data.text.size());
+    logical_column_number += static_cast<int>(data.text.size());
   }
 
   blitter.end();
   canvas = std::move(c);
+
+  viewport_changed = true;
 }
 
 void CodeWidget::OnIndexChanged(const ConfigManager &config_manager) {
@@ -749,6 +831,7 @@ void CodeWidget::OnIndexChanged(const ConfigManager &config_manager) {
 }
 
 void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
+  d->canvas_changed = true;
   d->theme = theme_manager.Theme();
 
   auto theme = d->theme.get();
@@ -759,12 +842,7 @@ void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   p.setColor(QPalette::Text, theme->DefaultForegroundColor());
   p.setColor(QPalette::AlternateBase, theme->DefaultBackgroundColor());
   setPalette(p);
-
-  auto font = theme->Font();
-
-  setFont(font);
-
-  d->ResetCanvas();
+  setFont(theme->Font());
   update();
 }
 
@@ -774,16 +852,16 @@ void CodeWidget::OnIconsChanged(const MediaManager &media_manager) {
 
 // Invoked when the set of macros to be expanded changes.
 void CodeWidget::OnExpandMacros(const QSet<RawEntityId> &macros_to_expand) {
+  d->scene_changed = true;  // TODO(pag): Be more selective.
   d->macros_to_expand = macros_to_expand;
-  d->ResetCanvas();
   update();
 }
 
 // Invoked when the set of entities to be renamed changes.
 void CodeWidget::OnRenameEntities(
     const QMap<RawEntityId, QString> &new_entity_names) {
+  d->scene_changed = true;  // TODO(pag): Be more selective.
   d->new_entity_names = new_entity_names;
-  d->ResetCanvas();
   update();
 }
 

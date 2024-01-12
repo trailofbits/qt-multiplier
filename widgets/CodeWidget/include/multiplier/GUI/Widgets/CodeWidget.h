@@ -17,6 +17,7 @@
 #include <multiplier/Index.h>
 
 QT_BEGIN_NAMESPACE
+class QKeyEvent;
 class QMouseEvent;
 class QPaintEvent;
 class QResizeEvent;
@@ -63,7 +64,9 @@ class CodeWidget Q_DECL_FINAL : public QWidget {
   void resizeEvent(QResizeEvent *event) Q_DECL_FINAL;
   void paintEvent(QPaintEvent *event) Q_DECL_FINAL;
   void mousePressEvent(QMouseEvent *event) Q_DECL_FINAL;
+  void mouseMoveEvent(QMouseEvent *event) Q_DECL_FINAL;
   void wheelEvent(QWheelEvent *event) Q_DECL_FINAL;
+  void keyPressEvent(QKeyEvent *event) Q_DECL_FINAL;
 
  private slots:
   void OnIndexChanged(const ConfigManager &);
