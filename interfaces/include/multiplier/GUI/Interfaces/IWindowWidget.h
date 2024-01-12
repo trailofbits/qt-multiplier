@@ -6,11 +6,15 @@
 
 #pragma once
 
-#include <QCloseEvent>
-#include <QHideEvent>
-#include <QModelIndex>
-#include <QShowEvent>
 #include <QWidget>
+
+QT_BEGIN_NAMESPACE
+class QCloseEvent;
+class QHideEvent;
+class QKeySequence;
+class QModelIndex;
+class QShowEvent;
+QT_END_NAMESPACE
 
 namespace mx::gui {
 
@@ -42,6 +46,9 @@ class IWindowWidget : public QWidget {
 
   //! Request a secondary click action.
   void RequestSecondaryClick(const QModelIndex &index);
+
+  //! Request a key press action.
+  void RequestKeyPress(const QKeySequence &keys, const QModelIndex &index);
 };
 
 }  // namespace mx::gui

@@ -6,6 +6,7 @@
 
 #include <multiplier/GUI/Explorers/ReferenceExplorer.h>
 
+#include <multiplier/Index.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IReferenceExplorerPlugin.h>
 #include <multiplier/GUI/Interfaces/ITreeGenerator.h>
@@ -25,6 +26,8 @@ namespace mx::gui {
 struct ReferenceExplorer::PrivateData {
   ConfigManager &config_manager;
 
+  IWindowManager * const manager;
+
   // The tabbed reference explorer widget docked inside of the main window.
   TabWidget *view{nullptr};
   IWindowWidget *dock{nullptr};
@@ -32,11 +35,16 @@ struct ReferenceExplorer::PrivateData {
   // List of plugins.
   std::vector<IReferenceExplorerPluginPtr> plugins;
 
-  // Launches a reference explorer given a data generator.
-  TriggerHandle open_reference_explorer_trigger;
+  // Launches a code preview for the selected entity.
+  TriggerHandle open_entity_trigger;
 
-  inline PrivateData(ConfigManager &config_manager_)
-      : config_manager(config_manager_) {}
+  // Launches a code preview for the selected entity.
+  TriggerHandle preview_entity_trigger;
+
+  inline PrivateData(ConfigManager &config_manager_,
+                     IWindowManager *manager_)
+      : config_manager(config_manager_),
+        manager(manager_) {}
 };
 
 ReferenceExplorer::~ReferenceExplorer(void) {}
@@ -44,13 +52,19 @@ ReferenceExplorer::~ReferenceExplorer(void) {}
 ReferenceExplorer::ReferenceExplorer(ConfigManager &config_manager,
                                      IWindowManager *parent)
     : IMainWindowPlugin(config_manager, parent),
-      d(new PrivateData(config_manager)) {
+      d(new PrivateData(config_manager, parent)) {
 
-  d->open_reference_explorer_trigger = config_manager.ActionManager().Register(
+  auto &action_manager = config_manager.ActionManager();
+
+  action_manager.Register(
       this, "com.trailofbits.action.OpenReferenceExplorer",
       &ReferenceExplorer::OnOpenReferenceExplorer);
 
-  CreateDockWidget(parent);
+  d->open_entity_trigger = action_manager.Find(
+      "com.trailofbits.action.OpenEntity");
+
+  d->preview_entity_trigger = action_manager.Find(
+      "com.trailofbits.action.OpenEntityPreview");
 }
 
 // Act on a primary click. For example, if browse mode is enabled, then this
@@ -106,7 +120,7 @@ std::vector<NamedAction> ReferenceExplorer::ActOnKeyPressEx(
   return actions;
 }
 
-void ReferenceExplorer::CreateDockWidget(IWindowManager *manager) {
+void ReferenceExplorer::CreateDockWidget(void) {
   d->dock = new IWindowWidget;
   d->dock->setWindowTitle(tr("Reference Explorer"));
   d->dock->setContentsMargins(0, 0, 0, 0);
@@ -131,7 +145,7 @@ void ReferenceExplorer::CreateDockWidget(IWindowManager *manager) {
   config.id = "com.trailofbits.dock.ReferenceExplorer";
   config.location = IWindowManager::DockLocation::Bottom;
   config.app_menu_location = {tr("View"), tr("Explorers")};
-  manager->AddDockWidget(d->dock, config);
+  d->manager->AddDockWidget(d->dock, config);
 }
 
 void ReferenceExplorer::OnTabBarClose(int i) {
@@ -175,15 +189,25 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
     return;
   }
 
+  if (!d->view) {
+    CreateDockWidget();
+  }
+
+  d->view->show();
+
   auto tree_view = new TreeGeneratorWidget(d->config_manager, d->view);
+
   connect(tree_view, &TreeGeneratorWidget::OpenItem,
-          this, &IMainWindowPlugin::RequestPrimaryClick);
+          this, &ReferenceExplorer::OnOpenItem);
 
   connect(tree_view, &TreeGeneratorWidget::RequestSecondaryClick,
           this, &IMainWindowPlugin::RequestSecondaryClick);
 
   connect(tree_view, &TreeGeneratorWidget::RequestPrimaryClick,
           this, &ReferenceExplorer::OnSelectionChange);
+
+  connect(tree_view, &TreeGeneratorWidget::RequestPrimaryClick,
+          this, &IMainWindowPlugin::RequestPrimaryClick);
 
   tree_view->InstallGenerator(std::move(generator));
 
@@ -197,9 +221,22 @@ void ReferenceExplorer::AddPlugin(IReferenceExplorerPluginPtr plugin) {
   }
 }
 
-// Behavior depends on if the code previews are open or not.
+void ReferenceExplorer::OnOpenItem(const QModelIndex &index) {
+  auto entity = IModel::EntitySkipThroughTokens(index);
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
+
+  d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
+}
+
 void ReferenceExplorer::OnSelectionChange(const QModelIndex &index) {
-  (void) index;
+  auto entity = IModel::EntitySkipThroughTokens(index);
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
+
+  d->preview_entity_trigger.Trigger(QVariant::fromValue(entity));
 }
 
 }  // namespace mx::gui

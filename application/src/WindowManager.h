@@ -36,6 +36,8 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
 
   void OnPrimaryClick(const QModelIndex &index) Q_DECL_FINAL;
   void OnSecondaryClick(const QModelIndex &index) Q_DECL_FINAL;
+  void OnKeyPress(const QKeySequence &keys,
+                  const QModelIndex &index) Q_DECL_FINAL;
   
   QMainWindow *Window(void) const noexcept Q_DECL_FINAL;
 

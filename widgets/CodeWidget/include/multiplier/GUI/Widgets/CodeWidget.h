@@ -19,6 +19,7 @@
 
 QT_BEGIN_NAMESPACE
 class QKeyEvent;
+class QKeySequence;
 class QMouseEvent;
 class QPaintEvent;
 class QResizeEvent;
@@ -58,8 +59,9 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   virtual ~CodeWidget(void);
 
   CodeWidget(const ConfigManager &config_manager,
-             const TokenTree &token_tree,
              QWidget *parent = nullptr);
+
+  void SetTokenTree(const TokenTree &token_tree);
 
  protected:
   void resizeEvent(QResizeEvent *event) Q_DECL_FINAL;

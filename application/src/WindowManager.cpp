@@ -107,6 +107,26 @@ void WindowManager::AddCentralWidget(IWindowWidget *widget,
           [=, this] (void) {
             d->tab_widget->setCurrentWidget(widget);
           });
+
+  connect(widget, &IWindowWidget::Closed,
+          [=, this] (void) {
+            auto index = d->tab_widget->indexOf(widget);
+            if (index != -1) {
+              d->tab_widget->RemoveTab(index);
+            }
+          });
+
+  // If the widget requested a click, then do it.
+  connect(widget, &IWindowWidget::RequestPrimaryClick,
+          d->window, &MainWindow::OnRequestPrimaryClick);
+
+  // If the widget requested a context menu, then do it.
+  connect(widget, &IWindowWidget::RequestSecondaryClick,
+          d->window, &MainWindow::OnRequestSecondaryClick);
+
+  // If the widget requested a context menu, then do it.
+  connect(widget, &IWindowWidget::RequestKeyPress,
+          d->window, &MainWindow::OnRequestKeyPress);
 }
 
 void WindowManager::AddDockWidget(IWindowWidget *widget,
@@ -168,15 +188,15 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
 
   // If the widget requested a click, then do it.
   connect(widget, &IWindowWidget::RequestPrimaryClick,
-          [this] (const QModelIndex &index) {
-            d->window->OnRequestPrimaryClick(index);
-          });
+          d->window, &MainWindow::OnRequestPrimaryClick);
 
   // If the widget requested a context menu, then do it.
   connect(widget, &IWindowWidget::RequestSecondaryClick,
-          [this] (const QModelIndex &index) {
-            d->window->OnRequestSecondaryClick(index);
-          });
+          d->window, &MainWindow::OnRequestSecondaryClick);
+
+  // If the widget requested a context menu, then do it.
+  connect(widget, &IWindowWidget::RequestKeyPress,
+          d->window, &MainWindow::OnRequestKeyPress);
 
   // If the dock wants to be removed when closed then delete it.
   if (config.delete_on_close) {
@@ -220,6 +240,12 @@ void WindowManager::OnPrimaryClick(const QModelIndex &index) {
 //! Invoked when a secondary click happens on an `IModel`-compatible index.
 void WindowManager::OnSecondaryClick(const QModelIndex &index) {
   d->window->OnRequestSecondaryClick(index);
+}
+
+//! Invoked when a key press happens on an `IModel`-compatible index.
+void WindowManager::OnKeyPress(const QKeySequence &keys,
+                               const QModelIndex &index) {
+  d->window->OnRequestKeyPress(keys, index);
 }
 
 //! Return the application-level menu for a given menu name.

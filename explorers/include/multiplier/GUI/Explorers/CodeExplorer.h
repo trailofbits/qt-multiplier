@@ -31,11 +31,17 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void ActOnPrimaryClick(
       IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
 
-  void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
-                        const QModelIndex &index) Q_DECL_FINAL;
+  std::optional<NamedAction> ActOnSecondaryClick(
+      IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
+
+  std::optional<NamedAction> ActOnKeyPress(
+    IWindowManager *, const QKeySequence &keys,
+    const QModelIndex &index) Q_DECL_FINAL;
 
  private slots:
   void OnOpenEntity(const QVariant &data);
+  void OnPreviewEntity(const QVariant &data);
+  void OnPinnedPreviewEntity(const QVariant &data);
 
   void OnExpandMacro(RawEntityId entity_id);
 

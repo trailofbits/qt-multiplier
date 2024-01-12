@@ -6,10 +6,15 @@
 
 #pragma once
 
-#include <QModelIndex>
-#include <QMainWindow>
 #include <QObject>
 #include <QStringList>
+
+QT_BEGIN_NAMESPACE
+class QKeySequence;
+class QMainWindow;
+class QMenu;
+class QModelIndex;
+QT_END_NAMESPACE
 
 namespace mx::gui {
 
@@ -84,6 +89,9 @@ class IWindowManager : public QObject {
   //! Invoked when a secondary click happens on an `IModel`-compatible index.
   virtual void OnSecondaryClick(const QModelIndex &index) = 0;
 
+  //! Invoked when a key press happens on an `IModel`-compatible index.
+  virtual void OnKeyPress(const QKeySequence &keys,
+                          const QModelIndex &index) = 0;
 };
 
 }  // namespace mx::gui

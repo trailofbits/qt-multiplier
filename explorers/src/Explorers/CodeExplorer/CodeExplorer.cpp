@@ -6,21 +6,37 @@
 
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
 
+#include <QKeySequence>
+
+#include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Widgets/CodeWidget.h>
+#include <multiplier/GUI/Util.h>
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/Index.h>
 #include <unordered_map>
 
+#include "CodePreviewWidget.h"
+
 namespace mx::gui {
+namespace {
+
+static const QKeySequence kKeySeqP("P");
+static const QKeySequence kKeySeqShiftP("Shift+P");
+
+}  // namespace
 
 struct CodeExplorer::PrivateData {
   ConfigManager &config_manager;
   IWindowManager * const manager;
+  CodePreviewWidget *preview{nullptr};
 
   std::unordered_map<RawEntityId, CodeWidget *> opened_windows;
+
+  TriggerHandle open_preview_trigger;
+  TriggerHandle open_pinned_preview_trigger;
 
   inline PrivateData(ConfigManager &config_manager_,
                      IWindowManager *manager_)
@@ -35,10 +51,17 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
     : IMainWindowPlugin(config_manager, parent),
       d(new PrivateData(config_manager, parent)) {
 
-  qDebug() << "initializing code explorer";
   config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenEntity",
       &CodeExplorer::OnOpenEntity);
+
+  d->open_preview_trigger = config_manager.ActionManager().Register(
+      this, "com.trailofbits.action.OpenEntityPreview",
+      &CodeExplorer::OnPreviewEntity);
+
+  d->open_pinned_preview_trigger = config_manager.ActionManager().Register(
+      this, "com.trailofbits.action.OpenPinnedEntityPreview",
+      &CodeExplorer::OnPinnedPreviewEntity);
 }
 
 void CodeExplorer::ActOnPrimaryClick(IWindowManager *manager,
@@ -47,11 +70,41 @@ void CodeExplorer::ActOnPrimaryClick(IWindowManager *manager,
   (void) index;
 }
 
-void CodeExplorer::ActOnContextMenu(IWindowManager *manager, QMenu *menu,
-                                    const QModelIndex &index) {
-  (void) manager;
-  (void) menu;
-  (void) index;
+std::optional<NamedAction> CodeExplorer::ActOnKeyPress(
+    IWindowManager *, const QKeySequence &keys, const QModelIndex &index) {
+
+  TriggerHandle *handle = nullptr;
+  QString name;
+
+  if (keys == kKeySeqP) {
+    handle = &(d->open_preview_trigger);
+    name = tr("Open Preview");
+
+  } else if (keys == kKeySeqShiftP) {
+    handle = &(d->open_pinned_preview_trigger);
+    name = tr("Open Pinned Preview");
+
+  } else {
+    return std::nullopt;
+  }
+
+  auto entity = IModel::EntitySkipThroughTokens(index);
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return std::nullopt;
+  }
+
+  return NamedAction{name, *handle, QVariant::fromValue(entity)};
+}
+
+std::optional<NamedAction> CodeExplorer::ActOnSecondaryClick(
+    IWindowManager *, const QModelIndex &index) {
+  auto entity = IModel::EntitySkipThroughTokens(index);
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return std::nullopt;
+  }
+
+  return NamedAction{tr("Open Pinned Preview"), d->open_pinned_preview_trigger,
+                     QVariant::fromValue(entity)};
 }
 
 void CodeExplorer::OnOpenEntity(const QVariant &data) {
@@ -75,36 +128,100 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
   })();
 
   auto &code_widget = d->opened_windows[id];
-  if (!code_widget) {
-    code_widget = new CodeWidget(d->config_manager, tt);
-
-    // Figure out the window title.
-    if (file) {
-      for (auto path : file->paths()) {
-        code_widget->setWindowTitle(QString::fromStdString(
-            path.filename().generic_string()));
-        break;
-      }
-    } else {
-      // TODO(pag): Choose top-level entity?
-    }
-
-    connect(code_widget, &IWindowWidget::Closed,
-            [=, this] (void) {
-              d->opened_windows.erase(id);
-            });
-
-    connect(code_widget, &CodeWidget::RequestPrimaryClick,
-            d->manager, &IWindowManager::OnPrimaryClick);
-
-    connect(code_widget, &CodeWidget::RequestSecondaryClick,
-            d->manager, &IWindowManager::OnSecondaryClick);
-
-    IWindowManager::CentralConfig config;
-    d->manager->AddCentralWidget(code_widget, config);
-  } else {
+  if (code_widget) {
     code_widget->show();
+    return;
   }
+  code_widget = new CodeWidget(d->config_manager);
+
+  // Figure out the window title.
+  if (file) {
+    for (auto path : file->paths()) {
+      code_widget->setWindowTitle(QString::fromStdString(
+          path.filename().generic_string()));
+      break;
+    }
+  } else {
+    // TODO(pag): Choose top-level entity?
+  }
+
+  code_widget->SetTokenTree(tt);
+
+  connect(code_widget, &IWindowWidget::Closed,
+          [=, this] (void) {
+            d->opened_windows.erase(id);
+          });
+
+  IWindowManager::CentralConfig config;
+  d->manager->AddCentralWidget(code_widget, config);
+}
+
+void CodeExplorer::OnPreviewEntity(const QVariant &data) {
+  if (data.isNull() || !data.canConvert<VariantEntity>()) {
+    return;
+  }
+
+  VariantEntity entity = data.value<VariantEntity>();
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
+
+  if (!d->preview) {
+    d->preview = new CodePreviewWidget(d->config_manager, true);
+
+    // When the user navigates the history, make sure that we change what the
+    // view shows.
+    connect(d->preview, &CodePreviewWidget::HistoricalEntitySelected,
+            [this] (VariantEntity entity) {
+              d->preview->DisplayEntity(
+                  std::move(entity), true  /* explicit request */,
+                  false  /* add to history */);
+            });
+  
+    IWindowManager::DockConfig config;
+    config.id = "com.trailofbits.dock.CodePreview";
+    config.location = IWindowManager::DockLocation::Bottom;
+    config.app_menu_location = {tr("View")};
+    d->manager->AddDockWidget(d->preview, config);
+  }
+
+  d->preview->DisplayEntity(
+      std::move(entity), false  /* implicit (click) request */,
+      true  /* add to history */);
+}
+
+void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
+  if (data.isNull() || !data.canConvert<VariantEntity>()) {
+    return;
+  }
+
+  VariantEntity entity = data.value<VariantEntity>();
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
+  }
+
+  auto preview = new CodePreviewWidget(d->config_manager, false);
+
+  connect(preview, &CodePreviewWidget::RequestPrimaryClick,
+          this, &IMainWindowPlugin::RequestPrimaryClick);
+
+  connect(preview, &CodePreviewWidget::RequestSecondaryClick,
+          this, &IMainWindowPlugin::RequestSecondaryClick);
+
+  if (auto name = NameOfEntityAsString(entity)) {
+    preview->setWindowTitle(
+        tr("Preview of `%1`").arg(name.value()));
+  }
+
+  preview->DisplayEntity(
+      std::move(entity), true  /* explicit request */,
+      false  /* don't add to history */);
+
+  IWindowManager::DockConfig config;
+  config.id = "com.trailofbits.dock.PinnedCodePreview";
+  config.location = IWindowManager::DockLocation::Right;
+  config.delete_on_close = true;
+  d->manager->AddDockWidget(preview, config);
 }
 
 void CodeExplorer::OnExpandMacro(RawEntityId entity_id) {

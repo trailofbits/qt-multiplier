@@ -6,15 +6,17 @@
 
 #pragma once
 
-#include <QKeySequence>
-#include <QMainWindow>
-#include <QMenu>
-#include <QModelIndex>
 #include <QObject>
 
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <optional>
 #include <vector>
+
+QT_BEGIN_NAMESPACE
+class QKeySequence;
+class QMenu;
+class QModelIndex;
+QT_END_NAMESPACE
 
 namespace mx::gui {
 
@@ -77,6 +79,12 @@ class IMainWindowPlugin : public QObject {
   //! menu for a `QModelIndex` whose model follows the `IModel` interface, and
   //! thus could benefit from allowing other plugins to see the index.
   void RequestSecondaryClick(const QModelIndex &index);
+
+  //! Signal emitted when some nested plugin widget wants to signal a key
+  //! press action for a `QModelIndex` whose model follows the `IModel`
+  //! interface, and thus could benefit from allowing other plugins to see the
+  //! index.
+  void RequestKeyPress(const QKeySequence &keys, const QModelIndex &index);
 };
 
 }  // namespace mx::gui

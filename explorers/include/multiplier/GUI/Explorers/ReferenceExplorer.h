@@ -45,7 +45,7 @@ class ReferenceExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   }
 
  private:
-  void CreateDockWidget(IWindowManager *parent);
+  void CreateDockWidget(void);
   friend class IReferenceExplorerPlugin;
 
   void OnOpenReferenceExplorer(const QVariant &data);
@@ -54,6 +54,7 @@ class ReferenceExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void OnTabBarClose(int index);
   void OnTabBarDoubleClick(int index);
   void OnSelectionChange(const QModelIndex &index);
+  void OnOpenItem(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

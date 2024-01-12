@@ -25,6 +25,8 @@ add_library("mx_explorers"
   src/Interfaces/IReferenceExplorerPlugin.cpp
 
   src/Explorers/CodeExplorer/CodeExplorer.cpp
+  src/Explorers/CodeExplorer/CodePreviewWidget.cpp
+  src/Explorers/CodeExplorer/CodePreviewWidget.h
 
   src/Explorers/EntityExplorer/CategoryComboBox.cpp
   src/Explorers/EntityExplorer/CategoryComboBox.h

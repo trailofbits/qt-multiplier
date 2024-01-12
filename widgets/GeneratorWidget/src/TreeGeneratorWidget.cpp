@@ -105,7 +105,6 @@ void TreeGeneratorWidget::InstallModel(void) {
   auto tree_selection_model = d->tree_widget->selectionModel();
   connect(tree_selection_model, &QItemSelectionModel::currentChanged,
           [this] (const QModelIndex &a, const QModelIndex &b) {
-            qDebug() << "currentChanged";
             OnCurrentItemChanged(a, b);
           });
 
@@ -562,7 +561,6 @@ void TreeGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
 }
 
 void TreeGeneratorWidget::OnOpenItemContextMenu(const QPoint &point) {
-  qDebug() << "Context menu";
   auto index = d->tree_widget->indexAt(point);
   d->selected_index = d->model_proxy->mapToSource(index);
   if (!d->selected_index.isValid()) {

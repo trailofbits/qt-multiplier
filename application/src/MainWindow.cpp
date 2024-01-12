@@ -86,11 +86,14 @@ void MainWindow::InitializePlugins(void) {
   d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
 
   for (const auto &plugin : d->plugins) {
+    connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
+            this, &MainWindow::OnRequestPrimaryClick);
+
     connect(plugin.get(), &IMainWindowPlugin::RequestSecondaryClick,
             this, &MainWindow::OnRequestSecondaryClick);
 
-    connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
-            this, &MainWindow::OnRequestPrimaryClick);
+    connect(plugin.get(), &IMainWindowPlugin::RequestKeyPress,
+            this, &MainWindow::OnRequestKeyPress);
   }
 }
 
@@ -183,6 +186,44 @@ void MainWindow::OnRequestPrimaryClick(const QModelIndex &index) {
   for (const auto &plugin : d->plugins) {
     plugin->ActOnPrimaryClick(d->window_manager, index);
   }
+}
+
+
+//! Invoked on an index whose underlying model follows the `IModel` interface.
+void MainWindow::OnRequestKeyPress(
+    const QKeySequence &keys, const QModelIndex &index) {
+  
+  std::vector<NamedAction> actions;
+
+  for (const auto &plugin : d->plugins) {
+    auto plugin_actions = plugin->ActOnKeyPressEx(
+        d->window_manager, keys, index);
+    actions.insert(actions.end(),
+                   std::make_move_iterator(plugin_actions.begin()),
+                   std::make_move_iterator(plugin_actions.end()));
+  }
+
+  if (actions.empty()) {
+    return;
+  }
+
+  if (actions.size() == 1u) {
+    actions[0].action.Trigger(actions[0].data);
+    return;
+  }
+
+  QMenu key_menu(tr("Key Press Menu"));
+  for (auto &plugin_action : actions) {
+    auto action = new QAction(plugin_action.name, &key_menu);
+    connect(
+        action, &QAction::triggered,
+        [trigger = std::move(plugin_action.action),
+         data = std::move(plugin_action.data)] (void) {
+          trigger.Trigger(data);
+        });
+    key_menu.addAction(action);
+  }
+  key_menu.exec(QCursor::pos());
 }
 
 }  // namespace mx::gui

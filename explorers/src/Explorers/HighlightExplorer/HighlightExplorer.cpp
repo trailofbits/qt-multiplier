@@ -9,6 +9,7 @@
 #include <QColor>
 #include <QColorDialog>
 #include <QListView>
+#include <QMenu>
 #include <QPoint>
 #include <QVBoxLayout>
 

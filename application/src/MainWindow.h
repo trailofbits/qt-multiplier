@@ -41,6 +41,9 @@ class MainWindow Q_DECL_FINAL : public QMainWindow {
 
   //! Invoked on an index whose underlying model follows the `IModel` interface.
   void OnRequestPrimaryClick(const QModelIndex &index);
+
+  //! Invoked on an index whose underlying model follows the `IModel` interface.
+  void OnRequestKeyPress(const QKeySequence &keys, const QModelIndex &index);
 };
 
 }  // namespace mx::gui

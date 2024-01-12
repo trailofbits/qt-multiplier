@@ -12,6 +12,7 @@
 #include <QFontMetricsF>
 #include <QHBoxLayout>
 #include <QImage>
+#include <QKeySequence>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QPainter>
@@ -307,7 +308,7 @@ struct CodeWidget::PrivateData {
   IThemePtr theme;
 
   // Source of data that we're rendering.
-  const TokenTree token_tree;
+  TokenTree token_tree;
 
   // Size of the visible viewport area for this widget.
   QRect viewport;
@@ -347,6 +348,7 @@ struct CodeWidget::PrivateData {
 
   TokenModel primary_click_model;
   TokenModel secondary_click_model;
+  TokenModel key_press_model;
 
   // Data structure keeping track of the logical things to render, and
   // where to render them. The act of rendering updates `Entity`s in the
@@ -365,9 +367,8 @@ struct CodeWidget::PrivateData {
   QScrollBar *horizontal_scrollbar{nullptr};
   QScrollBar *vertical_scrollbar{nullptr};
 
-  inline PrivateData(const TokenTree &token_tree_)
-      : token_tree(token_tree_),
-        monospace(" "),
+  inline PrivateData(void)
+      : monospace(" "),
         to(Qt::AlignLeft),
         dpi_ratio(qApp->devicePixelRatio()) {}
 
@@ -605,10 +606,9 @@ const Entity *CodeWidget::PrivateData::EntityUnderCursor(QPointF point) const {
 CodeWidget::~CodeWidget(void) {}
 
 CodeWidget::CodeWidget(const ConfigManager &config_manager,
-                       const TokenTree &token_tree,
                        QWidget *parent)
     : IWindowWidget(parent),
-      d(new PrivateData(token_tree)) {
+      d(new PrivateData) {
 
   // d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
   // d->vertical_scrollbar->setSingleStep(1);
@@ -637,7 +637,6 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   // setLayout(horizontal_layout);
 
   setContentsMargins(0, 0, 0, 0);
-
   setFocusPolicy(Qt::StrongFocus);
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
@@ -789,6 +788,7 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
   d->primary_click_model.token = {};
   d->secondary_click_model.token = {};
+  d->key_press_model.token = {};
 
   // Calculate the index of the current line.
   if (event->buttons() & Qt::LeftButton) {
@@ -849,6 +849,25 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
     case Qt::Key_Right:
       break;
     default:
+      if (d->current_entity && d->primary_click_model.token) {
+        QString modifier;
+        if (event->modifiers() & Qt::ShiftModifier) {
+          modifier += "Shift+";
+        }
+        if (event->modifiers() & Qt::ControlModifier) {
+          modifier += "Ctrl+";
+        }
+        if (event->modifiers() & Qt::AltModifier) {
+          modifier += "Alt+";
+        }
+        if (event->modifiers() & Qt::MetaModifier) {
+          modifier += "Meta+";
+        }
+
+        emit RequestKeyPress(
+            QKeySequence(modifier + QKeySequence(event->key()).toString()),
+            d->CreateModelIndex(d->key_press_model, d->current_entity));
+      }
       break;
   }
 
@@ -1071,10 +1090,9 @@ void CodeWidget::PrivateData::PaintToken(
   }
 }
 
-void CodeWidget::OnIndexChanged(const ConfigManager &config_manager) {
-  // d->model->Reset();
-
-  (void) config_manager;
+void CodeWidget::OnIndexChanged(const ConfigManager &) {
+  SetTokenTree({});
+  close();
 }
 
 void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
@@ -1142,6 +1160,21 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity) {
     d->scene_overrides.insert(frag->id().Pack());
   }
 
+  update();
+}
+
+void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
+  d->scene_changed = true;
+  d->canvas_changed = true;
+  d->current_entity = nullptr;
+  d->primary_click_model.token = {};
+  d->secondary_click_model.token = {};
+  d->key_press_model.token = {};
+  d->scroll_x = 0;
+  d->scroll_y = 0;
+  d->current_line_index = -1;
+  d->scene_overrides.clear();
+  d->token_tree = token_tree;
   update();
 }
 

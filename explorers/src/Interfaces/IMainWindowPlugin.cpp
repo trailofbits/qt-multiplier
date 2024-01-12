@@ -7,6 +7,8 @@
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 
 #include <QAction>
+#include <QMainWindow>
+#include <QMenu>
 
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>

@@ -410,8 +410,8 @@ void EntityInformationWidget::DisplayEntity(
 
         // If we're showing the history widget then keep track of the history.
         if (add_to_history && d->history) {
-          d->history->SetCurrentLocation(d->current_entity);
           d->history->CommitCurrentLocationToHistory();
+          d->history->SetCurrentLocation(d->current_entity);
         }
       }
 
