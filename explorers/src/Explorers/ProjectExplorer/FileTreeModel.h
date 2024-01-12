@@ -67,6 +67,10 @@ class FileTreeModel Q_DECL_FINAL : public IModel {
 
   //! Returns the index data for the specified role
   virtual QVariant data(const QModelIndex &index, int role) const Q_DECL_FINAL;
+
+  inline static QString ConstantModelId(void) {
+    return "com.trailofbits.explorer.ProjectExplorer.FileTreeModel";
+  }
 };
 
 }  // namespace mx::gui

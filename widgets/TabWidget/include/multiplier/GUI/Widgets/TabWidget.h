@@ -16,9 +16,6 @@ namespace mx::gui {
 class TabWidget final : public QTabWidget {
   Q_OBJECT
 
-  struct PrivateData;
-  std::unique_ptr<PrivateData> d;
-
   using QTabWidget::addTab;
   using QTabWidget::insertTab;
   using QTabWidget::removeTab;
@@ -32,8 +29,8 @@ class TabWidget final : public QTabWidget {
   //! Destructor
   virtual ~TabWidget(void);
 
-  void AddTab(QWidget *widget);
-  void InsertTab(int index, QWidget *widget);
+  void AddTab(QWidget *widget, bool update_title=true);
+  void InsertTab(int index, QWidget *widget, bool update_title=true);
   void RemoveTab(int index);
 };
 

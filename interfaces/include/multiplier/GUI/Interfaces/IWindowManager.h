@@ -54,6 +54,18 @@ class IWindowManager : public QObject {
     QStringList app_menu_location;
   };
 
+  struct CentralConfig {
+    //! ID of this central widget, e.g. `com.trailofbits.dock.EntityExplorer`.
+    //! This is optional and can be left empty.
+    QString id;
+
+    //! Should the dock title change with the widget title?
+    bool keep_title_up_to_date{true};
+  };
+
+  virtual void AddCentralWidget(IWindowWidget *widget,
+                                const CentralConfig &config) = 0;
+
   //! Adds a dock widget to the window manager.
   virtual void AddDockWidget(IWindowWidget *widget,
                              const DockConfig &config) = 0;

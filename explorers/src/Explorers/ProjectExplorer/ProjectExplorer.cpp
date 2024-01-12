@@ -64,7 +64,7 @@ void ProjectExplorer::CreateDockWidget(IWindowManager *manager) {
 void ProjectExplorer::ActOnPrimaryClick(
     IWindowManager *, const QModelIndex &index) {
 
-  if (!d->view || !index.isValid() || index.model() != d->model) {
+  if (IModel::ModelId(index) != FileTreeModel::ConstantModelId()) {
     return;
   }
 

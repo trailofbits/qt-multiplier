@@ -10,8 +10,10 @@
 #include <QMap>
 #include <QMenu>
 #include <QMenuBar>
+#include <QTabBar>
 
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
+#include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Widgets/TabWidget.h>
 #include <unordered_map>
 
@@ -34,13 +36,15 @@ static  Qt::DockWidgetArea ConvertLocation(IWindowManager::DockLocation loc) {
 
 struct WindowManager::PrivateData {
   MainWindow * const window;
+  TabWidget * const tab_widget;
 
   std::unordered_map<QDockWidget *, DockConfig> dock_configs;
 
   QMap<QString, QMenu *> app_menus;
 
   inline PrivateData(MainWindow *parent)
-      : window(parent) {}
+      : window(parent),
+        tab_widget(new TabWidget(parent)) {}
 };
 
 WindowManager::~WindowManager(void) {}
@@ -56,11 +60,53 @@ WindowManager::WindowManager(MainWindow *window)
   window->setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
   window->setDocumentMode(false);
 
-  // auto tab_widget = new TabWidget(window);
-  // tab_widget->setTabsClosable(true);
-  // tab_widget->setDocumentMode(true);
-  // tab_widget->setTabBarAutoHide(false);
-  // window->setCentralWidget(tab_widget);
+  connect(d->tab_widget->tabBar(), &QTabBar::tabCloseRequested,
+          this, &WindowManager::OnTabBarClose);
+
+  connect(d->tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
+          this, &WindowManager::OnTabBarDoubleClick);
+
+  d->tab_widget->setTabsClosable(true);
+  d->tab_widget->setDocumentMode(true);
+  d->tab_widget->setTabBarAutoHide(false);
+  window->setCentralWidget(d->tab_widget);
+}
+
+void WindowManager::OnTabBarClose(int i) {
+  auto widget = d->tab_widget->widget(i);
+  d->tab_widget->RemoveTab(i);
+  widget->close();
+}
+
+void WindowManager::OnTabBarDoubleClick(int i) {
+  auto current_tab_name = d->tab_widget->tabText(i);
+
+  SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,
+                               d->tab_widget);
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  const auto &opt_tab_name = dialog.TextInput();
+
+  QString new_tab_name;
+  if (opt_tab_name.has_value()) {
+    new_tab_name = opt_tab_name.value();
+  } else {
+    new_tab_name = tr("Reference Browser #") + QString::number(i);
+  }
+
+  d->tab_widget->setTabText(i, new_tab_name);
+}
+
+void WindowManager::AddCentralWidget(IWindowWidget *widget,
+                                     const CentralConfig &config) {
+  d->tab_widget->InsertTab(0, widget, config.keep_title_up_to_date);
+
+  connect(widget, &IWindowWidget::Shown,
+          [=, this] (void) {
+            d->tab_widget->setCurrentWidget(widget);
+          });
 }
 
 void WindowManager::AddDockWidget(IWindowWidget *widget,

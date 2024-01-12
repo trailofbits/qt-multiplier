@@ -118,4 +118,8 @@ TokenRange IModel::TokensToDisplay(const QModelIndex &index) {
   return var.value<TokenRange>();
 }
 
+QString IModel::ModelId(const QModelIndex &index) {
+  return index.data(ModelIdRole).toString();
+}
+
 }  // namespace mx::gui

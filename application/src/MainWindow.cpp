@@ -13,6 +13,7 @@
 #include <QMenuBar>
 
 #include <multiplier/Frontend/TokenTree.h>
+#include <multiplier/GUI/Explorers/CodeExplorer.h>
 #include <multiplier/GUI/Explorers/EntityExplorer.h>
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
 #include <multiplier/GUI/Explorers/InformationExplorer.h>
@@ -25,7 +26,6 @@
 #include <multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h>
 #include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
-#include <multiplier/GUI/Widgets/CodeWidget.h>
 #include <multiplier/Index.h>
 #include <vector>
 
@@ -61,10 +61,10 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
   InitializeIndex(application);
   InitializeDocks();
   InitializePlugins();
-  auto file = d->config_manager.Index().file(1152921504606847251ull);
-  auto code = new CodeWidget(d->config_manager, TokenTree::from(file.value()),
-                             this);
-  setCentralWidget(code);
+  // auto file = d->config_manager.Index().file(1152921504606847251ull);
+  // auto code = new CodeWidget(d->config_manager, TokenTree::from(file.value()),
+  //                            this);
+  // setCentralWidget(code);
 }
 
 void MainWindow::InitializePlugins(void) {
@@ -83,6 +83,7 @@ void MainWindow::InitializePlugins(void) {
   d->plugins.emplace_back(ref_explorer);
 
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
 
   for (const auto &plugin : d->plugins) {
     connect(plugin.get(), &IMainWindowPlugin::RequestSecondaryClick,

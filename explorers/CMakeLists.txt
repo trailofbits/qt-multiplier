@@ -7,6 +7,7 @@
 #
 
 add_library("mx_explorers"
+  include/multiplier/GUI/Explorers/CodeExplorer.h
   include/multiplier/GUI/Explorers/EntityExplorer.h
   include/multiplier/GUI/Explorers/HighlightExplorer.h
   include/multiplier/GUI/Explorers/InformationExplorer.h
@@ -22,6 +23,8 @@ add_library("mx_explorers"
   src/Interfaces/IInformationExplorerPlugin.cpp
   src/Interfaces/IMainWindowPlugin.cpp
   src/Interfaces/IReferenceExplorerPlugin.cpp
+
+  src/Explorers/CodeExplorer/CodeExplorer.cpp
 
   src/Explorers/EntityExplorer/CategoryComboBox.cpp
   src/Explorers/EntityExplorer/CategoryComboBox.h
@@ -55,6 +58,7 @@ add_library("mx_explorers"
 target_link_libraries("mx_explorers"
   PRIVATE
     "mx_action_manager"
+    "mx_code_widget"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_generator_widget"

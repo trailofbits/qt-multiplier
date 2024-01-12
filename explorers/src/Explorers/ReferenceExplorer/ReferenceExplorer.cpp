@@ -188,7 +188,6 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
   tree_view->InstallGenerator(std::move(generator));
 
   d->view->InsertTab(0, tree_view);
-  d->view->setCurrentIndex(0);
   d->dock->show();
 }
 

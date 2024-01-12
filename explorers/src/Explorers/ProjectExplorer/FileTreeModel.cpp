@@ -253,12 +253,12 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
   } else if (role == IModel::EntityRole) {
     if (node->file_id != kInvalidEntityId) {
       if (auto file = d->index.file(node->file_id)) {
-        return QVariant::fromValue(VariantEntity(std::move(file.value())));
+        return QVariant::fromValue<VariantEntity>(file.value());
       }
     }
 
   } else if (role == IModel::ModelIdRole) {
-    return "com.trailofbits.explorer.ProjectExplorer.FileTreeModel";
+    return ConstantModelId();
   
   } else if (role == IModel::TokenRangeDisplayRole) {
     if (node->file_id != kInvalidEntityId) {

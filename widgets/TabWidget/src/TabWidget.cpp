@@ -8,67 +8,48 @@
 
 #include <multiplier/GUI/Widgets/TabWidget.h>
 
-#include <QTimer>
-
 #include <unordered_map>
 
 #include "TabBar.h"
 
 namespace mx::gui {
 
-struct TabWidget::PrivateData {
-  std::unordered_map<QWidget *, std::pair<int, QTimer>> title_update_timers;
-};
-
 TabWidget::~TabWidget(void) {}
 
 TabWidget::TabWidget(QWidget *parent)
-    : QTabWidget(parent),
-      d(new PrivateData) {
+    : QTabWidget(parent) {
   setTabBar(new TabBar(this));
 }
 
 void TabWidget::TrackTitle(QWidget *widget) {
-  auto &timer = d->title_update_timers[widget];
-  connect(&(timer.second), &QTimer::timeout,
-          [=, this] (void) {
+  connect(widget, &QWidget::windowTitleChanged,
+          [=, this] (const QString &new_title) {
             auto index = indexOf(widget);
-            if (index == -1) {
-              d->title_update_timers.erase(widget);
-              return;
-            }
-
-            auto &entry = d->title_update_timers[widget];
-            auto title = widget->windowTitle();
-            setTabText(index, title);
-
-            if (title.isEmpty()) {
-              if (++entry.first < 10) {
-                entry.second.start(100);
-              } else {
-                d->title_update_timers.erase(widget);
-              }
+            if (index != -1) {
+              setTabText(index, new_title);
             }
           });
-
-  timer.second.start(100);
 }
 
-void TabWidget::AddTab(QWidget *widget) {
+void TabWidget::AddTab(QWidget *widget, bool update_title) {
+  auto index = count();
   addTab(widget, widget->windowTitle());
-  TrackTitle(widget);
-  
+  if (update_title) {
+    TrackTitle(widget);
+  }
+  setCurrentIndex(index);
 }
 
-void TabWidget::InsertTab(int index, QWidget *widget) {
+void TabWidget::InsertTab(int index, QWidget *widget, bool update_title) {
   insertTab(index, widget, widget->windowTitle());
-  TrackTitle(widget);
+  if (update_title) {
+    TrackTitle(widget);
+  }
+  setCurrentIndex(0);
 }
 
 void TabWidget::RemoveTab(int index) {
   if (auto tab = widget(index)) {
-    d->title_update_timers[tab].second.stop();
-    d->title_update_timers.erase(tab);
     removeTab(index);
   }
 }

@@ -29,6 +29,8 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
 
   explicit WindowManager(MainWindow *window);
 
+  void AddCentralWidget(IWindowWidget *widget,
+                                const CentralConfig &config) Q_DECL_FINAL;
   void AddDockWidget(IWindowWidget *widget,
                      const DockConfig &config) Q_DECL_FINAL;
 
@@ -41,6 +43,10 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
 
  private:
   void RemoveDockWidget(QDockWidget *dock_widget);
+
+ private slots:
+  void OnTabBarClose(int i);
+  void OnTabBarDoubleClick(int i);
 };
 
 }  // namespace mx::gui

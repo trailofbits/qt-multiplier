@@ -42,6 +42,8 @@ class IModel : public QAbstractItemModel {
   static VariantEntity EntitySkipThroughTokens(const QModelIndex &index);
 
   static TokenRange TokensToDisplay(const QModelIndex &index);
+
+  static QString ModelId(const QModelIndex &index);
 };
 
 }  // namespace mx::gui
