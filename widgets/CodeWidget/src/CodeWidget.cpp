@@ -938,14 +938,15 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   // Use a painter for also figuring out the maximum character size, as a
   // bounding rect from a painter could be bigger.
   {
-    QPainter p;
+    QPixmap dummy_pixmap(max_char_width * 4, line_height * 4);
+    QPainter p(&dummy_pixmap);
     p.setFont(bold_italic_font);
     max_char_width = std::max(
         max_char_width,
         static_cast<int>(std::ceil(
             p.boundingRect(
                 QRectF(max_char_width, line_height,
-                       max_char_width * 4, line_height * 4),
+                       max_char_width * 3, line_height * 3),
                 "W", to).width())));
   }
 

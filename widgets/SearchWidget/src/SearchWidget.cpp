@@ -157,8 +157,7 @@ void SearchWidget::InitializeWidgets(void) {
                              QLineEdit::TrailingPosition);
 
   d->whole_word_search_action =
-      new QAction(QPixmap(":/SearchWidget/search_icon_whole_word"),
-                  tr("Enable whole word search"));
+      new QAction(QIcon(), tr("Enable whole word search"));
 
   d->whole_word_search_action->setCheckable(true);
   d->whole_word_search_action->setChecked(false);
@@ -167,7 +166,7 @@ void SearchWidget::InitializeWidgets(void) {
                              QLineEdit::TrailingPosition);
 
   d->regex_search_action = new QAction(
-      QPixmap(":/SearchWidget/search_icon_regex"), tr("Enable regex search"));
+      QIcon(), tr("Enable regex search"));
 
   d->regex_search_action->setCheckable(true);
   d->regex_search_action->setChecked(false);
@@ -378,7 +377,7 @@ void SearchWidget::OnShowNextResult(void) {
 
 //! Loads the required icons from the resources
 void SearchWidget::LoadIcons(const MediaManager &media_manager) {
-  d->search_icon = media_manager.Pixmap(":/SearchWidget/search_icon");
+  d->search_icon = media_manager.Pixmap("com.trailofbits.icon.Search");
 
   d->enabled_case_sensitive_search = media_manager.Pixmap(
       "com.trailofbits.icon.CaseSensitiveSearch",
