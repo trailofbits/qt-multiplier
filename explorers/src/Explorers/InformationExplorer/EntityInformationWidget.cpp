@@ -151,7 +151,7 @@ EntityInformationWidget::EntityInformationWidget(
 
   setWindowTitle(tr("Information Explorer"));
   d->tree->setModel(d->sort_model);
-
+  d->tree->setHeaderHidden(true);
   d->tree->setSortingEnabled(true);
   d->tree->sortByColumn(0, Qt::AscendingOrder);
 

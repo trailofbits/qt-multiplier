@@ -14,6 +14,7 @@
 #include <QWidget>
 
 #include <memory>
+#include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/Index.h>
 
 QT_BEGIN_NAMESPACE
@@ -47,7 +48,7 @@ class ThemeManager;
 //       asks the main layout to add main widgets (files), which the window
 //       manager manages as tabs.
 
-class CodeWidget Q_DECL_FINAL : public QWidget {
+class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   Q_OBJECT
 
   struct PrivateData;

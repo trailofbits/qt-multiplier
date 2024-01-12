@@ -28,6 +28,7 @@
 #include <multiplier/Frontend/MacroSubstitution.h>
 #include <multiplier/Frontend/MacroVAOpt.h>
 #include <multiplier/Frontend/TokenTree.h>
+#include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
@@ -232,6 +233,72 @@ struct SceneBuilder {
   }
 };
 
+// Dummy model to expose tokens to other stuff.
+class TokenModel Q_DECL_FINAL : public IModel {
+  Q_OBJECT
+
+ public:
+  Token token;
+  QString text;
+
+  virtual ~TokenModel(void) = default;
+
+  TokenModel(QObject *parent = nullptr)
+      : IModel(parent) {}
+
+  QModelIndex index(
+      int row, int column, const QModelIndex &parent) const Q_DECL_FINAL {
+    if (!row && !column && !parent.isValid() && token) {
+      return createIndex(0, 0, token.id().Pack());
+    }
+    return {};
+  }
+
+  //! Returns the parent of the given model index
+  QModelIndex parent(const QModelIndex &) const Q_DECL_FINAL {
+    return {};
+  }
+
+  //! Returns the amount or rows in the model
+  //! Since this is a tree model, rows are intended as child items
+  int rowCount(const QModelIndex &parent) const Q_DECL_FINAL {
+    return parent.isValid() || !token ? 0 : 1;
+  }
+
+  //! Returns the amount of columns in the model
+  int columnCount(const QModelIndex &parent) const Q_DECL_FINAL {
+    return parent.isValid() || !token ? 0 : 1;
+  }
+
+  //! Returns the index data for the specified role
+  //! \todo Fix role=TokenCategoryRole support
+  QVariant data(const QModelIndex &index, int role) const Q_DECL_FINAL {
+    if (index.column() != 0 || index.row() != 0 ||
+        index.internalId() != token.id().Pack()) {
+      return {};
+    }
+
+    if (token) {
+      switch (role) {
+        case IModel::EntityRole:
+          return QVariant::fromValue<VariantEntity>(token);
+        case IModel::TokenRangeDisplayRole:
+          return QVariant::fromValue<TokenRange>(token);
+        case IModel::ModelIdRole:
+          return "com.trailofbits.model.CodeWidget.TokenModel";
+        case Qt::DisplayRole:
+          return text;
+      }
+    }
+    return {};
+  }
+
+  //! Returns the column names for the tree view header
+  QVariant headerData(int, Qt::Orientation, int) const Q_DECL_FINAL {
+    return {};
+  }
+};
+
 }  // namespace
 
 struct CodeWidget::PrivateData {
@@ -278,6 +345,9 @@ struct CodeWidget::PrivateData {
   // The current entity under the cursor.
   const Entity *current_entity{nullptr};
 
+  TokenModel primary_click_model;
+  TokenModel secondary_click_model;
+
   // Data structure keeping track of the logical things to render, and
   // where to render them. The act of rendering updates `Entity`s in the
   // scene to keep track of their physical locations within `*_canvas`.
@@ -322,6 +392,16 @@ struct CodeWidget::PrivateData {
   void ScrollBy(int horizontal_pixel_delta, int vertical_pixel_delta);
 
   const Entity *EntityUnderCursor(QPointF point) const;
+
+  QModelIndex CreateModelIndex(TokenModel &model, const Entity *entity) {
+    if (!entity) {
+      return {};
+    }
+
+    model.token = scene.tokens[entity->token_index];
+    model.text = scene.data[entity->data_index_and_config >> 2u].text;
+    return model.index(0, 0, {});
+  }
 };
 
 // Import a choice node.
@@ -527,7 +607,7 @@ CodeWidget::~CodeWidget(void) {}
 CodeWidget::CodeWidget(const ConfigManager &config_manager,
                        const TokenTree &token_tree,
                        QWidget *parent)
-    : QWidget(parent),
+    : IWindowWidget(parent),
       d(new PrivateData(token_tree)) {
 
   // d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
@@ -707,6 +787,9 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
   const Entity *entity = d->EntityUnderCursor(rel_position);
 
+  d->primary_click_model.token = {};
+  d->secondary_click_model.token = {};
+
   // Calculate the index of the current line.
   if (event->buttons() & Qt::LeftButton) {
     auto new_current_line_index = static_cast<int>(std::floor(y / d->line_height));
@@ -715,6 +798,12 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
     }
 
     d->current_entity = entity;
+    emit RequestPrimaryClick(
+        d->CreateModelIndex(d->primary_click_model, entity));
+
+  } else if (event->buttons() & Qt::RightButton) {
+    emit RequestSecondaryClick(
+        d->CreateModelIndex(d->secondary_click_model, entity));
   }
 
   update();
@@ -917,7 +1006,7 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 
   fg_painter.end();
   bg_painter.end();
-  
+
   foreground_canvas.swap(fg);
   background_canvas.swap(bg);
 }
@@ -1057,3 +1146,5 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity) {
 }
 
 }  // namespace mx::gui
+
+#include "CodeWidget.moc"
