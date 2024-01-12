@@ -148,6 +148,14 @@ void ThemedItemDelegate::PaintToken(
     color_and_style.background_color = background_color;
   }
 
+  if (!color_and_style.foreground_color.isValid()) {
+    color_and_style.foreground_color = theme_foreground_color;
+  }
+
+  if (!color_and_style.background_color.isValid()) {
+    color_and_style.background_color = theme_background_color;
+  }
+
   PaintText(painter, option, tok_data, color_and_style, pos_inout);
 }
 

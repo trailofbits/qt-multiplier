@@ -115,6 +115,9 @@ struct Scene {
   // The underlying tokens.
   std::vector<Token> tokens;
 
+  // A sorted list of related entity IDs and the into `entities`.
+  std::vector<std::pair<RawEntityId, unsigned>> related_entity_ids;
+
   // Maximum number of characters on any given line.
   int max_logical_columns{1};
 
@@ -135,11 +138,16 @@ struct SceneBuilder {
   int token_length{0};
   unsigned token_index{0u};
   bool added_anything{false};
+  RawEntityId related_entity_id{kInvalidEntityId};
 
   QString token_data;
 
   inline SceneBuilder(void) {
     scene.logical_line_index.emplace_back(0u);
+  }
+
+  void BeginToken(const Token &tok) {
+    related_entity_id = tok.related_entity_id().Pack();
   }
 
   void AddColumn(unsigned num_columns = 1u) {
@@ -201,6 +209,12 @@ struct SceneBuilder {
     }
     token_data.clear();
 
+    // Keep track of the related entity ID associated with this entity.
+    if (related_entity_id != kInvalidEntityId) {
+      scene.related_entity_ids.emplace_back(
+        related_entity_id, static_cast<unsigned>(scene.entities.size()));
+    }
+
     // Add the entity.
     Entity &e = scene.entities.emplace_back();
     e.logical_line_number = scene.num_lines;
@@ -213,6 +227,7 @@ struct SceneBuilder {
   }
 
   Scene TakeScene(void) & {
+    std::sort(scene.related_entity_ids.begin(), scene.related_entity_ids.end());
     return std::move(scene);
   }
 };
@@ -229,12 +244,9 @@ struct CodeWidget::PrivateData {
 
   // Size of the visible viewport area for this widget.
   QRect viewport;
-  int max_rendered_viewport_width{0};
-  int max_rendered_viewport_height{0};
 
   bool scene_changed{true};
   bool canvas_changed{true};
-  bool viewport_changed{true};
 
   // The current DPI ratio for the app.
   qreal dpi_ratio{1.0};
@@ -250,6 +262,9 @@ struct CodeWidget::PrivateData {
 
   // The index of the current line to highlight.
   int current_line_index{-1};
+
+  // The current entity under the cursor.
+  const Entity *current_entity{nullptr};
 
   // Data structure keeping track of the logical things to render, and
   // where to render them. The act of rendering updates `Entity`s in the
@@ -286,40 +301,7 @@ struct CodeWidget::PrivateData {
 
   void ScrollBy(int horizontal_pixel_delta, int vertical_pixel_delta);
 
-  Entity *EntityUnderCursor(QPointF point) {
-    if (scene.entities.empty()) {
-      return nullptr;
-    }
-
-    auto x = scroll_x + point.x();
-    auto y = scroll_y + point.y();
-
-    auto line_index = static_cast<unsigned>(std::floor(y / line_height));
-    if (line_index >= scene.logical_line_index.size()) {
-      return nullptr;
-    }
-
-    auto i = scene.logical_line_index[line_index];
-    auto max_i = scene.logical_line_index[line_index + 1];
-
-    for (; i < max_i; ++i) {
-      Entity &e = scene.entities[i];
-      if (e.x > x) {
-        continue;
-      }
-
-      Data &data = scene.data[e.data_index_and_config >> 2u];
-      QRectF r = data.bounding_rect[e.data_index_and_config & 0b11u];
-
-      r.moveTo(QPointF(e.x, e.y));
-      if (r.contains(QPointF(x, y))) {
-        qDebug() << "!!!" << data.text;
-        return &e;
-      }
-    }
-
-    return nullptr;
-  }
+  const Entity *EntityUnderCursor(QPointF point) const;
 };
 
 // Import a choice node.
@@ -397,6 +379,8 @@ void CodeWidget::PrivateData::ImportTokenNode(
     return;
   }
 
+  b.BeginToken(token);
+
   for (QChar ch : utf16_data) {
     switch (ch.unicode()) {
 
@@ -453,6 +437,7 @@ void CodeWidget::PrivateData::ImportNode(SceneBuilder &b, TokenTreeNode node) {
   }
 }
 
+// Scroll the window by a specific delta.
 void CodeWidget::PrivateData::ScrollBy(
     int horizontal_pixel_delta, int vertical_pixel_delta) {
 
@@ -479,6 +464,42 @@ void CodeWidget::PrivateData::ScrollBy(
   } else {
     scroll_y = 0;
   }
+}
+
+// Locate the entity underneath `point`. Point corresponds to a viewport
+// position.
+const Entity *CodeWidget::PrivateData::EntityUnderCursor(QPointF point) const {
+  if (scene.entities.empty()) {
+    return nullptr;
+  }
+
+  auto x = scroll_x + point.x();
+  auto y = scroll_y + point.y();
+
+  auto line_index = static_cast<unsigned>(std::floor(y / line_height));
+  if (line_index >= scene.logical_line_index.size()) {
+    return nullptr;
+  }
+
+  auto i = scene.logical_line_index[line_index];
+  auto max_i = scene.logical_line_index[line_index + 1];
+
+  for (; i < max_i; ++i) {
+    const Entity &e = scene.entities[i];
+    if (e.x > x) {
+      continue;
+    }
+
+    const Data &data = scene.data[e.data_index_and_config >> 2u];
+    QRectF r = data.bounding_rect[e.data_index_and_config & 0b11u];
+
+    r.moveTo(QPointF(e.x, e.y));
+    if (r.contains(QPointF(x, y))) {
+      return &e;
+    }
+  }
+
+  return nullptr;
 }
 
 CodeWidget::~CodeWidget(void) {}
@@ -538,18 +559,8 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
 
 void CodeWidget::resizeEvent(QResizeEvent *event) {
   QSize new_size = event->size();
-
   d->viewport.setWidth(new_size.width());
   d->viewport.setHeight(new_size.height());
-
-  if (new_size.width() > d->max_rendered_viewport_width) {
-    d->viewport_changed = true;
-  }
-
-  if (new_size.height() > d->max_rendered_viewport_height) {
-    d->viewport_changed = true;
-  }
-
   d->UpdateScrollbars();
 }
 
@@ -585,10 +596,6 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
 void CodeWidget::paintEvent(QPaintEvent *) {
   d->RecomputeCanvas();
 
-  d->max_rendered_viewport_width = d->viewport.width();
-  d->max_rendered_viewport_height = d->viewport.height();
-  d->viewport_changed = false;
-
   QPainter blitter(this);
   blitter.fillRect(d->viewport, QBrush(d->theme->DefaultBackgroundColor()));
 
@@ -603,6 +610,30 @@ void CodeWidget::paintEvent(QPaintEvent *) {
 
   // Draw the code layer.
   blitter.drawImage(-d->scroll_x, -d->scroll_y, d->canvas);
+
+  // Render the related entity ID highlights.
+  if (d->current_entity) {
+    const Token &token = d->scene.tokens[d->current_entity->token_index];
+    const RawEntityId related_entity_id = token.related_entity_id().Pack();
+    
+    auto highlight_color = d->theme->CurrentEntityBackgroundColor(
+        token.related_entity());
+
+    if (related_entity_id != kInvalidEntityId) {
+      auto end_it = d->scene.related_entity_ids.end();
+      auto it = std::upper_bound(
+          d->scene.related_entity_ids.begin(), end_it,
+          std::pair<RawEntityId, unsigned>(related_entity_id - 1, ~0u));
+      
+      for (; it != end_it && it->first == related_entity_id; ++it) {
+        const Entity &e = d->scene.entities[it->second];
+        const Data &data = d->scene.data[e.data_index_and_config >> 2u];
+        QRectF rect = data.bounding_rect[e.data_index_and_config & 0b11u];
+        rect.moveTo(QPointF(e.x - d->scroll_x, e.y - d->scroll_y));
+        blitter.fillRect(rect, highlight_color);
+      }
+    }
+  }
 
   blitter.end();
 }
@@ -622,18 +653,19 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
 
 
+  const Entity *entity = d->EntityUnderCursor(rel_position);
+
   // Calculate the index of the current line.
   if (event->buttons() & Qt::LeftButton) {
     auto new_current_line_index = static_cast<int>(std::floor(y / d->line_height));
     if (new_current_line_index != d->current_line_index) {
       d->current_line_index = new_current_line_index;
-      d->viewport_changed = true;
     }
+
+    d->current_entity = entity;
   }
 
   update();
-
-  d->EntityUnderCursor(rel_position);
 
   (void) x;
   // QPointF mouse_position(static_cast<qreal>(event->x() + d->viewport.x()),
@@ -642,12 +674,13 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 }
 
 void CodeWidget::keyPressEvent(QKeyEvent *event) {
+  auto need_repaint = false;
   switch (event->key()) {
 
     // Pressing the up arrow moves the current line up, and maybe triggers
     // a scroll.
     case Qt::Key_Up:
-      d->viewport_changed = true;
+      need_repaint = true;
       d->current_line_index = std::max(0, d->current_line_index - 1);
 
       // Detect if we need to scroll up to follow the current line.
@@ -660,7 +693,7 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
     // Pressing the down arrow moves the current line down, and maybe triggers
     // a scroll.
     case Qt::Key_Down:
-      d->viewport_changed = true;
+      need_repaint = true;
       d->current_line_index = std::min(
           d->scene.num_lines - 1, d->current_line_index + 1);
 
@@ -678,7 +711,7 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       break;
   }
 
-  if (d->viewport_changed) {
+  if (need_repaint) {
     update();
   }
 }
@@ -698,6 +731,7 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
   scene_changed = false;
 
   // Force a change.
+  current_entity = nullptr;
   canvas_changed = true;
 }
 
@@ -709,6 +743,8 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   }
 
   canvas_changed = false;
+
+  QColor theme_foreground_color = theme->DefaultForegroundColor();
 
   QFont font = theme->Font();
   font.setStyleStrategy(QFont::NoSubpixelAntialias);
@@ -815,8 +851,13 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
     font.setUnderline(cs.underline);
     font.setStrikeOut(cs.strikeout);
     font.setWeight(cs.bold ? QFont::DemiBold : QFont::Normal);
-    blitter.setPen(cs.foreground_color);
     blitter.setFont(font);
+
+    if (cs.foreground_color.isValid()) {
+      blitter.setPen(cs.foreground_color);
+    } else {
+      blitter.setPen(theme_foreground_color);
+    }
 
     // Figure out the configuration for this entity, and update it in place.
     unsigned rect_config = (cs.bold ? 2u : 0u) | (cs.italic ? 1u : 0u);
@@ -825,7 +866,7 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
     QRectF &token_rect = data.bounding_rect[rect_config];
     bool &token_rect_valid = data.bounding_rect_valid[rect_config];
 
-    // blitter.fillRect(token_rect, cs.background_color);
+    auto bg_valid = cs.background_color.isValid();
 
     // Draw one character at a time. That results in better alignment across
     // lines.
@@ -842,6 +883,9 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
         monospace[0] = ch;
 
         glyph_rect.moveTo(QPointF(x, y));
+        if (bg_valid) {
+          blitter.fillRect(glyph_rect, cs.background_color);
+        }
         blitter.drawText(glyph_rect, monospace, to);
         x += space_width;
       }
@@ -853,6 +897,10 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
         token_rect_valid = true;
       }
 
+      if (bg_valid) {
+        blitter.fillRect(token_rect, cs.background_color);
+      }
+
       blitter.drawText(token_rect, data.text, to);
       x += token_rect.width();
     }
@@ -862,8 +910,6 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 
   blitter.end();
   canvas = std::move(c);
-
-  viewport_changed = true;
 }
 
 void CodeWidget::OnIndexChanged(const ConfigManager &config_manager) {
