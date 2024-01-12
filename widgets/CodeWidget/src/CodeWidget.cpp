@@ -245,6 +245,18 @@ struct CodeWidget::PrivateData {
   // Size of the visible viewport area for this widget.
   QRect viewport;
 
+  // A single character string.
+  QString monospace;
+
+  // The font we're currently painting with.
+  QFont font;
+
+  QColor theme_foreground_color;
+  QColor theme_background_color;
+  QRectF space_rect;
+  QRect canvas_rect;
+  QTextOption to;
+
   bool scene_changed{true};
   bool canvas_changed{true};
 
@@ -268,11 +280,12 @@ struct CodeWidget::PrivateData {
 
   // Data structure keeping track of the logical things to render, and
   // where to render them. The act of rendering updates `Entity`s in the
-  // scene to keep track of their physical locations within `canvas`.
+  // scene to keep track of their physical locations within `*_canvas`.
   Scene scene;
 
   // Actual "picture" of what is rendered.
-  QImage canvas;
+  QImage background_canvas;
+  QImage foreground_canvas;
 
   // Sets of entities that configure what gets shown from `token_tree`.
   QSet<RawEntityId> macros_to_expand;
@@ -284,11 +297,18 @@ struct CodeWidget::PrivateData {
 
   inline PrivateData(const TokenTree &token_tree_)
       : token_tree(token_tree_),
+        monospace(" "),
+        to(Qt::AlignLeft),
         dpi_ratio(qApp->devicePixelRatio()) {}
 
   void UpdateScrollbars(void);
   void RecomputeScene(void);
   void RecomputeCanvas(void);
+
+  void PaintToken(
+      QPainter &fg_painter, QPainter &bg_painter, Data &data,
+      unsigned rect_config, ITheme::ColorAndStyle cs, qreal &x, qreal &y);
+
   void ImportChoiceNode(SceneBuilder &b,
                         ChoiceTokenTreeNode node);
   void ImportSubstitutionNode(SceneBuilder &b,
@@ -441,8 +461,8 @@ void CodeWidget::PrivateData::ImportNode(SceneBuilder &b, TokenTreeNode node) {
 void CodeWidget::PrivateData::ScrollBy(
     int horizontal_pixel_delta, int vertical_pixel_delta) {
 
-  auto c_width = static_cast<int>(canvas.width() / dpi_ratio);
-  auto c_height = static_cast<int>(canvas.height() / dpi_ratio);
+  auto c_width = static_cast<int>(foreground_canvas.width() / dpi_ratio);
+  auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
 
   auto v_width = viewport.width();
   auto v_height = viewport.height();
@@ -597,7 +617,10 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   d->RecomputeCanvas();
 
   QPainter blitter(this);
-  blitter.fillRect(d->viewport, QBrush(d->theme->DefaultBackgroundColor()));
+  blitter.eraseRect(d->viewport);
+
+  // Fill the viewport with the theme background color.
+  blitter.fillRect(d->viewport, d->theme_background_color);
 
   // Render current line within the canvas.
   if (d->current_line_index != -1) {
@@ -608,30 +631,61 @@ void CodeWidget::paintEvent(QPaintEvent *) {
     blitter.fillRect(current_line, d->theme->CurrentLineBackgroundColor());
   }
 
-  // Draw the code layer.
-  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->canvas);
+  // Draw the code background layer.
+  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->background_canvas);
 
-  // Render the related entity ID highlights.
+  auto re_it = d->scene.related_entity_ids.end();
+  auto re_end_it = d->scene.related_entity_ids.end();
+  QColor highlight_foreground_color;
+  RawEntityId related_entity_id = kInvalidEntityId;
+
+  // Render the related entity ID highlight background colors.
   if (d->current_entity) {
     const Token &token = d->scene.tokens[d->current_entity->token_index];
-    const RawEntityId related_entity_id = token.related_entity_id().Pack();
+    related_entity_id = token.related_entity_id().Pack();
     
-    auto highlight_color = d->theme->CurrentEntityBackgroundColor(
+    QColor highlight_color = d->theme->CurrentEntityBackgroundColor(
         token.related_entity());
+    highlight_foreground_color = ITheme::ContrastingColor(highlight_color);
 
     if (related_entity_id != kInvalidEntityId) {
-      auto end_it = d->scene.related_entity_ids.end();
-      auto it = std::upper_bound(
-          d->scene.related_entity_ids.begin(), end_it,
+      re_it = std::upper_bound(
+          d->scene.related_entity_ids.begin(), re_end_it,
           std::pair<RawEntityId, unsigned>(related_entity_id - 1, ~0u));
       
-      for (; it != end_it && it->first == related_entity_id; ++it) {
+      for (auto it = re_it; it != re_end_it && it->first == related_entity_id;
+           ++it) {
         const Entity &e = d->scene.entities[it->second];
         const Data &data = d->scene.data[e.data_index_and_config >> 2u];
-        QRectF rect = data.bounding_rect[e.data_index_and_config & 0b11u];
+        unsigned rect_config = e.data_index_and_config & 0b11u;
+        QRectF rect = data.bounding_rect[rect_config];
         rect.moveTo(QPointF(e.x - d->scroll_x, e.y - d->scroll_y));
         blitter.fillRect(rect, highlight_color);
       }
+    }
+  }
+
+  // Draw the code foreground layer.
+  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->foreground_canvas);
+
+  // Overlay the code foreground layer with contrasting text for the highlighted
+  // entities.
+  if (d->current_entity && highlight_foreground_color.isValid()) {
+    QPainter dummy_bg_painter;
+    for (auto it = re_it; it != re_end_it && it->first == related_entity_id;
+         ++it) {
+      const Entity &e = d->scene.entities[it->second];
+      const Token &t = d->scene.tokens[e.token_index];
+      Data &data = d->scene.data[e.data_index_and_config >> 2u];
+      unsigned rect_config = e.data_index_and_config & 0b11u;
+
+      ITheme::ColorAndStyle cs = d->theme->TokenColorAndStyle(t);
+      cs.background_color = QColor();
+      cs.foreground_color = highlight_foreground_color;
+
+      qreal x = e.x - d->scroll_x;
+      qreal y = e.y - d->scroll_y;
+      d->PaintToken(blitter, dummy_bg_painter, data, rect_config, cs, x, y);
     }
   }
 
@@ -650,8 +704,6 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   QPointF rel_position = event->position();
   auto x = d->scroll_x + rel_position.x();
   auto y = d->scroll_y + rel_position.y();
-
-
 
   const Entity *entity = d->EntityUnderCursor(rel_position);
 
@@ -744,9 +796,7 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 
   canvas_changed = false;
 
-  QColor theme_foreground_color = theme->DefaultForegroundColor();
-
-  QFont font = theme->Font();
+  font = theme->Font();  // Reset (to clear bold/italic).
   font.setStyleStrategy(QFont::NoSubpixelAntialias);
 
   QFont bold_font = font;
@@ -773,7 +823,6 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 
   // Use a painter for also figuring out the maximum character size, as a
   // bounding rect from a painter could be bigger.
-  QTextOption to(Qt::AlignLeft);
   {
     QPainter p;
     p.setFont(bold_italic_font);
@@ -789,24 +838,33 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   // Figure out the canvas size. This is the maximum number of characters we
   // have, plus a margin for one on the left and one on the right, to allow for
   // italic text to "lean in" and spill over into those margins.
-  QRect canvas_rect(
+  canvas_rect = QRect(
       0, 0,
       (max_char_width * static_cast<int>(scene.max_logical_columns + 2)),
       line_height * std::max(1, scene.num_lines));
 
-  QImage c(static_cast<int>(canvas_rect.width() * dpi_ratio),
-           static_cast<int>(canvas_rect.height() * dpi_ratio),
-           QImage::Format_RGBA8888);
-  c.setDevicePixelRatio(dpi_ratio);
+  QImage fg(static_cast<int>(canvas_rect.width() * dpi_ratio),
+            static_cast<int>(canvas_rect.height() * dpi_ratio),
+            QImage::Format_RGBA8888);
 
-  QPainter blitter(&c);
-  blitter.setRenderHints(QPainter::TextAntialiasing | QPainter::Antialiasing |
-                         QPainter::SmoothPixmapTransform);
+  QImage bg(static_cast<int>(canvas_rect.width() * dpi_ratio),
+            static_cast<int>(canvas_rect.height() * dpi_ratio),
+            QImage::Format_RGBA8888);
 
-  blitter.setFont(font);
+  fg.setDevicePixelRatio(dpi_ratio);
+  bg.setDevicePixelRatio(dpi_ratio);
 
-  QString monospace = " ";
-  QRectF space_rect = blitter.boundingRect(canvas_rect, monospace, to);
+  QPainter fg_painter(&fg);
+  QPainter bg_painter(&bg);
+
+  bg_painter.setRenderHints(QPainter::SmoothPixmapTransform);
+  fg_painter.setRenderHints(QPainter::TextAntialiasing |
+                            QPainter::Antialiasing |
+                            QPainter::SmoothPixmapTransform);
+  fg_painter.setFont(font);
+
+  monospace[0] = QChar::Space;
+  space_rect = fg_painter.boundingRect(canvas_rect, monospace, to);
   qreal space_width = space_rect.width();
 
   // Start new lines indented with a single space. This helps us account for
@@ -847,69 +905,81 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
     e.y = y;
 
     ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
-    font.setItalic(cs.italic);
-    font.setUnderline(cs.underline);
-    font.setStrikeOut(cs.strikeout);
-    font.setWeight(cs.bold ? QFont::DemiBold : QFont::Normal);
-    blitter.setFont(font);
-
-    if (cs.foreground_color.isValid()) {
-      blitter.setPen(cs.foreground_color);
-    } else {
-      blitter.setPen(theme_foreground_color);
-    }
 
     // Figure out the configuration for this entity, and update it in place.
     unsigned rect_config = (cs.bold ? 2u : 0u) | (cs.italic ? 1u : 0u);
     e.data_index_and_config |= rect_config;
 
-    QRectF &token_rect = data.bounding_rect[rect_config];
-    bool &token_rect_valid = data.bounding_rect_valid[rect_config];
-
-    auto bg_valid = cs.background_color.isValid();
-
-    // Draw one character at a time. That results in better alignment across
-    // lines.
-    if (is_monospaced) {
-      if (!token_rect_valid) {
-        token_rect = space_rect;
-        token_rect.setWidth(space_width * data.text.size());
-        token_rect_valid = true;
-      }
-
-      QRectF glyph_rect = space_rect;
-
-      for (QChar ch : data.text) {
-        monospace[0] = ch;
-
-        glyph_rect.moveTo(QPointF(x, y));
-        if (bg_valid) {
-          blitter.fillRect(glyph_rect, cs.background_color);
-        }
-        blitter.drawText(glyph_rect, monospace, to);
-        x += space_width;
-      }
-
-    // Draw it as one word.
-    } else {
-      if (!token_rect_valid) {
-        token_rect = blitter.boundingRect(canvas_rect, data.text, to);
-        token_rect_valid = true;
-      }
-
-      if (bg_valid) {
-        blitter.fillRect(token_rect, cs.background_color);
-      }
-
-      blitter.drawText(token_rect, data.text, to);
-      x += token_rect.width();
-    }
+    PaintToken(fg_painter, bg_painter, data, rect_config, cs, x, y);
 
     logical_column_number += static_cast<int>(data.text.size());
   }
 
-  blitter.end();
-  canvas = std::move(c);
+  fg_painter.end();
+  bg_painter.end();
+  
+  foreground_canvas.swap(fg);
+  background_canvas.swap(bg);
+}
+
+// Paint a token.
+void CodeWidget::PrivateData::PaintToken(
+    QPainter &fg_painter, QPainter &bg_painter, Data &data,
+    unsigned rect_config, ITheme::ColorAndStyle cs, qreal &x, qreal &y) {
+
+  font.setItalic(cs.italic);
+  font.setUnderline(cs.underline);
+  font.setStrikeOut(cs.strikeout);
+  font.setWeight(cs.bold ? QFont::DemiBold : QFont::Normal);
+  fg_painter.setFont(font);
+
+  if (cs.foreground_color.isValid()) {
+    fg_painter.setPen(cs.foreground_color);
+  } else {
+    fg_painter.setPen(theme_foreground_color);
+  }
+
+  QRectF &token_rect = data.bounding_rect[rect_config];
+  bool &token_rect_valid = data.bounding_rect_valid[rect_config];
+  bool bg_valid = cs.background_color.isValid();
+  qreal space_width = space_rect.width();
+
+  // Draw one character at a time. That results in better alignment across
+  // lines.
+  if (is_monospaced) {
+    if (!token_rect_valid) {
+      token_rect = space_rect;
+      token_rect.setWidth(space_width * data.text.size());
+      token_rect_valid = true;
+    }
+
+    QRectF glyph_rect = space_rect;
+
+    for (QChar ch : data.text) {
+      monospace[0] = ch;
+
+      glyph_rect.moveTo(QPointF(x, y));
+      if (bg_valid) {
+        bg_painter.fillRect(glyph_rect, cs.background_color);
+      }
+      fg_painter.drawText(glyph_rect, monospace, to);
+      x += space_width;
+    }
+
+  // Draw it as one word.
+  } else {
+    if (!token_rect_valid) {
+      token_rect = fg_painter.boundingRect(canvas_rect, data.text, to);
+      token_rect_valid = true;
+    }
+
+    if (bg_valid) {
+      bg_painter.fillRect(token_rect, cs.background_color);
+    }
+
+    fg_painter.drawText(token_rect, data.text, to);
+    x += token_rect.width();
+  }
 }
 
 void CodeWidget::OnIndexChanged(const ConfigManager &config_manager) {
@@ -919,18 +989,30 @@ void CodeWidget::OnIndexChanged(const ConfigManager &config_manager) {
 }
 
 void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
-  d->canvas_changed = true;
-  d->theme = theme_manager.Theme();
+  QFont old_font;
+  if (d->theme) {
+    old_font = d->theme->Font();
+  }
 
-  auto theme = d->theme.get();
+  d->theme = theme_manager.Theme();
+  d->font = d->theme->Font();
+  d->theme_foreground_color = d->theme->DefaultForegroundColor();
+  d->theme_background_color = d->theme->DefaultBackgroundColor();
+
+  if (old_font == d->font) {
+    d->canvas_changed = true;
+  } else {
+    d->scene_changed = true;
+  }
+
   QPalette p = palette();
-  p.setColor(QPalette::Window, theme->DefaultBackgroundColor());
-  p.setColor(QPalette::WindowText, theme->DefaultForegroundColor());
-  p.setColor(QPalette::Base, theme->DefaultBackgroundColor());
-  p.setColor(QPalette::Text, theme->DefaultForegroundColor());
-  p.setColor(QPalette::AlternateBase, theme->DefaultBackgroundColor());
+  p.setColor(QPalette::Window, d->theme_background_color);
+  p.setColor(QPalette::WindowText, d->theme_foreground_color);
+  p.setColor(QPalette::Base, d->theme_background_color);
+  p.setColor(QPalette::Text, d->theme_foreground_color);
+  p.setColor(QPalette::AlternateBase, d->theme_background_color);
   setPalette(p);
-  setFont(theme->Font());
+  setFont(d->font);
   update();
 }
 
