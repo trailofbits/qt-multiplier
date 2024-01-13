@@ -416,6 +416,7 @@ struct CodeWidget::PrivateData {
                                   qreal dir_y, qreal char_width) const;
   QPointF NextCursorPositionVariable(QPointF curr_cursor, qreal dir_x,
                                      qreal dir_y) const;
+  QPointF ClampCursorPosition(QPointF point) const;
 
   QModelIndex CreateModelIndex(TokenModel &model, const Entity *entity);
 
@@ -604,9 +605,9 @@ void CodeWidget::PrivateData::ScrollBy(
 //            `scroll_y`.
 QPointF CodeWidget::PrivateData::CursorPosition(QPointF point) const {  
   if (is_monospaced) {
-    return CursorPositionFixed(point);
+    return ClampCursorPosition(CursorPositionFixed(point));
   } else {
-    return CursorPositionVariable(point);
+    return ClampCursorPosition(CursorPositionVariable(point));
   }
 }
 
@@ -621,8 +622,9 @@ QPointF CodeWidget::PrivateData::CursorPositionFixed(QPointF point) const {
   
   // NOTE(pag): We always have an extra column of whitespace just before the
   //            first character of each line.
-  return QPointF(col_count * space_width,
-                 std::floor(point.y() / line_height) * line_height);
+  return QPointF(
+      col_count * space_width,
+      std::floor(point.y() / line_height) * line_height);
 }
 
 // Locates the top-left corner of a cursor that should be placed under/near
@@ -738,6 +740,24 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
   return QPointF(adj_pos.x() + r.width() + prev_entity->x, adj_pos.y());
 }
 
+// Always have one empty space on both sides margin, and keep the cursor in-
+// bounds.
+QPointF CodeWidget::PrivateData::ClampCursorPosition(QPointF point) const {
+  qreal c_width = foreground_canvas.width() / dpi_ratio;
+  qreal v_width = viewport.width();
+
+  qreal c_height = foreground_canvas.height() / dpi_ratio;
+  qreal v_height = viewport.height();
+  return QPointF(
+      std::max(
+          space_width,
+          std::min(point.x(), std::max<qreal>(c_width, v_width) - space_width)),
+      std::max<qreal>(
+          0,
+          std::min(std::max(c_height - line_height, v_height - line_height),
+                   point.y())));
+}
+
 // Locate the next cursor position (left or right, up or down).
 QPointF CodeWidget::PrivateData::NextCursorPosition(
     QPointF curr_cursor, qreal dir_x, qreal dir_y) const {
@@ -755,26 +775,14 @@ QPointF CodeWidget::PrivateData::NextCursorPosition(
 QPointF CodeWidget::PrivateData::NextCursorPositionFixed(
     QPointF curr_cursor, qreal dir_x, qreal dir_y, qreal char_width) const {
 
-  qreal c_width = foreground_canvas.width() / dpi_ratio;
-  qreal c_height = foreground_canvas.height() / dpi_ratio;
-
-  qreal v_width = viewport.width();
-  qreal v_height = viewport.height();
-
   qreal new_x = curr_cursor.x();
   if (dir_x != 0) {
-    new_x = std::max<qreal>(
-        space_width,  // Always have one empty space in left margin.
-        std::min(std::max<qreal>(c_width, v_width),
-                 new_x + (dir_x * char_width)));
+    new_x += (dir_x * char_width);
   }
   
   qreal new_y = curr_cursor.y();
   if (dir_y != 0) {
-    new_y = std::max<qreal>(
-        0,
-        std::min(std::max(c_height - line_height, v_height - line_height),
-                 new_y + (dir_y * line_height)));
+    new_y += (dir_y * line_height);
   }
   
   return CursorPosition(QPointF(new_x, new_y));
@@ -794,7 +802,7 @@ QPointF CodeWidget::PrivateData::NextCursorPositionVariable(
     auto guess_x = curr_x;
     for (; guess_x >= space_width; ) {
       guess_x += incr;
-      auto new_x = CursorPosition(QPointF(guess_x, curr_cursor.y())).x();
+      auto new_x = CursorPositionVariable(QPointF(guess_x, curr_cursor.y())).x();
       if (new_x != curr_x) {
         char_width = std::abs(new_x - curr_x);
         break;
@@ -1064,11 +1072,6 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   }
 
   update();
-
-  (void) x;
-  // QPointF mouse_position(static_cast<qreal>(event->x() + d->viewport.x()),
-  //                        static_cast<qreal>(event->y() + d->viewport.y()));
-  // (void) mouse_position;
 }
 
 void CodeWidget::keyPressEvent(QKeyEvent *event) {
