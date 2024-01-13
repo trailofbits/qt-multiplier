@@ -36,6 +36,8 @@ class ProxyTheme Q_DECL_FINAL : public ITheme {
 
   QFont Font(void) const Q_DECL_FINAL;
 
+  QColor CursorColor(void) const Q_DECL_FINAL;
+
   QColor IconColor(IconStyle style) const Q_DECL_FINAL;
 
   QColor GutterForegroundColor(void) const Q_DECL_FINAL;

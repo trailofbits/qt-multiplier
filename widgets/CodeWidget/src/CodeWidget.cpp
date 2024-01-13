@@ -39,6 +39,13 @@
 namespace mx::gui {
 namespace {
 
+static constexpr auto kBoldMask = 0b10u;
+static constexpr auto kItalicMask = 0b01u;
+static constexpr auto kFormatMask = kBoldMask | kItalicMask;
+static constexpr auto kFormatShift = 2u;
+static constexpr qreal kCursorWidth = 2;
+static constexpr qreal kCursorDisp = -0.5;
+
 // TODO(pag): Don't hardcode this. Investigate `QStackTextEngine`, the
 //            `QPainter` uses this internally. It seems that
 //            `QPainter::boundingRect` can take a `QTextOption` that can be
@@ -228,6 +235,8 @@ struct SceneBuilder {
   }
 
   Scene TakeScene(void) & {
+    scene.logical_line_index.emplace_back(
+        static_cast<unsigned>(scene.entities.size()));
     std::sort(scene.related_entity_ids.begin(), scene.related_entity_ids.end());
     return std::move(scene);
   }
@@ -318,9 +327,11 @@ struct CodeWidget::PrivateData {
   // The font we're currently painting with.
   QFont font;
 
+  QColor theme_cursor_color;
   QColor theme_foreground_color;
   QColor theme_background_color;
   QRectF space_rect;
+  qreal space_width{0};
   QRect canvas_rect;
   QTextOption to;
 
@@ -333,6 +344,9 @@ struct CodeWidget::PrivateData {
   // Current scroll x/y positions.
   int scroll_x{0};
   int scroll_y{0};
+
+  // Location of the cursor (accounting for `scroll_x` and `scroll_y`).
+  std::optional<QPointF> cursor;
 
   // Determined during painting.
   int line_height{0};
@@ -391,18 +405,35 @@ struct CodeWidget::PrivateData {
 
   void ScrollBy(int horizontal_pixel_delta, int vertical_pixel_delta);
 
-  const Entity *EntityUnderCursor(QPointF point) const;
+  const Entity *EntityUnderPoint(QPointF point) const;
 
-  QModelIndex CreateModelIndex(TokenModel &model, const Entity *entity) {
-    if (!entity) {
-      return {};
-    }
+  QPointF CursorPosition(QPointF point) const;
+  QPointF CursorPositionFixed(QPointF point) const;
+  QPointF CursorPositionVariable(QPointF point) const;
+  QPointF NextCursorPosition(QPointF curr_cursor, qreal dir_x,
+                             qreal dir_y) const;
+  QPointF NextCursorPositionFixed(QPointF curr_cursor, qreal dir_x,
+                                  qreal dir_y, qreal char_width) const;
+  QPointF NextCursorPositionVariable(QPointF curr_cursor, qreal dir_x,
+                                     qreal dir_y) const;
 
-    model.token = scene.tokens[entity->token_index];
-    model.text = scene.data[entity->data_index_and_config >> 2u].text;
-    return model.index(0, 0, {});
-  }
+  QModelIndex CreateModelIndex(TokenModel &model, const Entity *entity);
+
 };
+
+// Fills `model` (e.g. `PrivateData::primary_click_model`) with information from
+// `entity` sufficient to satisfy the `IModel` interface, so that we can
+// publish `QModelIndex`es in our signals, e.g. `RequestPrimaryClick`.
+QModelIndex CodeWidget::PrivateData::CreateModelIndex(
+    TokenModel &model, const Entity *entity) {
+  if (!entity) {
+    return {};
+  }
+
+  model.token = scene.tokens[entity->token_index];
+  model.text = scene.data[entity->data_index_and_config >> kFormatShift].text;
+  return model.index(0, 0, {});
+}
 
 // Import a choice node.
 void CodeWidget::PrivateData::ImportChoiceNode(
@@ -566,15 +597,226 @@ void CodeWidget::PrivateData::ScrollBy(
   }
 }
 
+// Locates the top-left corner of a cursor that should be placed under/near
+// `point`.
+//
+// NOTE(pag): `point` should already be translated by the `scroll_x` and
+//            `scroll_y`.
+QPointF CodeWidget::PrivateData::CursorPosition(QPointF point) const {  
+  if (is_monospaced) {
+    return CursorPositionFixed(point);
+  } else {
+    return CursorPositionVariable(point);
+  }
+}
+
+// Locates the top-left corner of a cursor that should be placed under/near
+// `point`, knowing that the font has a fixed width.
+//
+// NOTE(pag): `point` should already be translated by the `scroll_x` and
+//            `scroll_y`.
+QPointF CodeWidget::PrivateData::CursorPositionFixed(QPointF point) const {
+  qreal half_width = space_width / 2;
+  auto col_count = std::floor((point.x() + half_width) / space_width);
+  
+  // NOTE(pag): We always have an extra column of whitespace just before the
+  //            first character of each line.
+  return QPointF(col_count * space_width,
+                 std::floor(point.y() / line_height) * line_height);
+}
+
+// Locates the top-left corner of a cursor that should be placed under/near
+// `point`, knowing that the font does not have a fixed width.
+//
+// NOTE(pag): `point` should already be translated by the `scroll_x` and
+//            `scroll_y`.
+QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
+
+  if (scene.entities.empty()) {
+    return CursorPositionFixed(point);
+  }
+
+  auto x = point.x();
+  auto y = point.y();
+
+  auto line_index = static_cast<unsigned>(std::floor(y / line_height));
+  if (line_index >= scene.logical_line_index.size()) {
+    return CursorPositionFixed(point);
+  }
+
+  auto i = scene.logical_line_index[line_index];
+  auto max_i = scene.logical_line_index[line_index + 1];
+
+  const Entity *prev_entity = nullptr;
+  const Data *prev_data = nullptr;
+  const Entity *entity = nullptr;
+  const Data *data = nullptr;
+
+  for (; i < max_i; ++i, prev_entity = entity, prev_data = data) {
+    entity = &(scene.entities[i]);
+    data = &(scene.data[entity->data_index_and_config >> kFormatShift]);
+
+    Q_ASSERT(entity->logical_line_number == static_cast<int>(line_index + 1u));
+
+    // The cursor comes before `entity`.
+    if (entity->x > x) {
+      break;
+    }
+
+    auto text_config_index = entity->data_index_and_config & kFormatMask;
+    QRectF text_rect = data->bounding_rect[text_config_index];
+    qreal entity_y = static_cast<qreal>(line_index) * line_height;
+
+    text_rect.moveTo(QPointF(entity->x, entity_y));
+    if (!text_rect.contains(point)) {
+      continue;
+    }
+
+    QPixmap dummy_pixmap(static_cast<int>(text_rect.width()),
+                         static_cast<int>(text_rect.height()));
+    QPainter p(&dummy_pixmap);
+
+    // Configure the font based on the formatting of the entity. The bold/italic
+    // affects character sizes.
+    QFont entity_font = font;
+    if (text_config_index & kBoldMask) {
+      entity_font.setWeight(QFont::DemiBold);
+    }
+    if (text_config_index & kItalicMask) {
+      entity_font.setItalic(true);
+    }
+    p.setFont(entity_font);
+
+    auto cursor_y = static_cast<qreal>(line_index) * line_height;
+
+    // The cursor falls inside of an existing entity text. We'll calculate the
+    // width of the text. We go one character at a time, building up
+    // successively longer prefixes of `data->text` until we find that we've
+    // moved just beyond where the user clicked.
+    qreal prev_width = 0;
+    for (auto k = 1; k <= data->text.size(); ++k) {
+      auto prefix = data->text.sliced(0, k);
+      auto prefix_rect = p.boundingRect(text_rect, prefix, to);
+
+      if (prefix_rect.contains(point)) {
+        auto half = (prefix_rect.width() - prev_width) / 2;
+
+        // Falls to the left of this letter.
+        if ((entity->x + prev_width + half) > x) {
+          return QPointF(entity->x + prev_width, cursor_y);
+
+        // Falls to the right of this letter.
+        } else {
+          return QPointF(entity->x + prefix_rect.width(), cursor_y);
+        }
+      }
+
+      prev_width = prefix_rect.width();
+    }
+
+    Q_ASSERT(false);
+  }
+
+  // There are no entities on this line, or there is no previous entity, and so
+  // the cursor is before it.
+  if (!entity || !prev_entity) {
+    return CursorPositionFixed(point);
+  }
+
+  // The cursor is between two entities. Translate the point so that it's
+  // as though there is no previous entity, then it's just about whitespace
+  // calculation.
+  QRectF r = prev_data->bounding_rect[
+      prev_entity->data_index_and_config & kFormatMask];
+
+  r.moveTo(prev_entity->x, 0);
+
+  auto adj_pos = CursorPositionFixed(
+      QPointF(x - (prev_entity->x + r.width()), y));
+
+  // Readjust to account for the size of `prev_entity`.
+  return QPointF(adj_pos.x() + r.width() + prev_entity->x, adj_pos.y());
+}
+
+// Locate the next cursor position (left or right, up or down).
+QPointF CodeWidget::PrivateData::NextCursorPosition(
+    QPointF curr_cursor, qreal dir_x, qreal dir_y) const {
+
+  if (is_monospaced) {
+    return NextCursorPositionFixed(curr_cursor, dir_x, dir_y, space_width);
+  } else {
+    return NextCursorPositionVariable(curr_cursor, dir_x, dir_y);
+  }
+}
+
+// Locate the next cursor position (left or right, up or down) for a fixed-
+// width font, or where the next character in the relevant direction has width
+// `char_width`.
+QPointF CodeWidget::PrivateData::NextCursorPositionFixed(
+    QPointF curr_cursor, qreal dir_x, qreal dir_y, qreal char_width) const {
+
+  qreal c_width = foreground_canvas.width() / dpi_ratio;
+  qreal c_height = foreground_canvas.height() / dpi_ratio;
+
+  qreal v_width = viewport.width();
+  qreal v_height = viewport.height();
+
+  qreal new_x = curr_cursor.x();
+  if (dir_x != 0) {
+    new_x = std::max<qreal>(
+        space_width,  // Always have one empty space in left margin.
+        std::min(std::max<qreal>(c_width, v_width),
+                 new_x + (dir_x * char_width)));
+  }
+  
+  qreal new_y = curr_cursor.y();
+  if (dir_y != 0) {
+    new_y = std::max<qreal>(
+        0,
+        std::min(std::max(c_height - line_height, v_height - line_height),
+                 new_y + (dir_y * line_height)));
+  }
+  
+  return CursorPosition(QPointF(new_x, new_y));
+}
+
+QPointF CodeWidget::PrivateData::NextCursorPositionVariable(
+    QPointF curr_cursor, qreal dir_x, qreal dir_y) const {
+
+  // Hopefully quarters of the space width are smaller than the smallest
+  // horizontal advance of a character in the font.
+  auto incr = (space_width / 4) * dir_x;
+
+  // Opportunistically search for the next X position of the cursor.
+  qreal char_width = space_width;
+  if (dir_x != 0) {
+    auto curr_x = curr_cursor.x();
+    auto guess_x = curr_x;
+    for (; guess_x >= space_width; ) {
+      guess_x += incr;
+      auto new_x = CursorPosition(QPointF(guess_x, curr_cursor.y())).x();
+      if (new_x != curr_x) {
+        char_width = std::abs(new_x - curr_x);
+        break;
+      }
+    }
+  }
+
+  return NextCursorPositionFixed(curr_cursor, dir_x, dir_y, char_width);
+}
+
 // Locate the entity underneath `point`. Point corresponds to a viewport
 // position.
-const Entity *CodeWidget::PrivateData::EntityUnderCursor(QPointF point) const {
+//
+// NOTE(pag): `point` should already be translated by the `scroll_x` and
+//            `scroll_y`.
+const Entity *CodeWidget::PrivateData::EntityUnderPoint(QPointF point) const {
   if (scene.entities.empty()) {
     return nullptr;
   }
 
-  auto x = scroll_x + point.x();
-  auto y = scroll_y + point.y();
+  auto x = point.x();
+  auto y = point.y();
 
   auto line_index = static_cast<unsigned>(std::floor(y / line_height));
   if (line_index >= scene.logical_line_index.size()) {
@@ -590,13 +832,13 @@ const Entity *CodeWidget::PrivateData::EntityUnderCursor(QPointF point) const {
       continue;
     }
 
-    const Data &data = scene.data[e.data_index_and_config >> 2u];
-    QRectF r = data.bounding_rect[e.data_index_and_config & 0b11u];
+    const Data &data = scene.data[e.data_index_and_config >> kFormatShift];
+    QRectF r = data.bounding_rect[e.data_index_and_config & kFormatMask];
 
     qreal e_y = static_cast<qreal>(line_index) * line_height;
 
     r.moveTo(QPointF(e.x, e_y));
-    if (r.contains(QPointF(x, y))) {
+    if (r.contains(point)) {
       return &e;
     }
   }
@@ -679,13 +921,11 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
     auto vertical_angle_delta = event->angleDelta().y();
     auto horizontal_angle_delta = event->angleDelta().x();
 
-    auto line_height = QFontMetrics(d->theme->Font(), this).height();
-
     vertical_pixel_delta =
-        line_height * static_cast<int>(vertical_angle_delta * 1.0 / 120.0);
+        d->line_height * static_cast<int>(vertical_angle_delta * 1.0 / 120.0);
 
     horizontal_pixel_delta =
-      line_height * static_cast<int>(horizontal_angle_delta * 1.0 / 120.0);
+      d->line_height * static_cast<int>(horizontal_angle_delta * 1.0 / 120.0);
   }
 
   d->ScrollBy(horizontal_pixel_delta * -1, vertical_pixel_delta * -1);
@@ -736,8 +976,8 @@ void CodeWidget::paintEvent(QPaintEvent *) {
       for (auto it = re_it; it != re_end_it && it->first == related_entity_id;
            ++it) {
         const Entity &e = d->scene.entities[it->second];
-        const Data &data = d->scene.data[e.data_index_and_config >> 2u];
-        unsigned rect_config = e.data_index_and_config & 0b11u;
+        const Data &data = d->scene.data[e.data_index_and_config >> kFormatShift];
+        unsigned rect_config = e.data_index_and_config & kFormatMask;
         QRectF rect = data.bounding_rect[rect_config];
 
         qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
@@ -759,8 +999,8 @@ void CodeWidget::paintEvent(QPaintEvent *) {
          ++it) {
       const Entity &e = d->scene.entities[it->second];
       const Token &t = d->scene.tokens[e.token_index];
-      Data &data = d->scene.data[e.data_index_and_config >> 2u];
-      unsigned rect_config = e.data_index_and_config & 0b11u;
+      Data &data = d->scene.data[e.data_index_and_config >> kFormatShift];
+      unsigned rect_config = e.data_index_and_config & kFormatMask;
 
       ITheme::ColorAndStyle cs = d->theme->TokenColorAndStyle(t);
       cs.background_color = QColor();
@@ -772,6 +1012,13 @@ void CodeWidget::paintEvent(QPaintEvent *) {
 
       d->PaintToken(blitter, dummy_bg_painter, data, rect_config, cs, x, y);
     }
+  }
+
+  // Paint the cursor.
+  if (d->cursor && d->theme_cursor_color.isValid()) {
+    QRectF cursor(d->cursor->x() + kCursorDisp - d->scroll_x,
+                  d->cursor->y() - d->scroll_y, kCursorWidth, d->line_height);
+    blitter.fillRect(cursor, d->theme_cursor_color);
   }
 
   blitter.end();
@@ -790,7 +1037,9 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   auto x = d->scroll_x + rel_position.x();
   auto y = d->scroll_y + rel_position.y();
 
-  const Entity *entity = d->EntityUnderCursor(rel_position);
+  QPointF scrolled_xy(x, y);
+
+  const Entity *entity = d->EntityUnderPoint(scrolled_xy);
 
   d->primary_click_model.token = {};
   d->secondary_click_model.token = {};
@@ -807,6 +1056,8 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
     emit RequestPrimaryClick(
         d->CreateModelIndex(d->primary_click_model, entity));
 
+    d->cursor = d->CursorPosition(scrolled_xy);
+
   } else if (event->buttons() & Qt::RightButton) {
     emit RequestSecondaryClick(
         d->CreateModelIndex(d->secondary_click_model, entity));
@@ -822,6 +1073,9 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
 void CodeWidget::keyPressEvent(QKeyEvent *event) {
   auto need_repaint = false;
+  qreal dx = 0;
+  qreal dy = 0;
+
   switch (event->key()) {
 
     // Pressing the up arrow moves the current line up, and maybe triggers
@@ -834,7 +1088,7 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       if ((d->current_line_index * d->line_height) < d->scroll_y) {
         d->ScrollBy(0, -d->line_height);
       }
-
+      dy = -1;
       break;
 
     // Pressing the down arrow moves the current line down, and maybe triggers
@@ -849,10 +1103,13 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
           (d->scroll_y + d->viewport.height())) {
         d->ScrollBy(0, d->line_height);
       }
-
+      dy = 1;
       break;
     case Qt::Key_Left:
+      dx = -1;
+      break;
     case Qt::Key_Right:
+      dx = 1;
       break;
     default:
       if (d->current_entity && d->primary_click_model.token) {
@@ -875,6 +1132,15 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
             d->CreateModelIndex(d->key_press_model, d->current_entity));
       }
       break;
+  }
+
+  // Figure out the next cursor position.
+  if (d->cursor && (dx != 0 || dy != 0)) {
+    auto new_cursor = d->NextCursorPosition(d->cursor.value(), dx, dy);
+    if (new_cursor != d->cursor.value()) {
+      need_repaint = true;
+      d->cursor = new_cursor;
+    }
   }
 
   if (need_repaint) {
@@ -931,9 +1197,13 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
       {font_metrics_bi.height(), font_metrics_b.height(),
        font_metrics_i.height(), font_metrics.height()})));
 
+  Q_ASSERT(0 < line_height);
+
   max_char_width = static_cast<int>(std::ceil(std::max(
       {font_metrics_bi.maxWidth(), font_metrics_b.maxWidth(),
        font_metrics_i.maxWidth(), font_metrics.maxWidth()})));
+
+  Q_ASSERT(0 < max_char_width);
 
   // Use a painter for also figuring out the maximum character size, as a
   // bounding rect from a painter could be bigger.
@@ -941,13 +1211,15 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
     QPixmap dummy_pixmap(max_char_width * 4, line_height * 4);
     QPainter p(&dummy_pixmap);
     p.setFont(bold_italic_font);
+    auto r = p.boundingRect(QRectF(max_char_width, line_height,
+                                   max_char_width * 3, line_height * 3),
+                            "W", to);
+    
     max_char_width = std::max(
-        max_char_width,
-        static_cast<int>(std::ceil(
-            p.boundingRect(
-                QRectF(max_char_width, line_height,
-                       max_char_width * 3, line_height * 3),
-                "W", to).width())));
+        max_char_width, static_cast<int>(std::ceil(r.width())));
+
+    line_height = std::max(
+        line_height, static_cast<int>(std::ceil(r.height())));
   }
 
   // Figure out the canvas size. This is the maximum number of characters we
@@ -976,11 +1248,13 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   fg_painter.setRenderHints(QPainter::TextAntialiasing |
                             QPainter::Antialiasing |
                             QPainter::SmoothPixmapTransform);
-  fg_painter.setFont(font);
+  fg_painter.setFont(bold_italic_font);
 
   monospace[0] = QChar::Space;
   space_rect = fg_painter.boundingRect(canvas_rect, monospace, to);
-  qreal space_width = space_rect.width();
+  space_width = space_rect.width();
+
+  Q_ASSERT(0 < space_width);
 
   // Start new lines indented with a single space. This helps us account for
   // italic character writing outside of their minimum-sized bounding box.
@@ -995,7 +1269,7 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
       font_metrics_bi.horizontalAdvance(".") == font_metrics_bi.maxWidth();
 
   for (Entity &e : scene.entities) {
-    Data &data = scene.data[e.data_index_and_config >> 2u];
+    Data &data = scene.data[e.data_index_and_config >> kFormatShift];
     const Token &token = scene.tokens[e.token_index];
 
     Q_ASSERT(!data.text.isEmpty());
@@ -1021,7 +1295,8 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
     ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
 
     // Figure out the configuration for this entity, and update it in place.
-    unsigned rect_config = (cs.bold ? 2u : 0u) | (cs.italic ? 1u : 0u);
+    unsigned rect_config = (cs.bold ? kBoldMask : 0u) |
+                           (cs.italic ? kItalicMask : 0u);
     e.data_index_and_config |= rect_config;
 
     PaintToken(fg_painter, bg_painter, data, rect_config, cs, x, y);
@@ -1056,7 +1331,6 @@ void CodeWidget::PrivateData::PaintToken(
   QRectF &token_rect = data.bounding_rect[rect_config];
   bool &token_rect_valid = data.bounding_rect_valid[rect_config];
   bool bg_valid = cs.background_color.isValid();
-  qreal space_width = space_rect.width();
 
   // Draw one character at a time. That results in better alignment across
   // lines.
@@ -1091,6 +1365,7 @@ void CodeWidget::PrivateData::PaintToken(
       bg_painter.fillRect(token_rect, cs.background_color);
     }
 
+    token_rect.moveTo(QPointF(x, y));
     fg_painter.drawText(token_rect, data.text, to);
     x += token_rect.width();
   }
@@ -1109,6 +1384,7 @@ void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
 
   d->theme = theme_manager.Theme();
   d->font = d->theme->Font();
+  d->theme_cursor_color = d->theme->CursorColor();
   d->theme_foreground_color = d->theme->DefaultForegroundColor();
   d->theme_background_color = d->theme->DefaultBackgroundColor();
 

@@ -55,6 +55,8 @@ static const QColor kDefaultDarkForegroundColor
 static const QColor kDefaultDarkBackgroundColor
     = QColor::fromRgb(0x1e, 0x1e, 0x1e).darker();
 
+static const QColor kCursorColor = QColor::fromRgb(255, 170, 66);
+
 static const IBuiltinTheme::ThemeData kDarkThemeData{
   // selected_line_background_color
   QColor::fromRgb(0x1e, 0x1e, 0x1e),
@@ -129,6 +131,11 @@ class DarkTheme Q_DECL_FINAL : public IBuiltinTheme {
 #ifdef __APPLE__
     SetNSAppToDarkTheme();
 #endif
+  }
+
+  //! Color used by the cursor.
+  QColor CursorColor(void) const Q_DECL_FINAL {
+    return kCursorColor;
   }
 
   QColor IconColor(IconStyle style) const Q_DECL_FINAL {

@@ -54,6 +54,8 @@ static const QColor kDefaultLightForegroundColor = QColor::fromRgb(34, 34, 34);
 static const QColor kDefaultLightBackgroundColor
     = QColor::fromRgb(255, 255, 255);
 
+static const QColor kCursorColor = QColor::fromRgb(0x1e, 0x1e, 0x1e);
+
 static const IBuiltinTheme::ThemeData kLightThemeData{
   // selected_line_background_color
   QColor::fromRgb(236, 236, 236),
@@ -128,6 +130,10 @@ class LightTheme Q_DECL_FINAL : public IBuiltinTheme {
 #ifdef __APPLE__
     SetNSAppToLightTheme();
 #endif
+  }
+
+  QColor CursorColor(void) const Q_DECL_FINAL {
+    return kCursorColor;
   }
 
   QColor IconColor(IconStyle style) const Q_DECL_FINAL {

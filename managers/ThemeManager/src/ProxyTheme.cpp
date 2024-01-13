@@ -69,6 +69,14 @@ QFont ProxyTheme::Font(void) const {
   return font;
 }
 
+QColor ProxyTheme::CursorColor(void) const {
+  auto color = current_theme->CursorColor();
+  for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
+    color = (*it)->CursorColor(std::move(color));
+  }
+  return color;
+}
+
 QColor ProxyTheme::IconColor(IconStyle style) const {
   auto color = current_theme->IconColor(style);
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
