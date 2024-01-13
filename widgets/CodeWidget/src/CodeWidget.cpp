@@ -1083,37 +1083,75 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
     // Pressing the up arrow moves the current line up, and maybe triggers
     // a scroll.
-    case Qt::Key_Up:
-      need_repaint = true;
-      d->current_line_index = std::max(0, d->current_line_index - 1);
+    case Qt::Key_Up: {
+      auto new_current_line_index = std::max(0, d->current_line_index - 1);
+      if (new_current_line_index != d->current_line_index) {
+        need_repaint = true;
+        d->current_line_index = new_current_line_index;
 
-      // Detect if we need to scroll up to follow the current line.
-      if ((d->current_line_index * d->line_height) < d->scroll_y) {
-        d->ScrollBy(0, -d->line_height);
+        // Detect if we need to scroll up to follow the current line.
+        if ((new_current_line_index * d->line_height) < d->scroll_y) {
+          d->ScrollBy(0, -d->line_height);
+        }
+        dy = -1;
       }
-      dy = -1;
       break;
+    }
 
     // Pressing the down arrow moves the current line down, and maybe triggers
     // a scroll.
-    case Qt::Key_Down:
-      need_repaint = true;
-      d->current_line_index = std::min(
+    case Qt::Key_Down: {
+      auto new_current_line_index = std::min(
           d->scene.num_lines - 1, d->current_line_index + 1);
 
-      // Detect if we need to scroll down to follow the current line.
-      if (((d->current_line_index + 1) * d->line_height) >
-          (d->scroll_y + d->viewport.height())) {
-        d->ScrollBy(0, d->line_height);
+      if (new_current_line_index != d->current_line_index) {
+        need_repaint = true;
+        d->current_line_index = new_current_line_index;
+
+        // Detect if we need to scroll down to follow the current line.
+        if (((new_current_line_index + 1) * d->line_height) >
+            (d->scroll_y + d->viewport.height())) {
+          d->ScrollBy(0, d->line_height);
+        }
+        dy = 1;
       }
-      dy = 1;
       break;
+    }
+
+    // Pressing the left arrow moves the cursor left, and maybe triggers a
+    // scroll.
     case Qt::Key_Left:
       dx = -1;
+      if (d->cursor) {
+        auto new_cursor = d->NextCursorPosition(d->cursor.value(), -1, 0);
+        if ((new_cursor.x() - d->scroll_x) < 0) {
+          need_repaint = true;
+          d->ScrollBy(
+              static_cast<int>(-std::ceil(d->cursor->x() - new_cursor.x())), 0);
+
+          // If we get to the right edge of our left margin, then put us back at
+          // zero.
+          if (d->scroll_x <= d->space_width) {
+            d->scroll_x = 0;
+          }
+        }
+      }
       break;
+
+    // Pressing the right arrow moves the cursor left, and maybe triggers a
+    // scroll.
     case Qt::Key_Right:
       dx = 1;
+      if (d->cursor) {
+        auto new_cursor = d->NextCursorPosition(d->cursor.value(), 1, 0);
+        if ((new_cursor.x() - d->scroll_x) >= d->viewport.width()) {
+          need_repaint = true;
+          d->ScrollBy(
+              static_cast<int>(std::ceil(new_cursor.x() - d->cursor->x())), 0);
+        }
+      }
       break;
+
     default:
       if (d->current_entity && d->primary_click_model.token) {
         QString modifier;
