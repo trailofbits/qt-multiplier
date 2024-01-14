@@ -15,6 +15,8 @@ namespace mx::gui {
 class ProxyTheme Q_DECL_FINAL : public ITheme {
   Q_OBJECT
 
+  ProxyTheme(void) = delete;
+
  public:
 
   std::vector<IThemeProxyPtr> proxies;
@@ -22,7 +24,7 @@ class ProxyTheme Q_DECL_FINAL : public ITheme {
 
   virtual ~ProxyTheme(void);
 
-  ProxyTheme(ITheme *current_theme_, QObject *parent);
+  ProxyTheme(ITheme *current_theme_, QObject *parent = nullptr);
 
   void Add(IThemeProxyPtr proxy);
 

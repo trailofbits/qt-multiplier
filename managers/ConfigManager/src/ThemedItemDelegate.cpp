@@ -12,12 +12,14 @@
 #include <QFont>
 #include <QFontMetricsF>
 #include <QPainter>
+#include <QPixmap>
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
 #include <QSizeF>
 #include <QStyle>
 #include <QStyleOptionViewItem>
+#include <QTextOption>
 
 #include <multiplier/Frontend/TokenKind.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
@@ -61,6 +63,8 @@ inline static QPointF GetRectPosition(const QRect &rect) {
 }
 #endif
 
+static const QTextOption kTextOption(Qt::AlignLeft);
+
 }  // namespace
 
 ThemedItemDelegate::~ThemedItemDelegate(void) {}
@@ -79,7 +83,26 @@ ThemedItemDelegate::ThemedItemDelegate(
       theme_background_color(theme->DefaultBackgroundColor()),
       theme_highlight_color(theme->CurrentLineBackgroundColor()),
       model(new ThemedItemModel(this)),
-      whitespace_replacement(whitespace_replacement_) {}
+      whitespace_replacement(whitespace_replacement_) {
+
+  // Use a "dummy" painter to try to better estimate some baseline sizes.
+  qreal max_char_width = font_metrics.maxWidth();
+  QPixmap dummy_pixmap(static_cast<int>(max_char_width * 4),
+                       static_cast<int>(line_height * 4));
+  QPainter p(&dummy_pixmap);
+
+  QFont bold_italic_font = theme_font;
+  bold_italic_font.setWeight(QFont::DemiBold);
+  bold_italic_font.setItalic(true);
+  p.setFont(bold_italic_font);
+
+  auto r = p.boundingRect(QRectF(max_char_width, line_height,
+                                 max_char_width * 3, line_height * 3),
+                          " ", kTextOption);
+  
+  space_width = std::max(space_width, std::ceil(r.width()));
+  line_height = std::max(line_height, std::ceil(r.height()));
+}
 
 //! Generate the characters of `data`. If `whitespace` has a value, then we
 //! encode any sequence of whitespace into a single space token. Also in this

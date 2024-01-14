@@ -29,37 +29,41 @@ ThemeManager::ThemeManager(QApplication &application, QObject *parent)
     : QObject(parent),
       d(std::make_shared<ThemeManagerImpl>(application)) {
 
-  d->proxy_theme.reset(new ProxyTheme(nullptr, this));
+  d->proxy_theme.reset(new ProxyTheme(nullptr));
 
   connect(d->proxy_theme.get(), &ProxyTheme::UninstallProxy,
-          [this] (void) {
-            d->current_theme = d->proxy_theme->current_theme;
-            d->current_theme->Apply(d->application);
-            emit ThemeChanged(*this);
-          });
+          this, [this] (void) {
+                  d->current_theme = d->proxy_theme->current_theme;
+                  d->current_theme->Apply(d->application);
+                  emit ThemeChanged(*this);
+                });
 
   connect(d->proxy_theme.get(), &ITheme::ThemeChanged,
-          [this] (void) {
-            d->proxy_theme->current_theme->Apply(d->application);
-            emit ThemeChanged(*this);
-          });
+          this, [this] (void) {
+                  d->proxy_theme->current_theme->Apply(d->application);
+                  emit ThemeChanged(*this);
+                });
 }
 
 //! Register a theme with the manager.
 void ThemeManager::Register(std::unique_ptr<ITheme> theme) {
 
   auto raw_theme_ptr = d->themes.emplace_back(std::move(theme)).get();
-  raw_theme_ptr->setParent(this);
+
+  // NOTE(pag): We take ownership of memory management of themes. Don't let
+  //            Qt's `QObjectPrivate::deleteChildren` be responsible for
+  //            deleting these.
+  raw_theme_ptr->setParent(nullptr);
 
   // Connect the internal theme change of the theme itself to a publication
   // of a full theme change to the rest of the app.
   connect(raw_theme_ptr, &ITheme::ThemeChanged,
-          [raw_theme_ptr, this] (void) {
-            if (d->current_theme == raw_theme_ptr) {
-              raw_theme_ptr->Apply(d->application);
-              emit ThemeChanged(*this);
-            }
-          });
+          this, [raw_theme_ptr, this] (void) {
+                  if (d->current_theme == raw_theme_ptr) {
+                    raw_theme_ptr->Apply(d->application);
+                    emit ThemeChanged(*this);
+                  }
+                });
 
   emit ThemeListChanged(*this);
 

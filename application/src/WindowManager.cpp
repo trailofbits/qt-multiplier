@@ -104,17 +104,17 @@ void WindowManager::AddCentralWidget(IWindowWidget *widget,
   d->tab_widget->InsertTab(0, widget, config.keep_title_up_to_date);
 
   connect(widget, &IWindowWidget::Shown,
-          [=, this] (void) {
-            d->tab_widget->setCurrentWidget(widget);
-          });
+          d->tab_widget, [=, this] (void) {
+                            d->tab_widget->setCurrentWidget(widget);
+                          });
 
   connect(widget, &IWindowWidget::Closed,
-          [=, this] (void) {
-            auto index = d->tab_widget->indexOf(widget);
-            if (index != -1) {
-              d->tab_widget->RemoveTab(index);
-            }
-          });
+          d->tab_widget, [=, this] (void) {
+                            auto index = d->tab_widget->indexOf(widget);
+                            if (index != -1) {
+                              d->tab_widget->RemoveTab(index);
+                            }
+                          });
 
   // If the widget requested a click, then do it.
   connect(widget, &IWindowWidget::RequestPrimaryClick,
@@ -169,22 +169,22 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
 
   // If the dock's internal widget is closed, then remove the dock item.
   connect(widget, &IWindowWidget::Closed,
-          [=, this] (void) {
-            RemoveDockWidget(dock_widget);
-          });
+          dock_widget, [=, this] (void) {
+                         RemoveDockWidget(dock_widget);
+                       });
 
   // If the dock's internal widget is shown, then show it.
   connect(widget, &IWindowWidget::Shown,
-          [=] (void) {
-            dock_widget->show();
-            dock_widget->raise();
-          });
+          dock_widget, [=] (void) {
+                          dock_widget->show();
+                          dock_widget->raise();
+                        });
 
   // If the dock's internal widget is hidden, then remove the dock item.
   connect(widget, &IWindowWidget::Hidden,
-          [=] (void) {
-            dock_widget->hide();
-          });
+          dock_widget, [=] (void) {
+                         dock_widget->hide();
+                       });
 
   // If the widget requested a click, then do it.
   connect(widget, &IWindowWidget::RequestPrimaryClick,

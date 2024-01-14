@@ -16,7 +16,7 @@ IBuiltinTheme::~IBuiltinTheme(void) {}
 
 IBuiltinTheme::IBuiltinTheme(const MediaManager &media, QString name_, QString id_,
                              QPalette palette_, const ThemeData &data_)
-    : font(media.Font("Times New Roman")),
+    : font(media.Font("Snell Roundhand")),
       id(std::move(id_)),
       name(std::move(name_)),
       palette(std::move(palette_)),

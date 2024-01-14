@@ -945,7 +945,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   d->RecomputeCanvas();
 
   QPainter blitter(this);
-  blitter.eraseRect(d->viewport);
+  blitter.setRenderHints(QPainter::Antialiasing);
 
   // Fill the viewport with the theme background color.
   blitter.fillRect(d->viewport, d->theme_background_color);
@@ -1002,7 +1002,12 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   // Overlay the code foreground layer with contrasting text for the highlighted
   // entities.
   if (d->current_entity && highlight_foreground_color.isValid()) {
+
+    // NOTE(pag): By setting `cs.background_color = QColor();` below, we make
+    //            sure this painter won't be used, and so we don't anticipate
+    //            Qt reporting painter device errors.
     QPainter dummy_bg_painter;
+
     for (auto it = re_it; it != re_end_it && it->first == related_entity_id;
          ++it) {
       const Entity &e = d->scene.entities[it->second];
@@ -1273,14 +1278,19 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 
   QImage fg(static_cast<int>(canvas_rect.width() * dpi_ratio),
             static_cast<int>(canvas_rect.height() * dpi_ratio),
-            QImage::Format_RGBA8888);
+            QImage::Format_ARGB32_Premultiplied);
 
   QImage bg(static_cast<int>(canvas_rect.width() * dpi_ratio),
             static_cast<int>(canvas_rect.height() * dpi_ratio),
-            QImage::Format_RGBA8888);
+            QImage::Format_ARGB32_Premultiplied);
 
   fg.setDevicePixelRatio(dpi_ratio);
   bg.setDevicePixelRatio(dpi_ratio);
+
+  // Fill the contents with transparent pixels, rather than leaving them
+  // undefined.
+  fg.fill(0);
+  bg.fill(0);
 
   QPainter fg_painter(&fg);
   QPainter bg_painter(&bg);
@@ -1402,11 +1412,11 @@ void CodeWidget::PrivateData::PaintToken(
       token_rect_valid = true;
     }
 
+    token_rect.moveTo(QPointF(x, y));
     if (bg_valid) {
       bg_painter.fillRect(token_rect, cs.background_color);
     }
 
-    token_rect.moveTo(QPointF(x, y));
     fg_painter.drawText(token_rect, data.text, to);
     x += token_rect.width();
   }
@@ -1490,6 +1500,7 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->scene_changed = true;
   d->canvas_changed = true;
   d->current_entity = nullptr;
+  d->cursor.reset();
   d->primary_click_model.token = {};
   d->secondary_click_model.token = {};
   d->key_press_model.token = {};

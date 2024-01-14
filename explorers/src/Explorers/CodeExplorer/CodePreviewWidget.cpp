@@ -118,10 +118,10 @@ CodePreviewWidget::CodePreviewWidget(
     sync->setToolTip(tr("Keep in sync with preview requests in other views"));
 #endif
 
-    connect(d->history, &HistoryWidget::GoToEntity, this,
-            [this] (VariantEntity original_entity, VariantEntity) {
-              emit HistoricalEntitySelected(std::move(original_entity));
-            });
+    connect(d->history, &HistoryWidget::GoToEntity,
+            this, [this] (VariantEntity original_entity, VariantEntity) {
+                    emit HistoricalEntitySelected(std::move(original_entity));
+                  });
 
     connect(sync, &QCheckBox::stateChanged,
             this, &CodePreviewWidget::OnChangeSync);

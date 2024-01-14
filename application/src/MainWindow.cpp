@@ -119,16 +119,15 @@ void MainWindow::InitializeThemes(void) {
 }
 
 //! Keep the theme selection menu up-to-date with the set of registered themes.
-void MainWindow::OnThemeListChanged(const ThemeManager &theme_manager) {
+void MainWindow::OnThemeListChanged(const ThemeManager &) {
   d->view_theme_menu->clear();
 
-  auto current_theme = theme_manager.Theme();
-
-  for (auto theme : theme_manager.ThemeList()) {
-    auto action = new QAction(theme->Name());
+  auto theme_manager_ptr = &(d->config_manager.ThemeManager());
+  for (auto theme : theme_manager_ptr->ThemeList()) {
+    auto action = new QAction(theme->Name(), d->view_theme_menu);
     connect(action, &QAction::triggered,
-            [theme = std::move(theme), this] (void) {
-              d->config_manager.ThemeManager().SetTheme(std::move(theme));
+            theme_manager_ptr, [=, theme = std::move(theme)] (void) {
+              theme_manager_ptr->SetTheme(std::move(theme));
             });
     d->view_theme_menu->addAction(action);
   }

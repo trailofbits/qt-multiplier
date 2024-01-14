@@ -104,9 +104,9 @@ void TreeGeneratorWidget::InstallModel(void) {
   // tree view!
   auto tree_selection_model = d->tree_widget->selectionModel();
   connect(tree_selection_model, &QItemSelectionModel::currentChanged,
-          [this] (const QModelIndex &a, const QModelIndex &b) {
-            OnCurrentItemChanged(a, b);
-          });
+          this, [this] (const QModelIndex &a, const QModelIndex &b) {
+                  OnCurrentItemChanged(a, b);
+                });
 
   connect(d->model_proxy, &QAbstractItemModel::modelReset,
           this, &TreeGeneratorWidget::OnModelReset);
@@ -168,9 +168,9 @@ void TreeGeneratorWidget::InitializeWidgets(
           this, &TreeGeneratorWidget::OnOpenItemContextMenu);
 
   connect(d->tree_widget, &QAbstractItemView::clicked,
-          [this] (const QModelIndex &index) {
-            OnCurrentItemChanged(index, {});
-          });
+          this, [this] (const QModelIndex &index) {
+                  OnCurrentItemChanged(index, {});
+                });
 
   // Make sure we can render tokens, if need be.
   config_manager.InstallItemDelegate(d->tree_widget);
@@ -284,9 +284,9 @@ void TreeGeneratorWidget::ActOnContextMenu(
   auto open_action = new QAction(tr("Open"), menu);
   menu->addAction(open_action);
   connect(open_action, &QAction::triggered,
-          [=, this] (void) {
-            emit OpenItem(selected_index);
-          });
+          this, [=, this] (void) {
+                  emit OpenItem(selected_index);
+                });
 
   auto is_duplicate = index.data(TreeGeneratorModel::IsDuplicate);
   if (!is_duplicate.isValid() || !is_duplicate.toBool()) {
@@ -313,17 +313,17 @@ void TreeGeneratorWidget::ActOnContextMenu(
       action->setIcon(d->expand_item_icon_n[i]);
 
       connect(action, &QAction::triggered,
-              [=, this] (void) {
-                d->model->Expand(selected_index, i + 1u);
-              });
+              this, [=, this] (void) {
+                      d->model->Expand(selected_index, i + 1u);
+                    });
     }
   } else {
     auto goto_action = new QAction(tr("Goto Original"), menu);
     menu->addAction(goto_action);
     connect(goto_action, &QAction::triggered,
-            [=, this] (void) {
-              GotoOriginal(selected_index);
-            });
+            this, [=, this] (void) {
+                    GotoOriginal(selected_index);
+                  });
   }
 }
 

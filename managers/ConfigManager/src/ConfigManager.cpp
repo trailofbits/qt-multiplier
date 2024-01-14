@@ -79,8 +79,11 @@ void ConfigManager::InstallItemDelegate(
   auto set_delegate = [=] (const class ThemeManager &self) {
     QAbstractItemDelegate *old_delegate = view->itemDelegate();
 
+    auto theme = self.Theme();
+    view->setFont(theme->Font());
+
     auto new_delegate = new ThemedItemDelegate(
-        self.Theme(), config.whitespace_replacement,
+        std::move(theme), config.whitespace_replacement,
         4u  /* TODO(pag): Take from config manager. */, view);
     view->setItemDelegate(new_delegate);
 
@@ -91,7 +94,7 @@ void ConfigManager::InstallItemDelegate(
 
   set_delegate(d->theme_manager);
   connect(&(d->theme_manager), &ThemeManager::ThemeChanged,
-          std::move(set_delegate));
+          view, std::move(set_delegate));
 }
 
 }  // namespace mx::gui

@@ -125,9 +125,9 @@ void ListGeneratorWidget::InitializeWidgets(
           this, &ListGeneratorWidget::OnOpenItemContextMenu);
 
   connect(d->list_widget, &QAbstractItemView::clicked,
-          [this] (const QModelIndex &index) {
-            OnCurrentItemChanged(index, {});
-          });
+          this, [this] (const QModelIndex &index) {
+                  OnCurrentItemChanged(index, {});
+                });
 
   // Make sure we can render tokens, if need be.
   config_manager.InstallItemDelegate(d->list_widget);
@@ -225,14 +225,14 @@ void ListGeneratorWidget::ActOnContextMenu(
   menu->addMenu(sort_menu);
 
   connect(sort_ascending_order, &QAction::triggered,
-          [this] (void) {
-            d->model_proxy->sort(0, Qt::AscendingOrder);
-          });
+          this, [this] (void) {
+                  d->model_proxy->sort(0, Qt::AscendingOrder);
+                });
 
   connect(sort_descending_order, &QAction::triggered,
-          [this] (void) {
-            d->model_proxy->sort(0, Qt::DescendingOrder);
-          });
+          this, [this] (void) {
+                  d->model_proxy->sort(0, Qt::DescendingOrder);
+                });
 }
 
 bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {

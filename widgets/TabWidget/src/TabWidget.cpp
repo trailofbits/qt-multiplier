@@ -23,12 +23,12 @@ TabWidget::TabWidget(QWidget *parent)
 
 void TabWidget::TrackTitle(QWidget *widget) {
   connect(widget, &QWidget::windowTitleChanged,
-          [=, this] (const QString &new_title) {
-            auto index = indexOf(widget);
-            if (index != -1) {
-              setTabText(index, new_title);
-            }
-          });
+          this, [=, this] (const QString &new_title) {
+                  auto index = indexOf(widget);
+                  if (index != -1) {
+                    setTabText(index, new_title);
+                  }
+                });
 }
 
 void TabWidget::AddTab(QWidget *widget, bool update_title) {

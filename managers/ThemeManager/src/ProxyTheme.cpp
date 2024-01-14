@@ -12,14 +12,17 @@ namespace mx::gui {
 
 ProxyTheme::~ProxyTheme(void) {}
 
-ProxyTheme::ProxyTheme(ITheme *current_theme_,
-                       QObject *parent)
+ProxyTheme::ProxyTheme(ITheme *current_theme_, QObject *parent)
     : ITheme(parent),
       current_theme(current_theme_) {}
 
 void ProxyTheme::Add(IThemeProxyPtr proxy) {
   auto raw_proxy_ptr = proxies.emplace_back(std::move(proxy)).get();
-  raw_proxy_ptr->setParent(this);
+
+  // NOTE(pag): We take ownership of memory management of themes. Don't let
+  //            Qt's `QObjectPrivate::deleteChildren` be responsible for
+  //            deleting these.
+  raw_proxy_ptr->setParent(nullptr);
 
   // Forward a proxy change into a theme change.
   connect(raw_proxy_ptr, &IThemeProxy::ThemeProxyChanged,

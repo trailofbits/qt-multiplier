@@ -39,9 +39,13 @@ class ThemedItemDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   const IThemePtr theme;
   const QFont theme_font;
   const QFontMetricsF font_metrics;
-  const qreal line_height;
-  const qreal space_width;
-  const qreal tab_width;
+
+  // Need to be computed with a `QPainter`. The `QFontMetricsF` generally tends
+  // to under-approximate these.
+  qreal line_height;
+  qreal space_width;
+  qreal tab_width;
+
   const QColor theme_foreground_color;
   const QColor theme_background_color;
   const QColor theme_highlight_color;

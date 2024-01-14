@@ -148,9 +148,9 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
   code_widget->SetTokenTree(tt);
 
   connect(code_widget, &IWindowWidget::Closed,
-          [=, this] (void) {
-            d->opened_windows.erase(id);
-          });
+          this, [=, this] (void) {
+                  d->opened_windows.erase(id);
+                });
 
   IWindowManager::CentralConfig config;
   d->manager->AddCentralWidget(code_widget, config);
@@ -172,11 +172,11 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data) {
     // When the user navigates the history, make sure that we change what the
     // view shows.
     connect(d->preview, &CodePreviewWidget::HistoricalEntitySelected,
-            [this] (VariantEntity entity) {
-              d->preview->DisplayEntity(
-                  std::move(entity), true  /* explicit request */,
-                  false  /* add to history */);
-            });
+            d->preview, [this] (VariantEntity entity) {
+                          d->preview->DisplayEntity(
+                              std::move(entity), true  /* explicit request */,
+                              false  /* add to history */);
+                        });
   
     IWindowManager::DockConfig config;
     config.id = "com.trailofbits.dock.CodePreview";

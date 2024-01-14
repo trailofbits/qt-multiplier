@@ -235,9 +235,9 @@ void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
   // Keep the font up-to-date.
   d->search_input->setFont(theme_manager.Theme()->Font());
   connect(&theme_manager, &ThemeManager::ThemeChanged,
-          [this] (const ThemeManager &tm) {
-            d->search_input->setFont(tm.Theme()->Font());
-          });
+          d->search_input, [this] (const ThemeManager &tm) {
+                             d->search_input->setFont(tm.Theme()->Font());
+                           });
 
   connect(d->search_input, &QLineEdit::textChanged,
           this, &EntityExplorer::QueryParametersChanged);

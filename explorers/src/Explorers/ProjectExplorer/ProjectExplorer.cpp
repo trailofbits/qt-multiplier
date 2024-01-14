@@ -97,24 +97,24 @@ void ProjectExplorer::ActOnContextMenu(
   menu->addMenu(sort_menu);
 
   connect(sort_ascending_order, &QAction::triggered,
-          [this] (void) {
-            d->view->SortAscending();
-          });
+          this, [this] (void) {
+                  d->view->SortAscending();
+                });
 
   connect(sort_descending_order, &QAction::triggered,
-          [this] (void) {
-            d->view->SortDescending();
-          });
+          this, [this] (void) {
+                  d->view->SortDescending();
+                });
 
   connect(copy_full_path, &QAction::triggered,
-          [=] (void) {
-            qApp->clipboard()->setText(full_path);
-          });
+          this, [=] (void) {
+                  qApp->clipboard()->setText(full_path);
+                });
 
   connect(set_root_action, &QAction::triggered,
-          [=, this] (void) {
-            d->view->SetRoot(index);
-          });
+          this, [=, this] (void) {
+                  d->view->SetRoot(index);
+                });
 }
 
 void ProjectExplorer::OnIndexChanged(const ConfigManager &config_manager) {
