@@ -58,7 +58,7 @@ static const QColor kCursorColor = QColor::fromRgb(0x1e, 0x1e, 0x1e);
 
 static const IBuiltinTheme::ThemeData kLightThemeData{
   // selected_line_background_color
-  QColor::fromRgb(236, 236, 236),
+  QColor::fromRgb(232, 240, 252),
 
   // highlighted_entity_background_color
   QColor::fromRgb(204, 204, 255),
