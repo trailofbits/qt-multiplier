@@ -26,6 +26,9 @@ namespace {
 static const QKeySequence kKeySeqP("P");
 static const QKeySequence kKeySeqShiftP("Shift+P");
 
+static const QString kOpenEntityModelPrefix(
+    "com.trailofbits.CodeViewModel");
+
 }  // namespace
 
 struct CodeExplorer::PrivateData {
@@ -64,10 +67,21 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
       &CodeExplorer::OnPinnedPreviewEntity);
 }
 
-void CodeExplorer::ActOnPrimaryClick(IWindowManager *manager,
+void CodeExplorer::ActOnPrimaryClick(IWindowManager *,
                                      const QModelIndex &index) {
-  (void) manager;
-  (void) index;
+  if (!index.isValid()) {
+    return;
+  }
+
+  // Clicking in a code widget created by the code explorer should open the
+  // code.
+  if (IModel::ModelId(index) == CodePreviewWidget::kModelPrefix &&
+      IModel::ModelId(index) == kOpenEntityModelPrefix) {
+    return;
+  }
+
+  OnOpenEntity(QVariant::fromValue<VariantEntity>(
+      IModel::EntitySkipThroughTokens(index)));
 }
 
 std::optional<NamedAction> CodeExplorer::ActOnKeyPress(
@@ -132,7 +146,8 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
     code_widget->show();
     return;
   }
-  code_widget = new CodeWidget(d->config_manager);
+
+  code_widget = new CodeWidget(d->config_manager, kOpenEntityModelPrefix);
 
   // Figure out the window title.
   if (file) {
@@ -201,13 +216,6 @@ void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
   }
 
   auto preview = new CodePreviewWidget(d->config_manager, false);
-
-  connect(preview, &CodePreviewWidget::RequestPrimaryClick,
-          this, &IMainWindowPlugin::RequestPrimaryClick);
-
-  connect(preview, &CodePreviewWidget::RequestSecondaryClick,
-          this, &IMainWindowPlugin::RequestSecondaryClick);
-
   if (auto name = NameOfEntityAsString(entity)) {
     preview->setWindowTitle(
         tr("Preview of `%1`").arg(name.value()));

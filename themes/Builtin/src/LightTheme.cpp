@@ -109,7 +109,7 @@ static const IBuiltinTheme::ThemeData kLightThemeData{
     [TCI(TEMPLATE_PARAMETER_TYPE)] = {QColor::fromRgb(0, 0, 0), {}, false, true, false, false},
     [TCI(TEMPLATE_PARAMETER_VALUE)] = {QColor::fromRgb(0, 128, 128), {}, false, false, false, true},
     [TCI(LABEL)] = {QColor::fromRgb(16, 16, 16), {}, false, false, false, false},
-    [TCI(WHITESPACE)] = {kDefaultLightForegroundColor, {}, false, false, false, false},
+    [TCI(WHITESPACE)] = {QColor::fromRgb(51, 51, 51), {}, false, false, false, false},
     [TCI(FILE_NAME)] = {QColor::fromRgb(206, 18, 18), {}, false, false, false, false},
     [TCI(LINE_NUMBER)] = {QColor::fromRgb(0, 0, 0), {}, false, false, false, false},
     [TCI(COLUMN_NUMBER)] = {QColor::fromRgb(0, 0, 0), {}, false, false, false, false},

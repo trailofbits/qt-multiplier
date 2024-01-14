@@ -18,6 +18,7 @@
 #include <multiplier/Index.h>
 
 QT_BEGIN_NAMESPACE
+class QFocusEvent;
 class QKeyEvent;
 class QKeySequence;
 class QMouseEvent;
@@ -58,12 +59,17 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
  public:
   virtual ~CodeWidget(void);
 
+  // Create a code widget with the given configuration manager (used for theme
+  // access), and `model_id`, which is used to identify the model used by the
+  // signals emitted by this widget.
   CodeWidget(const ConfigManager &config_manager,
+             const QString &model_id,
              QWidget *parent = nullptr);
 
   void SetTokenTree(const TokenTree &token_tree);
 
  protected:
+  void focusOutEvent(QFocusEvent *event) Q_DECL_FINAL;
   void resizeEvent(QResizeEvent *event) Q_DECL_FINAL;
   void paintEvent(QPaintEvent *event) Q_DECL_FINAL;
   void mousePressEvent(QMouseEvent *event) Q_DECL_FINAL;

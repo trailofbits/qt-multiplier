@@ -59,7 +59,7 @@ struct CodePreviewWidget::PrivateData {
 
   inline PrivateData(const ConfigManager &config_manager, bool enable_history,
                      QWidget *parent)
-      : code(new CodeWidget(config_manager, parent)),
+      : code(new CodeWidget(config_manager, kModelPrefix, parent)),
         toolbar(enable_history ? new QToolBar(parent) : nullptr),
         history(
             enable_history ?
@@ -69,6 +69,9 @@ struct CodePreviewWidget::PrivateData {
         pinned_entity_info_trigger(config_manager.ActionManager().Find(
             "com.trailofbits.action.OpenPinnedEntityPreview")) {}
 };
+
+const QString CodePreviewWidget::kModelPrefix(
+    "com.trailofbits.CodePreviewModel");
 
 CodePreviewWidget::~CodePreviewWidget(void) {}
 

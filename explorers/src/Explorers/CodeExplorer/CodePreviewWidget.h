@@ -27,6 +27,8 @@ class CodePreviewWidget Q_DECL_FINAL : public IWindowWidget {
   std::unique_ptr<PrivateData> d;
 
  public:
+  static const QString kModelPrefix;
+
   //! Constructor
   CodePreviewWidget(const ConfigManager &config_manager,
                     bool enable_history, QWidget *parent = nullptr);

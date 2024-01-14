@@ -235,8 +235,9 @@ struct SceneBuilder {
   }
 
   Scene TakeScene(void) & {
-    scene.logical_line_index.emplace_back(
-        static_cast<unsigned>(scene.entities.size()));
+    scene.logical_line_index.resize(static_cast<unsigned>(scene.num_lines + 1));
+    scene.logical_line_index.back()
+        = static_cast<unsigned>(scene.entities.size());
     std::sort(scene.related_entity_ids.begin(), scene.related_entity_ids.end());
     return std::move(scene);
   }
@@ -247,13 +248,15 @@ class TokenModel Q_DECL_FINAL : public IModel {
   Q_OBJECT
 
  public:
+  QString model_id;
   Token token;
   QString text;
 
   virtual ~TokenModel(void) = default;
 
-  TokenModel(QObject *parent = nullptr)
-      : IModel(parent) {}
+  TokenModel(const QString &model_id_, QObject *parent = nullptr)
+      : IModel(parent),
+        model_id(model_id_) {}
 
   QModelIndex index(
       int row, int column, const QModelIndex &parent) const Q_DECL_FINAL {
@@ -294,7 +297,7 @@ class TokenModel Q_DECL_FINAL : public IModel {
         case IModel::TokenRangeDisplayRole:
           return QVariant::fromValue<TokenRange>(token);
         case IModel::ModelIdRole:
-          return "com.trailofbits.model.CodeWidget.TokenModel";
+          return model_id;
         case Qt::DisplayRole:
           return text;
       }
@@ -359,9 +362,7 @@ struct CodeWidget::PrivateData {
   // The current entity under the cursor.
   const Entity *current_entity{nullptr};
 
-  TokenModel primary_click_model;
-  TokenModel secondary_click_model;
-  TokenModel key_press_model;
+  TokenModel token_model;
 
   // Data structure keeping track of the logical things to render, and
   // where to render them. The act of rendering updates `Entity`s in the
@@ -380,10 +381,11 @@ struct CodeWidget::PrivateData {
   QScrollBar *horizontal_scrollbar{nullptr};
   QScrollBar *vertical_scrollbar{nullptr};
 
-  inline PrivateData(void)
+  inline PrivateData(const QString &model_id)
       : monospace(" "),
         to(Qt::AlignLeft),
-        dpi_ratio(qApp->devicePixelRatio()) {}
+        dpi_ratio(qApp->devicePixelRatio()),
+        token_model(model_id) {}
 
   void UpdateScrollbars(void);
   void RecomputeScene(void);
@@ -418,22 +420,21 @@ struct CodeWidget::PrivateData {
                                      qreal dir_y) const;
   QPointF ClampCursorPosition(QPointF point) const;
 
-  QModelIndex CreateModelIndex(TokenModel &model, const Entity *entity);
-
+  QModelIndex CreateModelIndex(const Entity *entity);
 };
 
-// Fills `model` (e.g. `PrivateData::primary_click_model`) with information from
+// Fills `model` (e.g. `PrivateData::token_model`) with information from
 // `entity` sufficient to satisfy the `IModel` interface, so that we can
 // publish `QModelIndex`es in our signals, e.g. `RequestPrimaryClick`.
-QModelIndex CodeWidget::PrivateData::CreateModelIndex(
-    TokenModel &model, const Entity *entity) {
+QModelIndex CodeWidget::PrivateData::CreateModelIndex(const Entity *entity) {
   if (!entity) {
     return {};
   }
 
-  model.token = scene.tokens[entity->token_index];
-  model.text = scene.data[entity->data_index_and_config >> kFormatShift].text;
-  return model.index(0, 0, {});
+  token_model.token = scene.tokens[entity->token_index];
+  token_model.text
+      = scene.data[entity->data_index_and_config >> kFormatShift].text;
+  return token_model.index(0, 0, {});
 }
 
 // Import a choice node.
@@ -518,12 +519,22 @@ void CodeWidget::PrivateData::ImportTokenNode(
 
       // TODO(pag): Configurable tab width; tab stops
       case QChar::Tabulation:
-        b.AddColumn(kTabWidth);
+        if (token.kind() == TokenKind::WHITESPACE) {
+          b.AddColumn(kTabWidth);
+        } else {
+          for (auto i = 0u; i < kTabWidth; ++i) {
+            b.AddChar(QChar::Space);
+          }
+        }
         break;
 
       case QChar::Space:
       case QChar::Nbsp:
-        b.AddColumn();
+        if (token.kind() == TokenKind::WHITESPACE) {
+          b.AddColumn();
+        } else {
+          b.AddChar(QChar::Space);
+        }
         break;
 
       case QChar::ParagraphSeparator:
@@ -642,12 +653,12 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
   auto y = point.y();
 
   auto line_index = static_cast<unsigned>(std::floor(y / line_height));
-  if (line_index >= scene.logical_line_index.size()) {
+  if ((line_index + 1u) >= scene.logical_line_index.size()) {
     return CursorPositionFixed(point);
   }
 
   auto i = scene.logical_line_index[line_index];
-  auto max_i = scene.logical_line_index[line_index + 1];
+  auto max_i = scene.logical_line_index[line_index + 1u];
 
   const Entity *prev_entity = nullptr;
   const Data *prev_data = nullptr;
@@ -755,7 +766,7 @@ QPointF CodeWidget::PrivateData::ClampCursorPosition(QPointF point) const {
       std::max<qreal>(
           0,
           std::min(std::max(c_height - line_height, v_height - line_height),
-                   point.y())));
+                   std::min<qreal>(line_height * scene.num_lines, point.y()))));
 }
 
 // Locate the next cursor position (left or right, up or down).
@@ -791,9 +802,9 @@ QPointF CodeWidget::PrivateData::NextCursorPositionFixed(
 QPointF CodeWidget::PrivateData::NextCursorPositionVariable(
     QPointF curr_cursor, qreal dir_x, qreal dir_y) const {
 
-  // Hopefully quarters of the space width are smaller than the smallest
+  // Hopefully eighths of the space width are smaller than the smallest
   // horizontal advance of a character in the font.
-  auto incr = (space_width / 4) * dir_x;
+  auto incr = (space_width / 8.0) * dir_x;
 
   // Opportunistically search for the next X position of the cursor.
   qreal char_width = space_width;
@@ -827,12 +838,12 @@ const Entity *CodeWidget::PrivateData::EntityUnderPoint(QPointF point) const {
   auto y = point.y();
 
   auto line_index = static_cast<unsigned>(std::floor(y / line_height));
-  if (line_index >= scene.logical_line_index.size()) {
+  if ((line_index + 1u) >= scene.logical_line_index.size()) {
     return nullptr;
   }
 
   auto i = scene.logical_line_index[line_index];
-  auto max_i = scene.logical_line_index[line_index + 1];
+  auto max_i = scene.logical_line_index[line_index + 1u];
 
   for (; i < max_i; ++i) {
     const Entity &e = scene.entities[i];
@@ -857,9 +868,10 @@ const Entity *CodeWidget::PrivateData::EntityUnderPoint(QPointF point) const {
 CodeWidget::~CodeWidget(void) {}
 
 CodeWidget::CodeWidget(const ConfigManager &config_manager,
+                       const QString &model_id,
                        QWidget *parent)
     : IWindowWidget(parent),
-      d(new PrivateData) {
+      d(new PrivateData(model_id)) {
 
   // d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
   // d->vertical_scrollbar->setSingleStep(1);
@@ -905,6 +917,13 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
 
   connect(&media_manager, &MediaManager::IconsChanged,
           this, &CodeWidget::OnIconsChanged);
+}
+
+void CodeWidget::focusOutEvent(QFocusEvent *) {
+  if (d->cursor) {
+    d->cursor.reset();
+    update();
+  }
 }
 
 void CodeWidget::resizeEvent(QResizeEvent *event) {
@@ -1054,33 +1073,30 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
   const Entity *entity = d->EntityUnderPoint(scrolled_xy);
 
-  d->primary_click_model.token = {};
-  d->secondary_click_model.token = {};
-  d->key_press_model.token = {};
+  d->token_model.token = {};
 
   // Calculate the index of the current line.
   if (event->buttons() & Qt::LeftButton) {
-    auto new_current_line_index = static_cast<int>(std::floor(y / d->line_height));
+    d->cursor = d->CursorPosition(scrolled_xy);
+
+    // Calculate the current line index based on the clamped cursor.
+    auto new_current_line_index = static_cast<int>(
+        std::floor(d->cursor->y() / d->line_height));
     if (new_current_line_index != d->current_line_index) {
       d->current_line_index = new_current_line_index;
     }
 
     d->current_entity = entity;
-    emit RequestPrimaryClick(
-        d->CreateModelIndex(d->primary_click_model, entity));
-
-    d->cursor = d->CursorPosition(scrolled_xy);
+    emit RequestPrimaryClick(d->CreateModelIndex(entity));
 
   } else if (event->buttons() & Qt::RightButton) {
-    emit RequestSecondaryClick(
-        d->CreateModelIndex(d->secondary_click_model, entity));
+    emit RequestSecondaryClick(d->CreateModelIndex(entity));
   }
 
   update();
 }
 
 void CodeWidget::keyPressEvent(QKeyEvent *event) {
-  auto need_repaint = false;
   qreal dx = 0;
   qreal dy = 0;
 
@@ -1088,77 +1104,30 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
     // Pressing the up arrow moves the current line up, and maybe triggers
     // a scroll.
-    case Qt::Key_Up: {
-      auto new_current_line_index = std::max(0, d->current_line_index - 1);
-      if (new_current_line_index != d->current_line_index) {
-        need_repaint = true;
-        d->current_line_index = new_current_line_index;
-
-        // Detect if we need to scroll up to follow the current line.
-        if ((new_current_line_index * d->line_height) < d->scroll_y) {
-          d->ScrollBy(0, -d->line_height);
-        }
-        dy = -1;
-      }
+    case Qt::Key_Up:
+      dy = -1;
       break;
-    }
 
     // Pressing the down arrow moves the current line down, and maybe triggers
     // a scroll.
-    case Qt::Key_Down: {
-      auto new_current_line_index = std::min(
-          d->scene.num_lines - 1, d->current_line_index + 1);
-
-      if (new_current_line_index != d->current_line_index) {
-        need_repaint = true;
-        d->current_line_index = new_current_line_index;
-
-        // Detect if we need to scroll down to follow the current line.
-        if (((new_current_line_index + 1) * d->line_height) >
-            (d->scroll_y + d->viewport.height())) {
-          d->ScrollBy(0, d->line_height);
-        }
-        dy = 1;
-      }
+    case Qt::Key_Down:
+      dy = 1;
       break;
-    }
 
     // Pressing the left arrow moves the cursor left, and maybe triggers a
     // scroll.
     case Qt::Key_Left:
       dx = -1;
-      if (d->cursor) {
-        auto new_cursor = d->NextCursorPosition(d->cursor.value(), -1, 0);
-        if ((new_cursor.x() - d->scroll_x) < 0) {
-          need_repaint = true;
-          d->ScrollBy(
-              static_cast<int>(-std::ceil(d->cursor->x() - new_cursor.x())), 0);
-
-          // If we get to the right edge of our left margin, then put us back at
-          // zero.
-          if (d->scroll_x <= d->space_width) {
-            d->scroll_x = 0;
-          }
-        }
-      }
       break;
 
     // Pressing the right arrow moves the cursor left, and maybe triggers a
     // scroll.
     case Qt::Key_Right:
       dx = 1;
-      if (d->cursor) {
-        auto new_cursor = d->NextCursorPosition(d->cursor.value(), 1, 0);
-        if ((new_cursor.x() - d->scroll_x) >= d->viewport.width()) {
-          need_repaint = true;
-          d->ScrollBy(
-              static_cast<int>(std::ceil(new_cursor.x() - d->cursor->x())), 0);
-        }
-      }
       break;
 
     default:
-      if (d->current_entity && d->primary_click_model.token) {
+      if (d->current_entity && d->cursor) {
         QString modifier;
         if (event->modifiers() & Qt::ShiftModifier) {
           modifier += "Shift+";
@@ -1175,17 +1144,58 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
         emit RequestKeyPress(
             QKeySequence(modifier + QKeySequence(event->key()).toString()),
-            d->CreateModelIndex(d->key_press_model, d->current_entity));
+            d->CreateModelIndex(d->current_entity));
       }
       break;
   }
 
+  if (!d->cursor || (dx == 0 && dy == 0)) {
+    return;
+  }
+
   // Figure out the next cursor position.
-  if (d->cursor && (dx != 0 || dy != 0)) {
-    auto new_cursor = d->NextCursorPosition(d->cursor.value(), dx, dy);
-    if (new_cursor != d->cursor.value()) {
-      need_repaint = true;
-      d->cursor = new_cursor;
+  auto need_repaint = false;
+  auto new_cursor = d->NextCursorPosition(d->cursor.value(), dx, dy);
+  auto new_current_line_index = static_cast<int>(
+      std::floor(new_cursor.y() / d->line_height));
+
+  // Set the current line, and possibly scroll us up or down.
+  if (new_current_line_index != d->current_line_index) {
+    need_repaint = true;
+    d->current_line_index = new_current_line_index;
+
+    // Detect if we need to scroll down to follow the current line.
+    if (dy == 1 && (((new_current_line_index + 1) * d->line_height) >
+                    (d->scroll_y + d->viewport.height()))) {
+      d->ScrollBy(0, d->line_height);
+
+    // Detect if we need to scroll up to follow the current line.
+    } else if (dy == -1 && ((new_current_line_index * d->line_height) <
+                            d->scroll_y)) {
+      d->ScrollBy(0, -d->line_height);
+    }
+  }
+
+  // Set the current cursor, and possible scroll us left or right.
+  if (new_cursor != d->cursor.value()) {
+    need_repaint = true;
+    d->cursor = new_cursor;
+    d->current_entity = d->EntityUnderPoint(new_cursor);
+
+    if (dx == -1 && (new_cursor.x() - d->scroll_x) < 0) {
+      d->ScrollBy(
+          static_cast<int>(-std::ceil(d->cursor->x() - new_cursor.x())), 0);
+
+      // If we get to the right edge of our left margin, then put us back at
+      // zero.
+      if (d->scroll_x <= d->space_width) {
+        d->scroll_x = 0;
+      }
+
+    } else if (dx == 1 && ((new_cursor.x() - d->scroll_x) >=
+                           d->viewport.width())) {
+      d->ScrollBy(
+          static_cast<int>(std::ceil(new_cursor.x() - d->cursor->x())), 0);
     }
   }
 
@@ -1501,9 +1511,7 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->canvas_changed = true;
   d->current_entity = nullptr;
   d->cursor.reset();
-  d->primary_click_model.token = {};
-  d->secondary_click_model.token = {};
-  d->key_press_model.token = {};
+  d->token_model.token = {};
   d->scroll_x = 0;
   d->scroll_y = 0;
   d->current_line_index = -1;

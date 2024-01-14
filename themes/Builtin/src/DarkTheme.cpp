@@ -110,7 +110,7 @@ static const IBuiltinTheme::ThemeData kDarkThemeData{
     [TCI(TEMPLATE_PARAMETER_TYPE)] = {QColor::fromRgb(198, 117, 29), {}, false, false, false, false},
     [TCI(TEMPLATE_PARAMETER_VALUE)] = {QColor::fromRgb(174, 144, 65), {}, false, false, false, true},
     [TCI(LABEL)] = {QColor::fromRgb(149, 149, 149), {}, false, false, false, false},
-    [TCI(WHITESPACE)] = {kDefaultDarkForegroundColor, {}, false, false, false, false},
+    [TCI(WHITESPACE)] = {QColor::fromRgb(93, 93, 93), {}, false, false, false, false},
     [TCI(FILE_NAME)] = {QColor::fromRgb(23, 185, 152), {}, false, false, false, false},
     [TCI(LINE_NUMBER)] = {QColor::fromRgb(109, 132, 140), {}, false, false, false, false},
     [TCI(COLUMN_NUMBER)] = {QColor::fromRgb(109, 132, 140), {}, false, false, false, false},
