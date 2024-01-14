@@ -27,7 +27,7 @@ TreeWidget::TreeWidget(QWidget *parent)
   // The auto scroll takes care of keeping the active item within the
   // visible viewport region. This is true for mouse clicks but also
   // keyboard navigation (i.e. arrow keys, page up/down, etc).
-  setAutoScroll(false);
+  setAutoScroll(true);
 
   // Smooth scrolling.
   setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);

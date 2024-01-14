@@ -134,7 +134,7 @@ void TreeGeneratorWidget::InitializeWidgets(
   // The auto scroll takes care of keeping the active item within the
   // visible viewport region. This is true for mouse clicks but also
   // keyboard navigation (i.e. arrow keys, page up/down, etc).
-  d->tree_widget->setAutoScroll(false);
+  d->tree_widget->setAutoScroll(true);
 
   // Smooth scrolling.
   d->tree_widget->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);

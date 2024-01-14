@@ -86,6 +86,9 @@ CodePreviewWidget::CodePreviewWidget(
   connect(d->code, &CodeWidget::RequestSecondaryClick,
           this, &IWindowWidget::RequestSecondaryClick);
 
+  connect(d->code, &CodeWidget::RequestKeyPress,
+          this, &IWindowWidget::RequestKeyPress);
+
   connect(d->code, &CodeWidget::Closed,
           this, &IWindowWidget::close);
 
