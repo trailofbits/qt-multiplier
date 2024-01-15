@@ -19,6 +19,8 @@
 #include <unordered_map>
 
 #include "CodePreviewWidget.h"
+#include "ExpandedMacrosModel.h"
+#include "MacroExplorer.h"
 
 namespace mx::gui {
 namespace {
@@ -63,7 +65,6 @@ static VariantEntity EntityForExpansion(VariantEntity entity) {
   }
 }
 
-
 }  // namespace
 
 struct CodeExplorer::PrivateData {
@@ -77,7 +78,8 @@ struct CodeExplorer::PrivateData {
   TriggerHandle open_preview_trigger;
   TriggerHandle open_pinned_preview_trigger;
 
-  std::vector<Macro> expanded_macros;
+  ExpandedMacrosModel *macro_explorer_model{nullptr};
+  MacroExplorer *macro_explorer{nullptr};
 
   inline PrivateData(ConfigManager &config_manager_,
                      IWindowManager *manager_)
@@ -315,24 +317,22 @@ void CodeExplorer::OnExpandMacro(const QVariant &data) {
     return;
   }
 
-  QSet<RawEntityId> macro_ids;
-  for (auto &existing_macro : d->expanded_macros) {
-    macro_ids.insert(existing_macro.id().Pack());
+  if (!d->macro_explorer) {
+    d->macro_explorer_model = new ExpandedMacrosModel(d->config_manager, this);
+    d->macro_explorer = new MacroExplorer(
+        d->config_manager, d->macro_explorer_model);
+
+    connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
+            this, &CodeExplorer::ExpandMacros);
+
+    IWindowManager::DockConfig config;
+    config.tabify = true;
+    config.id = "com.trailofbits.dock.MacroExplorer";
+    config.app_menu_location = {tr("View"), tr("Explorers")};
+    d->manager->AddDockWidget(d->macro_explorer, config);
   }
 
-  auto macro = std::move(std::get<Macro>(entity));
-  auto macro_id = macro.id().Pack();
-  if (macro_ids.contains(macro_id)) {
-    return;  // Already being expanded.
-  }
-
-  macro_ids.insert(macro_id);
-
-  std::reverse(d->expanded_macros.begin(), d->expanded_macros.end());
-  d->expanded_macros.emplace_back(std::move(macro));
-  std::reverse(d->expanded_macros.begin(), d->expanded_macros.end());
-
-  emit ExpandMacros(macro_ids);
+  d->macro_explorer_model->AddMacro(std::move(std::get<Macro>(entity)));
 }
 
 void CodeExplorer::OnRenameEntity(QVector<RawEntityId> entity_ids,

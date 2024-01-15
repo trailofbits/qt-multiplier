@@ -255,6 +255,9 @@ class TokenModel Q_DECL_FINAL : public IModel {
 
   QModelIndex index(
       int row, int column, const QModelIndex &parent) const Q_DECL_FINAL {
+    if (!hasIndex(row, column, parent)) {
+      return {};
+    }
     if (!row && !column && !parent.isValid() && token) {
       return createIndex(0, 0, token.id().Pack());
     }
@@ -934,20 +937,15 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   setFocusPolicy(Qt::StrongFocus);
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-  auto &media_manager = config_manager.MediaManager();
   auto &theme_manager = config_manager.ThemeManager();
 
   OnThemeChanged(theme_manager);  // Calls `RecomputeScene`.
-  OnIconsChanged(media_manager);
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &CodeWidget::OnIndexChanged);
 
   connect(&theme_manager, &ThemeManager::ThemeChanged,
           this, &CodeWidget::OnThemeChanged);
-
-  connect(&media_manager, &MediaManager::IconsChanged,
-          this, &CodeWidget::OnIconsChanged);
 }
 
 void CodeWidget::focusOutEvent(QFocusEvent *) {
@@ -1253,6 +1251,12 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
   // Force a change.
   current_entity = nullptr;
   canvas_changed = true;
+
+  // TODO(pag): `scroll_x` and `scroll_y` probably don't make sense anymore.
+  if (cursor) {
+    cursor = CursorPosition(cursor.value());
+    current_entity = EntityUnderPoint(cursor.value());
+  }
 }
 
 void CodeWidget::PrivateData::RecomputeCanvas(void) {
@@ -1499,10 +1503,6 @@ void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   setPalette(p);
   setFont(d->font);
   update();
-}
-
-void CodeWidget::OnIconsChanged(const MediaManager &media_manager) {
-  (void) media_manager;
 }
 
 // Invoked when the set of macros to be expanded changes.

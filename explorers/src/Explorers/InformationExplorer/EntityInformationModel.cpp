@@ -54,18 +54,6 @@ struct Node {
   bool render_name{true};
 };
 
-static QString TokensToString(TokenRange tokens) {
-  QString as_str;
-  for (Token tok : tokens) {
-    std::string_view data = tok.data();
-    if (!data.empty()) {
-      as_str += QString::fromUtf8(
-          data.data(), static_cast<qsizetype>(data.size()));
-    }
-  }
-  return as_str;
-}
-
 }  // namespace
 
 struct EntityInformationModel::PrivateData {

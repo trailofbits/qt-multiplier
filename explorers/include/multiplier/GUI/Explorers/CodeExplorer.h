@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QSet>
 #include <QVector>
 
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
@@ -47,8 +48,10 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
   void OnRenameEntity(QVector<RawEntityId> entity_ids,
                       QString new_name);
- 
+
  signals:
+
+  // Invoked when the set of macros to be expanded changes.
   void ExpandMacros(const QSet<RawEntityId> &macros_to_expand);
 };
 

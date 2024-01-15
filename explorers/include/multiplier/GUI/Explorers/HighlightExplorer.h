@@ -22,14 +22,11 @@ class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   HighlightExplorer(ConfigManager &config_manager,
                     IWindowManager *parent = nullptr);
 
-  void ActOnPrimaryClick(
-      IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
-
   void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
                         const QModelIndex &index) Q_DECL_FINAL;
 
  private:
-  void CreateDockWidget(IWindowManager *manager);
+  void CreateDockWidget(void);
   void ColorsUpdated(void);
 
  private slots:

@@ -27,6 +27,10 @@ add_library("mx_explorers"
   src/Explorers/CodeExplorer/CodeExplorer.cpp
   src/Explorers/CodeExplorer/CodePreviewWidget.cpp
   src/Explorers/CodeExplorer/CodePreviewWidget.h
+  src/Explorers/CodeExplorer/ExpandedMacrosModel.cpp
+  src/Explorers/CodeExplorer/ExpandedMacrosModel.h
+  src/Explorers/CodeExplorer/MacroExplorer.cpp
+  src/Explorers/CodeExplorer/MacroExplorer.h
 
   src/Explorers/EntityExplorer/CategoryComboBox.cpp
   src/Explorers/EntityExplorer/CategoryComboBox.h

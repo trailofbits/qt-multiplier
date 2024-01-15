@@ -40,6 +40,7 @@ struct HighlightExplorer::PrivateData {
   std::vector<RawEntityId> eids;
   HighlightedItemsModel *model{nullptr};
   QListView *view{nullptr};
+  IWindowManager *manager{nullptr};
   IWindowWidget *dock{nullptr};
 
   inline PrivateData(ConfigManager &config_manager_)
@@ -59,10 +60,10 @@ HighlightExplorer::HighlightExplorer(ConfigManager &config_manager,
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &HighlightExplorer::OnIndexChanged);
 
-  CreateDockWidget(parent);
+  d->manager = parent;
 }
 
-void HighlightExplorer::CreateDockWidget(IWindowManager *manager) {
+void HighlightExplorer::CreateDockWidget(void) {
 
   d->dock = new IWindowWidget;
   d->dock->setWindowTitle(tr("Highlight Explorer"));
@@ -80,10 +81,10 @@ void HighlightExplorer::CreateDockWidget(IWindowManager *manager) {
   // Enable context menus on the list itself.
   d->view->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(d->view, &QListView::customContextMenuRequested,
-          [=, this] (const QPoint &point) {
+          [this] (const QPoint &point) {
             auto index = d->view->indexAt(point);
             if (index.isValid()) {
-              manager->OnSecondaryClick(index);
+              d->manager->OnSecondaryClick(index);
             }
           });
 
@@ -103,33 +104,11 @@ void HighlightExplorer::CreateDockWidget(IWindowManager *manager) {
   config.tabify = true;
   config.id = "com.trailofbits.dock.HighlightExplorer";
   config.app_menu_location = {tr("View"), tr("Explorers")};
-  manager->AddDockWidget(d->dock, config);
-}
-
-// When clicked, open the entity.
-void HighlightExplorer::ActOnPrimaryClick(
-    IWindowManager *, const QModelIndex &index) {
-  d->entity = {};
-
-  if (!d->model || index.model() != d->model) {
-    return;
-  }
-
-  auto entity = IModel::Entity(index);
-  if (std::holds_alternative<NotAnEntity>(entity)) {
-    return;
-  }
-
-  d->view->setCurrentIndex(QModelIndex());
-  d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
+  d->manager->AddDockWidget(d->dock, config);
 }
 
 void HighlightExplorer::ActOnContextMenu(
     IWindowManager *, QMenu *menu, const QModelIndex &index) {
-
-  if (!d->view) {
-    return;
-  }
 
   d->eids.clear();
   d->entity = IModel::EntitySkipThroughTokens(index);
@@ -206,7 +185,7 @@ void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
 }
 
 void HighlightExplorer::SetColor(void) {
-  if (!d->model || d->eids.empty() || std::holds_alternative<NotAnEntity>(d->entity)) {
+  if (d->eids.empty() || std::holds_alternative<NotAnEntity>(d->entity)) {
     return;
   }
 
@@ -214,6 +193,10 @@ void HighlightExplorer::SetColor(void) {
   if (!color.isValid()) {
     d->eids.clear();
     return;
+  }
+
+  if (!d->dock) {
+    CreateDockWidget();
   }
 
   auto made_proxy = false;

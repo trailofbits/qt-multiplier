@@ -1056,14 +1056,11 @@ QString LocationOfEntity(const FileLocationCache &file_location_cache,
   return location;
 }
 
-//! Return the tokens of `ent` as a string.
-QString TokensToString(const VariantEntity &ent) {
-  // If we didn't get a name above, then try to get the file tokens and
-  // form them into a string.
-  TokenRange file_toks = FileTokens(ent);
+//! Return the tokens of `tokens` as a string.
+QString TokensToString(const TokenRange &tokens) {
   QString data;
   auto sep = "";
-  for (Token tok : file_toks) {
+  for (Token tok : tokens) {
     if (tok.kind() == TokenKind::WHITESPACE) {
       data += sep;
       sep = "";
@@ -1077,6 +1074,11 @@ QString TokensToString(const VariantEntity &ent) {
     }
   }
   return data;
+}
+
+//! Return the tokens of `ent` as a string.
+QString TokensToString(const VariantEntity &ent) {
+  return TokensToString(FileTokens(ent));
 }
 
 namespace {

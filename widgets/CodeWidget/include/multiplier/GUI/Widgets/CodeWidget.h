@@ -38,18 +38,7 @@ class ConfigManager;
 class MediaManager;
 class ThemeManager;
 
-// TODO: Have a class that one can connect to with signals, where the signals
-//       trigger things like macro expansion
-//
-//       A code widget owns an instance of this class, and will git out a
-//       pointer to it for those that want to selectively expand macros.
-//
-// TODO: Code plugin owns things like macro expansions, the global code preview
-//       miniwindow (and an event like `com.trailofbits.action.PreviewEntity`)
-//       (which can also pop out pinned previews, just like info browser), and
-//       asks the main layout to add main widgets (files), which the window
-//       manager manages as tabs.
-
+// Renders code.
 class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   Q_OBJECT
 
@@ -80,7 +69,6 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
  private slots:
   void OnIndexChanged(const ConfigManager &);
   void OnThemeChanged(const ThemeManager &);
-  void OnIconsChanged(const MediaManager &);
 
   void OnVerticalScroll(int change);
   void OnHorizontalScroll(int change);
