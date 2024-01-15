@@ -235,4 +235,21 @@ void CodePreviewWidget::OnChangeSync(int state) {
   d->sync = Qt::Checked == state;
 }
 
+// Invoked when the set of macros to be expanded changes.
+void CodePreviewWidget::OnExpandMacros(
+    const QSet<RawEntityId> &macros_to_expand) {
+  d->code->OnExpandMacros(macros_to_expand);
+}
+
+// Invoked when the set of entities to be renamed changes.
+void CodePreviewWidget::OnRenameEntities(
+    const QMap<RawEntityId, QString> &new_entity_names) {
+  d->code->OnRenameEntities(new_entity_names);
+}
+
+// Invoked when we want to scroll to a specific entity.
+void CodePreviewWidget::OnGoToEntity(const VariantEntity &entity) {
+  d->code->OnGoToEntity(entity);
+}
+
 }  // namespace mx::gui

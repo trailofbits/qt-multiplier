@@ -114,6 +114,9 @@ static const IBuiltinTheme::ThemeData kDarkThemeData{
     [TCI(FILE_NAME)] = {QColor::fromRgb(23, 185, 152), {}, false, false, false, false},
     [TCI(LINE_NUMBER)] = {QColor::fromRgb(109, 132, 140), {}, false, false, false, false},
     [TCI(COLUMN_NUMBER)] = {QColor::fromRgb(109, 132, 140), {}, false, false, false, false},
+    [TCI(INFORMATION)] = {QColor::fromRgb(105, 104, 97), {}, false, false, false, false},
+    [TCI(WARNING)] = {QColor::fromRgb(105, 104, 97), {}, false, false, false, false},
+    [TCI(ERROR)] = {QColor::fromRgb(105, 104, 97), {}, false, false, false, false},
   },
 };
 

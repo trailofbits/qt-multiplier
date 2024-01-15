@@ -26,15 +26,13 @@
 #include <QWheelEvent>
 
 #include <cmath>
-#include <multiplier/Frontend/MacroSubstitution.h>
+#include <multiplier/Frontend/MacroExpansion.h>
 #include <multiplier/Frontend/MacroVAOpt.h>
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
-
-// #include "CodeModel.h"
 
 namespace mx::gui {
 namespace {
@@ -75,12 +73,6 @@ struct Entity {
 
   // The logical (one-indexed) column number of this token.
   int logical_column_number;
-
-  // inline auto operator<=>(const Entity &that) const noexcept {
-  //   return position <=> that.position;
-  // }
-
-  // bool operator==(const Entity &that) const noexcept = default;
 };
 
 struct Data {
@@ -125,6 +117,9 @@ struct Scene {
 
   // A sorted list of related entity IDs and the into `entities`.
   std::vector<std::pair<RawEntityId, unsigned>> related_entity_ids;
+
+  // Keeps track of which macros were and weren't expanded.
+  std::unordered_map<RawEntityId, bool> expanded_macros;
 
   // Maximum number of characters on any given line.
   int max_logical_columns{1};
@@ -324,7 +319,9 @@ struct CodeWidget::PrivateData {
   // Size of the visible viewport area for this widget.
   QRect viewport;
 
-  // A single character string.
+  // A single character string. Sometimes we have to draw one character at a
+  // time, or measure the width of a single character, so we end up just
+  // reusing this string as a single character sized buffer.
   QString monospace;
 
   // The font we're currently painting with.
@@ -333,15 +330,34 @@ struct CodeWidget::PrivateData {
   QColor theme_cursor_color;
   QColor theme_foreground_color;
   QColor theme_background_color;
+
+  // Calculated shape and width of a single space in this font. Generally we
+  // make this the size of a bold and italic space.
   QRectF space_rect;
   qreal space_width{0};
+  
   QRect canvas_rect;
   QTextOption to;
 
+  // The scene is a linearization of the current configuration of the
+  // `TokenTree`, where we represent things in terms of entities, and we know
+  // which bits of data each entity is associated with, etc. The scene also
+  // caches the shapes/locations of each textual element. When we have
+  // requests for things like macro expansions or entity renamings, we need
+  // to signal to the next `paintEvent` that the scene has changed, and thus
+  // must be recomputed.
   bool scene_changed{true};
+
+  // The canvas is really a mix of things, but as a whole it represents what
+  // we're trying to paint in order to render code. The canvas is made of a mix
+  // of cached layers (`background_canvas`, `foreground_canvas`) and layers
+  // that are (re)generated on every `paintEvent`. If the scene or theme changes
+  // then we generally need to recompute the canvas.
   bool canvas_changed{true};
 
-  // The current DPI ratio for the app.
+  // The current DPI ratio for the app. The viewport of the codewidget is
+  // expressed in pixels, and we need to multiply by the DPI ratio to get the
+  // actual width that we're painting.
   qreal dpi_ratio{1.0};
 
   // Current scroll x/y positions.
@@ -461,14 +477,29 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
     SceneBuilder &b, SubstitutionTokenTreeNode node) {
 
   RawEntityId macro_id = kInvalidEntityId;
+  RawEntityId def_id = kInvalidEntityId;
   auto sub = node.macro();
   if (std::holds_alternative<MacroSubstitution>(sub)) {
     macro_id = std::get<MacroSubstitution>(sub).id().Pack();
+
+    // Global expansion of a macro is based on the definition ID.
+    if (auto exp = MacroExpansion::from(std::get<MacroSubstitution>(sub))) {
+      if (auto def = exp->definition()) {
+        def_id = def->id().Pack();
+      }
+    }
   } else {
     macro_id = std::get<MacroVAOpt>(sub).id().Pack();
   }
 
-  if (macros_to_expand.contains(macro_id)) {
+  auto expanded = macros_to_expand.contains(macro_id);
+  if (def_id != kInvalidEntityId) {
+    expanded = expanded || macros_to_expand.contains(def_id);
+    b.scene.expanded_macros.emplace(def_id, expanded);
+  }
+  b.scene.expanded_macros.emplace(macro_id, expanded);
+
+  if (expanded) {
     ImportNode(b, node.after());
   } else {
     ImportNode(b, node.before());
@@ -1038,7 +1069,8 @@ void CodeWidget::paintEvent(QPaintEvent *) {
       cs.background_color = QColor();
       cs.foreground_color = highlight_foreground_color;
 
-      qreal e_y = static_cast<qreal>(e.logical_line_number - 1) * d->line_height;
+      qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
+                  d->line_height;
       qreal x = e.x - d->scroll_x;
       qreal y = e_y - d->scroll_y;
 
@@ -1449,8 +1481,11 @@ void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   d->theme_foreground_color = d->theme->DefaultForegroundColor();
   d->theme_background_color = d->theme->DefaultBackgroundColor();
 
+  // If the old font is the same as the new font, then the entity positions
+  // and data rects remain the same, so we don't need to recompute the scene.
   if (old_font == d->font) {
     d->canvas_changed = true;
+
   } else {
     d->scene_changed = true;
   }
@@ -1472,9 +1507,32 @@ void CodeWidget::OnIconsChanged(const MediaManager &media_manager) {
 
 // Invoked when the set of macros to be expanded changes.
 void CodeWidget::OnExpandMacros(const QSet<RawEntityId> &macros_to_expand) {
-  d->scene_changed = true;  // TODO(pag): Be more selective.
+
+  // Look for macros that weren't expanded before, but are now requested to be
+  // expanded.
+  for (auto macro_id : macros_to_expand) {
+    auto it = d->scene.expanded_macros.find(macro_id);
+    if (it != d->scene.expanded_macros.end() && !(it->second)) {
+      d->scene_changed = true;
+      break;
+    }
+  }
+
+  // Look for macros that were expanded before, and now aren't being expanded.
+  if (!d->scene_changed) {
+    for (auto [macro_id, expanded] : d->scene.expanded_macros) {
+      if (expanded && !macros_to_expand.contains(macro_id)) {
+        d->scene_changed = true;
+        break;
+      }
+    }
+  }
+
   d->macros_to_expand = macros_to_expand;
-  update();
+
+  if (d->scene_changed) {
+    update();
+  }
 }
 
 // Invoked when the set of entities to be renamed changes.

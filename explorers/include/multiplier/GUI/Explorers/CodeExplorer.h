@@ -31,7 +31,7 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void ActOnPrimaryClick(
       IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
 
-  std::optional<NamedAction> ActOnSecondaryClick(
+  std::vector<NamedAction> ActOnSecondaryClickEx(
       IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
 
   std::optional<NamedAction> ActOnKeyPress(
@@ -43,10 +43,13 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void OnPreviewEntity(const QVariant &data);
   void OnPinnedPreviewEntity(const QVariant &data);
 
-  void OnExpandMacro(RawEntityId entity_id);
+  void OnExpandMacro(const QVariant &data);
 
   void OnRenameEntity(QVector<RawEntityId> entity_ids,
                       QString new_name);
+ 
+ signals:
+  void ExpandMacros(const QSet<RawEntityId> &macros_to_expand);
 };
 
 }  // namespace mx::gui

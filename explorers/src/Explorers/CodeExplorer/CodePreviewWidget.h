@@ -44,6 +44,16 @@ class CodePreviewWidget Q_DECL_FINAL : public IWindowWidget {
   void OnChangeSync(int state);
   void OnIconsChanged(const MediaManager &media_manager);
   void OnPopOutPressed(void);
+ 
+ public slots:
+  // Invoked when the set of macros to be expanded changes.
+  void OnExpandMacros(const QSet<RawEntityId> &macros_to_expand);
+
+  // Invoked when the set of entities to be renamed changes.
+  void OnRenameEntities(const QMap<RawEntityId, QString> &new_entity_names);
+
+  // Invoked when we want to scroll to a specific entity.
+  void OnGoToEntity(const VariantEntity &entity);
 
  signals:
   void HistoricalEntitySelected(VariantEntity entity);

@@ -23,11 +23,46 @@
 namespace mx::gui {
 namespace {
 
+static const QKeySequence kKeySeqE("E");
 static const QKeySequence kKeySeqP("P");
 static const QKeySequence kKeySeqShiftP("Shift+P");
 
 static const QString kOpenEntityModelPrefix(
     "com.trailofbits.CodeViewModel");
+
+// Figure out what entity to use for macro expansion.
+static VariantEntity EntityForExpansion(VariantEntity entity) {
+
+  // It's a token; see if we can find it inside of a macro.
+  if (std::holds_alternative<Token>(entity)) {
+    for (Macro macro : Macro::containing(std::get<Token>(entity))) {
+      entity = macro;
+      break;
+    }
+  }
+
+  // It's still a token; get the related entity.
+  if (std::holds_alternative<Token>(entity)) {
+    entity = std::get<Token>(entity).related_entity();
+  }
+
+  if (!std::holds_alternative<Macro>(entity)) {
+    return NotAnEntity{};
+  }
+
+  switch (std::get<Macro>(entity).kind()) {
+    case MacroKind::DEFINE_DIRECTIVE:
+    case MacroKind::SUBSTITUTION:
+    case MacroKind::STRINGIFY:
+    case MacroKind::CONCATENATE:
+    case MacroKind::PARAMETER_SUBSTITUTION:
+    case MacroKind::EXPANSION:
+      return entity;
+    default:
+      return NotAnEntity{};
+  }
+}
+
 
 }  // namespace
 
@@ -38,8 +73,11 @@ struct CodeExplorer::PrivateData {
 
   std::unordered_map<RawEntityId, CodeWidget *> opened_windows;
 
+  TriggerHandle expand_macro_trigger;
   TriggerHandle open_preview_trigger;
   TriggerHandle open_pinned_preview_trigger;
+
+  std::vector<Macro> expanded_macros;
 
   inline PrivateData(ConfigManager &config_manager_,
                      IWindowManager *manager_)
@@ -57,6 +95,10 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
   config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenEntity",
       &CodeExplorer::OnOpenEntity);
+
+  d->expand_macro_trigger = config_manager.ActionManager().Register(
+      this, "com.trailofbits.action.ExpandMacro",
+      &CodeExplorer::OnExpandMacro);
 
   d->open_preview_trigger = config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenEntityPreview",
@@ -87,22 +129,29 @@ void CodeExplorer::ActOnPrimaryClick(IWindowManager *,
 std::optional<NamedAction> CodeExplorer::ActOnKeyPress(
     IWindowManager *, const QKeySequence &keys, const QModelIndex &index) {
 
+  VariantEntity entity;
   TriggerHandle *handle = nullptr;
   QString name;
 
   if (keys == kKeySeqP) {
     handle = &(d->open_preview_trigger);
     name = tr("Open Preview");
+    entity = IModel::EntitySkipThroughTokens(index);
 
   } else if (keys == kKeySeqShiftP) {
     handle = &(d->open_pinned_preview_trigger);
     name = tr("Open Pinned Preview");
+    entity = IModel::EntitySkipThroughTokens(index);
+
+  } else if (keys == kKeySeqE) {
+    handle = &(d->expand_macro_trigger);
+    name = tr("Expand Macro");
+    entity = EntityForExpansion(IModel::Entity(index));
 
   } else {
     return std::nullopt;
   }
 
-  auto entity = IModel::EntitySkipThroughTokens(index);
   if (std::holds_alternative<NotAnEntity>(entity)) {
     return std::nullopt;
   }
@@ -110,15 +159,29 @@ std::optional<NamedAction> CodeExplorer::ActOnKeyPress(
   return NamedAction{name, *handle, QVariant::fromValue(entity)};
 }
 
-std::optional<NamedAction> CodeExplorer::ActOnSecondaryClick(
+std::vector<NamedAction> CodeExplorer::ActOnSecondaryClickEx(
     IWindowManager *, const QModelIndex &index) {
-  auto entity = IModel::EntitySkipThroughTokens(index);
+  std::vector<NamedAction> actions;
+
+  auto entity = IModel::Entity(index);
   if (std::holds_alternative<NotAnEntity>(entity)) {
-    return std::nullopt;
+    return actions;
   }
 
-  return NamedAction{tr("Open Pinned Preview"), d->open_pinned_preview_trigger,
-                     QVariant::fromValue(entity)};
+  auto exp_entity = EntityForExpansion(entity);
+  if (!std::holds_alternative<NotAnEntity>(exp_entity)) {
+    actions.emplace_back(NamedAction{
+        tr("Expand Macro"), d->expand_macro_trigger,
+        QVariant::fromValue(exp_entity)});
+  }
+
+  if (!std::holds_alternative<NotAnEntity>(entity)) {
+    actions.emplace_back(NamedAction{
+        tr("Open Pinned Preview"), d->open_pinned_preview_trigger,
+        QVariant::fromValue(entity)});
+  }
+
+  return actions;
 }
 
 void CodeExplorer::OnOpenEntity(const QVariant &data) {
@@ -148,6 +211,9 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
   }
 
   code_widget = new CodeWidget(d->config_manager, kOpenEntityModelPrefix);
+
+  connect(this, &CodeExplorer::ExpandMacros,
+          code_widget, &CodeWidget::OnExpandMacros);
 
   // Figure out the window title.
   if (file) {
@@ -184,6 +250,9 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data) {
   if (!d->preview) {
     d->preview = new CodePreviewWidget(d->config_manager, true);
 
+    connect(this, &CodeExplorer::ExpandMacros,
+            d->preview, &CodePreviewWidget::OnExpandMacros);
+
     // When the user navigates the history, make sure that we change what the
     // view shows.
     connect(d->preview, &CodePreviewWidget::HistoricalEntitySelected,
@@ -216,6 +285,10 @@ void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
   }
 
   auto preview = new CodePreviewWidget(d->config_manager, false);
+
+  connect(this, &CodeExplorer::ExpandMacros,
+          preview, &CodePreviewWidget::OnExpandMacros);
+
   if (auto name = NameOfEntityAsString(entity)) {
     preview->setWindowTitle(
         tr("Preview of `%1`").arg(name.value()));
@@ -232,8 +305,34 @@ void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
   d->manager->AddDockWidget(preview, config);
 }
 
-void CodeExplorer::OnExpandMacro(RawEntityId entity_id) {
-  (void) entity_id;
+void CodeExplorer::OnExpandMacro(const QVariant &data) {
+  if (data.isNull() || !data.canConvert<VariantEntity>()) {
+    return;
+  }
+
+  VariantEntity entity = data.value<VariantEntity>();
+  if (!std::holds_alternative<Macro>(entity)) {
+    return;
+  }
+
+  QSet<RawEntityId> macro_ids;
+  for (auto &existing_macro : d->expanded_macros) {
+    macro_ids.insert(existing_macro.id().Pack());
+  }
+
+  auto macro = std::move(std::get<Macro>(entity));
+  auto macro_id = macro.id().Pack();
+  if (macro_ids.contains(macro_id)) {
+    return;  // Already being expanded.
+  }
+
+  macro_ids.insert(macro_id);
+
+  std::reverse(d->expanded_macros.begin(), d->expanded_macros.end());
+  d->expanded_macros.emplace_back(std::move(macro));
+  std::reverse(d->expanded_macros.begin(), d->expanded_macros.end());
+
+  emit ExpandMacros(macro_ids);
 }
 
 void CodeExplorer::OnRenameEntity(QVector<RawEntityId> entity_ids,

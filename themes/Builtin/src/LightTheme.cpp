@@ -113,6 +113,9 @@ static const IBuiltinTheme::ThemeData kLightThemeData{
     [TCI(FILE_NAME)] = {QColor::fromRgb(206, 18, 18), {}, false, false, false, false},
     [TCI(LINE_NUMBER)] = {QColor::fromRgb(0, 0, 0), {}, false, false, false, false},
     [TCI(COLUMN_NUMBER)] = {QColor::fromRgb(0, 0, 0), {}, false, false, false, false},
+    [TCI(INFORMATION)] = {QColor::fromRgb(0, 0, 255), {}, false, false, false, true},
+    [TCI(WARNING)] = {QColor::fromRgb(0, 0, 255), {}, false, false, false, true},
+    [TCI(ERROR)] = {QColor::fromRgb(0, 0, 255), {}, false, false, false, true},
   },
 };
 
