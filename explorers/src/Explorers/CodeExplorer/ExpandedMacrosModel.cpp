@@ -89,8 +89,8 @@ int ExpandedMacrosModel::rowCount(const QModelIndex &parent) const {
   return !parent.isValid() ? static_cast<int>(d->macros.size()) : 0;
 }
 
-int ExpandedMacrosModel::columnCount(const QModelIndex &) const {
-  return 3;
+int ExpandedMacrosModel::columnCount(const QModelIndex &parent) const {
+  return !parent.isValid() ? 3 : 0;
 }
 
 QVariant ExpandedMacrosModel::headerData(
@@ -200,6 +200,48 @@ void ExpandedMacrosModel::AddMacro(Macro macro) {
   std::reverse(d->location.begin(), d->location.end());
 
   emit endInsertRows();
+
+  emit ExpandMacros(macro_ids);
+}
+
+void ExpandedMacrosModel::RemoveMacro(Macro macro) {
+  auto macro_id = macro.id().Pack();
+
+  std::vector<Macro> new_macros;
+  std::vector<TokenRange> new_tokens;
+  std::vector<QString> new_display;
+  std::vector<QString> new_location;
+
+  QSet<RawEntityId> macro_ids;
+  auto row = 0u;
+  std::optional<int> found_at_row;
+
+  for (auto &existing_macro : d->macros) {
+    auto existing_macro_id = existing_macro.id().Pack();
+    if (existing_macro_id == macro_id) {
+      Q_ASSERT(!found_at_row);
+      found_at_row = static_cast<int>(row);
+      continue;
+    }
+
+    macro_ids.insert(existing_macro_id);
+    new_macros.emplace_back(existing_macro);
+    new_tokens.emplace_back(d->tokens[row]);
+    new_display.emplace_back(d->display[row]);
+    new_location.emplace_back(d->location[row]);
+    ++row;
+  }
+
+  if (!found_at_row) {
+    return;
+  }
+
+  emit beginRemoveRows({}, found_at_row.value(), found_at_row.value());
+  new_macros.swap(d->macros);
+  new_tokens.swap(d->tokens);
+  new_display.swap(d->display);
+  new_location.swap(d->location);
+  emit endRemoveRows();
 
   emit ExpandMacros(macro_ids);
 }

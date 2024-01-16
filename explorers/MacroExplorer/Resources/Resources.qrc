@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/Icons/MacroExplorer">
-        <file alias="Delete">Icons/delete.png</file>
-    </qresource>
-</RCC>

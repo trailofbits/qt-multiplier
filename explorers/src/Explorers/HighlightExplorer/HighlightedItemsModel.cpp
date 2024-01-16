@@ -48,8 +48,8 @@ int HighlightedItemsModel::rowCount(const QModelIndex &parent) const {
   return !parent.isValid() ? static_cast<int>(d->entities.size()) : 0;
 }
 
-int HighlightedItemsModel::columnCount(const QModelIndex &) const {
-  return 1;
+int HighlightedItemsModel::columnCount(const QModelIndex &parent) const {
+  return !parent.isValid() ? 1 : 0;
 }
 
 QVariant HighlightedItemsModel::data(const QModelIndex &index, int role) const {

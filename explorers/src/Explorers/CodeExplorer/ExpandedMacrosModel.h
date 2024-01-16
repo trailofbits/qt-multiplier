@@ -29,6 +29,7 @@ class ExpandedMacrosModel Q_DECL_FINAL : public IModel {
                       QObject *parent = nullptr);
 
   void AddMacro(Macro macro);
+  void RemoveMacro(Macro macro);
 
   QModelIndex index(
       int row, int column, const QModelIndex &parent) const Q_DECL_FINAL;
