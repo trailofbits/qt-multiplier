@@ -1105,8 +1105,7 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
   d->token_model.token = {};
 
-  // Calculate the index of the current line.
-  if (event->buttons() & Qt::LeftButton) {
+  if (event->buttons() & (Qt::LeftButton | Qt::RightButton)) {
     d->cursor = d->CursorPosition(scrolled_xy);
 
     // Calculate the current line index based on the clamped cursor.
@@ -1117,6 +1116,10 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
     }
 
     d->current_entity = entity;
+  }
+
+  // Calculate the index of the current line.
+  if (event->buttons() & Qt::LeftButton) {
     emit RequestPrimaryClick(d->CreateModelIndex(entity));
 
   } else if (event->buttons() & Qt::RightButton) {
