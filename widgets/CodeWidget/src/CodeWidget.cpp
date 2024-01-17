@@ -1329,13 +1329,13 @@ void CodeWidget::mouseReleaseEvent(QMouseEvent *event) {
     return;
   }
 
-  d->tracking_selection = false;
-
-  Q_ASSERT(d->selection_start_cursor.has_value());
-  Q_ASSERT(d->cursor.has_value());
-  if (d->selection_start_cursor.value() == d->cursor.value()) {
-    d->selection_start_cursor.reset();
-    return;
+  if (d->tracking_selection) {
+    d->tracking_selection = false;
+    Q_ASSERT(d->selection_start_cursor);
+    Q_ASSERT(d->cursor.has_value());
+    if (d->selection_start_cursor.value() == d->cursor.value()) {
+      d->selection_start_cursor.reset();
+    }
   }
 
   update();
