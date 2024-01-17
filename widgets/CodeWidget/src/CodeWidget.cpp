@@ -87,19 +87,6 @@ struct Data {
   QRectF bounding_rect[4u];
 };
 
-// struct DecisionRange {
-//   std::pair<unsigned, unsigned> begin_position;
-//   std::pair<unsigned, unsigned> end_position;
-//   std::pair<unsigned, unsigned> token_range;
-
-//   // An entity ID, such as a fragment, or a 
-//   RawEntityId decision_id{kInvalidEntityId};
-
-//   // Indexes into `Scene::tokens` on the range of 
-//   unsigned begin;
-//   unsigned end;
-// };
-
 struct Scene {
   // The complete, (nearly) original document.
   QString document;
@@ -286,24 +273,18 @@ class TokenModel Q_DECL_FINAL : public IModel {
     return {};
   }
 
-  //! Returns the parent of the given model index
   QModelIndex parent(const QModelIndex &) const Q_DECL_FINAL {
     return {};
   }
 
-  //! Returns the amount or rows in the model
-  //! Since this is a tree model, rows are intended as child items
   int rowCount(const QModelIndex &parent) const Q_DECL_FINAL {
     return parent.isValid() || !token ? 0 : 1;
   }
 
-  //! Returns the amount of columns in the model
   int columnCount(const QModelIndex &parent) const Q_DECL_FINAL {
     return parent.isValid() || !token ? 0 : 1;
   }
 
-  //! Returns the index data for the specified role
-  //! \todo Fix role=TokenCategoryRole support
   QVariant data(const QModelIndex &index, int role) const Q_DECL_FINAL {
     if (index.column() != 0 || index.row() != 0 ||
         index.internalId() != token.id().Pack()) {
@@ -331,6 +312,7 @@ class TokenModel Q_DECL_FINAL : public IModel {
   }
 };
 
+// Consistent way to initialize our `QPainter`s.
 inline static void InitializePainterOptions(QPainter &p) {
   p.setRenderHints(QPainter::Antialiasing |
                    QPainter::TextAntialiasing |
@@ -430,7 +412,7 @@ struct CodeWidget::PrivateData {
   // scene to keep track of their physical locations within `*_canvas`.
   Scene scene;
 
-  // Actual "picture" of what is rendered.
+  // Semi-persistent layers of the "picture" of what is rendered.
   QImage background_canvas;
   QImage foreground_canvas;
   QImage highlight_canvas;
@@ -606,22 +588,14 @@ void CodeWidget::PrivateData::ImportTokenNode(
 
       // TODO(pag): Configurable tab width; tab stops
       case QChar::Tabulation:
-        if (token.kind() == TokenKind::WHITESPACE) {
-          b.AddColumn(kTabWidth);
-        } else {
-          for (auto i = 0u; i < kTabWidth; ++i) {
-            b.AddChar(QChar::Space);
-          }
+        for (auto i = 0u; i < kTabWidth; ++i) {
+          b.AddChar(QChar::Space);
         }
         break;
 
       case QChar::Space:
       case QChar::Nbsp:
-        if (token.kind() == TokenKind::WHITESPACE) {
-          b.AddColumn();
-        } else {
-          b.AddChar(QChar::Space);
-        }
+        b.AddChar(QChar::Space);
         break;
 
       case QChar::ParagraphSeparator:
@@ -1158,15 +1132,12 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   // ---------------------------------------------------------------------------
   // Draw the code layers.
   blitter.drawImage(-d->scroll_x, -d->scroll_y, d->background_canvas);
-  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->foreground_canvas);
   blitter.drawImage(-d->scroll_x, -d->scroll_y, d->highlight_canvas);
 
   // ---------------------------------------------------------------------------
   // Draw the selection background colors.
-  std::optional<QRectF> selections[3u];
-  QColor selection_color;
-  QColor selected_text_color;
   if (d->cursor && d->selection_start_cursor) {
+    std::optional<QRectF> selections[3u];
 
     QPointF top_left = d->cursor.value();
     QPointF bottom_right = d->selection_start_cursor.value();
@@ -1204,8 +1175,8 @@ void CodeWidget::paintEvent(QPaintEvent *) {
           bottom_right.x(), d->line_height);
     }
 
-    selection_color = d->theme->SelectionColor();
-    selected_text_color = ITheme::ContrastingColor(selection_color);
+    QColor selection_color = d->theme->SelectionColor();
+    // selected_text_color = ITheme::ContrastingColor(selection_color);
 
     // Fill in up to three rectangles for the selection.
     for (auto &sel : selections) {
@@ -1228,6 +1199,8 @@ void CodeWidget::paintEvent(QPaintEvent *) {
       auto i = d->scene.logical_line_index[l];
       auto max_i = d->scene.logical_line_index[l + 1];
 
+      QPainter dummy_fg;
+
       // Inspect each entity on the line.
       for (; i < max_i; ++i) {
         const Entity &e = d->scene.entities[i];
@@ -1238,7 +1211,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
         const Token &t = d->scene.tokens[e.token_index];
         ITheme::ColorAndStyle cs = d->theme->TokenColorAndStyle(t);
         cs.background_color = selection_color;
-        cs.foreground_color = selected_text_color;
+        cs.foreground_color = QColor();
 
         qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
                     d->line_height;
@@ -1255,7 +1228,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
 
           // The selection fully contains this entity; paint it.
           if (sel->contains(bounding_rect)) {
-            d->PaintToken(blitter, blitter, data, rect_config, cs, x, y);
+            d->PaintToken(dummy_fg, blitter, data, rect_config, cs, x, y);
             break;
 
           // The selection is unrelated to this entity.
@@ -1288,12 +1261,16 @@ void CodeWidget::paintEvent(QPaintEvent *) {
             new_data.text += data.text[k];
           }
 
-          d->PaintToken(blitter, blitter, new_data, rect_config, cs, x, y);
+          d->PaintToken(dummy_fg, blitter, new_data, rect_config, cs, x, y);
           break;
         }
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Paint the code.
+  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->foreground_canvas);
 
   // ---------------------------------------------------------------------------
   // Paint the cursor.
@@ -1404,14 +1381,15 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
   d->current_entity = entity;
 
+  // Update *prior* to rendering the context menu, if any.
+  update();
+
   // Calculate the index of the current line.
   if (!d->tracking_selection) {
     if (!d->click_was_primary && d->click_was_secondary) {
       emit RequestSecondaryClick(d->CreateModelIndex(entity));
     }
   }
-
-  update();
 }
 
 void CodeWidget::keyPressEvent(QKeyEvent *event) {
@@ -1587,22 +1565,23 @@ void CodeWidget::PrivateData::RecomputeHighlights(void) {
 
   prev_highlighted_entity = current_entity;
 
-  QImage fg(static_cast<int>(canvas_rect.width() * dpi_ratio),
+  QImage bg(static_cast<int>(canvas_rect.width() * dpi_ratio),
             static_cast<int>(canvas_rect.height() * dpi_ratio),
             QImage::Format_ARGB32_Premultiplied);
 
-  fg.setDevicePixelRatio(dpi_ratio);
+  bg.setDevicePixelRatio(dpi_ratio);
 
   // Fill the contents with transparent pixels, rather than leaving them
   // undefined.
-  fg.fill(0);
+  bg.fill(0);
 
-  QPainter blitter(&fg);
-  InitializePainterOptions(blitter);
+  QPainter fg_painter;  // Dummy.
+  QPainter bg_painter(&bg);
+  InitializePainterOptions(bg_painter);
 
   if (!current_entity) {
-    blitter.end();
-    highlight_canvas.swap(fg);
+    bg_painter.end();
+    highlight_canvas.swap(bg);
     return;
   }
 
@@ -1611,11 +1590,10 @@ void CodeWidget::PrivateData::RecomputeHighlights(void) {
   
   QColor highlight_color = theme->CurrentEntityBackgroundColor(
       token.related_entity());
-  QColor highlight_foreground_color = ITheme::ContrastingColor(highlight_color);
 
   if (related_entity_id == kInvalidEntityId) {
-    blitter.end();
-    highlight_canvas.swap(fg);
+    bg_painter.end();
+    highlight_canvas.swap(bg);
     return;
   }
 
@@ -1639,13 +1617,13 @@ void CodeWidget::PrivateData::RecomputeHighlights(void) {
 
     ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(t);
     cs.background_color = highlight_color;
-    cs.foreground_color = highlight_foreground_color;
+    cs.foreground_color = QColor();
 
-    PaintToken(blitter, blitter, data, rect_config, cs, e_x, e_y);
+    PaintToken(fg_painter, bg_painter, data, rect_config, cs, e_x, e_y);
   }
 
-  blitter.end();
-  highlight_canvas.swap(fg);
+  bg_painter.end();
+  highlight_canvas.swap(bg);
 }
 
 void CodeWidget::PrivateData::RecomputeCanvas(void) {
@@ -1822,17 +1800,23 @@ void CodeWidget::PrivateData::PaintToken(
   font.setUnderline(cs.underline);
   font.setStrikeOut(cs.strikeout);
   font.setWeight(cs.bold ? QFont::DemiBold : QFont::Normal);
-  fg_painter.setFont(font);
-
-  if (cs.foreground_color.isValid()) {
-    fg_painter.setPen(cs.foreground_color);
-  } else {
-    fg_painter.setPen(theme_foreground_color);
-  }
 
   QRectF &token_rect = data.bounding_rect[rect_config];
   bool &token_rect_valid = data.bounding_rect_valid[rect_config];
+  bool fg_valid = cs.foreground_color.isValid();
   bool bg_valid = cs.background_color.isValid();
+
+  if (fg_valid) {
+    fg_painter.setPen(cs.foreground_color);
+  }
+
+  if (bg_valid) {
+    bg_painter.setFont(font);
+  }
+
+  Q_ASSERT(fg_valid || bg_valid);
+  QPainter *valid_painter = bg_valid ? &bg_painter : &fg_painter;
+  valid_painter->setFont(font);
 
   // Draw one character at a time. That results in better alignment across
   // lines.
@@ -1852,14 +1836,16 @@ void CodeWidget::PrivateData::PaintToken(
       if (bg_valid) {
         bg_painter.fillRect(glyph_rect, cs.background_color);
       }
-      fg_painter.drawText(glyph_rect, monospace, to);
+      if (fg_valid) {
+        fg_painter.drawText(glyph_rect, monospace, to);
+      }
       x += space_width;
     }
 
   // Draw it as one word.
   } else {
     if (!token_rect_valid) {
-      token_rect = fg_painter.boundingRect(canvas_rect, data.text, to);
+      token_rect = valid_painter->boundingRect(canvas_rect, data.text, to);
       token_rect_valid = true;
     }
 
@@ -1867,8 +1853,9 @@ void CodeWidget::PrivateData::PaintToken(
     if (bg_valid) {
       bg_painter.fillRect(token_rect, cs.background_color);
     }
-
-    fg_painter.drawText(token_rect, data.text, to);
+    if (fg_valid) {
+      fg_painter.drawText(token_rect, data.text, to);
+    }
     x += token_rect.width();
   }
 }
