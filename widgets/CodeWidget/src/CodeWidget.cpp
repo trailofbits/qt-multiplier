@@ -223,6 +223,10 @@ struct SceneBuilder {
       Data &d = scene.data.emplace_back();
       d.text = std::move(token_data);
 
+      for (auto &v : d.bounding_rect_valid) {
+        v = false;
+      }
+
     } else {
       data_index = data_index_it.value();
     }
@@ -327,6 +331,12 @@ class TokenModel Q_DECL_FINAL : public IModel {
   }
 };
 
+inline static void InitializePainterOptions(QPainter &p) {
+  p.setRenderHints(QPainter::Antialiasing |
+                   QPainter::TextAntialiasing |
+                   QPainter::SmoothPixmapTransform);
+}
+
 }  // namespace
 
 struct CodeWidget::PrivateData {
@@ -345,9 +355,8 @@ struct CodeWidget::PrivateData {
   // reusing this string as a single character sized buffer.
   QString monospace;
 
-  // The font we're currently painting with.
-  QFont font;
-
+  // Theme defaults.
+  QFont theme_font;
   QColor theme_cursor_color;
   QColor theme_foreground_color;
   QColor theme_background_color;
@@ -356,6 +365,10 @@ struct CodeWidget::PrivateData {
   // make this the size of a bold and italic space.
   QRectF space_rect;
   qreal space_width{0};
+
+  // Left and right margin.
+  qreal left_margin{0};
+  qreal right_margin{0};
   
   QRect canvas_rect;
   QTextOption to;
@@ -407,6 +420,9 @@ struct CodeWidget::PrivateData {
   // The current entity under the cursor.
   const Entity *current_entity{nullptr};
 
+  // The previous highlighted entity.
+  const Entity *prev_highlighted_entity{nullptr};
+
   TokenModel token_model;
 
   // Data structure keeping track of the logical things to render, and
@@ -417,6 +433,7 @@ struct CodeWidget::PrivateData {
   // Actual "picture" of what is rendered.
   QImage background_canvas;
   QImage foreground_canvas;
+  QImage highlight_canvas;
 
   // Sets of entities that configure what gets shown from `token_tree`.
   QSet<RawEntityId> macros_to_expand;
@@ -435,6 +452,7 @@ struct CodeWidget::PrivateData {
   void UpdateScrollbars(void);
   void RecomputeScene(void);
   void RecomputeCanvas(void);
+  void RecomputeHighlights(void);
 
   void PaintToken(
       QPainter &fg_painter, QPainter &bg_painter, Data &data,
@@ -701,12 +719,14 @@ std::pair<int, qreal> CodeWidget::PrivateData::CharacterPositionVariable(
   auto text_config_index = entity->data_index_and_config & kFormatMask;
   const Data *data = &(scene.data[text_data_index]);
 
-  qreal x = point.x();
+  const qreal x = point.x();
 
   // The cursor comes before `entity`.
   if (entity->x > x) {
     return {-1, 0.0};
   }
+
+  Q_ASSERT(entity->x >= left_margin);
 
   qreal line_index = entity->logical_line_number - 1;
   QRectF text_rect = data->bounding_rect[text_config_index];
@@ -719,18 +739,20 @@ std::pair<int, qreal> CodeWidget::PrivateData::CharacterPositionVariable(
 
   QPixmap dummy_pixmap(static_cast<int>(text_rect.width()),
                        static_cast<int>(text_rect.height()));
-  QPainter p(&dummy_pixmap);
 
   // Configure the font based on the formatting of the entity. The bold/italic
   // affects character sizes.
-  QFont entity_font = font;
+  QFont font = theme_font;
   if (text_config_index & kBoldMask) {
-    entity_font.setWeight(QFont::DemiBold);
+    font.setWeight(QFont::DemiBold);
   }
   if (text_config_index & kItalicMask) {
-    entity_font.setItalic(true);
+    font.setItalic(true);
   }
-  p.setFont(entity_font);
+
+  QPainter p(&dummy_pixmap);
+  InitializePainterOptions(p);
+  p.setFont(font);
 
   // The cursor falls inside of an existing entity text. We'll calculate the
   // width of the text. We go one character at a time, building up
@@ -739,6 +761,7 @@ std::pair<int, qreal> CodeWidget::PrivateData::CharacterPositionVariable(
   qreal prev_width = 0;
   for (auto k = 1; k <= data->text.size(); ++k) {
     auto prefix = data->text.sliced(0, k);
+
     auto prefix_rect = p.boundingRect(text_rect, prefix, to);
 
     if (prefix_rect.contains(point)) {
@@ -892,7 +915,7 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
   return QPointF(adj_pos.x() + r.width() + prev_entity->x, adj_pos.y());
 }
 
-// Always have one empty space on both sides margin, and keep the cursor in-
+// Always have margin on both sides margin, and keep the cursor in-
 // bounds.
 QPointF CodeWidget::PrivateData::ClampCursorPosition(QPointF point) const {
   qreal c_width = foreground_canvas.width() / dpi_ratio;
@@ -902,8 +925,8 @@ QPointF CodeWidget::PrivateData::ClampCursorPosition(QPointF point) const {
   qreal v_height = viewport.height();
   return QPointF(
       std::max(
-          space_width,
-          std::min(point.x(), std::max<qreal>(c_width, v_width) - space_width)),
+          left_margin,
+          std::min(point.x(), std::max<qreal>(c_width, v_width) - right_margin)),
       std::max<qreal>(
           0,
           std::min(std::max(c_height - line_height, v_height - line_height),
@@ -943,9 +966,9 @@ QPointF CodeWidget::PrivateData::NextCursorPositionFixed(
 QPointF CodeWidget::PrivateData::NextCursorPositionVariable(
     QPointF curr_cursor, qreal dir_x, qreal dir_y) const {
 
-  // Hopefully eighths of the space width are smaller than the smallest
+  // Hopefully sixteenths of the space width are smaller than the smallest
   // horizontal advance of a character in the font.
-  auto incr = (space_width / 8.0) * dir_x;
+  auto incr = (space_width / 16.0) * dir_x;
 
   // Opportunistically search for the next X position of the cursor.
   qreal char_width = space_width;
@@ -1103,11 +1126,23 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
 }
 
 void CodeWidget::paintEvent(QPaintEvent *) {
+  
+  // Check if the DPI ratio has changed.
+  if (auto window = QApplication::activeWindow()) {
+    auto window_dpi_ratio = window->devicePixelRatio();
+    if (window_dpi_ratio != d->dpi_ratio) {
+      d->dpi_ratio = window_dpi_ratio;
+      d->canvas_changed = true;
+      d->scene_changed = true;
+    }
+  }
+
   d->RecomputeCanvas();
 
   QPainter blitter(this);
-  blitter.setRenderHints(QPainter::Antialiasing);
+  InitializePainterOptions(blitter);
 
+  // ---------------------------------------------------------------------------
   // Fill the viewport with the theme background color.
   blitter.fillRect(d->viewport, d->theme_background_color);
 
@@ -1120,79 +1155,14 @@ void CodeWidget::paintEvent(QPaintEvent *) {
     blitter.fillRect(current_line, d->theme->CurrentLineBackgroundColor());
   }
 
-  // Draw the code background layer.
+  // ---------------------------------------------------------------------------
+  // Draw the code layers.
   blitter.drawImage(-d->scroll_x, -d->scroll_y, d->background_canvas);
-
-  auto re_it = d->scene.related_entity_ids.end();
-  auto re_end_it = d->scene.related_entity_ids.end();
-  QColor highlight_foreground_color;
-  RawEntityId related_entity_id = kInvalidEntityId;
-
-  // Render the related entity ID highlight background colors.
-  if (d->current_entity) {
-    const Token &token = d->scene.tokens[d->current_entity->token_index];
-    related_entity_id = token.related_entity_id().Pack();
-    
-    QColor highlight_color = d->theme->CurrentEntityBackgroundColor(
-        token.related_entity());
-    highlight_foreground_color = ITheme::ContrastingColor(highlight_color);
-
-    if (related_entity_id != kInvalidEntityId) {
-      re_it = std::upper_bound(
-          d->scene.related_entity_ids.begin(), re_end_it,
-          std::pair<RawEntityId, unsigned>(related_entity_id - 1, ~0u));
-      
-      for (auto it = re_it; it != re_end_it && it->first == related_entity_id;
-           ++it) {
-        const Entity &e = d->scene.entities[it->second];
-        const Data &data = d->scene.data[e.data_index_and_config >> kFormatShift];
-        unsigned rect_config = e.data_index_and_config & kFormatMask;
-        QRectF rect = data.bounding_rect[rect_config];
-
-        qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
-                    d->line_height;
-        rect.moveTo(QPointF(e.x - d->scroll_x, e_y - d->scroll_y));
-        blitter.fillRect(rect, highlight_color);
-      }
-    }
-  }
-
-  // Draw the code foreground layer.
   blitter.drawImage(-d->scroll_x, -d->scroll_y, d->foreground_canvas);
+  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->highlight_canvas);
 
-  // Overlay the code foreground layer with contrasting text for the highlighted
-  // entities.
-  if (d->current_entity && highlight_foreground_color.isValid()) {
-
-    // NOTE(pag): By setting `cs.background_color = QColor();` below, we make
-    //            sure this painter won't be used, and so we don't anticipate
-    //            Qt reporting painter device errors.
-    QPainter dummy_bg_painter;
-
-    for (auto it = re_it; it != re_end_it && it->first == related_entity_id;
-         ++it) {
-      const Entity &e = d->scene.entities[it->second];
-      const Token &t = d->scene.tokens[e.token_index];
-      Data &data = d->scene.data[e.data_index_and_config >> kFormatShift];
-      unsigned rect_config = e.data_index_and_config & kFormatMask;
-
-      qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
-                  d->line_height;
-      qreal x = e.x - d->scroll_x;
-      qreal y = e_y - d->scroll_y;
-
-      QRectF bounding_rect = data.bounding_rect[rect_config];
-      bounding_rect.moveTo(x, y);
-
-      ITheme::ColorAndStyle cs = d->theme->TokenColorAndStyle(t);
-      cs.background_color = QColor();
-      cs.foreground_color = highlight_foreground_color;
-
-      d->PaintToken(blitter, dummy_bg_painter, data, rect_config, cs, x, y);
-    }
-  }
-
-  // Draw the selection background, if any.
+  // ---------------------------------------------------------------------------
+  // Draw the selection background colors.
   std::optional<QRectF> selections[3u];
   QColor selection_color;
   QColor selected_text_color;
@@ -1244,6 +1214,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
       }
     }
 
+    // -------------------------------------------------------------------------
     // Go find all entities bounded by the selections, and repaint them as being
     // selected.
     auto start_index = static_cast<unsigned>(
@@ -1252,7 +1223,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
     auto stop_index = static_cast<unsigned>(
         (bottom_right.y() + (d->line_height / 2)) / d->line_height);
 
-    // Go through only the entities on the relevant lines. 
+    // Go through only the entities on the relevant lines.
     for (auto l = start_index; l <= stop_index; ++l) {
       auto i = d->scene.logical_line_index[l];
       auto max_i = d->scene.logical_line_index[l + 1];
@@ -1271,17 +1242,17 @@ void CodeWidget::paintEvent(QPaintEvent *) {
 
         qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
                     d->line_height;
-        qreal x = e.x - d->scroll_x;
-        qreal y = e_y - d->scroll_y;
 
         QRectF bounding_rect = data.bounding_rect[rect_config];
-        bounding_rect.moveTo(x, y);
-
         for (auto &sel : selections) {
           if (!sel) {
             continue;
           }
-          
+
+          qreal x = e.x - d->scroll_x;
+          qreal y = e_y - d->scroll_y;
+          bounding_rect.moveTo(x, y);
+
           // The selection fully contains this entity; paint it.
           if (sel->contains(bounding_rect)) {
             d->PaintToken(blitter, blitter, data, rect_config, cs, x, y);
@@ -1291,8 +1262,6 @@ void CodeWidget::paintEvent(QPaintEvent *) {
           } else if (!sel->intersects(bounding_rect)) {
             continue;
           }
-
-          Data new_data;
 
           qsizetype start_k = 0;
           qsizetype stop_k = data.text.size();
@@ -1313,6 +1282,8 @@ void CodeWidget::paintEvent(QPaintEvent *) {
             Q_ASSERT(0 < stop_k);
           }
 
+          Data new_data = {};
+          new_data.bounding_rect_valid[rect_config] = false;
           for (auto k = start_k; 0 <= k && k < stop_k; ++k) {
             new_data.text += data.text[k];
           }
@@ -1324,6 +1295,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
     }
   }
 
+  // ---------------------------------------------------------------------------
   // Paint the cursor.
   if (d->cursor && d->theme_cursor_color.isValid()) {
     QRectF cursor(d->cursor->x() + kCursorDisp - d->scroll_x,
@@ -1534,7 +1506,6 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
   // Set the current cursor, and possible scroll us left or right.
   if (new_cursor != d->cursor.value()) {
     need_repaint = true;
-    d->cursor = new_cursor;
     d->current_entity = d->EntityUnderPoint(new_cursor);
 
     if (dx == -1 && (new_cursor.x() - d->scroll_x) < 0) {
@@ -1543,7 +1514,7 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
       // If we get to the right edge of our left margin, then put us back at
       // zero.
-      if (d->scroll_x <= d->space_width) {
+      if (d->scroll_x <= d->left_margin) {
         d->scroll_x = 0;
       }
 
@@ -1553,6 +1524,8 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
           static_cast<int>(std::ceil(new_cursor.x() - d->cursor->x())), 0);
     }
   }
+
+  d->cursor = new_cursor;
 
   if (need_repaint) {
     update();
@@ -1605,36 +1578,99 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
   // Force a change.
   current_entity = nullptr;
   canvas_changed = true;
+}
 
-  // TODO(pag): `scroll_x` and `scroll_y` probably don't make sense anymore.
-  if (cursor) {
-    cursor = CursorPosition(cursor.value());
-    current_entity = EntityUnderPoint(cursor.value());
+void CodeWidget::PrivateData::RecomputeHighlights(void) {
+  if (current_entity == prev_highlighted_entity && !canvas_changed) {
+    return;
   }
+
+  prev_highlighted_entity = current_entity;
+
+  QImage fg(static_cast<int>(canvas_rect.width() * dpi_ratio),
+            static_cast<int>(canvas_rect.height() * dpi_ratio),
+            QImage::Format_ARGB32_Premultiplied);
+
+  fg.setDevicePixelRatio(dpi_ratio);
+
+  // Fill the contents with transparent pixels, rather than leaving them
+  // undefined.
+  fg.fill(0);
+
+  QPainter blitter(&fg);
+  InitializePainterOptions(blitter);
+
+  if (!current_entity) {
+    blitter.end();
+    highlight_canvas.swap(fg);
+    return;
+  }
+
+  const Token &token = scene.tokens[current_entity->token_index];
+  RawEntityId related_entity_id = token.related_entity_id().Pack();
+  
+  QColor highlight_color = theme->CurrentEntityBackgroundColor(
+      token.related_entity());
+  QColor highlight_foreground_color = ITheme::ContrastingColor(highlight_color);
+
+  if (related_entity_id == kInvalidEntityId) {
+    blitter.end();
+    highlight_canvas.swap(fg);
+    return;
+  }
+
+  auto re_end_it = scene.related_entity_ids.end();
+  auto re_it = std::upper_bound(
+      scene.related_entity_ids.begin(), re_end_it,
+      std::pair<RawEntityId, unsigned>(related_entity_id - 1, ~0u));
+
+  for (auto it = re_it; it != re_end_it && it->first == related_entity_id;
+     ++it) {
+    const Entity &e = scene.entities[it->second];
+    const Token &t = scene.tokens[e.token_index];
+    Data &data = scene.data[e.data_index_and_config >> kFormatShift];
+    unsigned rect_config = e.data_index_and_config & kFormatMask;
+
+    qreal e_x = e.x;
+    qreal e_y = static_cast<qreal>(e.logical_line_number - 1) * line_height;
+
+    QRectF bounding_rect = data.bounding_rect[rect_config];
+    bounding_rect.moveTo(e_x, e_y);
+
+    ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(t);
+    cs.background_color = highlight_color;
+    cs.foreground_color = highlight_foreground_color;
+
+    PaintToken(blitter, blitter, data, rect_config, cs, e_x, e_y);
+  }
+
+  blitter.end();
+  highlight_canvas.swap(fg);
 }
 
 void CodeWidget::PrivateData::RecomputeCanvas(void) {
   RecomputeScene();
 
   if (!canvas_changed) {
+    RecomputeHighlights();
     return;
   }
 
   canvas_changed = false;
 
-  font = theme->Font();  // Reset (to clear bold/italic).
-  font.setStyleStrategy(QFont::NoSubpixelAntialias);
+  theme_font = theme->Font();  // Reset (to clear bold/italic).
+  theme_font.setStyleStrategy(QFont::NoSubpixelAntialias);
 
-  QFont bold_font = font;
-  QFont italic_font = font;
-  QFont bold_italic_font = font;
+  QFont bold_font = theme_font;
+  QFont italic_font = theme_font;
+  QFont bold_italic_font = theme_font;
 
   bold_font.setWeight(QFont::DemiBold);
   italic_font.setItalic(true);
   bold_italic_font.setWeight(QFont::DemiBold);
   bold_italic_font.setItalic(true);
 
-  QFontMetricsF font_metrics(font);
+  QFontMetricsF font_metrics(theme_font);
   QFontMetricsF font_metrics_bi(bold_italic_font);
   QFontMetricsF font_metrics_b(bold_font);
   QFontMetricsF font_metrics_i(italic_font);
@@ -1656,6 +1692,7 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   {
     QPixmap dummy_pixmap(max_char_width * 4, line_height * 4);
     QPainter p(&dummy_pixmap);
+    InitializePainterOptions(p);
     p.setFont(bold_italic_font);
     auto r = p.boundingRect(QRectF(max_char_width, line_height,
                                    max_char_width * 3, line_height * 3),
@@ -1695,21 +1732,26 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   QPainter fg_painter(&fg);
   QPainter bg_painter(&bg);
 
-  bg_painter.setRenderHints(QPainter::SmoothPixmapTransform);
-  fg_painter.setRenderHints(QPainter::TextAntialiasing |
-                            QPainter::Antialiasing |
-                            QPainter::SmoothPixmapTransform);
+  InitializePainterOptions(fg_painter);
+  InitializePainterOptions(bg_painter);
+
   fg_painter.setFont(bold_italic_font);
 
   monospace[0] = QChar::Space;
   space_rect = fg_painter.boundingRect(canvas_rect, monospace, to);
   space_width = space_rect.width();
 
+  // Left and right margins are one space wide.
+  //
+  // TODO(pag): Extend left margin size for line numbers.
+  left_margin = space_width;
+  right_margin = space_width;
+
   Q_ASSERT(0 < space_width);
 
   // Start new lines indented with a single space. This helps us account for
   // italic character writing outside of their minimum-sized bounding box.
-  qreal x = space_width;
+  qreal x = left_margin;
   qreal y = 0;
   int logical_column_number = 1;
   int logical_line_number = 1;
@@ -1729,7 +1771,7 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
     // for whitespace.
     while (logical_line_number < e.logical_line_number) {
       y += line_height;
-      x = space_width;
+      x = left_margin;
       logical_line_number += 1;
       logical_column_number = 1;
     }
@@ -1760,6 +1802,14 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 
   foreground_canvas.swap(fg);
   background_canvas.swap(bg);
+
+  // TODO(pag): `scroll_x` and `scroll_y` probably don't make sense anymore.
+  if (cursor) {
+    cursor = CursorPosition(cursor.value());
+    current_entity = EntityUnderPoint(cursor.value());
+  }
+
+  RecomputeHighlights();
 }
 
 // Paint a token.
@@ -1767,6 +1817,7 @@ void CodeWidget::PrivateData::PaintToken(
     QPainter &fg_painter, QPainter &bg_painter, Data &data,
     unsigned rect_config, ITheme::ColorAndStyle cs, qreal &x, qreal &y) {
 
+  QFont font = theme_font;
   font.setItalic(cs.italic);
   font.setUnderline(cs.underline);
   font.setStrikeOut(cs.strikeout);
@@ -1834,19 +1885,32 @@ void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   }
 
   d->theme = theme_manager.Theme();
-  d->font = d->theme->Font();
+  d->theme_font = d->theme->Font();
   d->theme_cursor_color = d->theme->CursorColor();
   d->theme_foreground_color = d->theme->DefaultForegroundColor();
   d->theme_background_color = d->theme->DefaultBackgroundColor();
 
-  // If the old font is the same as the new font, then the entity positions
-  // and data rects remain the same, so we don't need to recompute the scene.
-  if (old_font == d->font) {
-    d->canvas_changed = true;
+  d->scene_changed = true;
 
-  } else {
-    d->scene_changed = true;
+  // If the font changed then scale the scroll position.
+  if (old_font != d->theme_font) {
+    QFontMetricsF old_fm(old_font);
+    QFontMetricsF new_fm(d->theme_font);
+
+    d->scroll_x = static_cast<int>(
+        (d->scroll_x / old_fm.maxWidth()) * new_fm.maxWidth());
+    d->scroll_y = static_cast<int>(
+        (d->scroll_y / old_fm.height()) * new_fm.height());
   }
+
+  // Rendering of things like the selection position is entirely dependent
+  // on the font sizes, so all of this stuff needs to be cleared out.
+  d->click_was_primary = false;
+  d->click_was_secondary = false;
+  d->current_entity = nullptr;
+  d->cursor.reset();
+  d->selection_start_cursor.reset();
+  d->tracking_selection = false;
 
   QPalette p = palette();
   p.setColor(QPalette::Window, d->theme_background_color);
@@ -1855,7 +1919,7 @@ void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   p.setColor(QPalette::Text, d->theme_foreground_color);
   p.setColor(QPalette::AlternateBase, d->theme_background_color);
   setPalette(p);
-  setFont(d->font);
+  setFont(d->theme_font);
   update();
 }
 
@@ -1931,6 +1995,7 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->scroll_x = 0;
   d->scroll_y = 0;
   d->current_line_index = -1;
+  d->current_entity = nullptr;
   d->scene_overrides.clear();
   d->token_tree = token_tree;
   update();

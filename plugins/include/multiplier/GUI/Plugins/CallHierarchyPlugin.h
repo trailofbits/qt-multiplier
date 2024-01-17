@@ -25,11 +25,11 @@ class CallHierarchyPlugin Q_DECL_FINAL : public IReferenceExplorerPlugin {
 
   CallHierarchyPlugin(ConfigManager &config_manager, QObject *parent = nullptr);
 
-  std::optional<NamedAction> ActOnMainWindowSecondaryClick(
+  std::optional<NamedAction> ActOnSecondaryClick(
       IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
 
   // Allow a main window plugin to act on a key sequence.
-  std::optional<NamedAction> ActOnMainWindowKeyPress(
+  std::optional<NamedAction> ActOnKeyPress(
       IWindowManager *manager, const QKeySequence &keys,
       const QModelIndex &index) Q_DECL_FINAL;
 };

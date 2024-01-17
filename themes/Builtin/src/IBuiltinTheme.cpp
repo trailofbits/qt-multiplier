@@ -16,13 +16,13 @@ IBuiltinTheme::~IBuiltinTheme(void) {}
 
 IBuiltinTheme::IBuiltinTheme(const MediaManager &media, QString name_, QString id_,
                              QPalette palette_, const ThemeData &data_)
-    : font(media.Font("Source Code Pro")),
+    : font(media.Font("Times New Roman")),
       id(std::move(id_)),
       name(std::move(name_)),
       palette(std::move(palette_)),
       data(data_) {
-  // font.setPointSize(14);
-  font.setStyleHint(QFont::TypeWriter);        
+  font.setPointSize(14);
+  // font.setStyleHint(QFont::TypeWriter);        
 }
 
 QString IBuiltinTheme::Name(void) const {

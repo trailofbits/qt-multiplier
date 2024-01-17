@@ -73,7 +73,7 @@ ReferenceExplorer::ReferenceExplorer(ConfigManager &config_manager,
 void ReferenceExplorer::ActOnPrimaryClick(
     IWindowManager *manager, const QModelIndex &index) {
   for (const auto &plugin : d->plugins) {
-    plugin->ActOnMainWindowPrimaryClick(manager, index);
+    plugin->ActOnPrimaryClick(manager, index);
   }
 }
 
@@ -81,7 +81,7 @@ void ReferenceExplorer::ActOnPrimaryClick(
 void ReferenceExplorer::ActOnContextMenu(
     IWindowManager *manager, QMenu *menu, const QModelIndex &index) {
   for (const auto &plugin : d->plugins) {
-    plugin->ActOnMainWindowContextMenu(manager, menu, index);
+    plugin->ActOnContextMenu(manager, menu, index);
   }
 
   if (d->view && d->view->isVisible() && index.isValid()) {
@@ -96,7 +96,7 @@ void ReferenceExplorer::ActOnContextMenu(
 void ReferenceExplorer::ActOnLongHover(
     IWindowManager *manager, const QModelIndex &index) {
   for (const auto &plugin : d->plugins) {
-    plugin->ActOnMainWindowLongHover(manager, index);
+    plugin->ActOnLongHover(manager, index);
   }
 }
 
@@ -110,7 +110,7 @@ std::vector<NamedAction> ReferenceExplorer::ActOnKeyPressEx(
 
   for (const auto &plugin : d->plugins) {
     auto plugin_actions = 
-        plugin->ActOnMainWindowKeyPressEx(manager, keys, index);
+        plugin->ActOnKeyPressEx(manager, keys, index);
 
     actions.insert(actions.end(),
                  std::make_move_iterator(plugin_actions.begin()),

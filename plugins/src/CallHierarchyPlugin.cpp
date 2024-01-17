@@ -220,7 +220,7 @@ CallHierarchyPlugin::CallHierarchyPlugin(
     : IReferenceExplorerPlugin(config_manager, parent),
       d(new PrivateData(config_manager)) {}
 
-std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowSecondaryClick(
+std::optional<NamedAction> CallHierarchyPlugin::ActOnSecondaryClick(
     IWindowManager *, const QModelIndex &index) {
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
@@ -241,7 +241,7 @@ std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowSecondaryClick(
 }
 
 // Allow a main window plugin to act on a key sequence.
-std::optional<NamedAction> CallHierarchyPlugin::ActOnMainWindowKeyPress(
+std::optional<NamedAction> CallHierarchyPlugin::ActOnKeyPress(
     IWindowManager *, const QKeySequence &keys, const QModelIndex &index) {
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);

@@ -42,30 +42,30 @@ class IReferenceExplorerPlugin : public QObject {
       std::function<IReferenceExplorerPluginPtr(IMainWindowPlugin *)>
           create_plugin);
 
-  virtual void ActOnMainWindowPrimaryClick(
+  virtual void ActOnPrimaryClick(
       IWindowManager *manager, const QModelIndex &index);
 
-  virtual std::optional<NamedAction> ActOnMainWindowSecondaryClick(
+  virtual std::optional<NamedAction> ActOnSecondaryClick(
       IWindowManager *manager, const QModelIndex &index);
 
-  virtual std::vector<NamedAction> ActOnMainWindowSecondaryClickEx(
+  virtual std::vector<NamedAction> ActOnSecondaryClickEx(
       IWindowManager *manager, const QModelIndex &index);
 
-  virtual void ActOnMainWindowContextMenu(
+  virtual void ActOnContextMenu(
       IWindowManager *manager, QMenu *menu, const QModelIndex &index);
 
   // Allow a main window plugin to act on a long hover over something.
-  virtual void ActOnMainWindowLongHover(
+  virtual void ActOnLongHover(
       IWindowManager *manager, const QModelIndex &index);
 
   // Allow a main window plugin to act on a key sequence.
-  virtual std::optional<NamedAction> ActOnMainWindowKeyPress(
+  virtual std::optional<NamedAction> ActOnKeyPress(
       IWindowManager *manager, const QKeySequence &keys,
       const QModelIndex &index);
 
   // Allow a main window plugin to provide one of several actions to be
   // performed on a key press.
-  virtual std::vector<NamedAction> ActOnMainWindowKeyPressEx(
+  virtual std::vector<NamedAction> ActOnKeyPressEx(
       IWindowManager *manager, const QKeySequence &keys,
       const QModelIndex &index);
 
