@@ -851,11 +851,9 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
   auto max_i = scene.logical_line_index[line_index + 1u];
 
   const Entity *prev_entity = nullptr;
-  const Data *prev_data = nullptr;
   const Entity *entity = nullptr;
-  const Data *data = nullptr;
 
-  for (; i < max_i; ++i, prev_entity = entity, prev_data = data) {
+  for (; i < max_i; ++i, prev_entity = entity) {
     entity = &(scene.entities[i]);
     Q_ASSERT(entity->logical_line_number == static_cast<int>(line_index + 1u));
 
@@ -880,6 +878,8 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
   // The cursor is between two entities. Translate the point so that it's
   // as though there is no previous entity, then it's just about whitespace
   // calculation.
+  const Data *prev_data = &(scene.data[
+      prev_entity->data_index_and_config >> kFormatShift]);
   QRectF r = prev_data->bounding_rect[
       prev_entity->data_index_and_config & kFormatMask];
 
