@@ -71,6 +71,9 @@ class ITheme : public QObject {
   //! Color used by the cursor.
   virtual QColor CursorColor(void) const = 0;
 
+  //! Color used for text selections.
+  virtual QColor SelectionColor(void) const = 0;
+
   //! Color used for icons. Most icons are a single color with a transparent
   //! background, and represent a mask. This color is applied to the mask to
   //! make the theme-specific colored icon.

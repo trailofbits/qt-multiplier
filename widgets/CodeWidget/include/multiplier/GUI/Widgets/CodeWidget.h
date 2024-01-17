@@ -63,6 +63,7 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   void paintEvent(QPaintEvent *event) Q_DECL_FINAL;
   void mousePressEvent(QMouseEvent *event) Q_DECL_FINAL;
   void mouseMoveEvent(QMouseEvent *event) Q_DECL_FINAL;
+  void mouseReleaseEvent(QMouseEvent *event) Q_DECL_FINAL;
   void wheelEvent(QWheelEvent *event) Q_DECL_FINAL;
   void keyPressEvent(QKeyEvent *event) Q_DECL_FINAL;
 

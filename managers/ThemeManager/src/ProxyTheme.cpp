@@ -80,6 +80,14 @@ QColor ProxyTheme::CursorColor(void) const {
   return color;
 }
 
+QColor ProxyTheme::SelectionColor(void) const {
+  auto color = current_theme->SelectionColor();
+  for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
+    color = (*it)->SelectionColor(std::move(color));
+  }
+  return color;
+}
+
 QColor ProxyTheme::IconColor(IconStyle style) const {
   auto color = current_theme->IconColor(style);
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {

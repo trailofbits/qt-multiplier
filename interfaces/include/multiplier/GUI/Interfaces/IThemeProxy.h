@@ -34,6 +34,9 @@ class IThemeProxy : public QObject {
   //! Color used by the cursor.
   virtual QColor CursorColor(QColor theme_color) const;
 
+  //! Color used by the selection.
+  virtual QColor SelectionColor(QColor theme_color) const;
+
   //! Color used for icons. Most icons are a single color with a transparent
   //! background, and represent a mask. This color is applied to the mask to
   //! make the theme-specific colored icon.

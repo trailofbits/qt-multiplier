@@ -139,6 +139,10 @@ class LightTheme Q_DECL_FINAL : public IBuiltinTheme {
     return kCursorColor;
   }
 
+  QColor SelectionColor(void) const Q_DECL_FINAL {
+    return QColor::fromRgb(232, 240, 252).darker(110);
+  }
+
   QColor IconColor(IconStyle style) const Q_DECL_FINAL {
     switch (style) {
       case IconStyle::NONE: return Qt::darkGray;

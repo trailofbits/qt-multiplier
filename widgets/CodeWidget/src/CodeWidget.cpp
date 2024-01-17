@@ -73,6 +73,9 @@ struct Entity {
 
   // The logical (one-indexed) column number of this token.
   int logical_column_number;
+
+  // Offset of the beginning of this entity in the total text of the document.
+  int document_offset;
 };
 
 struct Data {
@@ -98,6 +101,8 @@ struct Data {
 // };
 
 struct Scene {
+  // The complete, (nearly) original document.
+  QString document;
 
   // Sorted list of entities in this scene. This is sorted by
   // `(Entity::x, Entity::y)` positions.
@@ -139,6 +144,8 @@ struct SceneBuilder {
   int logical_column_number{1};
   int token_start_column{0};
   int token_length{0};
+  int expansion_depth{0};
+  int document_offset{0};
   unsigned token_index{0u};
   bool added_anything{false};
   RawEntityId related_entity_id{kInvalidEntityId};
@@ -151,6 +158,7 @@ struct SceneBuilder {
 
   void BeginToken(const Token &tok) {
     related_entity_id = tok.related_entity_id().Pack();
+    document_offset = static_cast<int>(scene.document.size());
   }
 
   void AddColumn(unsigned num_columns = 1u) {
@@ -224,9 +232,11 @@ struct SceneBuilder {
     e.logical_column_number = token_start_column;
     e.data_index_and_config = data_index << 2u;
     e.token_index = token_index;
+    e.document_offset = document_offset;
 
     token_start_column = 0u;
     token_length = 0;
+    document_offset = static_cast<int>(scene.document.size());
   }
 
   Scene TakeScene(void) & {
@@ -370,6 +380,14 @@ struct CodeWidget::PrivateData {
   // Location of the cursor (accounting for `scroll_x` and `scroll_y`).
   std::optional<QPointF> cursor;
 
+  // The starting cursor of the selection.
+  std::optional<QPointF> selection_start_cursor;
+
+  bool click_was_primary{false};
+  bool click_was_secondary{false};
+
+  bool tracking_selection{false};
+
   // Determined during painting.
   int line_height{0};
   int max_char_width{0};
@@ -427,6 +445,13 @@ struct CodeWidget::PrivateData {
   void ScrollBy(int horizontal_pixel_delta, int vertical_pixel_delta);
 
   const Entity *EntityUnderPoint(QPointF point) const;
+
+  std::pair<int, qreal> CharacterPosition(
+      QPointF point, const Entity *entity) const;
+  std::pair<int, qreal> CharacterPositionVariable(
+      QPointF point, const Entity *entity) const;
+  std::pair<int, qreal> CharacterPositionFixed(
+      QPointF point, const Entity *entity) const;
 
   QPointF CursorPosition(QPointF point) const;
   QPointF CursorPositionFixed(QPointF point) const;
@@ -503,7 +528,9 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
   b.scene.expanded_macros.emplace(macro_id, expanded);
 
   if (expanded) {
+    ++b.expansion_depth;
     ImportNode(b, node.after());
+    --b.expansion_depth;
   } else {
     ImportNode(b, node.before());
   }
@@ -553,6 +580,7 @@ void CodeWidget::PrivateData::ImportTokenNode(
 
       // TODO(pag): Configurable tab width; tab stops
       case QChar::Tabulation:
+        b.scene.document.append(QChar::Tabulation);
         if (token.kind() == TokenKind::WHITESPACE) {
           b.AddColumn(kTabWidth);
         } else {
@@ -564,6 +592,7 @@ void CodeWidget::PrivateData::ImportTokenNode(
 
       case QChar::Space:
       case QChar::Nbsp:
+        b.scene.document.append(QChar::Space);
         if (token.kind() == TokenKind::WHITESPACE) {
           b.AddColumn();
         } else {
@@ -574,6 +603,7 @@ void CodeWidget::PrivateData::ImportTokenNode(
       case QChar::ParagraphSeparator:
       case QChar::LineFeed:
       case QChar::LineSeparator: {
+        b.scene.document.append(QChar::LineFeed);
         b.AddNewLine();
         break;
       }
@@ -582,6 +612,7 @@ void CodeWidget::PrivateData::ImportTokenNode(
         continue;
 
       default:
+        b.scene.document.append(ch);
         b.AddChar(ch);
         break;
     }
@@ -641,6 +672,127 @@ void CodeWidget::PrivateData::ScrollBy(
   } else {
     scroll_y = 0;
   }
+
+  UpdateScrollbars();
+}
+
+// Return the character offset (`-1` if invalid) to the right of `point` (the
+// cursor), and the width of the data of `entity` to the left of `point`. 
+std::pair<int, qreal> CodeWidget::PrivateData::CharacterPosition(
+    QPointF point, const Entity *entity) const {
+  if (is_monospaced) {
+    return CharacterPositionFixed(point, entity);
+  } else {
+    return CharacterPositionVariable(point, entity);
+  }
+}
+
+// Return the character offset (`-1` if invalid) to the right of `point` (the
+// cursor), and the width of the data of `entity` to the left of `point` for a
+// variable/proportional-sized font.
+std::pair<int, qreal> CodeWidget::PrivateData::CharacterPositionVariable(
+    QPointF point, const Entity *entity) const {
+
+  auto text_data_index = entity->data_index_and_config >> kFormatShift;
+  auto text_config_index = entity->data_index_and_config & kFormatMask;
+  const Data *data = &(scene.data[text_data_index]);
+
+  qreal x = point.x();
+
+  // The cursor comes before `entity`.
+  if (entity->x > x) {
+    return {-1, 0.0};
+  }
+
+  qreal line_index = entity->logical_line_number - 1;
+  QRectF text_rect = data->bounding_rect[text_config_index];
+  qreal entity_y = line_index * line_height;
+
+  text_rect.moveTo(QPointF(entity->x, entity_y));
+  if (!text_rect.contains(point)) {
+    return {-1, 0.0};
+  }
+
+  QPixmap dummy_pixmap(static_cast<int>(text_rect.width()),
+                       static_cast<int>(text_rect.height()));
+  QPainter p(&dummy_pixmap);
+
+  // Configure the font based on the formatting of the entity. The bold/italic
+  // affects character sizes.
+  QFont entity_font = font;
+  if (text_config_index & kBoldMask) {
+    entity_font.setWeight(QFont::DemiBold);
+  }
+  if (text_config_index & kItalicMask) {
+    entity_font.setItalic(true);
+  }
+  p.setFont(entity_font);
+
+  // The cursor falls inside of an existing entity text. We'll calculate the
+  // width of the text. We go one character at a time, building up
+  // successively longer prefixes of `data->text` until we find that we've
+  // moved just beyond where the user clicked.
+  qreal prev_width = 0;
+  for (auto k = 1; k <= data->text.size(); ++k) {
+    auto prefix = data->text.sliced(0, k);
+    auto prefix_rect = p.boundingRect(text_rect, prefix, to);
+
+    if (prefix_rect.contains(point)) {
+      auto half = (prefix_rect.width() - prev_width) / 2;
+
+      // Falls to the left of this letter.
+      if ((entity->x + prev_width + half) > x) {
+        return {k - 1, prev_width};
+
+      // Falls to the right of this letter.
+      } else {
+        return {k, prefix_rect.width()};
+      }
+    }
+
+    prev_width = prefix_rect.width();
+  }
+
+  Q_ASSERT(false);
+  return {-1, 0.0};
+}
+
+// Return the character offset (`-1` if invalid) to the right of `point` (the
+// cursor), and the width of the data of `entity` to the left of `point` for a
+// fixed-width-sized font.
+std::pair<int, qreal> CodeWidget::PrivateData::CharacterPositionFixed(
+    QPointF point, const Entity *entity) const {
+
+  auto text_data_index = entity->data_index_and_config >> kFormatShift;
+  auto text_config_index = entity->data_index_and_config & kFormatMask;
+  const Data *data = &(scene.data[text_data_index]);
+
+  qreal x = point.x();
+
+  // The cursor comes before `entity`.
+  if (entity->x > x) {
+    return {-1, 0.0};
+  }
+
+  qreal line_index = entity->logical_line_number - 1;
+  QRectF text_rect = data->bounding_rect[text_config_index];
+  qreal entity_y = line_index * line_height;
+
+  text_rect.moveTo(QPointF(entity->x, entity_y));
+  if (!text_rect.contains(point)) {
+    return {-1, 0.0};
+  }
+
+  auto diff = x - text_rect.x();
+
+  qreal half_width = space_width / 2;
+  auto col_count = std::floor((diff + half_width) / space_width);
+  
+  if (col_count < 1) {
+    return {0, 0.0};
+  }
+
+  return {static_cast<int>(col_count), col_count * space_width};
 }
 
 // Locates the top-left corner of a cursor that should be placed under/near
@@ -701,8 +853,6 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
 
   for (; i < max_i; ++i, prev_entity = entity, prev_data = data) {
     entity = &(scene.entities[i]);
-    data = &(scene.data[entity->data_index_and_config >> kFormatShift]);
-
     Q_ASSERT(entity->logical_line_number == static_cast<int>(line_index + 1u));
 
     // The cursor comes before `entity`.
@@ -710,58 +860,11 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
       break;
     }
 
-    auto text_config_index = entity->data_index_and_config & kFormatMask;
-    QRectF text_rect = data->bounding_rect[text_config_index];
-    qreal entity_y = static_cast<qreal>(line_index) * line_height;
-
-    text_rect.moveTo(QPointF(entity->x, entity_y));
-    if (!text_rect.contains(point)) {
-      continue;
+    auto [k, prefix_width] = CharacterPositionVariable(point, entity);
+    if (k != -1) {
+      return QPointF(entity->x + prefix_width,
+                     static_cast<qreal>(line_index) * line_height);
     }
-
-    QPixmap dummy_pixmap(static_cast<int>(text_rect.width()),
-                         static_cast<int>(text_rect.height()));
-    QPainter p(&dummy_pixmap);
-
-    // Configure the font based on the formatting of the entity. The bold/italic
-    // affects character sizes.
-    QFont entity_font = font;
-    if (text_config_index & kBoldMask) {
-      entity_font.setWeight(QFont::DemiBold);
-    }
-    if (text_config_index & kItalicMask) {
-      entity_font.setItalic(true);
-    }
-    p.setFont(entity_font);
-
-    auto cursor_y = static_cast<qreal>(line_index) * line_height;
-
-    // The cursor falls inside of an existing entity text. We'll calculate the
-    // width of the text. We go one character at a time, building up
-    // successively longer prefixes of `data->text` until we find that we've
-    // moved just beyond where the user clicked.
-    qreal prev_width = 0;
-    for (auto k = 1; k <= data->text.size(); ++k) {
-      auto prefix = data->text.sliced(0, k);
-      auto prefix_rect = p.boundingRect(text_rect, prefix, to);
-
-      if (prefix_rect.contains(point)) {
-        auto half = (prefix_rect.width() - prev_width) / 2;
-
-        // Falls to the left of this letter.
-        if ((entity->x + prev_width + half) > x) {
-          return QPointF(entity->x + prev_width, cursor_y);
-
-        // Falls to the right of this letter.
-        } else {
-          return QPointF(entity->x + prefix_rect.width(), cursor_y);
-        }
-      }
-
-      prev_width = prefix_rect.width();
-    }
-
-    Q_ASSERT(false);
   }
 
   // There are no entities on this line, or there is no previous entity, and so
@@ -907,33 +1010,36 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
     : IWindowWidget(parent),
       d(new PrivateData(model_id)) {
 
-  // d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
-  // d->vertical_scrollbar->setSingleStep(1);
-  // connect(d->vertical_scrollbar, &QScrollBar::valueChanged, this,
-  //         &CodeWidget::OnVerticalScroll);
+  d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
+  d->vertical_scrollbar->setSingleStep(1);
+  connect(d->vertical_scrollbar, &QScrollBar::valueChanged, this,
+          &CodeWidget::OnVerticalScroll);
 
-  // d->horizontal_scrollbar = new QScrollBar(Qt::Horizontal, this);
-  // d->horizontal_scrollbar->setSingleStep(1);
-  // connect(d->horizontal_scrollbar, &QScrollBar::valueChanged, this,
-  //         &CodeWidget::OnHorizontalScroll);
+  d->horizontal_scrollbar = new QScrollBar(Qt::Horizontal, this);
+  d->horizontal_scrollbar->setSingleStep(1);
+  connect(d->horizontal_scrollbar, &QScrollBar::valueChanged, this,
+          &CodeWidget::OnHorizontalScroll);
 
-  // auto vertical_layout = new QVBoxLayout(this);
-  // vertical_layout->setContentsMargins(0, 0, 0, 0);
-  // vertical_layout->setSpacing(0);
-  // vertical_layout->addSpacerItem(
-  //     new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Expanding));
-  // vertical_layout->addStretch();
-  // vertical_layout->addWidget(d->horizontal_scrollbar);
+  auto vertical_layout = new QVBoxLayout;
+  vertical_layout->setContentsMargins(0, 0, 0, 0);
+  vertical_layout->setSpacing(0);
+  vertical_layout->addSpacerItem(
+      new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Expanding));
+  vertical_layout->addStretch();
+  vertical_layout->addWidget(d->horizontal_scrollbar);
   
-  // auto horizontal_layout = new QHBoxLayout();
-  // horizontal_layout->setContentsMargins(0, 0, 0, 0);
-  // horizontal_layout->setSpacing(0);
-  // horizontal_layout->addLayout(vertical_layout);
-  // horizontal_layout->addWidget(d->vertical_scrollbar);
-
-  // setLayout(horizontal_layout);
+  auto horizontal_layout = new QHBoxLayout;
+  horizontal_layout->setContentsMargins(0, 0, 0, 0);
+  horizontal_layout->setSpacing(0);
+  horizontal_layout->addLayout(vertical_layout);
+  horizontal_layout->addWidget(d->vertical_scrollbar);
 
   setContentsMargins(0, 0, 0, 0);
+  setLayout(horizontal_layout);
+
+  d->vertical_scrollbar->hide();
+  d->horizontal_scrollbar->hide();
+
   setFocusPolicy(Qt::StrongFocus);
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
@@ -949,8 +1055,12 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
 }
 
 void CodeWidget::focusOutEvent(QFocusEvent *) {
-  if (d->cursor) {
+  // Requests for context menus trigger `focusOutEvent`s prior to
+  // `mouseReleaseEvent`.
+  if (d->cursor && !d->click_was_secondary) {
     d->cursor.reset();
+    d->selection_start_cursor.reset();
+    d->tracking_selection = false;
     update();
   }
 }
@@ -985,7 +1095,6 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
   }
 
   d->ScrollBy(horizontal_pixel_delta * -1, vertical_pixel_delta * -1);
-  d->UpdateScrollbars();
   update();
 }
 
@@ -1063,16 +1172,150 @@ void CodeWidget::paintEvent(QPaintEvent *) {
       Data &data = d->scene.data[e.data_index_and_config >> kFormatShift];
       unsigned rect_config = e.data_index_and_config & kFormatMask;
 
-      ITheme::ColorAndStyle cs = d->theme->TokenColorAndStyle(t);
-      cs.background_color = QColor();
-      cs.foreground_color = highlight_foreground_color;
-
       qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
                   d->line_height;
       qreal x = e.x - d->scroll_x;
       qreal y = e_y - d->scroll_y;
 
+      QRectF bounding_rect = data.bounding_rect[rect_config];
+      bounding_rect.moveTo(x, y);
+
+      ITheme::ColorAndStyle cs = d->theme->TokenColorAndStyle(t);
+      cs.background_color = QColor();
+      cs.foreground_color = highlight_foreground_color;
+
       d->PaintToken(blitter, dummy_bg_painter, data, rect_config, cs, x, y);
+    }
+  }
+
+  // Draw the selection background, if any.
+  std::optional<QRectF> selections[3u];
+  QColor selection_color;
+  QColor selected_text_color;
+  if (d->cursor && d->selection_start_cursor) {
+
+    QPointF top_left = d->cursor.value();
+    QPointF bottom_right = d->selection_start_cursor.value();
+    if (top_left.y() > bottom_right.y()) {
+      std::swap(top_left, bottom_right);
+    }
+
+    // Selection contained within one line; the polygon is a rectange.
+    if (top_left.y() == bottom_right.y()) {
+      auto left_point = std::min(top_left.x(), bottom_right.x());
+      auto right_point = std::max(top_left.x(), bottom_right.x());
+
+      selections[0] = QRectF(
+          left_point - d->scroll_x, top_left.y() - d->scroll_y,
+          right_point - left_point, d->line_height);
+
+    // Selection cross multiple lines.
+    } else {
+      selections[0] = QRectF(
+          top_left.x() - d->scroll_x, top_left.y() - d->scroll_y,
+          d->canvas_rect.width() + d->viewport.width(),
+          d->line_height);
+
+      auto bottom_left_y = top_left.y() + d->line_height;
+
+      if (bottom_left_y < bottom_right.y()) {
+        selections[1] = QRectF(
+            -d->scroll_x, bottom_left_y - d->scroll_y,
+            d->canvas_rect.width() + d->viewport.width(),
+            bottom_right.y() - bottom_left_y);
+      }
+
+      selections[2] = QRectF(
+          -d->scroll_x, bottom_right.y() - d->scroll_y,
+          bottom_right.x(), d->line_height);
+    }
+
+    selection_color = d->theme->SelectionColor();
+    selected_text_color = ITheme::ContrastingColor(selection_color);
+
+    // Fill in up to three rectangles for the selection.
+    for (auto &sel : selections) {
+      if (sel) {
+        blitter.fillRect(sel.value(), selection_color);
+      }
+    }
+
+    // Go find all entities bounded by the selections, and repaint them as being
+    // selected.
+    auto start_index = static_cast<unsigned>(
+        (top_left.y() + (d->line_height / 2)) / d->line_height);
+
+    auto stop_index = static_cast<unsigned>(
+        (bottom_right.y() + (d->line_height / 2)) / d->line_height);
+
+    // Go through only the entities on the relevant lines. 
+    for (auto l = start_index; l <= stop_index; ++l) {
+      auto i = d->scene.logical_line_index[l];
+      auto max_i = d->scene.logical_line_index[l + 1];
+
+      // Inspect each entity on the line.
+      for (; i < max_i; ++i) {
+        const Entity &e = d->scene.entities[i];
+        unsigned data_index = e.data_index_and_config >> kFormatShift;
+        unsigned rect_config = e.data_index_and_config & kFormatMask;
+        Data &data = d->scene.data[data_index];
+
+        const Token &t = d->scene.tokens[e.token_index];
+        ITheme::ColorAndStyle cs = d->theme->TokenColorAndStyle(t);
+        cs.background_color = selection_color;
+        cs.foreground_color = selected_text_color;
+
+        qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
+                    d->line_height;
+        qreal x = e.x - d->scroll_x;
+        qreal y = e_y - d->scroll_y;
+
+        QRectF bounding_rect = data.bounding_rect[rect_config];
+        bounding_rect.moveTo(x, y);
+
+        for (auto &sel : selections) {
+          if (!sel) {
+            continue;
+          }
+          
+          // The selection fully contains this entity; paint it.
+          if (sel->contains(bounding_rect)) {
+            d->PaintToken(blitter, blitter, data, rect_config, cs, x, y);
+            break;
+
+          // The selection is unrelated to this entity.
+          } else if (!sel->intersects(bounding_rect)) {
+            continue;
+          }
+
+          Data new_data;
+
+          qsizetype start_k = 0;
+          qsizetype stop_k = data.text.size();
+
+          // Top-left intersection case (highlight a suffix of `data`).
+          if (bounding_rect.x() < sel->x()) {
+            auto [index, width] = d->CharacterPosition(
+                QPointF(sel->x(), e_y), &e);
+            Q_ASSERT(0 < index);
+            x += width;
+            start_k = index;
+          }
+
+          // Bottom-right intersection case (highlight a prefix of `data`).
+          if (sel->topRight().x() < bounding_rect.topRight().x()) {
+            stop_k = d->CharacterPosition(
+                QPointF(sel->topRight().x(), e_y), &e).first;
+            Q_ASSERT(0 < stop_k);
+          }
+
+          for (auto k = start_k; 0 <= k && k < stop_k; ++k) {
+            new_data.text += data.text[k];
+          }
+
+          d->PaintToken(blitter, blitter, new_data, rect_config, cs, x, y);
+        }
+      }
     }
   }
 
@@ -1086,11 +1329,65 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   blitter.end();
 }
 
-void CodeWidget::mouseMoveEvent(QMouseEvent *event) {
+void CodeWidget::mouseReleaseEvent(QMouseEvent *event) {
+  auto click_was_primary = d->click_was_primary;
+  auto click_was_secondary = d->click_was_secondary;
+  d->click_was_primary = false;
+  d->click_was_secondary = false;
+
   if (event->buttons() & Qt::LeftButton) {
-    mousePressEvent(event);
     return;
   }
+
+  // Web browsers and SciTools Understand's Browse Mode all enact the change of
+  // website on mouse release rather than press. This has inspired a habit in
+  // Jay to use selections as a way of getting his cursor on an entity without
+  // having the view change. 
+  if (!d->tracking_selection && click_was_primary && !click_was_secondary) {
+    d->selection_start_cursor.reset();
+
+    if (d->current_entity) {
+      emit RequestPrimaryClick(d->CreateModelIndex(d->current_entity));
+    }
+    return;
+  }
+
+  d->tracking_selection = false;
+
+  Q_ASSERT(d->selection_start_cursor.has_value());
+  Q_ASSERT(d->cursor.has_value());
+  if (d->selection_start_cursor.value() == d->cursor.value()) {
+    d->selection_start_cursor.reset();
+    return;
+  }
+
+  update();
+}
+
+void CodeWidget::mouseMoveEvent(QMouseEvent *event) {
+  if (!(event->buttons() & Qt::LeftButton)) {
+    return;
+  }
+
+  if (!d->selection_start_cursor && d->cursor && d->click_was_primary) {
+    d->tracking_selection = true;
+    d->selection_start_cursor = d->cursor;
+  }
+
+  mousePressEvent(event);
+
+  QPointF rel_position = event->position();
+  auto x = d->scroll_x + rel_position.x();
+  auto y = d->scroll_y + rel_position.y();
+
+  QPointF scrolled_xy(x, y);
+  auto curr_cursor = d->CursorPosition(scrolled_xy);
+  if (curr_cursor == d->cursor.value()) {
+    return;
+  }
+
+  d->cursor = curr_cursor;
+  update();
 }
 
 void CodeWidget::mousePressEvent(QMouseEvent *event) {
@@ -1100,13 +1397,25 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   auto y = d->scroll_y + rel_position.y();
 
   QPointF scrolled_xy(x, y);
+  QPointF new_cursor = d->CursorPosition(scrolled_xy);
 
   const Entity *entity = d->EntityUnderPoint(scrolled_xy);
 
   d->token_model.token = {};
+  d->click_was_primary = event->buttons() & Qt::LeftButton;
+  d->click_was_secondary = event->buttons() & Qt::RightButton;
 
-  if (event->buttons() & (Qt::LeftButton | Qt::RightButton)) {
-    d->cursor = d->CursorPosition(scrolled_xy);
+  if (d->selection_start_cursor && !d->tracking_selection &&
+      (d->click_was_primary || !d->click_was_secondary)) {
+    d->selection_start_cursor.reset();
+  }
+
+  // When we click, we want to set the cursor. If we right click and we have a
+  // selection, then we don't want to change the cursor or the current line. If
+  // we right click and don't have a selection, when we want to move the cursor.
+  if (d->click_was_primary ||
+      ((d->click_was_secondary && !d->selection_start_cursor))) {
+    d->cursor = new_cursor;
 
     // Calculate the current line index based on the clamped cursor.
     auto new_current_line_index = static_cast<int>(
@@ -1114,16 +1423,15 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
     if (new_current_line_index != d->current_line_index) {
       d->current_line_index = new_current_line_index;
     }
-
-    d->current_entity = entity;
   }
 
-  // Calculate the index of the current line.
-  if (event->buttons() & Qt::LeftButton) {
-    emit RequestPrimaryClick(d->CreateModelIndex(entity));
+  d->current_entity = entity;
 
-  } else if (event->buttons() & Qt::RightButton) {
-    emit RequestSecondaryClick(d->CreateModelIndex(entity));
+  // Calculate the index of the current line.
+  if (!d->tracking_selection) {
+    if (!d->click_was_primary && d->click_was_secondary) {
+      emit RequestSecondaryClick(d->CreateModelIndex(entity));
+    }
   }
 
   update();
@@ -1182,12 +1490,21 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       break;
   }
 
+  auto need_repaint = false;
+  if (d->selection_start_cursor) {
+    d->selection_start_cursor.reset();
+    d->tracking_selection = false;
+    need_repaint = true;
+  }
+
   if (!d->cursor || (dx == 0 && dy == 0)) {
+    if (need_repaint) {
+      update();
+    }
     return;
   }
 
   // Figure out the next cursor position.
-  auto need_repaint = false;
   auto new_cursor = d->NextCursorPosition(d->cursor.value(), dx, dy);
   auto new_current_line_index = static_cast<int>(
       std::floor(new_cursor.y() / d->line_height));
@@ -1238,7 +1555,36 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 }
 
 void CodeWidget::PrivateData::UpdateScrollbars(void) {
+  return;
+  if (scene.entities.empty()) {
+    horizontal_scrollbar->hide();
+    vertical_scrollbar->hide();
+    return;
+  }
 
+  auto s_width = canvas_rect.width();
+  auto s_height = canvas_rect.height();
+
+  auto v_width = viewport.width();
+  auto v_height = viewport.height();
+
+  if (v_width < s_width) {
+    horizontal_scrollbar->show();
+    horizontal_scrollbar->setMaximum(static_cast<int>(s_width - v_width));
+
+  } else {
+    horizontal_scrollbar->hide();
+    horizontal_scrollbar->setMaximum(0);
+  }
+
+  if (v_height < s_height) {
+    vertical_scrollbar->show();
+    vertical_scrollbar->setMaximum(static_cast<int>(s_height - v_height));
+
+  } else {
+    vertical_scrollbar->hide();
+    vertical_scrollbar->setMaximum(0);
+  }
 }
 
 void CodeWidget::PrivateData::RecomputeScene(void) {
@@ -1570,8 +1916,12 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity) {
 void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->scene_changed = true;
   d->canvas_changed = true;
+  d->click_was_primary = false;
+  d->click_was_secondary = false;
   d->current_entity = nullptr;
   d->cursor.reset();
+  d->selection_start_cursor.reset();
+  d->tracking_selection = false;
   d->token_model.token = {};
   d->scroll_x = 0;
   d->scroll_y = 0;

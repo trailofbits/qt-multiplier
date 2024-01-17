@@ -20,8 +20,11 @@ QFont IThemeProxy::Font(QFont theme_font) const {
   return theme_font;
 }
 
-//! Color used by the cursor.
 QColor IThemeProxy::CursorColor(QColor theme_color) const {
+  return theme_color;
+}
+
+QColor IThemeProxy::SelectionColor(QColor theme_color) const {
   return theme_color;
 }
 
