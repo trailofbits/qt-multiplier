@@ -165,6 +165,9 @@ struct SceneBuilder {
     if (token_length) {
       AddEntity();
     }
+    for (auto i = 0u; i < num_columns; ++i) {
+      scene.document.append(QChar::Space);
+    }
     logical_column_number += num_columns;
   }
 
@@ -172,7 +175,11 @@ struct SceneBuilder {
     if (token_length) {
       AddEntity();
     }
-
+    while (!scene.document.isEmpty() &&
+           scene.document.back() == QChar::Space) {
+      scene.document.chop(1);
+    }
+    scene.document.append(QChar::LineFeed);
     logical_column_number = 1u;
     scene.num_lines += 1;
     scene.logical_line_index.emplace_back(
@@ -183,7 +190,8 @@ struct SceneBuilder {
     if (!token_start_column) {
       token_start_column = logical_column_number;
     }
-    token_data += ch;
+    scene.document.append(ch);
+    token_data.append(ch);
     token_length += 1;
     logical_column_number += 1u;
     added_anything = true;
@@ -580,7 +588,6 @@ void CodeWidget::PrivateData::ImportTokenNode(
 
       // TODO(pag): Configurable tab width; tab stops
       case QChar::Tabulation:
-        b.scene.document.append(QChar::Tabulation);
         if (token.kind() == TokenKind::WHITESPACE) {
           b.AddColumn(kTabWidth);
         } else {
@@ -592,7 +599,6 @@ void CodeWidget::PrivateData::ImportTokenNode(
 
       case QChar::Space:
       case QChar::Nbsp:
-        b.scene.document.append(QChar::Space);
         if (token.kind() == TokenKind::WHITESPACE) {
           b.AddColumn();
         } else {
@@ -603,7 +609,6 @@ void CodeWidget::PrivateData::ImportTokenNode(
       case QChar::ParagraphSeparator:
       case QChar::LineFeed:
       case QChar::LineSeparator: {
-        b.scene.document.append(QChar::LineFeed);
         b.AddNewLine();
         break;
       }
@@ -612,7 +617,6 @@ void CodeWidget::PrivateData::ImportTokenNode(
         continue;
 
       default:
-        b.scene.document.append(ch);
         b.AddChar(ch);
         break;
     }
@@ -1296,7 +1300,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
           // Top-left intersection case (highlight a suffix of `data`).
           if (bounding_rect.x() < sel->x()) {
             auto [index, width] = d->CharacterPosition(
-                QPointF(sel->x(), e_y), &e);
+                QPointF(sel->x() + d->scroll_x, e_y), &e);
             Q_ASSERT(0 < index);
             x += width;
             start_k = index;
@@ -1305,7 +1309,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
           // Bottom-right intersection case (highlight a prefix of `data`).
           if (sel->topRight().x() < bounding_rect.topRight().x()) {
             stop_k = d->CharacterPosition(
-                QPointF(sel->topRight().x(), e_y), &e).first;
+                QPointF(sel->topRight().x() + d->scroll_x, e_y), &e).first;
             Q_ASSERT(0 < stop_k);
           }
 
@@ -1314,6 +1318,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
           }
 
           d->PaintToken(blitter, blitter, new_data, rect_config, cs, x, y);
+          break;
         }
       }
     }

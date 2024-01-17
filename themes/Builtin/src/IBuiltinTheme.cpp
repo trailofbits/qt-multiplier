@@ -21,7 +21,7 @@ IBuiltinTheme::IBuiltinTheme(const MediaManager &media, QString name_, QString i
       name(std::move(name_)),
       palette(std::move(palette_)),
       data(data_) {
-  font.setPointSize(14);
+  // font.setPointSize(14);
   font.setStyleHint(QFont::TypeWriter);        
 }
 
