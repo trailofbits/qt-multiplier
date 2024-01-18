@@ -40,6 +40,7 @@
 namespace mx::gui {
 namespace {
 
+static const QKeySequence kCopyKeqSequence("Ctrl+C");
 static constexpr auto kBoldMask = 0b10u;
 static constexpr auto kItalicMask = 0b01u;
 static constexpr auto kFormatMask = kBoldMask | kItalicMask;
@@ -1290,6 +1291,26 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
   qreal dx = 0;
   qreal dy = 0;
 
+  QString modifier;
+
+  if (event->modifiers() & Qt::ShiftModifier) {
+    modifier += "Shift+";
+  }
+
+  if (event->modifiers() & Qt::ControlModifier) {
+    modifier += "Ctrl+";
+  }
+
+  if (event->modifiers() & Qt::AltModifier) {
+    modifier += "Alt+";
+  }
+
+  if (event->modifiers() & Qt::MetaModifier) {
+    modifier += "Meta+";
+  }
+
+  QKeySequence ks(modifier + QKeySequence(event->key()).toString());
+
   switch (event->key()) {
 
     // Pressing the up arrow moves the current line up, and maybe triggers
@@ -1317,30 +1338,20 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       break;
 
     default:
-      if (d->current_entity && d->cursor) {
-        QString modifier;
-        if (event->modifiers() & Qt::ShiftModifier) {
-          modifier += "Shift+";
-        }
-        if (event->modifiers() & Qt::ControlModifier) {
-          modifier += "Ctrl+";
-        }
-        if (event->modifiers() & Qt::AltModifier) {
-          modifier += "Alt+";
-        }
-        if (event->modifiers() & Qt::MetaModifier) {
-          modifier += "Meta+";
-        }
+      // Support Ctrl-C.
+      if (ks == kCopyKeqSequence && d->selection_start_cursor &&
+          !d->token_model.selection.isEmpty()) {
+        qApp->clipboard()->setText(d->token_model.selection);
 
-        emit RequestKeyPress(
-            QKeySequence(modifier + QKeySequence(event->key()).toString()),
-            d->CreateModelIndex(d->current_entity));
+      // Otherwise, request a generic keypress handler.
+      } else if (d->current_entity && d->cursor) {
+        emit RequestKeyPress(ks, d->CreateModelIndex(d->current_entity));
       }
       break;
   }
 
   auto need_repaint = false;
-  if (d->selection_start_cursor) {
+  if (d->selection_start_cursor && !event->modifiers()) {
     d->selection_start_cursor.reset();
     d->tracking_selection = false;
     need_repaint = true;
