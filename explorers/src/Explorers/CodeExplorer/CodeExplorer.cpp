@@ -125,8 +125,14 @@ void CodeExplorer::ActOnPrimaryClick(IWindowManager *,
   if (model_id == CodePreviewWidget::kModelId ||
       model_id == kOpenEntityModelId) {
 
-    OnOpenEntity(QVariant::fromValue<VariantEntity>(
-        IModel::EntitySkipThroughTokens(index)));
+    // When we click on an entity in a code view, try to bring us to its
+    // definition.
+    auto entity = IModel::EntitySkipThroughTokens(index);
+    if (std::holds_alternative<Decl>(entity)) {
+      entity = std::get<Decl>(entity).canonical_declaration();
+    }
+
+    OnOpenEntity(QVariant::fromValue<VariantEntity>(entity));
   }
 }
 
