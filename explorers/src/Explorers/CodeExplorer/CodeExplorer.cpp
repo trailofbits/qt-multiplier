@@ -120,9 +120,14 @@ void CodeExplorer::ActOnPrimaryClick(IWindowManager *,
     return;
   }
 
-  // Clicking on something should open the code.
-  OnOpenEntity(QVariant::fromValue<VariantEntity>(
-      IModel::EntitySkipThroughTokens(index)));
+  // Clicking on something in the code view should open the code.
+  auto model_id = IModel::ModelId(index);
+  if (model_id == CodePreviewWidget::kModelId ||
+      model_id == kOpenEntityModelId) {
+
+    OnOpenEntity(QVariant::fromValue<VariantEntity>(
+        IModel::EntitySkipThroughTokens(index)));
+  }
 }
 
 std::optional<NamedAction> CodeExplorer::ActOnKeyPress(
@@ -160,8 +165,9 @@ std::optional<NamedAction> CodeExplorer::ActOnKeyPress(
 
 void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
                                     const QModelIndex &index) {
-  if (IModel::ModelId(index) == CodePreviewWidget::kModelId ||
-      IModel::ModelId(index) == kOpenEntityModelId) {
+  auto model_id = IModel::ModelId(index);
+  if (model_id == CodePreviewWidget::kModelId ||
+      model_id == kOpenEntityModelId) {
     
     auto sel_text = index.data(CodeWidget::SelectedTextUserRole).toString();
     if (!sel_text.isEmpty()) {
@@ -218,6 +224,7 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
   auto &code_widget = d->opened_windows[id];
   if (code_widget) {
     code_widget->show();
+    code_widget->OnGoToEntity(entity);
     return;
   }
 
@@ -234,10 +241,31 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
       break;
     }
   } else {
-    // TODO(pag): Choose top-level entity?
+    auto found = false;
+    for (auto tld : frag->top_level_declarations()) {
+      if (auto name = NameOfEntityAsString(tld)) {
+        code_widget->setWindowTitle(name.value());
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      for (auto mt : frag->preprocessed_code()) {
+        auto macro = std::get_if<Macro>(&mt);
+        if (!macro) {
+          continue;
+        }
+        if (auto name = NameOfEntityAsString(*macro)) {
+          code_widget->setWindowTitle(name.value());
+          break;
+        }
+      }
+    }
   }
 
   code_widget->SetTokenTree(tt);
+  code_widget->OnGoToEntity(entity);
 
   connect(code_widget, &IWindowWidget::Closed,
           this, [=, this] (void) {

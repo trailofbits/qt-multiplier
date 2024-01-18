@@ -188,7 +188,7 @@ TokenRange Tokens(const VariantEntity &ent) {
   const auto VariantEntityVisitor = Overload{
       [](const Decl &entity) { return entity.tokens(); },
       [](const Stmt &entity) { return entity.tokens(); },
-      [](const Type &) { return TokenRange(); },
+      [](const Type &entity) { return entity.tokens(); },
       [](const Token &entity) { return TokenRange(entity); },
       [](const Macro &entity) { return entity.use_tokens(); },
       [](const Designator &entity) { return entity.tokens(); },

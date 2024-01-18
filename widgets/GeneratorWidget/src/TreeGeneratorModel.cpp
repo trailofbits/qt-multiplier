@@ -348,14 +348,7 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
     return tooltip;
 
   } else if (role == IModel::EntityRole) {
-    auto entity = node->item->AliasedEntity();
-    if (std::holds_alternative<NotAnEntity>(entity)) {
-      entity = node->item->Entity();
-    }
-
-    if (!std::holds_alternative<NotAnEntity>(entity)) {
-      return QVariant::fromValue(entity);
-    }
+    return QVariant::fromValue(node->item->Entity());
 
   } else if (role == IModel::ModelIdRole) {
     return "com.trailofbits.model.TreeGeneratorModel";

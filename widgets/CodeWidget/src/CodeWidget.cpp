@@ -25,10 +25,15 @@
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QSpacerItem>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
 #include <cmath>
+#include <multiplier/AST/AddrLabelExpr.h>
+#include <multiplier/AST/DeclRefExpr.h>
+#include <multiplier/AST/LabelStmt.h>
+#include <multiplier/AST/MemberExpr.h>
 #include <multiplier/Frontend/MacroExpansion.h>
 #include <multiplier/Frontend/MacroVAOpt.h>
 #include <multiplier/Frontend/TokenTree.h>
@@ -36,6 +41,7 @@
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/GUI/Util.h>
 
 namespace mx::gui {
 namespace {
@@ -119,6 +125,12 @@ struct Scene {
   // Keeps track of which macros were and weren't expanded.
   std::unordered_map<RawEntityId, bool> expanded_macros;
 
+  // Maps things like fragments to where they should/could logically begin.
+  std::unordered_map<RawEntityId, unsigned> entity_begin_offset;
+
+  // Maps displayed fragments to where they should/could logically begin.
+  std::unordered_map<RawEntityId, unsigned> fragment_begin_offset;
+
   // Maximum number of characters on any given line.
   int max_logical_columns{1};
 
@@ -177,7 +189,16 @@ struct SceneBuilder {
   void EndToken(Token tok) {
     AddEntity();
     if (added_anything) {
-      scene.tokens.emplace_back(std::move(tok));
+
+      // The `TokenTree` API often gives us macro tokens, but if we can get a
+      // parsed token, then we actually want that, as it makes scroll to entity
+      // much easier.
+      if (auto parsed_tok = tok.parsed_token()) {
+        scene.tokens.emplace_back(std::move(parsed_tok));
+      } else {
+        scene.tokens.emplace_back(std::move(tok));
+      }
+
       added_anything = false;
       token_index += 1u;
     }
@@ -322,6 +343,8 @@ inline static void InitializePainterOptions(QPainter &p) {
 
 struct CodeWidget::PrivateData {
 
+  uint64_t version_number{0};
+
   // The theme being used.
   IThemePtr theme;
 
@@ -438,6 +461,7 @@ struct CodeWidget::PrivateData {
   void RecomputeCanvas(void);
   void RecomputeHighlights(void);
   void RecomputeSelection(QPainter &blitter);
+  void ScrollToEntityOffset(CodeWidget *self, unsigned offset);
 
   void PaintToken(
       QPainter &fg_painter, QPainter &bg_painter, Data &data,
@@ -498,16 +522,24 @@ void CodeWidget::PrivateData::ImportChoiceNode(
     SceneBuilder &b, ChoiceTokenTreeNode node) {
 
   std::optional<TokenTreeNode> chosen_node;
+  RawEntityId chosen_fragment_id = kInvalidEntityId;
+  unsigned eo = static_cast<unsigned>(b.scene.entities.size());
 
   for (auto &item : node.children()) {
     RawEntityId fragment_id = item.first.id().Pack();
+    
+    // Keep track of fragment locations.
+    b.scene.entity_begin_offset.emplace(fragment_id, eo);
+
     if (scene_overrides.contains(fragment_id) || !chosen_node) {
       chosen_node.reset();
       chosen_node.emplace(std::move(item.second));
+      chosen_fragment_id = fragment_id;
     }
   }
 
   if (chosen_node) {
+    b.scene.fragment_begin_offset.emplace(chosen_fragment_id, eo);
     ImportNode(b, std::move(chosen_node.value()));
   }
 }
@@ -532,12 +564,17 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
     macro_id = std::get<MacroVAOpt>(sub).id().Pack();
   }
 
+  // Keep track of which macros were expanded.
   auto expanded = macros_to_expand.contains(macro_id);
   if (def_id != kInvalidEntityId) {
     expanded = expanded || macros_to_expand.contains(def_id);
     b.scene.expanded_macros.emplace(def_id, expanded);
   }
   b.scene.expanded_macros.emplace(macro_id, expanded);
+
+  // Keep track of macro locations.
+  b.scene.entity_begin_offset.emplace(
+      macro_id, static_cast<unsigned>(b.scene.entities.size()));
 
   if (expanded) {
     ++b.expansion_depth;
@@ -570,9 +607,10 @@ void CodeWidget::PrivateData::ImportTokenNode(
   QString utf16_data = QString::fromUtf8(
       utf8_data.data(), static_cast<qsizetype>(utf8_data.size()));
 
-  // Support entity renaming.
   RawEntityId related_entity_id = token.related_entity_id().Pack();
   if (related_entity_id != kInvalidEntityId) {
+
+    // Support entity renaming.
     if (auto rename_it = new_entity_names.find(related_entity_id);
         rename_it != new_entity_names.end()) {
       utf16_data = rename_it.value();
@@ -1313,27 +1351,51 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
   switch (event->key()) {
 
+    // Pressing the page up button should shift by the number of lines in the
+    // viewport.
+    case Qt::Key_PageUp:
+      d->selection_start_cursor.reset();
+      d->tracking_selection = false;
+      dy = -std::floor(d->viewport.height() / d->line_height);
+      break;
+
+    // Pressing the page down button should shift by the number of lines in the
+    // viewport.
+    case Qt::Key_PageDown:
+      d->selection_start_cursor.reset();
+      d->tracking_selection = false;
+      dy = std::floor(d->viewport.height() / d->line_height);
+      break;
+
     // Pressing the up arrow moves the current line up, and maybe triggers
     // a scroll.
     case Qt::Key_Up:
+      d->selection_start_cursor.reset();
+      d->tracking_selection = false;
       dy = -1;
       break;
 
     // Pressing the down arrow moves the current line down, and maybe triggers
     // a scroll.
     case Qt::Key_Down:
+      d->selection_start_cursor.reset();
+      d->tracking_selection = false;
       dy = 1;
       break;
 
     // Pressing the left arrow moves the cursor left, and maybe triggers a
     // scroll.
     case Qt::Key_Left:
+      d->selection_start_cursor.reset();
+      d->tracking_selection = false;
       dx = -1;
       break;
 
     // Pressing the right arrow moves the cursor left, and maybe triggers a
     // scroll.
     case Qt::Key_Right:
+      d->selection_start_cursor.reset();
+      d->tracking_selection = false;
       dx = 1;
       break;
 
@@ -1846,6 +1908,60 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   RecomputeHighlights();
 }
 
+void CodeWidget::PrivateData::ScrollToEntityOffset(
+    CodeWidget *self, unsigned offset) {
+
+  if (offset > scene.entities.size()) {
+    return;
+  }
+
+  auto v_width = viewport.width();
+  auto v_height = viewport.height();
+
+  // If we don't yet have a viewport width/height, then schedule this function
+  // to run later.
+  if (!v_width || !v_height) {
+    QTimer::singleShot(
+        10, self, [=, this, vn = version_number] (void) {
+          if (vn == version_number) {
+            ScrollToEntityOffset(self, offset);
+          }
+        });
+    return;
+  }
+
+  const Entity &entity = scene.entities[offset];
+
+  current_line_index = entity.logical_line_number - 1;
+  qreal entity_y = current_line_index * line_height;
+  QPointF entity_loc(entity.x, entity_y);
+  selection_start_cursor.reset();
+  cursor = CursorPosition(entity_loc);
+
+  auto c_width = static_cast<int>(foreground_canvas.width() / dpi_ratio);
+  auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
+
+  // If the entity isn't already visible, then center the window to make it
+  // visible.
+  if (entity_y < scroll_y ||
+      (entity_y + line_height) > (scroll_y + v_height)) {
+    scroll_y = std::min(
+        std::max(0, static_cast<int>(entity_y - (v_height / 2))),
+        c_height - v_height);
+  }
+  
+  if (entity.x > v_width) {
+    scroll_x = std::min(
+        std::max(0, static_cast<int>(entity.x - (v_width / 2))),
+        c_width - v_width);
+
+  } else {
+    scroll_x = 0;
+  }
+
+  self->update();
+}
+
 // Paint a token.
 void CodeWidget::PrivateData::PaintToken(
     QPainter &fg_painter, QPainter &bg_painter, Data &data,
@@ -2015,11 +2131,139 @@ void CodeWidget::OnHorizontalScroll(int change) {
 }
 
 // Invoked when we want to scroll to a specific entity.
-void CodeWidget::OnGoToEntity(const VariantEntity &entity) {
-  d->scene_overrides.clear();
+void CodeWidget::OnGoToEntity(const VariantEntity &entity_) {
 
+  // Clear out any selections.
+  d->selection_start_cursor.reset();
+  d->tracking_selection = false;
+
+  VariantEntity entity = entity_;
+
+  // TODO(pag): Eventually handle nested fragments.
+  RawEntityId frag_id = kInvalidEntityId;
   if (auto frag = Fragment::containing(entity)) {
-    d->scene_overrides.insert(frag->id().Pack());
+    frag_id = frag->id().Pack();
+    if (!d->scene.fragment_begin_offset.contains(frag_id) &&
+        d->scene.entity_begin_offset.contains(frag_id)) {
+      d->scene_overrides.clear();
+      d->scene_overrides.insert(frag->id().Pack());
+      d->scene_changed = true;
+    }
+  }
+
+  // It's possible we haven't painted anything yet, and so we need a scene to
+  // be able to know what entities are even in our scene.
+  d->RecomputeCanvas();
+
+  auto from_macro = false;
+  auto it_end = d->scene.entity_begin_offset.end();
+
+  // Map to the entity.
+  while (!std::holds_alternative<NotAnEntity>(entity)) {
+
+    // Try to find `entity`.
+    RawEntityId entity_id = EntityId(entity).Pack();
+    auto it = d->scene.entity_begin_offset.find(entity_id);
+    if (it != it_end) {
+      d->ScrollToEntityOffset(this, it->second);
+      return;
+    }
+
+    // We failed to find `entity`, try to compute a findable `entity` by
+    // ascending various tree-like representations.
+
+    if (auto tok = std::get_if<Token>(&entity)) {
+      if (!tok) {
+        break;
+      }
+
+      if (!from_macro) {
+        if (auto macro = tok->containing_macro()) {
+          entity = macro.value();
+          continue;
+        }
+      }
+      from_macro = false;
+
+      auto ti = 0u;
+      for (const auto &existing_tok : d->scene.tokens) {
+        if (existing_tok == *tok) {
+          break;
+        }
+        ++ti;
+      }
+
+      // We found the token in the scene; now find the first entity using the
+      // token.
+      if (ti < d->scene.tokens.size()) {
+        const auto &entities = d->scene.entities;
+        auto max_eo = entities.size();
+        for (auto eo = ti; eo < max_eo; ++eo) {
+          if (entities[eo].token_index == ti) {
+            d->ScrollToEntityOffset(this, eo);
+            return;
+          }
+        }
+      }
+
+      // Fall back on the fragment.
+      break;
+
+    } else if (auto macro = std::get_if<Macro>(&entity)) {
+
+      if (auto dir = MacroDirective::from(*macro)) {
+        if (auto hash = dir->hash()) {
+          entity = hash;  // Might not have a hash with a `_Pragma` case.
+          from_macro = true;
+          continue;
+        }
+      }
+
+      if (auto parent = macro->parent()) {
+        entity = parent.value();
+
+      } else {
+        entity = Fragment::containing(*macro);
+      }
+
+    // Keep us where we are.
+    } else if (std::holds_alternative<File>(entity)) {
+      update();
+      return;
+
+    } else {
+      auto found = false;
+      for (auto entity_tok : Tokens(entity)) {
+        entity = entity_tok;
+        found = true;
+        break;
+      }
+
+      if (found) {
+        continue;
+      }
+
+      if (!std::holds_alternative<Fragment>(entity)) {
+        if (auto frag = Fragment::containing(entity)) {
+          entity = frag.value();
+          continue;
+        }
+      }
+
+      if (!found) {
+        break;
+      }
+    }
+  }
+
+  // TODO(pag): Add line-based fallback?
+
+  // We failed to find the entity, hopefully we can find its containing
+  // fragment. This code is probably dead.
+  auto it = d->scene.entity_begin_offset.find(frag_id);
+  if (it != it_end) {
+    d->ScrollToEntityOffset(this, it->second);
+    return;
   }
 
   update();
@@ -2027,6 +2271,7 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity) {
 
 //! Change the underlying data / model being rendered by this code widget.
 void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
+  d->version_number++;
   d->scene_changed = true;
   d->canvas_changed = true;
   d->click_was_primary = false;

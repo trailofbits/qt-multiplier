@@ -21,6 +21,7 @@ target_link_libraries("mx_code_widget"
     "mx_interfaces"
     "mx_media_manager"
     "mx_theme_manager"
+    "mx_util_component"
 
   PUBLIC
     "mx_multiplier_library"

@@ -208,12 +208,8 @@ void CodePreviewWidget::DisplayEntity(
   }
 
   // Dedup check; don't want to reload the model unnecessarily.
-  if (EntityId(d->containing_entity) == EntityId(containing_entity)) {
-
-    // TODO(pag): Change scroll position.
-
-    return;
-  }
+  auto reuse_token_tree = EntityId(d->containing_entity) ==
+                          EntityId(containing_entity);
 
   d->current_entity = std::move(entity);
   d->containing_entity = std::move(containing_entity);
@@ -228,7 +224,10 @@ void CodePreviewWidget::DisplayEntity(
     d->history->SetCurrentLocation(d->current_entity);
   }
 
-  d->code->SetTokenTree(tt);
+  if (!reuse_token_tree) {
+    d->code->SetTokenTree(tt);
+  }
+  d->code->OnGoToEntity(d->current_entity);
 }
 
 void CodePreviewWidget::OnChangeSync(int state) {
