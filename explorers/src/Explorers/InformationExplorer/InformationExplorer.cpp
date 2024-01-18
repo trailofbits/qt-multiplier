@@ -115,7 +115,7 @@ void InformationExplorer::ActOnPrimaryClick(
 std::optional<NamedAction> InformationExplorer::ActOnSecondaryClick(
     IWindowManager *, const QModelIndex &index) {
 
-  auto entity = IModel::Entity(index);
+  auto entity = IModel::EntitySkipThroughTokens(index);
 
   // Don't allow us to open info from entities shown in the info browser itself.
   // In practice, there isn't a good separation between the entity and the

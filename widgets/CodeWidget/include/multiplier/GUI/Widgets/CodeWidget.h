@@ -14,6 +14,7 @@
 #include <QWidget>
 
 #include <memory>
+#include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/Index.h>
 
@@ -21,6 +22,8 @@ QT_BEGIN_NAMESPACE
 class QFocusEvent;
 class QKeyEvent;
 class QKeySequence;
+class QMenu;
+class QModelIndex;
 class QMouseEvent;
 class QPaintEvent;
 class QResizeEvent;
@@ -35,6 +38,7 @@ class TokenTree;
 namespace mx::gui {
 
 class ConfigManager;
+class IWindowManager;
 class MediaManager;
 class ThemeManager;
 
@@ -48,6 +52,10 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
  public:
   virtual ~CodeWidget(void);
 
+  enum : int {
+    SelectedTextUserRole = IModel::MultiplierUserRole
+  };
+
   // Create a code widget with the given configuration manager (used for theme
   // access), and `model_id`, which is used to identify the model used by the
   // signals emitted by this widget.
@@ -55,7 +63,12 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
              const QString &model_id,
              QWidget *parent = nullptr);
 
+  //! Change the underlying data / model being rendered by this code widget.
   void SetTokenTree(const TokenTree &token_tree);
+
+  //! Called when we want to act on the context menu.
+  void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
+                        const QModelIndex &index);
 
  protected:
   void focusOutEvent(QFocusEvent *event) Q_DECL_FINAL;

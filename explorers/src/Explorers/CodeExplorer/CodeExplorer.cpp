@@ -6,7 +6,11 @@
 
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
 
+#include <QAction>
+#include <QApplication>
+#include <QClipboard>
 #include <QKeySequence>
+#include <QMenu>
 
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
@@ -29,8 +33,7 @@ static const QKeySequence kKeySeqE("E");
 static const QKeySequence kKeySeqP("P");
 static const QKeySequence kKeySeqShiftP("Shift+P");
 
-static const QString kOpenEntityModelPrefix(
-    "com.trailofbits.CodeViewModel");
+static const QString kOpenEntityModelId("com.trailofbits.CodeViewModel");
 
 // Figure out what entity to use for macro expansion.
 static VariantEntity EntityForExpansion(VariantEntity entity) {
@@ -117,13 +120,7 @@ void CodeExplorer::ActOnPrimaryClick(IWindowManager *,
     return;
   }
 
-  // Clicking in a code widget created by the code explorer should open the
-  // code.
-  if (IModel::ModelId(index) == CodePreviewWidget::kModelPrefix &&
-      IModel::ModelId(index) == kOpenEntityModelPrefix) {
-    return;
-  }
-
+  // Clicking on something should open the code.
   OnOpenEntity(QVariant::fromValue<VariantEntity>(
       IModel::EntitySkipThroughTokens(index)));
 }
@@ -161,29 +158,41 @@ std::optional<NamedAction> CodeExplorer::ActOnKeyPress(
   return NamedAction{name, *handle, QVariant::fromValue(entity)};
 }
 
-std::vector<NamedAction> CodeExplorer::ActOnSecondaryClickEx(
-    IWindowManager *, const QModelIndex &index) {
-  std::vector<NamedAction> actions;
-
-  auto entity = IModel::Entity(index);
-  if (std::holds_alternative<NotAnEntity>(entity)) {
-    return actions;
+void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
+                                    const QModelIndex &index) {
+  if (IModel::ModelId(index) == CodePreviewWidget::kModelId ||
+      IModel::ModelId(index) == kOpenEntityModelId) {
+    
+    auto sel_text = index.data(CodeWidget::SelectedTextUserRole).toString();
+    if (!sel_text.isEmpty()) {
+      auto copy_selection = new QAction(tr("Copy"), menu);
+      menu->addAction(copy_selection);
+      connect(copy_selection, &QAction::triggered,
+              [sel_text = std::move(sel_text)] (void) {
+                qApp->clipboard()->setText(sel_text);
+              });
+    }
   }
 
-  auto exp_entity = EntityForExpansion(entity);
+  auto exp_entity = EntityForExpansion(IModel::Entity(index));
   if (!std::holds_alternative<NotAnEntity>(exp_entity)) {
-    actions.emplace_back(NamedAction{
-        tr("Expand Macro"), d->expand_macro_trigger,
-        QVariant::fromValue(exp_entity)});
+    auto expand_action = new QAction(tr("Expand Macro"), menu);
+    menu->addAction(expand_action);
+    connect(expand_action, &QAction::triggered,
+            [exp_entity, action = d->expand_macro_trigger] (void) {
+              action.Trigger(QVariant::fromValue(exp_entity));
+            });
   }
 
+  auto entity = IModel::EntitySkipThroughTokens(index);
   if (!std::holds_alternative<NotAnEntity>(entity)) {
-    actions.emplace_back(NamedAction{
-        tr("Open Pinned Preview"), d->open_pinned_preview_trigger,
-        QVariant::fromValue(entity)});
+    auto preview_action = new QAction(tr("Open Pinned Preview"), menu);
+    menu->addAction(preview_action);
+    connect(preview_action, &QAction::triggered,
+            [entity, action = d->open_pinned_preview_trigger] (void) {
+              action.Trigger(QVariant::fromValue(entity));
+            });
   }
-
-  return actions;
 }
 
 void CodeExplorer::OnOpenEntity(const QVariant &data) {
@@ -212,7 +221,7 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
     return;
   }
 
-  code_widget = new CodeWidget(d->config_manager, kOpenEntityModelPrefix);
+  code_widget = new CodeWidget(d->config_manager, kOpenEntityModelId);
 
   connect(this, &CodeExplorer::ExpandMacros,
           code_widget, &CodeWidget::OnExpandMacros);

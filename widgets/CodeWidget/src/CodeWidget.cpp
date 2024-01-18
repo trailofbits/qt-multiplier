@@ -8,11 +8,14 @@
 
 #include <multiplier/GUI/Widgets/CodeWidget.h>
 
+#include <QAction>
 #include <QApplication>
+#include <QClipboard>
 #include <QFontMetricsF>
 #include <QHBoxLayout>
 #include <QImage>
 #include <QKeySequence>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QPainter>
@@ -73,13 +76,12 @@ struct Entity {
 
   // The logical (one-indexed) column number of this token.
   int logical_column_number;
-
-  // Offset of the beginning of this entity in the total text of the document.
-  int document_offset;
 };
 
 struct Data {
   QString text;
+
+  QString selection;
 
   bool bounding_rect_valid[4u];
 
@@ -98,6 +100,9 @@ struct Scene {
   // For logical (one-based) line number `N`, `logical_line_index[N - 1]` is
   // the index into `entities` of the first entity on that line.
   std::vector<unsigned> logical_line_index;
+
+  // Offset of the beginning of each entity in the total text of the document.
+  std::vector<int> begin_of_entity_in_document;
 
   // A linear representation of the token data. If a token spans multiple lines
   // then it is split into multiple entries in `token_data`. If a token only
@@ -148,25 +153,9 @@ struct SceneBuilder {
     document_offset = static_cast<int>(scene.document.size());
   }
 
-  void AddColumn(unsigned num_columns = 1u) {
-    if (token_length) {
-      AddEntity();
-    }
-    for (auto i = 0u; i < num_columns; ++i) {
-      scene.document.append(QChar::Space);
-    }
-    logical_column_number += num_columns;
-  }
-
   void AddNewLine(void) {
-    if (token_length) {
-      AddEntity();
-    }
-    while (!scene.document.isEmpty() &&
-           scene.document.back() == QChar::Space) {
-      scene.document.chop(1);
-    }
-    scene.document.append(QChar::LineFeed);
+    AddChar(QChar::LineFeed);
+    AddEntity();
     logical_column_number = 1u;
     scene.num_lines += 1;
     scene.logical_line_index.emplace_back(
@@ -231,7 +220,8 @@ struct SceneBuilder {
     e.logical_column_number = token_start_column;
     e.data_index_and_config = data_index << 2u;
     e.token_index = token_index;
-    e.document_offset = document_offset;
+
+    scene.begin_of_entity_in_document.push_back(document_offset);
 
     token_start_column = 0u;
     token_length = 0;
@@ -255,6 +245,11 @@ class TokenModel Q_DECL_FINAL : public IModel {
   QString model_id;
   Token token;
   QString text;
+  QString selection;
+
+  bool HasTokenOrSelection(void) const noexcept {
+    return token || !selection.isEmpty();
+  }
 
   virtual ~TokenModel(void) = default;
 
@@ -267,7 +262,7 @@ class TokenModel Q_DECL_FINAL : public IModel {
     if (!hasIndex(row, column, parent)) {
       return {};
     }
-    if (!row && !column && !parent.isValid() && token) {
+    if (!row && !column && !parent.isValid() && HasTokenOrSelection()) {
       return createIndex(0, 0, token.id().Pack());
     }
     return {};
@@ -278,30 +273,33 @@ class TokenModel Q_DECL_FINAL : public IModel {
   }
 
   int rowCount(const QModelIndex &parent) const Q_DECL_FINAL {
-    return parent.isValid() || !token ? 0 : 1;
+    return parent.isValid() || !HasTokenOrSelection() ? 0 : 1;
   }
 
   int columnCount(const QModelIndex &parent) const Q_DECL_FINAL {
-    return parent.isValid() || !token ? 0 : 1;
+    return parent.isValid() || !HasTokenOrSelection() ? 0 : 1;
   }
 
   QVariant data(const QModelIndex &index, int role) const Q_DECL_FINAL {
-    if (index.column() != 0 || index.row() != 0 ||
-        index.internalId() != token.id().Pack()) {
+    if (index.column() != 0 || index.row() != 0 || !HasTokenOrSelection()) {
       return {};
     }
 
-    if (token) {
-      switch (role) {
-        case IModel::EntityRole:
+    switch (role) {
+      case IModel::EntityRole:
+        if (index.internalId() == token.id().Pack()) {
           return QVariant::fromValue<VariantEntity>(token);
-        case IModel::TokenRangeDisplayRole:
+        }
+      case IModel::TokenRangeDisplayRole:
+        if (index.internalId() == token.id().Pack()) {
           return QVariant::fromValue<TokenRange>(token);
-        case IModel::ModelIdRole:
-          return model_id;
-        case Qt::DisplayRole:
-          return text;
-      }
+        }
+      case IModel::ModelIdRole:
+        return model_id;
+      case Qt::DisplayRole:
+        return text;
+      case CodeWidget::SelectedTextUserRole:
+        return selection;
     }
     return {};
   }
@@ -386,6 +384,9 @@ struct CodeWidget::PrivateData {
   // The starting cursor of the selection.
   std::optional<QPointF> selection_start_cursor;
 
+  int selection_start_offset{-1};
+  int selection_end_offset{-1};
+
   bool click_was_primary{false};
   bool click_was_secondary{false};
 
@@ -435,6 +436,7 @@ struct CodeWidget::PrivateData {
   void RecomputeScene(void);
   void RecomputeCanvas(void);
   void RecomputeHighlights(void);
+  void RecomputeSelection(QPainter &blitter);
 
   void PaintToken(
       QPainter &fg_painter, QPainter &bg_painter, Data &data,
@@ -480,12 +482,13 @@ struct CodeWidget::PrivateData {
 // publish `QModelIndex`es in our signals, e.g. `RequestPrimaryClick`.
 QModelIndex CodeWidget::PrivateData::CreateModelIndex(const Entity *entity) {
   if (!entity) {
-    return {};
+    token_model.token = {};
+    token_model.text = token_model.selection;
+  } else {
+    token_model.token = scene.tokens[entity->token_index];
+    token_model.text
+        = scene.data[entity->data_index_and_config >> kFormatShift].text;
   }
-
-  token_model.token = scene.tokens[entity->token_index];
-  token_model.text
-      = scene.data[entity->data_index_and_config >> kFormatShift].text;
   return token_model.index(0, 0, {});
 }
 
@@ -1130,142 +1133,23 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   }
 
   // ---------------------------------------------------------------------------
-  // Draw the code layers.
+  // Draw the code background layer. If any tokens have background colors then
+  // they are in this layer.
   blitter.drawImage(-d->scroll_x, -d->scroll_y, d->background_canvas);
-  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->highlight_canvas);
 
   // ---------------------------------------------------------------------------
-  // Draw the selection background colors.
+  // Draw the entity highlights. If the cursor is on an token, then all tokens
+  // with the same related entity IDs are highlighted. Here, we only actually
+  // change the background color.
+  if (d->current_entity) {
+    blitter.drawImage(-d->scroll_x, -d->scroll_y, d->highlight_canvas);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Draw the selection background colors, and compute the bounds of the
+  // currently selected text.
   if (d->cursor && d->selection_start_cursor) {
-    std::optional<QRectF> selections[3u];
-
-    QPointF top_left = d->cursor.value();
-    QPointF bottom_right = d->selection_start_cursor.value();
-    if (top_left.y() > bottom_right.y()) {
-      std::swap(top_left, bottom_right);
-    }
-
-    // Selection contained within one line; the polygon is a rectange.
-    if (top_left.y() == bottom_right.y()) {
-      auto left_point = std::min(top_left.x(), bottom_right.x());
-      auto right_point = std::max(top_left.x(), bottom_right.x());
-
-      selections[0] = QRectF(
-          left_point - d->scroll_x, top_left.y() - d->scroll_y,
-          right_point - left_point, d->line_height);
-
-    // Selection cross multiple lines.
-    } else {
-      selections[0] = QRectF(
-          top_left.x() - d->scroll_x, top_left.y() - d->scroll_y,
-          d->canvas_rect.width() + d->viewport.width(),
-          d->line_height);
-
-      auto bottom_left_y = top_left.y() + d->line_height;
-
-      if (bottom_left_y < bottom_right.y()) {
-        selections[1] = QRectF(
-            -d->scroll_x, bottom_left_y - d->scroll_y,
-            d->canvas_rect.width() + d->viewport.width(),
-            bottom_right.y() - bottom_left_y);
-      }
-
-      selections[2] = QRectF(
-          -d->scroll_x, bottom_right.y() - d->scroll_y,
-          bottom_right.x(), d->line_height);
-    }
-
-    QColor selection_color = d->theme->SelectionColor();
-    // selected_text_color = ITheme::ContrastingColor(selection_color);
-
-    // Fill in up to three rectangles for the selection.
-    for (auto &sel : selections) {
-      if (sel) {
-        blitter.fillRect(sel.value(), selection_color);
-      }
-    }
-
-    // -------------------------------------------------------------------------
-    // Go find all entities bounded by the selections, and repaint them as being
-    // selected.
-    auto start_index = static_cast<unsigned>(
-        (top_left.y() + (d->line_height / 2)) / d->line_height);
-
-    auto stop_index = static_cast<unsigned>(
-        (bottom_right.y() + (d->line_height / 2)) / d->line_height);
-
-    // Go through only the entities on the relevant lines.
-    for (auto l = start_index; l <= stop_index; ++l) {
-      auto i = d->scene.logical_line_index[l];
-      auto max_i = d->scene.logical_line_index[l + 1];
-
-      QPainter dummy_fg;
-
-      // Inspect each entity on the line.
-      for (; i < max_i; ++i) {
-        const Entity &e = d->scene.entities[i];
-        unsigned data_index = e.data_index_and_config >> kFormatShift;
-        unsigned rect_config = e.data_index_and_config & kFormatMask;
-        Data &data = d->scene.data[data_index];
-
-        const Token &t = d->scene.tokens[e.token_index];
-        ITheme::ColorAndStyle cs = d->theme->TokenColorAndStyle(t);
-        cs.background_color = selection_color;
-        cs.foreground_color = QColor();
-
-        qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
-                    d->line_height;
-
-        QRectF bounding_rect = data.bounding_rect[rect_config];
-        for (auto &sel : selections) {
-          if (!sel) {
-            continue;
-          }
-
-          qreal x = e.x - d->scroll_x;
-          qreal y = e_y - d->scroll_y;
-          bounding_rect.moveTo(x, y);
-
-          // The selection fully contains this entity; paint it.
-          if (sel->contains(bounding_rect)) {
-            d->PaintToken(dummy_fg, blitter, data, rect_config, cs, x, y);
-            break;
-
-          // The selection is unrelated to this entity.
-          } else if (!sel->intersects(bounding_rect)) {
-            continue;
-          }
-
-          qsizetype start_k = 0;
-          qsizetype stop_k = data.text.size();
-
-          // Top-left intersection case (highlight a suffix of `data`).
-          if (bounding_rect.x() < sel->x()) {
-            auto [index, width] = d->CharacterPosition(
-                QPointF(sel->x() + d->scroll_x, e_y), &e);
-            Q_ASSERT(0 < index);
-            x += width;
-            start_k = index;
-          }
-
-          // Bottom-right intersection case (highlight a prefix of `data`).
-          if (sel->topRight().x() < bounding_rect.topRight().x()) {
-            stop_k = d->CharacterPosition(
-                QPointF(sel->topRight().x() + d->scroll_x, e_y), &e).first;
-            Q_ASSERT(0 < stop_k);
-          }
-
-          Data new_data = {};
-          new_data.bounding_rect_valid[rect_config] = false;
-          for (auto k = start_k; 0 <= k && k < stop_k; ++k) {
-            new_data.text += data.text[k];
-          }
-
-          d->PaintToken(dummy_fg, blitter, new_data, rect_config, cs, x, y);
-          break;
-        }
-      }
-    }
+    d->RecomputeSelection(blitter);
   }
 
   // ---------------------------------------------------------------------------
@@ -1383,6 +1267,16 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
   // Update *prior* to rendering the context menu, if any.
   update();
+
+  // Update the selection in the model.
+  d->token_model.selection.clear();
+  auto sel_size = d->selection_end_offset - d->selection_start_offset;
+  if (d->selection_start_cursor && 0 <= d->selection_start_offset &&
+      0 <= d->selection_end_offset && 0 < sel_size &&
+      (d->selection_start_offset + sel_size) <= d->scene.document.size()) {
+    d->token_model.selection
+        = d->scene.document.sliced(d->selection_start_offset, sel_size);
+  }
 
   // Calculate the index of the current line.
   if (!d->tracking_selection) {
@@ -1558,6 +1452,154 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
   canvas_changed = true;
 }
 
+// Recompute and paint the selection.
+void CodeWidget::PrivateData::RecomputeSelection(QPainter &blitter) {
+  std::optional<QRectF> selections[3u];
+
+  QPointF top_left = cursor.value();
+  QPointF bottom_right = selection_start_cursor.value();
+  if (top_left.y() > bottom_right.y()) {
+    std::swap(top_left, bottom_right);
+  }
+
+  // Selection contained within one line; the polygon is a rectange.
+  if (top_left.y() == bottom_right.y()) {
+    auto left_point = std::min(top_left.x(), bottom_right.x());
+    auto right_point = std::max(top_left.x(), bottom_right.x());
+
+    selections[0] = QRectF(
+        left_point - scroll_x, top_left.y() - scroll_y,
+        right_point - left_point, line_height);
+
+  // Selection cross multiple lines.
+  } else {
+    selections[0] = QRectF(
+        top_left.x() - scroll_x, top_left.y() - scroll_y,
+        canvas_rect.width() + viewport.width(),
+        line_height);
+
+    auto bottom_left_y = top_left.y() + line_height;
+
+    if (bottom_left_y < bottom_right.y()) {
+      selections[1] = QRectF(
+          -scroll_x, bottom_left_y - scroll_y,
+          canvas_rect.width() + viewport.width(),
+          bottom_right.y() - bottom_left_y);
+    }
+
+    selections[2] = QRectF(
+        -scroll_x, bottom_right.y() - scroll_y,
+        bottom_right.x(), line_height);
+  }
+
+  QColor selection_color = theme->SelectionColor();
+
+  // Fill in up to three rectangles for the selection.
+  for (auto &sel : selections) {
+    if (sel) {
+      blitter.fillRect(sel.value(), selection_color);
+    }
+  }
+
+  // Track what actual characters in the underlying document are being
+  // selected for the sake of copy & paste.
+  selection_start_offset = -1;
+  selection_end_offset = -1;
+  int *selection = &(selection_start_offset);
+
+  auto update_selections = [&, this] (auto begin_offset, auto end_offset) {
+    *selection = static_cast<int>(begin_offset);
+    selection = &(selection_end_offset);
+    *selection = static_cast<int>(end_offset);
+  };
+
+  // -------------------------------------------------------------------------
+  // Go find all entities bounded by the selections, and repaint them as being
+  // selected.
+  auto start_index = static_cast<unsigned>(
+      (top_left.y() + (line_height / 2)) / line_height);
+
+  auto stop_index = static_cast<unsigned>(
+      (bottom_right.y() + (line_height / 2)) / line_height);
+
+  // Go through only the entities on the relevant lines.
+  for (auto l = start_index; l <= stop_index; ++l) {
+    auto i = scene.logical_line_index[l];
+    auto max_i = scene.logical_line_index[l + 1];
+
+    QPainter dummy_fg;
+
+    // Inspect each entity on the line.
+    for (; i < max_i; ++i) {
+      const Entity &e = scene.entities[i];
+      unsigned data_index = e.data_index_and_config >> kFormatShift;
+      unsigned rect_config = e.data_index_and_config & kFormatMask;
+      Data &data = scene.data[data_index];
+
+      const Token &t = scene.tokens[e.token_index];
+      ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(t);
+      cs.background_color = selection_color;
+      cs.foreground_color = QColor();
+
+      int entity_offset = scene.begin_of_entity_in_document[i];
+      qreal e_y = static_cast<qreal>(e.logical_line_number - 1) *
+                  line_height;
+
+      QRectF bounding_rect = data.bounding_rect[rect_config];
+      for (auto &sel : selections) {
+        if (!sel) {
+          continue;
+        }
+
+        qreal x = e.x - scroll_x;
+        qreal y = e_y - scroll_y;
+        bounding_rect.moveTo(x, y);
+
+        // The selection fully contains this entity; paint it.
+        if (sel->contains(bounding_rect)) {
+          update_selections(entity_offset + 0,
+                            entity_offset + data.text.size());
+          PaintToken(dummy_fg, blitter, data, rect_config, cs, x, y);
+          break;
+
+        // The selection is unrelated to this entity.
+        } else if (!sel->intersects(bounding_rect)) {
+          continue;
+        }
+
+        qsizetype start_k = 0;
+        qsizetype stop_k = data.text.size();
+
+        // Top-left intersection case (highlight a suffix of `data`).
+        if (bounding_rect.x() < sel->x()) {
+          auto [index, width] = CharacterPosition(
+              QPointF(sel->x() + scroll_x, e_y), &e);
+          Q_ASSERT(0 < index);
+          x += width;
+          start_k = index;
+        }
+
+        // Bottom-right intersection case (highlight a prefix of `data`).
+        if (sel->topRight().x() < bounding_rect.topRight().x()) {
+          stop_k = CharacterPosition(
+              QPointF(sel->topRight().x() + scroll_x, e_y), &e).first;
+          Q_ASSERT(0 < stop_k);
+        }
+
+        Data new_data = {};
+        new_data.bounding_rect_valid[rect_config] = false;
+        for (auto k = start_k; 0 <= k && k < stop_k; ++k) {
+          new_data.text += data.text[k];
+        }
+        
+        update_selections(entity_offset + start_k, entity_offset + stop_k);
+        PaintToken(dummy_fg, blitter, new_data, rect_config, cs, x, y);
+        break;
+      }
+    }
+  }
+}
+
 void CodeWidget::PrivateData::RecomputeHighlights(void) {
   if (current_entity == prev_highlighted_entity && !canvas_changed) {
     return;
@@ -1575,27 +1617,30 @@ void CodeWidget::PrivateData::RecomputeHighlights(void) {
   // undefined.
   bg.fill(0);
 
-  QPainter fg_painter;  // Dummy.
-  QPainter bg_painter(&bg);
-  InitializePainterOptions(bg_painter);
-
   if (!current_entity) {
-    bg_painter.end();
     highlight_canvas.swap(bg);
     return;
   }
 
   const Token &token = scene.tokens[current_entity->token_index];
   RawEntityId related_entity_id = token.related_entity_id().Pack();
-  
-  QColor highlight_color = theme->CurrentEntityBackgroundColor(
-      token.related_entity());
-
   if (related_entity_id == kInvalidEntityId) {
-    bg_painter.end();
     highlight_canvas.swap(bg);
     return;
   }
+
+  QColor highlight_color = theme->CurrentEntityBackgroundColor(
+      token.related_entity());
+
+  // The theme doesn't want to highlight current entities.
+  if (!highlight_color.isValid()) {
+    highlight_canvas.swap(bg);
+    return;
+  }
+
+  QPainter fg_painter;
+  QPainter bg_painter(&bg);
+  InitializePainterOptions(bg_painter);
 
   auto re_end_it = scene.related_entity_ids.end();
   auto re_it = std::upper_bound(
@@ -1969,6 +2014,7 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity) {
   update();
 }
 
+//! Change the underlying data / model being rendered by this code widget.
 void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->scene_changed = true;
   d->canvas_changed = true;
@@ -1979,6 +2025,7 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->selection_start_cursor.reset();
   d->tracking_selection = false;
   d->token_model.token = {};
+  d->token_model.selection.clear();
   d->scroll_x = 0;
   d->scroll_y = 0;
   d->current_line_index = -1;
@@ -1986,6 +2033,19 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->scene_overrides.clear();
   d->token_tree = token_tree;
   update();
+}
+
+//! Called when we want to act on the context menu.
+void CodeWidget::ActOnContextMenu(IWindowManager *, QMenu *menu,
+                                  const QModelIndex &) {
+  if (!d->token_model.selection.isEmpty()) {
+    auto copy_selection = new QAction(tr("Copy"), menu);
+    menu->addAction(copy_selection);
+    connect(copy_selection, &QAction::triggered,
+            this, [this] (void) {
+                    qApp->clipboard()->setText(d->token_model.selection);
+                  });
+  }
 }
 
 }  // namespace mx::gui

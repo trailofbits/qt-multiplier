@@ -32,8 +32,9 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void ActOnPrimaryClick(
       IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
 
-  std::vector<NamedAction> ActOnSecondaryClickEx(
-      IWindowManager *manager, const QModelIndex &index) Q_DECL_FINAL;
+  void ActOnContextMenu(
+      IWindowManager *manager, QMenu *menu,
+      const QModelIndex &index) Q_DECL_FINAL;
 
   std::optional<NamedAction> ActOnKeyPress(
     IWindowManager *, const QKeySequence &keys,
