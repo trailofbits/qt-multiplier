@@ -108,6 +108,10 @@ struct Scene {
   // the index into `entities` of the first entity on that line.
   std::vector<unsigned> logical_line_index;
 
+  // The file line number associated with the `N`th entity. `0` if invalid,
+  // negative if in a macro.
+  std::vector<int> file_line_number;
+
   // Offset of the beginning of each entity in the total text of the document.
   std::vector<int> begin_of_entity_in_document;
 
@@ -136,6 +140,9 @@ struct Scene {
 
   // Number of logical lines in this scene.
   int num_lines{1};
+
+  // Number file line number seen.
+  int num_file_lines{1};
 };
 
 // The scene builder helps to populate a given `Scene`. It keeps track of state
@@ -151,10 +158,11 @@ struct SceneBuilder {
   int token_length{0};
   int expansion_depth{0};
   int document_offset{0};
+  int line_number{0};
   unsigned token_index{0u};
   bool added_anything{false};
   RawEntityId related_entity_id{kInvalidEntityId};
-
+  FileLocationCache file_cache;
   QString token_data;
 
   inline SceneBuilder(void) {
@@ -164,6 +172,33 @@ struct SceneBuilder {
   void BeginToken(const Token &tok) {
     related_entity_id = tok.related_entity_id().Pack();
     document_offset = static_cast<int>(scene.document.size());
+    line_number = 0;
+
+    auto file_toks = TokenRange(tok).file_tokens();
+    auto first_file_loc = file_toks.front().location(file_cache);
+    auto last_file_loc = file_toks.back().location(file_cache);
+
+    if (!first_file_loc) {
+      return;
+    }
+
+    Q_ASSERT(last_file_loc.has_value());
+
+    auto first_line_num = static_cast<int>(first_file_loc->first);
+    auto last_line_num = static_cast<int>(last_file_loc->first);
+    
+    // The token, or the extent of the use of the macro, are all on one line.
+    if (first_line_num == last_line_num) {
+      line_number = first_line_num;
+    }
+
+    scene.num_file_lines = std::max(scene.num_file_lines, line_number);
+
+    // If we're in an expansion, then negate the line number to signal that it
+    // should be specially colored.
+    if (expansion_depth) {
+      line_number = -line_number;
+    }
   }
 
   void AddNewLine(void) {
@@ -173,6 +208,10 @@ struct SceneBuilder {
     scene.num_lines += 1;
     scene.logical_line_index.emplace_back(
         static_cast<unsigned>(scene.entities.size()));
+
+    if (0 < line_number) {
+      line_number += 1;
+    } 
   }
 
   void AddChar(QChar ch) {
@@ -243,6 +282,7 @@ struct SceneBuilder {
     e.data_index_and_config = data_index << 2u;
     e.token_index = token_index;
 
+    scene.file_line_number.push_back(line_number);
     scene.begin_of_entity_in_document.push_back(document_offset);
 
     token_start_column = 0u;
@@ -441,6 +481,7 @@ struct CodeWidget::PrivateData {
   QImage background_canvas;
   QImage foreground_canvas;
   QImage highlight_canvas;
+  QImage line_number_canvas;
 
   // Sets of entities that configure what gets shown from `token_tree`.
   QSet<RawEntityId> macros_to_expand;
@@ -459,6 +500,7 @@ struct CodeWidget::PrivateData {
   void UpdateScrollbars(void);
   void RecomputeScene(void);
   void RecomputeCanvas(void);
+  void RecomputeLineNumbers(void);
   void RecomputeHighlights(void);
   void RecomputeSelection(QPainter &blitter);
   void ScrollToEntityOffset(CodeWidget *self, unsigned offset);
@@ -1162,6 +1204,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   // Fill the viewport with the theme background color.
   blitter.fillRect(d->viewport, d->theme_background_color);
 
+  // ---------------------------------------------------------------------------
   // Render current line within the canvas.
   if (d->current_line_index != -1) {
     QRectF current_line(
@@ -1190,6 +1233,10 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   if (d->cursor && d->selection_start_cursor) {
     d->RecomputeSelection(blitter);
   }
+
+  // ---------------------------------------------------------------------------
+  // Draw the line numbers.
+  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->line_number_canvas);
 
   // ---------------------------------------------------------------------------
   // Paint the code.
@@ -1675,6 +1722,99 @@ void CodeWidget::PrivateData::RecomputeSelection(QPainter &blitter) {
   }
 }
 
+// Recompute the line numbers.
+void CodeWidget::PrivateData::RecomputeLineNumbers(void) {
+  auto bg_color = theme->GutterBackgroundColor();
+  if (!bg_color.isValid()) {
+    bg_color = theme_background_color;
+  }
+
+  auto fg_color = theme->GutterForegroundColor();
+  if (!fg_color.isValid()) {
+    fg_color = theme_foreground_color;
+  }
+
+  int num_digits = 0;
+  for (auto i = scene.num_file_lines; i; ++num_digits) {
+    i /= 10;
+  }
+
+  QFontMetricsF fm(theme_font);
+
+  auto width = (space_width * 3) + (fm.maxWidth() * num_digits);
+  left_margin = width;
+
+  QImage bg(static_cast<int>(width * dpi_ratio),
+            static_cast<int>(canvas_rect.height() * dpi_ratio),
+            QImage::Format_ARGB32_Premultiplied);
+
+  bg.setDevicePixelRatio(dpi_ratio);
+
+  if (bg_color.isValid()) {
+    bg.fill(bg_color);
+  } else {
+    bg.fill(0);
+  }
+
+  QPainter blitter(&bg);
+  InitializePainterOptions(blitter);
+
+  QFont font = theme_font;
+  blitter.setPen(fg_color);
+
+  QTextOption gutter_to(Qt::AlignRight);
+
+  auto max_i = scene.logical_line_index.size() - 1u;
+  QRectF bounding_rect(space_width, 0, width - (space_width * 3), line_height);
+
+  int last_line_num = 0;
+
+  // Paint the line numbers.
+  for (auto i = 0u; i < max_i; ++i) {
+    int line_number = 0;
+    auto max_e = scene.logical_line_index[i + 1u];
+    
+    // Go get the minimum line number. Some might be negative because of a
+    // macro expansion on the line, so we want to highlight that an expansion
+    // happened somewhere on the line.
+    for (auto e = scene.logical_line_index[i]; e < max_e; ++e) {
+      if (auto ln = scene.file_line_number[e]) {
+        if (!line_number) {
+          line_number = ln;
+        } else {
+          line_number = std::min(line_number, ln);
+        }
+      }
+    }
+
+    if (!line_number) {
+      line_number = last_line_num;
+    }
+
+    if (line_number) {
+      QString text = QString::number(std::abs(line_number));
+      font.setUnderline(0 > line_number);
+      blitter.setFont(font);
+      blitter.drawText(bounding_rect, text, gutter_to);
+
+      last_line_num = -std::abs(line_number);
+    }
+
+    bounding_rect.moveTo(
+        QPointF(bounding_rect.x(), bounding_rect.y() + line_height));
+  }
+
+  // Paint a right margin one space wide.
+  QRectF right_margin_rect((space_width * 2) + (fm.maxWidth() * num_digits), 0,
+                           space_width, canvas_rect.height());
+  blitter.fillRect(right_margin_rect, theme_background_color);
+
+  blitter.end();
+
+  line_number_canvas.swap(bg);
+}
+
+// Recompute the highlights.
 void CodeWidget::PrivateData::RecomputeHighlights(void) {
   if (current_entity == prev_highlighted_entity && !canvas_changed) {
     return;
@@ -1839,10 +1979,7 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   space_rect = fg_painter.boundingRect(canvas_rect, monospace, to);
   space_width = space_rect.width();
 
-  // Left and right margins are one space wide.
-  //
-  // TODO(pag): Extend left margin size for line numbers.
-  left_margin = space_width;
+  RecomputeLineNumbers();  // Computes `left_margin` using `space_width`.
   right_margin = space_width;
 
   Q_ASSERT(0 < space_width);
