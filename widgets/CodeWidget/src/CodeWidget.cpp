@@ -1111,7 +1111,7 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   vertical_layout->setContentsMargins(0, 0, 0, 0);
   vertical_layout->setSpacing(0);
   vertical_layout->addSpacerItem(
-      new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Expanding));
+      new QSpacerItem(300, 100, QSizePolicy::Expanding, QSizePolicy::Expanding));
   vertical_layout->addStretch();
   vertical_layout->addWidget(d->horizontal_scrollbar);
   
@@ -1834,7 +1834,7 @@ void CodeWidget::PrivateData::RecomputeLineNumbers(void) {
 
   // Paint a right margin one space wide.
   QRectF right_margin_rect((space_width * 2) + (fm.maxWidth() * num_digits), 0,
-                           space_width, canvas_rect.height());
+                           space_width, height);
   blitter.fillRect(right_margin_rect, theme_background_color);
 
   blitter.end();
