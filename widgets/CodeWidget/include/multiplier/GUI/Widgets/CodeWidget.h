@@ -54,6 +54,9 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
 
   enum : int {
     SelectedTextUserRole = IModel::MultiplierUserRole
+
+    // TODO(pag): Eventually expose line/column numbers, and perhaps other
+    //            things relevant to annotations.
   };
 
   // Create a code widget with the given configuration manager (used for theme

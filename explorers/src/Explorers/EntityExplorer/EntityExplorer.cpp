@@ -247,7 +247,7 @@ void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
   auto query_mode_layout = new QHBoxLayout;
   d->exact_match_radio = new QRadioButton(tr("Exact Match"), d->view);
 
-  d->containing_radio = new QRadioButton(tr("Containing"), d->view);
+  d->containing_radio = new QRadioButton(tr("Word Prefix Match"), d->view);
   d->containing_radio->setChecked(true);
 
   query_mode_layout->addWidget(d->exact_match_radio);

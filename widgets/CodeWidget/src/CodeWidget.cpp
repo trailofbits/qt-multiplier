@@ -1515,6 +1515,8 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
     return;
   }
 
+  version_number++;
+
   SceneBuilder builder;  
   ImportNode(builder, token_tree.root());
   scene = builder.TakeScene();

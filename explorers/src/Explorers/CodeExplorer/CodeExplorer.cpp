@@ -301,11 +301,11 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data) {
     // When the user navigates the history, make sure that we change what the
     // view shows.
     connect(d->preview, &CodePreviewWidget::HistoricalEntitySelected,
-            d->preview, [this] (VariantEntity entity) {
-                          d->preview->DisplayEntity(
-                              std::move(entity), true  /* explicit request */,
-                              false  /* add to history */);
-                        });
+            this, [this] (VariantEntity entity) {
+                    d->preview->DisplayEntity(
+                        std::move(entity), true  /* explicit request */,
+                        false  /* add to history */);
+                  });
   
     IWindowManager::DockConfig config;
     config.id = "com.trailofbits.dock.CodePreview";

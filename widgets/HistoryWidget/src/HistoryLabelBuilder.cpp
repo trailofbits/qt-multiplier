@@ -72,13 +72,8 @@ void HistoryLabelBuilder::run(void) {
       entity_label = NameOfEntityAsString(related_entity);
     }
 
-  } else if (std::holds_alternative<Decl>(entity)) {
+  } else if (!std::holds_alternative<File>(entity)) {
     entity_label = NameOfEntityAsString(entity);
-
-  } else if (std::holds_alternative<File>(entity)) {
-
-  } else {
-    return;
   }
 
   // Put all the sub-labels together. We have a few different forms:
