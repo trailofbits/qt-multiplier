@@ -43,6 +43,10 @@
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Util.h>
 
+#ifdef __APPLE__
+# include "MacosUtils.h"
+#endif
+
 namespace mx::gui {
 namespace {
 
@@ -752,8 +756,6 @@ void CodeWidget::PrivateData::ScrollBy(
   } else {
     scroll_y = 0;
   }
-
-  UpdateScrollbars();
 }
 
 // Return the character offset (`-1` if invalid) to the right of `point` (the
@@ -1116,7 +1118,7 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   auto horizontal_layout = new QHBoxLayout;
   horizontal_layout->setContentsMargins(0, 0, 0, 0);
   horizontal_layout->setSpacing(0);
-  horizontal_layout->addLayout(vertical_layout);
+  horizontal_layout->addLayout(vertical_layout, 1);
   horizontal_layout->addWidget(d->vertical_scrollbar);
 
   setContentsMargins(0, 0, 0, 0);
@@ -1155,12 +1157,13 @@ void CodeWidget::resizeEvent(QResizeEvent *event) {
   d->viewport.setWidth(new_size.width());
   d->viewport.setHeight(new_size.height());
   d->UpdateScrollbars();
+  update();
 }
 
 void CodeWidget::wheelEvent(QWheelEvent *event) {
 
-  int vertical_pixel_delta = 0;
-  int horizontal_pixel_delta = 0;
+  qreal vertical_pixel_delta = 0;
+  qreal horizontal_pixel_delta = 0;
 
   if (auto pixel_delta_point = event->pixelDelta(); !pixel_delta_point.isNull()) {
     vertical_pixel_delta = pixel_delta_point.y();
@@ -1173,14 +1176,33 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
     auto horizontal_angle_delta = event->angleDelta().x();
 
     vertical_pixel_delta =
-        d->line_height * static_cast<int>(vertical_angle_delta * 1.0 / 120.0);
+        d->line_height * (vertical_angle_delta * 1.0 / 120.0);
 
     horizontal_pixel_delta =
-      d->line_height * static_cast<int>(horizontal_angle_delta * 1.0 / 120.0);
+      d->line_height * (horizontal_angle_delta * 1.0 / 120.0);
   }
 
-  d->ScrollBy(horizontal_pixel_delta * -1, vertical_pixel_delta * -1);
-  update();
+  auto old_scroll_x = d->scroll_x;
+  auto old_scroll_y = d->scroll_y;
+
+#ifdef __APPLE__
+  qreal mult = IsNaturalScroll() ? 1 : -1;
+#else
+  qreal mult = 1;
+#endif
+
+  d->ScrollBy(static_cast<int>(horizontal_pixel_delta * mult),
+              static_cast<int>(vertical_pixel_delta * mult));
+
+  if (auto delta_x = d->scroll_x - old_scroll_x) {
+    d->horizontal_scrollbar->setValue(
+        d->horizontal_scrollbar->value() + delta_x);
+  }
+
+  if (auto delta_y = d->scroll_y - old_scroll_y) {
+    d->vertical_scrollbar->setValue(
+        d->vertical_scrollbar->value() + delta_y);
+  }
 }
 
 void CodeWidget::paintEvent(QPaintEvent *) {
@@ -1520,36 +1542,41 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
   d->cursor = new_cursor;
 
   if (need_repaint) {
+    d->UpdateScrollbars();
     update();
   }
 }
 
 void CodeWidget::PrivateData::UpdateScrollbars(void) {
-  return;
+
   if (scene.entities.empty()) {
     horizontal_scrollbar->hide();
     vertical_scrollbar->hide();
     return;
   }
 
-  auto s_width = canvas_rect.width();
-  auto s_height = canvas_rect.height();
+  qreal c_width = canvas_rect.width();
+  qreal c_height = canvas_rect.height();
 
-  auto v_width = viewport.width();
-  auto v_height = viewport.height();
+  qreal v_width = viewport.width();
+  qreal v_height = viewport.height();
 
-  if (v_width < s_width) {
+  // qDebug() << c_height << v_height << scroll_y;
+
+  if (0 < v_width && v_width < c_width) {
     horizontal_scrollbar->show();
-    horizontal_scrollbar->setMaximum(static_cast<int>(s_width - v_width));
+    horizontal_scrollbar->setMinimum(0);
+    horizontal_scrollbar->setMaximum(static_cast<int>(c_width - v_width));
 
   } else {
     horizontal_scrollbar->hide();
     horizontal_scrollbar->setMaximum(0);
   }
 
-  if (v_height < s_height) {
+  if (0 < v_height && v_height < c_height) {
     vertical_scrollbar->show();
-    vertical_scrollbar->setMaximum(static_cast<int>(s_height - v_height));
+    vertical_scrollbar->setMinimum(0);
+    vertical_scrollbar->setMaximum(static_cast<int>(c_height - v_height));
 
   } else {
     vertical_scrollbar->hide();
@@ -1741,11 +1768,12 @@ void CodeWidget::PrivateData::RecomputeLineNumbers(void) {
 
   QFontMetricsF fm(theme_font);
 
+  auto height = std::max(canvas_rect.height(), viewport.height()) * dpi_ratio;
   auto width = (space_width * 3) + (fm.maxWidth() * num_digits);
   left_margin = width;
 
   QImage bg(static_cast<int>(width * dpi_ratio),
-            static_cast<int>(canvas_rect.height() * dpi_ratio),
+            static_cast<int>(height * dpi_ratio),
             QImage::Format_ARGB32_Premultiplied);
 
   bg.setDevicePixelRatio(dpi_ratio);
@@ -1950,6 +1978,8 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
       0, 0,
       (max_char_width * static_cast<int>(scene.max_logical_columns + 2)),
       line_height * std::max(1, scene.num_lines));
+
+  UpdateScrollbars();
 
   QImage fg(static_cast<int>(canvas_rect.width() * dpi_ratio),
             static_cast<int>(canvas_rect.height() * dpi_ratio),
@@ -2259,13 +2289,15 @@ void CodeWidget::OnRenameEntities(
   update();
 }
 
-void CodeWidget::OnVerticalScroll(int change) {
-  d->scroll_y += change;
+void CodeWidget::OnVerticalScroll(int) {
+  auto change = d->vertical_scrollbar->value() - d->scroll_y;
+  d->ScrollBy(0, change);
   update();
 }
 
-void CodeWidget::OnHorizontalScroll(int change) {
-  d->scroll_x += change;
+void CodeWidget::OnHorizontalScroll(int) {
+  auto change = d->horizontal_scrollbar->value() - d->scroll_x;
+  d->ScrollBy(change, 0);
   update();
 }
 
@@ -2427,6 +2459,7 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->current_entity = nullptr;
   d->scene_overrides.clear();
   d->token_tree = token_tree;
+  d->UpdateScrollbars();
   update();
 }
 

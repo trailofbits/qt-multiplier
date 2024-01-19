@@ -6,12 +6,17 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(extra_sources
+    src/MacosUtils.h
+    src/MacosUtils.mm
+  )
+endif()
+
 add_library("mx_code_widget"
   include/multiplier/GUI/Widgets/CodeWidget.h
-
-  #src/CodeModel.cpp
-  #src/CodeModel.h
   src/CodeWidget.cpp
+  ${extra_sources}
 )
 
 target_link_libraries("mx_code_widget"

@@ -6,7 +6,6 @@
 # the LICENSE file found in the root directory of this source tree.
 #
 
-
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(extra_sources
     src/MacosUtils.h
