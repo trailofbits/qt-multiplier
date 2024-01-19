@@ -25,6 +25,7 @@ target_link_libraries("mx_code_widget"
     "mx_cxx_flags"
     "mx_interfaces"
     "mx_media_manager"
+    "mx_search_widget"
     "mx_theme_manager"
     "mx_util_component"
 

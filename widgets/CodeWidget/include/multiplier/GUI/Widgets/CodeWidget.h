@@ -19,6 +19,7 @@
 #include <multiplier/Index.h>
 
 QT_BEGIN_NAMESPACE
+class QEvent;
 class QFocusEvent;
 class QKeyEvent;
 class QKeySequence;
@@ -74,8 +75,8 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
                         const QModelIndex &index);
 
  protected:
+  bool eventFilter(QObject *object, QEvent *event) Q_DECL_FINAL;
   void focusOutEvent(QFocusEvent *event) Q_DECL_FINAL;
-  void resizeEvent(QResizeEvent *event) Q_DECL_FINAL;
   void paintEvent(QPaintEvent *event) Q_DECL_FINAL;
   void mousePressEvent(QMouseEvent *event) Q_DECL_FINAL;
   void mouseMoveEvent(QMouseEvent *event) Q_DECL_FINAL;

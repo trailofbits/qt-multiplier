@@ -24,7 +24,6 @@
 #include <QRectF>
 #include <QResizeEvent>
 #include <QScrollBar>
-#include <QSpacerItem>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWheelEvent>
@@ -42,6 +41,7 @@
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Util.h>
+#include <multiplier/GUI/Widgets/SearchWidget.h>
 
 #ifdef __APPLE__
 # include "MacosUtils.h"
@@ -51,6 +51,7 @@ namespace mx::gui {
 namespace {
 
 static const QKeySequence kCopyKeqSequence("Ctrl+C");
+static const QKeySequence kFindKeqSequence("Ctrl+F");
 static constexpr auto kBoldMask = 0b10u;
 static constexpr auto kItalicMask = 0b01u;
 static constexpr auto kFormatMask = kBoldMask | kItalicMask;
@@ -492,8 +493,10 @@ struct CodeWidget::PrivateData {
   QMap<RawEntityId, QString> new_entity_names;
   QSet<RawEntityId> scene_overrides;
 
+  QWidget *code_area{nullptr};
   QScrollBar *horizontal_scrollbar{nullptr};
   QScrollBar *vertical_scrollbar{nullptr};
+  SearchWidget *search_widget{nullptr};
 
   inline PrivateData(const QString &model_id)
       : monospace(" "),
@@ -1134,12 +1137,18 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   connect(d->horizontal_scrollbar, &QScrollBar::valueChanged, this,
           &CodeWidget::OnHorizontalScroll);
 
+  d->search_widget = new SearchWidget(
+      config_manager.MediaManager(), SearchWidget::Mode::Search, this);
+
+  d->code_area = new QWidget();
+  d->code_area->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  d->code_area->setMinimumWidth(300);
+  d->code_area->setMinimumHeight(100);
+
   auto vertical_layout = new QVBoxLayout;
   vertical_layout->setContentsMargins(0, 0, 0, 0);
   vertical_layout->setSpacing(0);
-  vertical_layout->addSpacerItem(
-      new QSpacerItem(300, 100, QSizePolicy::Expanding, QSizePolicy::Expanding));
-  vertical_layout->addStretch();
+  vertical_layout->addWidget(d->code_area, 1);
   vertical_layout->addWidget(d->horizontal_scrollbar);
   
   auto horizontal_layout = new QHBoxLayout;
@@ -1148,11 +1157,19 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   horizontal_layout->addLayout(vertical_layout, 1);
   horizontal_layout->addWidget(d->vertical_scrollbar);
 
-  setContentsMargins(0, 0, 0, 0);
-  setLayout(horizontal_layout);
+  auto search_layout = new QVBoxLayout;
+  search_layout->setContentsMargins(0, 0, 0, 0);
+  search_layout->setSpacing(0);
+  search_layout->addLayout(horizontal_layout, 1);
+  search_layout->addWidget(d->search_widget);
 
+  setContentsMargins(0, 0, 0, 0);
+  setLayout(search_layout);
+
+  d->search_widget->hide();
   d->vertical_scrollbar->hide();
   d->horizontal_scrollbar->hide();
+  d->code_area->installEventFilter(this);
 
   setFocusPolicy(Qt::StrongFocus);
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -1179,12 +1196,17 @@ void CodeWidget::focusOutEvent(QFocusEvent *) {
   }
 }
 
-void CodeWidget::resizeEvent(QResizeEvent *event) {
-  QSize new_size = event->size();
-  d->viewport.setWidth(new_size.width());
-  d->viewport.setHeight(new_size.height());
-  d->UpdateScrollbars();
-  update();
+bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
+  if (object == d->code_area) {
+    if (auto re = dynamic_cast<QResizeEvent *>(event)) {
+      QSize new_size = re->size();
+      d->viewport.setWidth(new_size.width());
+      d->viewport.setHeight(new_size.height());
+      d->UpdateScrollbars();
+      update();
+    }
+  }
+  return false;
 }
 
 void CodeWidget::wheelEvent(QWheelEvent *event) {
@@ -1489,6 +1511,9 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       if (ks == kCopyKeqSequence && d->selection_start_cursor &&
           !d->token_model.selection.isEmpty()) {
         qApp->clipboard()->setText(d->token_model.selection);
+
+      } else if (ks == kFindKeqSequence) {
+        d->search_widget->show();
 
       // Otherwise, request a generic keypress handler.
       } else if (d->current_entity && d->cursor) {
