@@ -546,7 +546,34 @@ struct CodeWidget::PrivateData {
   QPointF ClampCursorPosition(QPointF point) const;
 
   QModelIndex CreateModelIndex(const Entity *entity);
+
+  template <typename CB>
+  void TriggerScrollbarUpdate(CB cb);
 };
+
+// Apply some change to the `scroll_x` and `scroll_y`, and trigger the
+// relevant change in the scrollbars.
+template <typename CB>
+void CodeWidget::PrivateData::TriggerScrollbarUpdate(CB cb) {
+  auto old_scroll_x = scroll_x;
+  auto old_scroll_y = scroll_y;
+
+  cb();
+
+  if (horizontal_scrollbar->maximum()) {
+    if (auto delta_x = scroll_x - old_scroll_x) {
+      horizontal_scrollbar->setValue(
+          horizontal_scrollbar->value() + delta_x);
+    }
+  }
+
+  if (vertical_scrollbar->maximum()) {
+    if (auto delta_y = scroll_y - old_scroll_y) {
+      vertical_scrollbar->setValue(
+          vertical_scrollbar->value() + delta_y);
+    }
+  }
+}
 
 // Fills `model` (e.g. `PrivateData::token_model`) with information from
 // `entity` sufficient to satisfy the `IModel` interface, so that we can
@@ -1182,27 +1209,16 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
       d->line_height * (horizontal_angle_delta * 1.0 / 120.0);
   }
 
-  auto old_scroll_x = d->scroll_x;
-  auto old_scroll_y = d->scroll_y;
-
+  d->TriggerScrollbarUpdate([=, this] (void) {
 #ifdef __APPLE__
-  qreal mult = IsNaturalScroll() ? 1 : -1;
+    qreal mult = IsNaturalScroll() ? 1 : -1;
 #else
-  qreal mult = 1;
+    qreal mult = 1;
 #endif
 
-  d->ScrollBy(static_cast<int>(horizontal_pixel_delta * mult),
-              static_cast<int>(vertical_pixel_delta * mult));
-
-  if (auto delta_x = d->scroll_x - old_scroll_x) {
-    d->horizontal_scrollbar->setValue(
-        d->horizontal_scrollbar->value() + delta_x);
-  }
-
-  if (auto delta_y = d->scroll_y - old_scroll_y) {
-    d->vertical_scrollbar->setValue(
-        d->vertical_scrollbar->value() + delta_y);
-  }
+    d->ScrollBy(static_cast<int>(horizontal_pixel_delta * mult),
+                static_cast<int>(vertical_pixel_delta * mult));
+  });
 }
 
 void CodeWidget::paintEvent(QPaintEvent *) {
@@ -1495,54 +1511,56 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
     return;
   }
 
-  // Figure out the next cursor position.
-  auto new_cursor = d->NextCursorPosition(d->cursor.value(), dx, dy);
-  auto new_current_line_index = static_cast<int>(
-      std::floor(new_cursor.y() / d->line_height));
+  d->TriggerScrollbarUpdate([=, &need_repaint, this] (void) {
+    // Figure out the next cursor position.
+    auto new_cursor = d->NextCursorPosition(d->cursor.value(), dx, dy);
+    auto new_current_line_index = static_cast<int>(
+        std::floor(new_cursor.y() / d->line_height));
 
-  // Set the current line, and possibly scroll us up or down.
-  if (new_current_line_index != d->current_line_index) {
-    need_repaint = true;
-    d->current_line_index = new_current_line_index;
+    // Set the current line, and possibly scroll us up or down.
+    if (new_current_line_index != d->current_line_index) {
+      need_repaint = true;
+      d->current_line_index = new_current_line_index;
 
-    // Detect if we need to scroll down to follow the current line.
-    if (dy == 1 && (((new_current_line_index + 1) * d->line_height) >
-                    (d->scroll_y + d->viewport.height()))) {
-      d->ScrollBy(0, d->line_height);
+      // Detect if we need to scroll down to follow the current line.
+      if (0 < dy && (((new_current_line_index + 1) * d->line_height) >
+                     (d->scroll_y + d->viewport.height()))) {
+        d->ScrollBy(0, static_cast<int>(dy * d->line_height));
 
-    // Detect if we need to scroll up to follow the current line.
-    } else if (dy == -1 && ((new_current_line_index * d->line_height) <
+      // Detect if we need to scroll up to follow the current line.
+      } else if (0 > dy && ((new_current_line_index * d->line_height) <
                             d->scroll_y)) {
-      d->ScrollBy(0, -d->line_height);
-    }
-  }
-
-  // Set the current cursor, and possible scroll us left or right.
-  if (new_cursor != d->cursor.value()) {
-    need_repaint = true;
-    d->current_entity = d->EntityUnderPoint(new_cursor);
-
-    if (dx == -1 && (new_cursor.x() - d->scroll_x) < 0) {
-      d->ScrollBy(
-          static_cast<int>(-std::ceil(d->cursor->x() - new_cursor.x())), 0);
-
-      // If we get to the right edge of our left margin, then put us back at
-      // zero.
-      if (d->scroll_x <= d->left_margin) {
-        d->scroll_x = 0;
+        d->ScrollBy(0, static_cast<int>(dy * d->line_height));
       }
-
-    } else if (dx == 1 && ((new_cursor.x() - d->scroll_x) >=
-                           d->viewport.width())) {
-      d->ScrollBy(
-          static_cast<int>(std::ceil(new_cursor.x() - d->cursor->x())), 0);
     }
-  }
 
-  d->cursor = new_cursor;
+    // Set the current cursor, and possible scroll us left or right.
+    if (new_cursor != d->cursor.value()) {
+      need_repaint = true;
+      d->current_entity = d->EntityUnderPoint(new_cursor);
+
+      if (0 > dx && (new_cursor.x() - d->scroll_x) < 0) {
+        d->ScrollBy(
+            static_cast<int>(-std::ceil(d->cursor->x() - new_cursor.x())), 0);
+
+        // If we get to the right edge of our left margin, then put us back at
+        // zero.
+        if (d->scroll_x <= d->left_margin) {
+          d->scroll_x = 0;
+        }
+
+      } else if (0 < dx && ((new_cursor.x() - d->scroll_x) >=
+                            d->viewport.width())) {
+        d->ScrollBy(
+            static_cast<int>(std::ceil(new_cursor.x() - d->cursor->x())), 0);
+      }
+    }
+
+    d->cursor = new_cursor;
+  });
+
 
   if (need_repaint) {
-    d->UpdateScrollbars();
     update();
   }
 }
@@ -1560,8 +1578,6 @@ void CodeWidget::PrivateData::UpdateScrollbars(void) {
 
   qreal v_width = viewport.width();
   qreal v_height = viewport.height();
-
-  // qDebug() << c_height << v_height << scroll_y;
 
   if (0 < v_width && v_width < c_width) {
     horizontal_scrollbar->show();
@@ -2106,27 +2122,30 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
   QPointF entity_loc(entity.x, entity_y);
   selection_start_cursor.reset();
   cursor = CursorPosition(entity_loc);
+  current_entity = &entity;
 
   auto c_width = static_cast<int>(foreground_canvas.width() / dpi_ratio);
   auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
 
-  // If the entity isn't already visible, then center the window to make it
-  // visible.
-  if (entity_y < scroll_y ||
-      (entity_y + line_height) > (scroll_y + v_height)) {
-    scroll_y = std::min(
-        std::max(0, static_cast<int>(entity_y - (v_height / 2))),
-        c_height - v_height);
-  }
-  
-  if (entity.x > v_width) {
-    scroll_x = std::min(
-        std::max(0, static_cast<int>(entity.x - (v_width / 2))),
-        c_width - v_width);
+  TriggerScrollbarUpdate([=, this] (void) {
+    // If the entity isn't already visible, then center the window to make it
+    // visible.
+    if (entity_y < scroll_y ||
+        (entity_y + line_height) > (scroll_y + v_height)) {
+      scroll_y = std::min(
+          std::max(0, static_cast<int>(entity_y - (v_height / 2))),
+          c_height - v_height);
+    }
+    
+    if (entity.x > v_width) {
+      scroll_x = std::min(
+          std::max(0, static_cast<int>(entity.x - (v_width / 2))),
+          c_width - v_width);
 
-  } else {
-    scroll_x = 0;
-  }
+    } else {
+      scroll_x = 0;
+    }
+  });
 
   self->update();
 }
