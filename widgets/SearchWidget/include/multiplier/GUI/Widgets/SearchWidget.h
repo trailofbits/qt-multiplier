@@ -127,9 +127,6 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   //! Emitted when search parameters have been changed
   void SearchParametersChanged(void);
 
-  //! Emitted when the user presses the prev/next buttons
-  void SearchResultSelected(size_t index);
-
   //! Emitted when a new search result should be made active
   void ShowSearchResult(size_t result_index);
 };

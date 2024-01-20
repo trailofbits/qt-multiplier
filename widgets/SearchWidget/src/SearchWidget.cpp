@@ -230,7 +230,7 @@ void SearchWidget::ClearDisplayMessage() {
   d->search_input_error_display->setVisible(false);
 }
 
-void SearchWidget::ShowResult() {
+void SearchWidget::ShowResult(void) {
   SetDisplayMessage(false, tr("Showing result ") +
                                QString::number(d->current_search_result + 1) +
                                tr(" of ") +

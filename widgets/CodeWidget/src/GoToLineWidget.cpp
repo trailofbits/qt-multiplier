@@ -52,6 +52,7 @@ void GoToLineWidget::InitializeWidgets(QWidget *parent) {
                                          &GoToLineWidget::Disable,
                                          Qt::WidgetWithChildrenShortcut);
 
+  setFocusPolicy(Qt::StrongFocus);
   setVisible(false);
 }
 

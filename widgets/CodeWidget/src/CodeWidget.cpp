@@ -1150,6 +1150,9 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   connect(d->search_widget, &SearchWidget::SearchParametersChanged,
           this, &CodeWidget::OnSearchParametersChange);
 
+  connect(d->search_widget, &SearchWidget::ShowSearchResult,
+          this, &CodeWidget::OnShowSearchResult);
+
   d->goto_line_widget = new GoToLineWidget(this);
   connect(d->goto_line_widget, &GoToLineWidget::LineNumberChanged,
           this, &CodeWidget::OnGoToLineNumber);
@@ -1402,6 +1405,10 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   d->token_model.token = {};
   d->click_was_primary = event->buttons() & Qt::LeftButton;
   d->click_was_secondary = event->buttons() & Qt::RightButton;
+
+  if (d->click_was_primary || d->click_was_secondary) {
+    d->goto_line_widget->Deactivate();
+  }
 
   if (d->selection_start_cursor && !d->tracking_selection &&
       (d->click_was_primary || !d->click_was_secondary)) {
@@ -2191,6 +2198,7 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
   });
 
   self->update();
+  self->setFocus();
 }
 
 // Paint a token.
@@ -2576,6 +2584,33 @@ void CodeWidget::OnSearchParametersChange(void) {
   }
 
   d->search_widget->UpdateSearchResultCount(d->search_result_list.size());
+}
+
+void CodeWidget::OnShowSearchResult(size_t result_index) {
+  if (result_index >= d->search_result_list.size()) {
+    return;
+  }
+
+  auto [begin_, length] = d->search_result_list[result_index];
+  auto begin = static_cast<int>(begin_);
+  auto end = begin + static_cast<int>(length);
+  if (0 > begin || 0 > end || (begin + end) >= d->scene.document.size()) {
+    return;
+  }
+
+  auto it_begin = d->scene.begin_of_entity_in_document.begin();
+  auto it_end = d->scene.begin_of_entity_in_document.end();
+  auto it = std::lower_bound(it_begin, it_end, begin + 1);
+
+  Q_ASSERT(it != it_end);
+
+  for (; it != it_end; ++it) {
+    auto eo = static_cast<unsigned>(it - it_begin);
+    auto begin_offset = d->scene.begin_of_entity_in_document[eo];
+
+    Q_ASSERT(begin_offset <= begin);
+    break;
+  }
 }
 
 //! Called when we want to act on the context menu.
