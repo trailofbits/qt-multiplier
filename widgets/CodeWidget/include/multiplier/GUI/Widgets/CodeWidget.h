@@ -87,9 +87,9 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
  private slots:
   void OnIndexChanged(const ConfigManager &);
   void OnThemeChanged(const ThemeManager &);
-
   void OnVerticalScroll(int change);
   void OnHorizontalScroll(int change);
+  void OnGoToLineNumber(unsigned line);
 
  public slots:
 

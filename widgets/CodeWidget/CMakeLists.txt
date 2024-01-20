@@ -16,6 +16,8 @@ endif()
 add_library("mx_code_widget"
   include/multiplier/GUI/Widgets/CodeWidget.h
   src/CodeWidget.cpp
+  src/GoToLineWidget.cpp
+  src/GoToLineWidget.h
   ${extra_sources}
 )
 

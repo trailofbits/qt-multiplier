@@ -43,6 +43,8 @@
 #include <multiplier/GUI/Util.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
 
+#include "GoToLineWidget.h"
+
 #ifdef __APPLE__
 # include "MacosUtils.h"
 #endif
@@ -52,6 +54,7 @@ namespace {
 
 static const QKeySequence kCopyKeqSequence("Ctrl+C");
 static const QKeySequence kFindKeqSequence("Ctrl+F");
+static const QKeySequence kGotoLineKeqSequence("Ctrl+L");
 static constexpr auto kBoldMask = 0b10u;
 static constexpr auto kItalicMask = 0b01u;
 static constexpr auto kFormatMask = kBoldMask | kItalicMask;
@@ -497,6 +500,7 @@ struct CodeWidget::PrivateData {
   QScrollBar *horizontal_scrollbar{nullptr};
   QScrollBar *vertical_scrollbar{nullptr};
   SearchWidget *search_widget{nullptr};
+  GoToLineWidget *goto_line_widget{nullptr};
 
   inline PrivateData(const QString &model_id)
       : monospace(" "),
@@ -1140,9 +1144,13 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   d->search_widget = new SearchWidget(
       config_manager.MediaManager(), SearchWidget::Mode::Search, this);
 
+  d->goto_line_widget = new GoToLineWidget(this);
+  connect(d->goto_line_widget, &GoToLineWidget::LineNumberChanged,
+          this, &CodeWidget::OnGoToLineNumber);
+
   d->code_area = new QWidget();
   d->code_area->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-  d->code_area->setMinimumWidth(300);
+  d->code_area->setMinimumWidth(200);
   d->code_area->setMinimumHeight(100);
 
   auto vertical_layout = new QVBoxLayout;
@@ -1514,6 +1522,10 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
       } else if (ks == kFindKeqSequence) {
         d->search_widget->show();
+
+      } else if (ks == kGotoLineKeqSequence && d->scene.num_file_lines) {
+        d->goto_line_widget->Activate(
+            static_cast<unsigned>(d->scene.num_file_lines));
 
       // Otherwise, request a generic keypress handler.
       } else if (d->current_entity && d->cursor) {
@@ -2505,6 +2517,17 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->token_tree = token_tree;
   d->UpdateScrollbars();
   update();
+}
+
+void CodeWidget::OnGoToLineNumber(unsigned line_) {
+  auto line = static_cast<int>(line_);
+  auto max_e = d->scene.entities.size();
+  for (auto e = 0u; e < max_e; ++e) {
+    if (std::abs(d->scene.file_line_number[e]) == line) {
+      d->ScrollToEntityOffset(this, e);
+      break;
+    }
+  }
 }
 
 //! Called when we want to act on the context menu.
