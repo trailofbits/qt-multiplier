@@ -198,7 +198,7 @@ void SearchWidget::InitializeKeyboardShortcuts(QWidget *parent) {
 
   d->disable_search_shortcut =
       new QShortcut(QKeySequence::Cancel, this, this,
-                    &SearchWidget::Deactivate, Qt::WidgetWithChildrenShortcut);
+                    &SearchWidget::Disable, Qt::WidgetWithChildrenShortcut);
 
   if (d->mode == Mode::Search) {
     d->search_previous_shortcut = new QShortcut(
@@ -437,6 +437,14 @@ void SearchWidget::Deactivate(void) {
   d->current_search_result = 0;
 
   emit Deactivated();
+}
+
+//! Disable this wiget.
+void SearchWidget::Disable(void) {
+  Deactivate();
+  if (auto pw = dynamic_cast<QWidget *>(parent())) {
+    pw->setFocus(Qt::OtherFocusReason);
+  }
 }
 
 }  // namespace mx::gui

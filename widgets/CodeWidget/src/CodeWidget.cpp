@@ -22,6 +22,7 @@
 #include <QPaintEvent>
 #include <QPixmap>
 #include <QRectF>
+#include <QRegularExpression>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QTimer>
@@ -495,6 +496,9 @@ struct CodeWidget::PrivateData {
   QSet<RawEntityId> macros_to_expand;
   QMap<RawEntityId, QString> new_entity_names;
   QSet<RawEntityId> scene_overrides;
+
+  // Search results.
+  std::vector<std::pair<qsizetype, qsizetype>> search_result_list;
 
   QWidget *code_area{nullptr};
   QScrollBar *horizontal_scrollbar{nullptr};
@@ -1143,6 +1147,8 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
 
   d->search_widget = new SearchWidget(
       config_manager.MediaManager(), SearchWidget::Mode::Search, this);
+  connect(d->search_widget, &SearchWidget::SearchParametersChanged,
+          this, &CodeWidget::OnSearchParametersChange);
 
   d->goto_line_widget = new GoToLineWidget(this);
   connect(d->goto_line_widget, &GoToLineWidget::LineNumberChanged,
@@ -2515,6 +2521,9 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->current_entity = nullptr;
   d->scene_overrides.clear();
   d->token_tree = token_tree;
+  d->goto_line_widget->Deactivate();
+  d->search_widget->Deactivate();
+  d->search_result_list.clear();
   d->UpdateScrollbars();
   update();
 }
@@ -2528,6 +2537,45 @@ void CodeWidget::OnGoToLineNumber(unsigned line_) {
       break;
     }
   }
+}
+
+void CodeWidget::OnSearchParametersChange(void) {
+  const auto &search_parameters = d->search_widget->Parameters();
+
+  d->search_result_list.clear();
+  if (search_parameters.pattern.empty()) {
+    return;
+  }
+
+  QRegularExpression::PatternOptions options{
+      QRegularExpression::NoPatternOption};
+
+  if (!search_parameters.case_sensitive) {
+    options |= QRegularExpression::CaseInsensitiveOption;
+  }
+
+  auto pattern = QString::fromStdString(search_parameters.pattern);
+
+  if (search_parameters.type == SearchWidget::SearchParameters::Type::Text) {
+    pattern = QRegularExpression::escape(pattern);
+    if (search_parameters.whole_word) {
+      pattern = "\\b" + pattern + "\\b";
+    }
+  }
+
+  QRegularExpression regex(pattern, options);
+
+  // The regex is already validated by the search widget
+  Q_ASSERT(regex.isValid());
+
+
+  QRegularExpressionMatchIterator i = regex.globalMatch(d->scene.document);
+  while (i.hasNext()) {
+    QRegularExpressionMatch match = i.next();
+    d->search_result_list.emplace_back(match.capturedStart(), match.capturedLength());
+  }
+
+  d->search_widget->UpdateSearchResultCount(d->search_result_list.size());
 }
 
 //! Called when we want to act on the context menu.

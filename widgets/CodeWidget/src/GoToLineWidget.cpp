@@ -49,7 +49,7 @@ void GoToLineWidget::InitializeWidgets(QWidget *parent) {
   UpdateWidgetPlacement();
 
   d->deactivate_shortcut = new QShortcut(QKeySequence::Cancel, this, this,
-                                         &GoToLineWidget::Deactivate,
+                                         &GoToLineWidget::Disable,
                                          Qt::WidgetWithChildrenShortcut);
 
   setVisible(false);
@@ -98,8 +98,16 @@ void GoToLineWidget::Activate(unsigned max_line_number) {
   d->line_number_edit->setFocus();
 }
 
-void GoToLineWidget::Deactivate() {
+void GoToLineWidget::Deactivate(void) {
   setVisible(false);
+}
+
+//! Disable this wiget.
+void GoToLineWidget::Disable(void) {
+  Deactivate();
+  if (auto pw = dynamic_cast<QWidget *>(parent())) {
+    pw->setFocus(Qt::OtherFocusReason);
+  }
 }
 
 }  // namespace mx::gui

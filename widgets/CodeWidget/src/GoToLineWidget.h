@@ -47,6 +47,7 @@ class GoToLineWidget Q_DECL_FINAL : public QWidget {
  private slots:
   //! Called when the line edit is edited by the user
   void OnLineNumberInputChanged(void);
+  void Disable(void);
 
  public slots:
   //! Shows the widget

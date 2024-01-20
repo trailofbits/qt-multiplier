@@ -90,6 +90,7 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   void OnVerticalScroll(int change);
   void OnHorizontalScroll(int change);
   void OnGoToLineNumber(unsigned line);
+  void OnSearchParametersChange(void);
 
  public slots:
 

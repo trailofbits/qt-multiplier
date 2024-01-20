@@ -106,6 +106,9 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   //! Called when the theme changes.
   void OnIconsChanged(const MediaManager &media_manager);
 
+  //! Disable this wiget.
+  void Disable(void);
+
  public slots:
 
   //! Activates the search widget
