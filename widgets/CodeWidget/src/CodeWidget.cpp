@@ -518,6 +518,7 @@ struct CodeWidget::PrivateData {
   void RecomputeLineNumbers(void);
   void RecomputeHighlights(void);
   void RecomputeSelection(QPainter &blitter);
+  void ScrollToPoint(CodeWidget *self, QPointF, bool set_focus=true);
   void ScrollToEntityOffset(CodeWidget *self, unsigned offset);
 
   void PaintToken(
@@ -2143,12 +2144,8 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   RecomputeHighlights();
 }
 
-void CodeWidget::PrivateData::ScrollToEntityOffset(
-    CodeWidget *self, unsigned offset) {
-
-  if (offset > scene.entities.size()) {
-    return;
-  }
+void CodeWidget::PrivateData::ScrollToPoint(
+    CodeWidget *self, QPointF point, bool set_focus) {
 
   auto v_width = viewport.width();
   auto v_height = viewport.height();
@@ -2159,20 +2156,11 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
     QTimer::singleShot(
         10, self, [=, this, vn = version_number] (void) {
           if (vn == version_number) {
-            ScrollToEntityOffset(self, offset);
+            ScrollToPoint(self, point, set_focus);
           }
         });
     return;
   }
-
-  const Entity &entity = scene.entities[offset];
-
-  current_line_index = entity.logical_line_number - 1;
-  qreal entity_y = current_line_index * line_height;
-  QPointF entity_loc(entity.x, entity_y);
-  selection_start_cursor.reset();
-  cursor = CursorPosition(entity_loc);
-  current_entity = &entity;
 
   auto c_width = static_cast<int>(foreground_canvas.width() / dpi_ratio);
   auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
@@ -2180,16 +2168,16 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
   TriggerScrollbarUpdate([=, this] (void) {
     // If the entity isn't already visible, then center the window to make it
     // visible.
-    if (entity_y < scroll_y ||
-        (entity_y + line_height) > (scroll_y + v_height)) {
+    if (point.y() < scroll_y ||
+        (point.y() + line_height) > (scroll_y + v_height)) {
       scroll_y = std::min(
-          std::max(0, static_cast<int>(entity_y - (v_height / 2))),
+          std::max(0, static_cast<int>(point.y() - (v_height / 2))),
           c_height - v_height);
     }
     
-    if (entity.x > v_width) {
+    if (point.x() > v_width) {
       scroll_x = std::min(
-          std::max(0, static_cast<int>(entity.x - (v_width / 2))),
+          std::max(0, static_cast<int>(point.x() - (v_width / 2))),
           c_width - v_width);
 
     } else {
@@ -2198,7 +2186,28 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
   });
 
   self->update();
-  self->setFocus();
+
+  if (set_focus) {
+    self->setFocus();
+  }
+}
+
+void CodeWidget::PrivateData::ScrollToEntityOffset(
+    CodeWidget *self, unsigned offset) {
+
+  if (offset > scene.entities.size()) {
+    return;
+  }
+
+  const Entity &entity = scene.entities[offset];
+  current_line_index = entity.logical_line_number - 1;
+  qreal entity_y = current_line_index * line_height;
+  QPointF entity_loc(entity.x, entity_y);
+  selection_start_cursor.reset();
+  cursor = CursorPosition(entity_loc);
+  current_entity = &entity;
+
+  ScrollToPoint(self, QPointF(entity.x, entity_y));
 }
 
 // Paint a token.
@@ -2576,12 +2585,17 @@ void CodeWidget::OnSearchParametersChange(void) {
   // The regex is already validated by the search widget
   Q_ASSERT(regex.isValid());
 
-
   QRegularExpressionMatchIterator i = regex.globalMatch(d->scene.document);
   while (i.hasNext()) {
     QRegularExpressionMatch match = i.next();
     d->search_result_list.emplace_back(match.capturedStart(), match.capturedLength());
   }
+
+  std::sort(d->search_result_list.begin(), d->search_result_list.end());
+  auto it = std::unique(d->search_result_list.begin(),
+                        d->search_result_list.end());
+
+  d->search_result_list.erase(it, d->search_result_list.end());
 
   d->search_widget->UpdateSearchResultCount(d->search_result_list.size());
 }
@@ -2594,23 +2608,64 @@ void CodeWidget::OnShowSearchResult(size_t result_index) {
   auto [begin_, length] = d->search_result_list[result_index];
   auto begin = static_cast<int>(begin_);
   auto end = begin + static_cast<int>(length);
-  if (0 > begin || 0 > end || (begin + end) >= d->scene.document.size()) {
+  if (0 > begin || 0 > end || end >= d->scene.document.size()) {
     return;
   }
 
   auto it_begin = d->scene.begin_of_entity_in_document.begin();
   auto it_end = d->scene.begin_of_entity_in_document.end();
-  auto it = std::lower_bound(it_begin, it_end, begin + 1);
+  auto it = std::upper_bound(it_begin, it_end, begin);
+  if (it == it_begin) {
+    return;
+  }
 
-  Q_ASSERT(it != it_end);
+  --it;
+
+  const Entity *entity = nullptr;
+  int begin_offset = -1;
+  unsigned eo = 0u;
 
   for (; it != it_end; ++it) {
-    auto eo = static_cast<unsigned>(it - it_begin);
-    auto begin_offset = d->scene.begin_of_entity_in_document[eo];
-
+    eo = static_cast<unsigned>(it - it_begin);
+    begin_offset = d->scene.begin_of_entity_in_document[eo];
     Q_ASSERT(begin_offset <= begin);
+    entity = &(d->scene.entities[eo]);
     break;
   }
+
+  if (!entity) {
+    return;
+  }
+
+  const Data &data = d->scene.data[
+      entity->data_index_and_config >> kFormatShift];
+  QRectF entity_rect = data.bounding_rect[
+      entity->data_index_and_config & kFormatMask];
+
+  auto diff = begin - begin_offset;
+  qreal entity_y = (entity->logical_line_number - 1) * d->line_height;
+  qreal incr = d->is_monospaced ? d->space_width : (d->space_width / 16.0);
+  qreal shift = 0;
+
+  for (qreal max_width = entity_rect.width(); ; shift += incr) {
+    auto [index, width] = d->CharacterPosition(
+        QPointF(entity->x + shift, entity_y), entity);
+
+    if (index == diff) {
+      shift = width;
+      break;
+    }
+
+    if (shift >= max_width) {
+      shift = max_width;
+      break; 
+    }
+  }
+
+  d->current_entity = nullptr;
+  d->cursor = d->CursorPosition(QPointF(entity->x + shift, entity_y));
+  d->selection_start_cursor.reset();  // TODO
+  d->ScrollToPoint(this, d->cursor.value(), false  /* set focus */);
 }
 
 //! Called when we want to act on the context menu.
