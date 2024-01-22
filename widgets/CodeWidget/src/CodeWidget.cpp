@@ -144,6 +144,11 @@ struct Scene {
   // Maps displayed fragments to where they should/could logically begin.
   std::unordered_map<RawEntityId, unsigned> fragment_begin_offset;
 
+  // Given that `N` is a logical line number, `physical_line_number[N - 1]` is
+  // a physical line number. These can have repeats, and negative numbers, and
+  // can't be relied upon as being in 
+  std::vector<int> physical_line_number;
+
   // Maximum number of characters on any given line.
   int max_logical_columns{1};
 
@@ -173,6 +178,7 @@ struct SceneBuilder {
   RawEntityId related_entity_id{kInvalidEntityId};
   FileLocationCache file_cache;
   QString token_data;
+  TokenRange macro_use_tokens;
 
   inline SceneBuilder(void) {
     scene.logical_line_index.emplace_back(0u);
@@ -183,10 +189,14 @@ struct SceneBuilder {
     document_offset = static_cast<int>(scene.document.size());
     line_number = 0;
 
-    auto file_toks = TokenRange(tok).file_tokens();
+    TokenRange file_toks;
+    if (expansion_depth) {
+      file_toks = macro_use_tokens;
+    } else {
+      file_toks = TokenRange(tok).file_tokens();
+    }
     auto first_file_loc = file_toks.front().location(file_cache);
     auto last_file_loc = file_toks.back().location(file_cache);
-
     if (!first_file_loc) {
       return;
     }
@@ -304,6 +314,43 @@ struct SceneBuilder {
     scene.logical_line_index.back()
         = static_cast<unsigned>(scene.entities.size());
     std::sort(scene.related_entity_ids.begin(), scene.related_entity_ids.end());
+
+    auto max_i = scene.logical_line_index.size() - 1u;
+    int last_line_num = -1;
+
+    // Paint the line numbers.
+    for (auto i = 0u; i < max_i; ++i) {
+      line_number = 0;
+      auto backup_line_number = 0;
+      auto max_e = scene.logical_line_index[i + 1u];
+      
+      // Go get the minimum line number. Some might be negative because of a
+      // macro expansion on the line, so we want to highlight that an expansion
+      // happened somewhere on the line.
+      for (auto e = scene.logical_line_index[i]; e < max_e; ++e) {
+        if (auto ln = scene.file_line_number[e]) {
+          if (!line_number) {
+            line_number = ln;
+          } else if (std::abs(ln) >= std::abs(last_line_num)) {
+            line_number = std::min(line_number, ln);
+          
+          // TODO(pag): Sometimes see these; diagnose their source.
+          } else if (!backup_line_number) {
+            backup_line_number = ln;
+          } else {
+            backup_line_number = std::min(backup_line_number, ln);
+          }
+        }
+      }
+
+      if (!line_number) {
+        line_number = backup_line_number ? backup_line_number : last_line_num;
+      }
+
+      scene.physical_line_number.emplace_back(line_number);
+      last_line_num = -std::abs(line_number);
+    }
+
     return std::move(scene);
   }
 };
@@ -635,21 +682,23 @@ void CodeWidget::PrivateData::ImportChoiceNode(
 void CodeWidget::PrivateData::ImportSubstitutionNode(
     SceneBuilder &b, SubstitutionTokenTreeNode node) {
 
-  RawEntityId macro_id = kInvalidEntityId;
   RawEntityId def_id = kInvalidEntityId;
+  std::optional<Macro> macro;
   auto sub = node.macro();
   if (std::holds_alternative<MacroSubstitution>(sub)) {
-    macro_id = std::get<MacroSubstitution>(sub).id().Pack();
+    macro = std::get<MacroSubstitution>(sub);
 
     // Global expansion of a macro is based on the definition ID.
-    if (auto exp = MacroExpansion::from(std::get<MacroSubstitution>(sub))) {
+    if (auto exp = MacroExpansion::from(macro.value())) {
       if (auto def = exp->definition()) {
         def_id = def->id().Pack();
       }
     }
   } else {
-    macro_id = std::get<MacroVAOpt>(sub).id().Pack();
+    macro = std::get<MacroVAOpt>(sub);
   }
+
+  const RawEntityId macro_id = macro->id().Pack();
 
   // Keep track of which macros were expanded.
   auto expanded = macros_to_expand.contains(macro_id);
@@ -664,7 +713,11 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
       macro_id, static_cast<unsigned>(b.scene.entities.size()));
 
   if (expanded) {
+    if (!b.expansion_depth) {
+      b.macro_use_tokens = macro->use_tokens().file_tokens();
+    }
     ++b.expansion_depth;
+
     ImportNode(b, node.after());
     --b.expansion_depth;
   } else {
@@ -1692,12 +1745,83 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
     return;
   }
 
+  // Try to maintain scroll position across scene changes.
+  qreal line_multiplier = 0.0;
+  int line_index = 0;
+  int abs_phy_line = 0;
+  int phy_line_rel = 0;
+  std::vector<std::pair<unsigned, RawEntityId>> eo_to_eid;
+  if (scroll_y && !scene.physical_line_number.empty()) {
+    line_multiplier = scroll_y / line_height;
+    line_index = static_cast<int>(std::floor(line_multiplier));
+    auto line_nums = scene.physical_line_number.data();
+    abs_phy_line = std::abs(line_nums[line_index]);
+    for (auto i = line_index - 1; 0 <= i; --i, ++phy_line_rel) {
+      if (std::abs(line_nums[i]) != abs_phy_line) {
+        break;
+      }
+    }
+
+    Q_ASSERT(static_cast<unsigned>(line_index) <
+             scene.logical_line_index.size());
+
+    for (auto [eid, eo] : scene.entity_begin_offset) {
+      eo_to_eid.emplace_back(eo, eid);
+    }
+
+    std::sort(eo_to_eid.begin(), eo_to_eid.end());
+  }
+
   version_number++;
 
   SceneBuilder builder;  
   ImportNode(builder, token_tree.root());
+
   scene = builder.TakeScene();
   scene_changed = false;
+
+  int found = 0;
+  auto new_line_index = 0;  // Logical line index.
+  auto new_line_index_rel = 0;
+  for (auto new_phy_line : scene.physical_line_number) {
+    if (found && found > phy_line_rel) {
+      break;
+    }
+
+    auto abs_new_phy_line = std::abs(new_phy_line);
+    if (abs_new_phy_line == abs_phy_line) {
+      if (!new_line_index_rel) {
+        new_line_index_rel = new_line_index;
+      }
+      ++found;
+    } else if (found && abs_new_phy_line > abs_phy_line) {
+      break;
+    }
+    ++new_line_index;
+  }
+
+// TODO: the line numbers inside of a macro expansion should come from the
+//       importing process telling us what top-level macro we're in.
+
+  if (found) {
+
+    // We have enough relative lines, e.g. a macro that expanded to multiple
+    // lines.
+    if (found >= phy_line_rel) {
+      scroll_y = static_cast<int>(
+          (new_line_index_rel + phy_line_rel) * line_height);
+
+    // We have fewer relative lines, e.g. a macro that spanned multiple lines
+    // and was unexpanded.
+    } else {
+      scroll_y = static_cast<int>(
+          (new_line_index_rel + (found - 1)) * line_height);
+    }
+  
+  // Backup position. Useful if all that's changed is the theme.
+  } else {
+    scroll_y = static_cast<int>(line_height * line_multiplier);
+  }
 
   // Force a change.
   current_entity = nullptr;
