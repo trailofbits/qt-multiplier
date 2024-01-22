@@ -2317,7 +2317,7 @@ void CodeWidget::PrivateData::PaintToken(
 }
 
 void CodeWidget::OnIndexChanged(const ConfigManager &) {
-  SetTokenTree({});
+  ChangeScene({}, {});
   close();
 }
 
@@ -2556,7 +2556,8 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_) {
 }
 
 //! Change the underlying data / model being rendered by this code widget.
-void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
+void CodeWidget::ChangeScene(const TokenTree &token_tree,
+                             const SceneOptions &options) {
   d->version_number++;
   d->scene_changed = true;
   d->canvas_changed = true;
@@ -2577,6 +2578,8 @@ void CodeWidget::SetTokenTree(const TokenTree &token_tree) {
   d->goto_line_widget->Deactivate();
   d->search_widget->Deactivate();
   d->search_result_list.clear();
+  d->macros_to_expand = options.macros_to_expand;
+  d->new_entity_names = options.new_entity_names;
   d->UpdateScrollbars();
   update();
 }

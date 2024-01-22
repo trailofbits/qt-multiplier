@@ -81,6 +81,10 @@ struct CodeExplorer::PrivateData {
   TriggerHandle open_preview_trigger;
   TriggerHandle open_pinned_preview_trigger;
 
+  // TODO(pag): `connect` the same signals to update `scene_options` to keep
+  //            them in sync with other things.
+  CodeWidget::SceneOptions scene_options;
+
   ExpandedMacrosModel *macro_explorer_model{nullptr};
   MacroExplorer *macro_explorer{nullptr};
 
@@ -270,7 +274,7 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
     }
   }
 
-  code_widget->SetTokenTree(tt);
+  code_widget->ChangeScene(tt, d->scene_options);
   code_widget->OnGoToEntity(entity);
 
   connect(code_widget, &IWindowWidget::Closed,
@@ -293,7 +297,8 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data) {
   }
 
   if (!d->preview) {
-    d->preview = new CodePreviewWidget(d->config_manager, true);
+    d->preview = new CodePreviewWidget(
+        d->config_manager, d->scene_options, true);
 
     connect(this, &CodeExplorer::ExpandMacros,
             d->preview, &CodePreviewWidget::OnExpandMacros);
@@ -329,7 +334,8 @@ void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
     return;
   }
 
-  auto preview = new CodePreviewWidget(d->config_manager, false);
+  auto preview = new CodePreviewWidget(
+      d->config_manager, d->scene_options, false);
 
   connect(this, &CodeExplorer::ExpandMacros,
           preview, &CodePreviewWidget::OnExpandMacros);
@@ -367,6 +373,13 @@ void CodeExplorer::OnExpandMacro(const QVariant &data) {
 
     connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
             this, &CodeExplorer::ExpandMacros);
+
+    // Keep our shadow model of scene options in sync with the macro explorer.
+    // The macro explorer actually does the real double-checking of things.
+    connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
+            this, [this] (const QSet<RawEntityId> &macros_to_expand) {
+              d->scene_options.macros_to_expand = macros_to_expand;
+            });
 
     IWindowManager::DockConfig config;
     config.tabify = true;

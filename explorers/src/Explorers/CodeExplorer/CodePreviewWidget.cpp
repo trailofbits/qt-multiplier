@@ -22,7 +22,6 @@
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/HistoryWidget.h>
-#include <multiplier/GUI/Widgets/CodeWidget.h>
 
 namespace mx::gui {
 namespace {
@@ -32,6 +31,9 @@ static constexpr unsigned kMaxHistorySize = 32;
 }  // namespace
 
 struct CodePreviewWidget::PrivateData {
+
+  // Current scene options.
+  CodeWidget::SceneOptions scene_options;
 
   // Preview of the code.
   CodeWidget * const code;
@@ -57,9 +59,12 @@ struct CodePreviewWidget::PrivateData {
   // Trigger to open some info in a pinned preview.
   TriggerHandle pinned_entity_info_trigger;
 
-  inline PrivateData(const ConfigManager &config_manager, bool enable_history,
+  inline PrivateData(const ConfigManager &config_manager,
+                     const CodeWidget::SceneOptions &scene_options_,
+                     bool enable_history,
                      QWidget *parent)
-      : code(new CodeWidget(config_manager, kModelId, parent)),
+      : scene_options(scene_options_),
+        code(new CodeWidget(config_manager, kModelId, parent)),
         toolbar(enable_history ? new QToolBar(parent) : nullptr),
         history(
             enable_history ?
@@ -76,10 +81,11 @@ const QString CodePreviewWidget::kModelId(
 CodePreviewWidget::~CodePreviewWidget(void) {}
 
 CodePreviewWidget::CodePreviewWidget(
-    const ConfigManager &config_manager, bool enable_history,
-    QWidget *parent)
+    const ConfigManager &config_manager,
+    const CodeWidget::SceneOptions &scene_options_,
+    bool enable_history, QWidget *parent)
     : IWindowWidget(parent),
-      d(new PrivateData(config_manager, enable_history, this)) {
+      d(new PrivateData(config_manager, scene_options_, enable_history, this)) {
 
   setWindowTitle(tr("Code Preview"));
 
@@ -225,8 +231,9 @@ void CodePreviewWidget::DisplayEntity(
   }
 
   if (!reuse_token_tree) {
-    d->code->SetTokenTree(tt);
+    d->code->ChangeScene(tt, d->scene_options);
   }
+
   d->code->OnGoToEntity(d->current_entity);
 }
 
@@ -237,13 +244,15 @@ void CodePreviewWidget::OnChangeSync(int state) {
 // Invoked when the set of macros to be expanded changes.
 void CodePreviewWidget::OnExpandMacros(
     const QSet<RawEntityId> &macros_to_expand) {
-  d->code->OnExpandMacros(macros_to_expand);
+  d->scene_options.macros_to_expand = macros_to_expand;
+  d->code->OnExpandMacros(d->scene_options.macros_to_expand);
 }
 
 // Invoked when the set of entities to be renamed changes.
 void CodePreviewWidget::OnRenameEntities(
     const QMap<RawEntityId, QString> &new_entity_names) {
-  d->code->OnRenameEntities(new_entity_names);
+  d->scene_options.new_entity_names = new_entity_names;
+  d->code->OnRenameEntities(d->scene_options.new_entity_names);
 }
 
 // Invoked when we want to scroll to a specific entity.

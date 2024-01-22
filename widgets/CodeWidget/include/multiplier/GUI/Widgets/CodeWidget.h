@@ -51,6 +51,13 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   std::unique_ptr<PrivateData> d;
 
  public:
+
+  //! Options that configure the initial state of the scene.
+  struct SceneOptions {
+    QSet<RawEntityId> macros_to_expand;
+    QMap<RawEntityId, QString> new_entity_names;
+  };
+
   virtual ~CodeWidget(void);
 
   enum : int {
@@ -68,7 +75,7 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
              QWidget *parent = nullptr);
 
   //! Change the underlying data / model being rendered by this code widget.
-  void SetTokenTree(const TokenTree &token_tree);
+  void ChangeScene(const TokenTree &token_tree, const SceneOptions &options);
 
   //! Called when we want to act on the context menu.
   void ActOnContextMenu(IWindowManager *manager, QMenu *menu,

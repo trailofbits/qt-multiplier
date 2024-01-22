@@ -11,6 +11,7 @@
 #include <QWidget>
 
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
+#include <multiplier/GUI/Widgets/CodeWidget.h>
 #include <multiplier/Index.h>
 
 namespace mx::gui {
@@ -31,6 +32,7 @@ class CodePreviewWidget Q_DECL_FINAL : public IWindowWidget {
 
   //! Constructor
   CodePreviewWidget(const ConfigManager &config_manager,
+                    const CodeWidget::SceneOptions &scene_options,
                     bool enable_history, QWidget *parent = nullptr);
 
   //! Destructor
