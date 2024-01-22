@@ -1289,7 +1289,7 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
 #ifdef __APPLE__
     qreal mult = IsNaturalScroll() ? 1 : -1;
 #else
-    qreal mult = 1;
+    qreal mult = event->inverted() ? 1 : -1;
 #endif
 
     d->ScrollBy(static_cast<int>(horizontal_pixel_delta * mult),
