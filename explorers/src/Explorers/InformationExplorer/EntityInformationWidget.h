@@ -53,6 +53,10 @@ class EntityInformationWidget Q_DECL_FINAL : public IWindowWidget {
       const std::vector<IInformationExplorerPluginPtr> &plugins,
       bool is_explicit_request, bool add_to_history);
 
+ protected:
+  //! Used to implement click support without using the selection model
+  virtual bool eventFilter(QObject *object, QEvent *event);
+
  private slots:
   void OnAllDataFound(void);
   void OnCancelRunningRequest(void);
@@ -60,7 +64,7 @@ class EntityInformationWidget Q_DECL_FINAL : public IWindowWidget {
   void OnSearchParametersChange(void);
   void ExpandAllBelow(const QModelIndex &parent);
   void OnCurrentItemChanged(const QModelIndex &current_index);
-  void OnOpenItemContextMenu(const QPoint &point);
+  void OnOpenItemContextMenu(const QPoint &tree_local_mouse_pos);
   void OnIconsChanged(const MediaManager &media_manager);
   void OnPopOutPressed(void);
 

@@ -156,15 +156,7 @@ EntityInformationWidget::EntityInformationWidget(
   d->tree->sortByColumn(0, Qt::AscendingOrder);
 
   d->tree->setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(d->tree, &TreeWidget::customContextMenuRequested,
-          this, &EntityInformationWidget::OnOpenItemContextMenu);
-
-  connect(d->tree, &QAbstractItemView::clicked,
-          this, &EntityInformationWidget::OnCurrentItemChanged);
-
-  auto tree_selection_model = d->tree->selectionModel();
-  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
-          this, &EntityInformationWidget::OnCurrentItemChanged);
+  d->tree->viewport()->installEventFilter(this);
 
   // Create the status widget
   d->status->setVisible(false);
@@ -437,6 +429,50 @@ void EntityInformationWidget::DisplayEntity(
   }
 }
 
+bool EntityInformationWidget::eventFilter(QObject *object, QEvent *event) {
+  if (object == d->tree->viewport()) {
+    if (event->type() == QEvent::MouseButtonPress) {
+      return true;
+
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+      const auto &mouse_event = *static_cast<QMouseEvent *>(event);
+      auto local_mouse_pos = mouse_event.position().toPoint();
+
+      auto index = d->tree->indexAt(local_mouse_pos);
+      if (!index.isValid()) {
+        return true;
+      }
+
+      auto &selection_model = *d->tree->selectionModel();
+      selection_model.setCurrentIndex(index,
+          QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
+
+      switch (mouse_event.button()) {
+      case Qt::LeftButton: {
+        OnCurrentItemChanged(index);
+        break;
+      }
+
+      case Qt::RightButton: {
+        OnOpenItemContextMenu(local_mouse_pos);
+        break;
+      }
+
+      default:
+        break;
+      }
+
+      return true;
+
+    } else {
+      return false;
+    }
+
+  } else {
+    return false;
+  }
+}
+
 void EntityInformationWidget::OnAllDataFound(void) {
   --d->num_requests;
 
@@ -477,8 +513,8 @@ void EntityInformationWidget::OnCurrentItemChanged(
   emit SelectedItemChanged(d->selected_index);
 }
 
-void EntityInformationWidget::OnOpenItemContextMenu(const QPoint &point) {
-  auto index = d->tree->indexAt(point);
+void EntityInformationWidget::OnOpenItemContextMenu(const QPoint &tree_local_mouse_pos) {
+  auto index = d->tree->indexAt(tree_local_mouse_pos);
   d->selected_index = d->sort_model->mapToSource(index);
   if (!d->selected_index.isValid()) {
     return;
