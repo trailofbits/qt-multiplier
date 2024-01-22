@@ -181,7 +181,7 @@ void InformationExplorer::OpenInfo(const QVariant &data) {
   d->view->show();
   d->view->DisplayEntity(
       std::move(entity), d->config_manager.FileLocationCache(), d->plugins,
-      false  /* implicit (click) request */, true  /* add to history */);
+      true  /* explicit (click) request */, true  /* add to history */);
 }
 
 void InformationExplorer::OpenPinnedInfo(const QVariant &data) {
