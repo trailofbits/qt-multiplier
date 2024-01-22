@@ -8,7 +8,11 @@
 
 #pragma once
 
+// This header is required by multiplier's `Entity.h`
+// clang-format off
+#include <memory>
 #include <multiplier/Entity.h>
+// clang-format on
 
 #include <QVariant>
 

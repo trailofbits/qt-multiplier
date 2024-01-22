@@ -2279,7 +2279,7 @@ void CodeWidget::PrivateData::PaintToken(
   if (is_monospaced) {
     if (!token_rect_valid) {
       token_rect = space_rect;
-      token_rect.setWidth(space_width * data.text.size());
+      token_rect.setWidth(space_width * static_cast<double>(data.text.size()));
       token_rect_valid = true;
     }
 

@@ -15,6 +15,7 @@ target_compile_options("qtmx_common_flags" INTERFACE
   -Wshadow
   -fvisibility=hidden
   -Werror
+  -Wno-c99-designator
 )
 
 set_target_properties("qtmx_common_flags" PROPERTIES

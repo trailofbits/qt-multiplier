@@ -277,9 +277,11 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
   code_widget->ChangeScene(tt, d->scene_options);
   code_widget->OnGoToEntity(entity);
 
+  // We need C++20 to avoid this copy
+  auto copy_of_id{id};
   connect(code_widget, &IWindowWidget::Closed,
           this, [=, this] (void) {
-                  d->opened_windows.erase(id);
+                  d->opened_windows.erase(copy_of_id);
                 });
 
   IWindowManager::CentralConfig config;

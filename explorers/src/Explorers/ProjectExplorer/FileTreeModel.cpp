@@ -269,7 +269,10 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
 
   } else if (role == FileIdRole) {
     if (node->file_id != kInvalidEntityId) {
-      return node->file_id;
+      QVariant value;
+      value.setValue(node->file_id);
+
+      return value;
     }
   }
 

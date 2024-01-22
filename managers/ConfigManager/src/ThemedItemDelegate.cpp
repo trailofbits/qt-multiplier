@@ -205,8 +205,8 @@ void ThemedItemDelegate::PaintText(
   painter->setFont(font);
 
   QTextOption to(option.displayAlignment);
-  QRectF baseline_rect(0, 0, 2 * font_metrics.maxWidth() * tok_data.size(),
-                       2 * font_metrics.height());
+  QRectF baseline_rect(0, 0, 2 * font_metrics.maxWidth() * static_cast<double>(tok_data.size()),
+                       2 * static_cast<double>(font_metrics.height()));
   auto base_rect = painter->boundingRect(baseline_rect, kSpace);
   auto rect = painter->boundingRect(baseline_rect, tok_data);
 
