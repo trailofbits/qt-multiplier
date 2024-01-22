@@ -42,7 +42,9 @@ class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
  private:
   void CreateDockWidget(IWindowManager *manager);
-  void OpenInfo(const QVariant &data);
+  void OpenInfo(const QVariant &data, bool is_explicit);
+  void OpenInfoImplicit(const QVariant &data);
+  void OpenInfoExplicit(const QVariant &data);
   void OpenPinnedInfo(const QVariant &data);
 };
 

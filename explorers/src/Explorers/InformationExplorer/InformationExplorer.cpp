@@ -40,6 +40,7 @@ struct InformationExplorer::PrivateData {
 
   // Open an entity's information.
   TriggerHandle entity_info_trigger;
+  TriggerHandle user_entity_info_trigger;
   TriggerHandle pinned_entity_info_trigger;
 
   IWindowManager *window_manager{nullptr};
@@ -59,7 +60,11 @@ InformationExplorer::InformationExplorer(ConfigManager &config_manager,
   
   d->entity_info_trigger = config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenEntityInfo",
-      &InformationExplorer::OpenInfo);
+      &InformationExplorer::OpenInfoImplicit);
+  
+  d->user_entity_info_trigger = config_manager.ActionManager().Register(
+      this, "com.trailofbits.action.UserRequestedOpenEntityInfo",
+      &InformationExplorer::OpenInfoExplicit);
   
   d->pinned_entity_info_trigger = config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenPinnedEntityInfo",
@@ -137,7 +142,7 @@ std::optional<NamedAction> InformationExplorer::ActOnSecondaryClick(
     return std::nullopt;
   }
 
-  return NamedAction{tr("Open Information"), d->entity_info_trigger,
+  return NamedAction{tr("Open Information"), d->user_entity_info_trigger,
                      QVariant::fromValue(entity)};
 }
 
@@ -149,7 +154,7 @@ std::optional<NamedAction> InformationExplorer::ActOnKeyPress(
   QString name;
 
   if (keys == kKeySeqI) {
-    handle = &(d->entity_info_trigger);
+    handle = &(d->user_entity_info_trigger);
     name = tr("Open Information");
 
   } else if (keys == kKeySeqShiftI) {
@@ -168,7 +173,15 @@ std::optional<NamedAction> InformationExplorer::ActOnKeyPress(
   return NamedAction{name, *handle, QVariant::fromValue(entity)};
 }
 
-void InformationExplorer::OpenInfo(const QVariant &data) {
+void InformationExplorer::OpenInfoImplicit(const QVariant &data) {
+  OpenInfo(data, false);
+}
+
+void InformationExplorer::OpenInfoExplicit(const QVariant &data) {
+  OpenInfo(data, true);
+}
+
+void InformationExplorer::OpenInfo(const QVariant &data, bool is_explicit) {
   if (!data.isValid() || !data.canConvert<VariantEntity>()) {
     return;
   }
@@ -181,7 +194,7 @@ void InformationExplorer::OpenInfo(const QVariant &data) {
   d->view->show();
   d->view->DisplayEntity(
       std::move(entity), d->config_manager.FileLocationCache(), d->plugins,
-      true  /* explicit (click) request */, true  /* add to history */);
+      is_explicit  /* explicit (click) request */, true  /* add to history */);
 }
 
 void InformationExplorer::OpenPinnedInfo(const QVariant &data) {
