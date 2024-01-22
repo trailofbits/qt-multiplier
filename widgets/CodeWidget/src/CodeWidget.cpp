@@ -539,6 +539,8 @@ struct CodeWidget::PrivateData {
 
   const Entity *EntityUnderPoint(QPointF point) const;
 
+  std::pair<const Entity *, int> EntityAtDocumentOffset(int offset) const;
+
   std::pair<int, qreal> CharacterPosition(
       QPointF point, const Entity *entity) const;
   std::pair<int, qreal> CharacterPositionVariable(
@@ -1126,6 +1128,40 @@ const Entity *CodeWidget::PrivateData::EntityUnderPoint(QPointF point) const {
   }
 
   return nullptr;
+}
+
+std::pair<const Entity *, int> CodeWidget::PrivateData::EntityAtDocumentOffset(
+    int offset) const {
+
+  auto it_begin = scene.begin_of_entity_in_document.begin();
+  auto it_end = scene.begin_of_entity_in_document.end();
+  auto it = std::upper_bound(it_begin, it_end, offset);
+  if (it == it_begin) {
+    return {nullptr, -1};
+  }
+
+  --it;
+
+  for (; it != it_end; ++it) {
+    auto eo = static_cast<unsigned>(it - it_begin);
+    const Entity *entity = &(scene.entities[eo]);
+    auto begin_offset = scene.begin_of_entity_in_document[eo];
+    if (begin_offset > offset) {
+      break;
+    }
+
+    const Data &data = scene.data[
+        entity->data_index_and_config >> kFormatShift];
+
+    if ((begin_offset + data.text.size()) < offset) {
+      continue;
+    }
+
+    Q_ASSERT(begin_offset <= offset);
+    return {entity, offset - begin_offset};
+  }
+
+  return {nullptr, -1};
 }
 
 CodeWidget::~CodeWidget(void) {}
@@ -2612,60 +2648,50 @@ void CodeWidget::OnShowSearchResult(size_t result_index) {
     return;
   }
 
-  auto it_begin = d->scene.begin_of_entity_in_document.begin();
-  auto it_end = d->scene.begin_of_entity_in_document.end();
-  auto it = std::upper_bound(it_begin, it_end, begin);
-  if (it == it_begin) {
+  auto eo_to_point =
+    [this] (const Entity *entity, int entity_offset) -> QPointF {
+      const Data &data = d->scene.data[
+          entity->data_index_and_config >> kFormatShift];
+      QRectF entity_rect = data.bounding_rect[
+          entity->data_index_and_config & kFormatMask];
+
+      // Figure out the starting position of the selection.
+      qreal entity_y = (entity->logical_line_number - 1) * d->line_height;
+      qreal incr = d->is_monospaced ? d->space_width : (d->space_width / 16.0);
+      qreal shift = 0;
+
+      for (qreal max_width = entity_rect.width(); ; shift += incr) {
+        auto [index, width] = d->CharacterPosition(
+            QPointF(entity->x + shift, entity_y), entity);
+
+        if (index >= entity_offset || shift >= max_width) {
+          shift = width;
+          break;
+        }
+      }
+
+      return QPointF(entity->x + shift, entity_y);
+    };
+
+  auto [begin_entity, begin_offset] = d->EntityAtDocumentOffset(begin);
+  if (!begin_entity) {
     return;
   }
 
-  --it;
-
-  const Entity *entity = nullptr;
-  int begin_offset = -1;
-  unsigned eo = 0u;
-
-  for (; it != it_end; ++it) {
-    eo = static_cast<unsigned>(it - it_begin);
-    begin_offset = d->scene.begin_of_entity_in_document[eo];
-    Q_ASSERT(begin_offset <= begin);
-    entity = &(d->scene.entities[eo]);
-    break;
-  }
-
-  if (!entity) {
-    return;
-  }
-
-  const Data &data = d->scene.data[
-      entity->data_index_and_config >> kFormatShift];
-  QRectF entity_rect = data.bounding_rect[
-      entity->data_index_and_config & kFormatMask];
-
-  auto diff = begin - begin_offset;
-  qreal entity_y = (entity->logical_line_number - 1) * d->line_height;
-  qreal incr = d->is_monospaced ? d->space_width : (d->space_width / 16.0);
-  qreal shift = 0;
-
-  for (qreal max_width = entity_rect.width(); ; shift += incr) {
-    auto [index, width] = d->CharacterPosition(
-        QPointF(entity->x + shift, entity_y), entity);
-
-    if (index == diff) {
-      shift = width;
-      break;
-    }
-
-    if (shift >= max_width) {
-      shift = max_width;
-      break; 
-    }
-  }
-
+  d->token_model.selection = d->scene.document.sliced(begin, length);
   d->current_entity = nullptr;
-  d->cursor = d->CursorPosition(QPointF(entity->x + shift, entity_y));
-  d->selection_start_cursor.reset();  // TODO
-  d->ScrollToPoint(this, d->cursor.value(), false  /* set focus */);
+  d->cursor = d->CursorPosition(
+      eo_to_point(begin_entity, begin_offset));
+  d->selection_start_cursor = d->cursor;
+
+  auto [end_entity, end_offset] = d->EntityAtDocumentOffset(end);
+  if (end_entity) {
+    d->selection_start_cursor
+        = d->CursorPosition(eo_to_point(end_entity, end_offset));
+  }
+
+  d->ScrollToPoint(this, d->cursor.value(),
+                   false  /* set focus */);
 }
 
 //! Called when we want to act on the context menu.
