@@ -31,7 +31,7 @@ struct ListGeneratorWidget::PrivateData final {
   ListGeneratorModel *model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
 
-  QListView *list_widget{nullptr};
+  QListView *list_view{nullptr};
   SearchWidget *search_widget{nullptr};
   QWidget *status_widget{nullptr};
 
@@ -73,14 +73,10 @@ void ListGeneratorWidget::InstallModel(void) {
   d->model_proxy->setSourceModel(d->model);
   d->model_proxy->setDynamicSortFilter(true);
 
-  d->list_widget->setModel(d->model_proxy);
+  d->list_view->setModel(d->model_proxy);
 
   // Note: this needs to happen after the model has been set in the
   // tree view!
-  auto tree_selection_model = d->list_widget->selectionModel();
-  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
-          this, &ListGeneratorWidget::OnCurrentItemChanged);
-
   connect(d->model_proxy, &QAbstractItemModel::modelReset,
           this, &ListGeneratorWidget::OnModelReset);
 
@@ -97,40 +93,31 @@ void ListGeneratorWidget::InitializeWidgets(
   auto &media_manager = config_manager.MediaManager();
 
   // Initialize the list view
-  d->list_widget = new QListView(this);
+  d->list_view = new QListView(this);
 
   // The auto scroll takes care of keeping the active item within the
   // visible viewport region. This is true for mouse clicks but also
   // keyboard navigation (i.e. arrow keys, page up/down, etc).
-  d->list_widget->setAutoScroll(false);
+  d->list_view->setAutoScroll(false);
 
   // Smooth scrolling.
-  d->list_widget->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-  d->list_widget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  d->list_view->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+  d->list_view->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
 
   // Disallow multiple selection. If we have grouping by file enabled, then when
   // a user clicks on a file name, we instead jump down to the first entry
   // grouped under that file. This is to make using the up/down arrows easier.
-  d->list_widget->setSelectionBehavior(QAbstractItemView::SelectRows);
-  d->list_widget->setSelectionMode(QAbstractItemView::SingleSelection);
-  d->list_widget->setTextElideMode(Qt::TextElideMode::ElideRight);
+  d->list_view->setSelectionBehavior(QAbstractItemView::SelectRows);
+  d->list_view->setSelectionMode(QAbstractItemView::SingleSelection);
+  d->list_view->setTextElideMode(Qt::TextElideMode::ElideRight);
 
-  d->list_widget->setAlternatingRowColors(false);
-  d->list_widget->installEventFilter(this);
-  d->list_widget->viewport()->installEventFilter(this);
-  d->list_widget->viewport()->setMouseTracking(true);
-
-  d->list_widget->setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(d->list_widget, &QListView::customContextMenuRequested,
-          this, &ListGeneratorWidget::OnOpenItemContextMenu);
-
-  connect(d->list_widget, &QAbstractItemView::clicked,
-          this, [this] (const QModelIndex &index) {
-                  OnCurrentItemChanged(index, {});
-                });
+  d->list_view->setAlternatingRowColors(false);
+  d->list_view->installEventFilter(this);
+  d->list_view->viewport()->installEventFilter(this);
+  d->list_view->viewport()->setMouseTracking(true);
 
   // Make sure we can render tokens, if need be.
-  config_manager.InstallItemDelegate(d->list_widget);
+  config_manager.InstallItemDelegate(d->list_view);
 
   d->goto_ = new QPushButton(QIcon(), "", this);
   d->goto_->setToolTip(tr("Goto Original"));
@@ -174,7 +161,7 @@ void ListGeneratorWidget::InitializeWidgets(
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(d->list_widget, 1);
+  layout->addWidget(d->list_view, 1);
   layout->addStretch();
   layout->addWidget(d->status_widget);
   layout->addWidget(d->search_widget);
@@ -192,7 +179,7 @@ void ListGeneratorWidget::InitializeWidgets(
 
   OnIconsChanged(media_manager);
 
-  config_manager.InstallItemDelegate(d->list_widget);
+  config_manager.InstallItemDelegate(d->list_view);
 }
 
 //! Called when we want to act on the context menu.
@@ -236,13 +223,13 @@ void ListGeneratorWidget::ActOnContextMenu(
 }
 
 bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
-  if (obj == d->list_widget) {
+  if (obj == d->list_view) {
     // Disable the overlay buttons while scrolling. It is hard to keep
     // them on screen due to how the scrolling event is propagated.
     if (event->type() == QEvent::Wheel) {
       auto scrolling_enabled =
-          (d->list_widget->horizontalScrollBar()->isVisible() ||
-           d->list_widget->verticalScrollBar()->isVisible());
+          (d->list_view->horizontalScrollBar()->isVisible() ||
+           d->list_view->verticalScrollBar()->isVisible());
 
       if (scrolling_enabled) {
         UpdateItemButtons();
@@ -256,10 +243,43 @@ bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
     return false;
 
-  } else if (obj == d->list_widget->viewport()) {
+  } else if (obj == d->list_view->viewport()) {
     if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
       UpdateItemButtons();
       return false;
+
+    } else if (event->type() == QEvent::MouseButtonPress) {
+      return true;
+
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+      const auto &mouse_event = *static_cast<QMouseEvent *>(event);
+      auto local_mouse_pos = mouse_event.position().toPoint();
+
+      auto index = d->list_view->indexAt(local_mouse_pos);
+      if (!index.isValid()) {
+        return true;
+      }
+
+      auto &selection_model = *d->list_view->selectionModel();
+      selection_model.setCurrentIndex(index,
+          QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
+
+      switch (mouse_event.button()) {
+      case Qt::LeftButton: {
+        OnItemClicked(index);
+        break;
+      }
+
+      case Qt::RightButton: {
+        OnOpenItemContextMenu(local_mouse_pos);
+        break;
+      }
+
+      default:
+        break;
+      }
+
+      return true;
 
     } else {
       return false;
@@ -285,8 +305,8 @@ void ListGeneratorWidget::UpdateItemButtons(void) {
   d->updating_buttons = true;
   d->goto_->setVisible(false);
 
-  auto mouse_pos = d->list_widget->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->list_widget->indexAt(mouse_pos);
+  auto mouse_pos = d->list_view->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->list_view->indexAt(mouse_pos);
   if (!d->model_proxy->mapToSource(index).isValid()) {
     d->updating_buttons = false;
     return;
@@ -302,16 +322,16 @@ void ListGeneratorWidget::UpdateItemButtons(void) {
   d->goto_->setVisible(true);
 
   // Update the button positions
-  auto rect = d->list_widget->visualRect(index);
+  auto rect = d->list_view->visualRect(index);
 
   auto button_margin = rect.height() / 6;
   auto button_size = rect.height() - (button_margin * 2);
   auto button_area_width = button_size + button_margin;
 
   auto current_x =
-      d->list_widget->pos().x() + d->list_widget->width() - button_area_width;
+      d->list_view->pos().x() + d->list_view->width() - button_area_width;
 
-  const auto &vertical_scrollbar = *d->list_widget->verticalScrollBar();
+  const auto &vertical_scrollbar = *d->list_view->verticalScrollBar();
   if (vertical_scrollbar.isVisible()) {
     current_x -= vertical_scrollbar.width();
   }
@@ -319,7 +339,7 @@ void ListGeneratorWidget::UpdateItemButtons(void) {
   auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
 
   auto pos = mapFromGlobal(
-      d->list_widget->viewport()->mapToGlobal(QPoint(current_x, current_y)));
+      d->list_view->viewport()->mapToGlobal(QPoint(current_x, current_y)));
 
   d->goto_->resize(button_size, button_size);
   d->goto_->move(pos.x(), pos.y());
@@ -347,11 +367,10 @@ void ListGeneratorWidget::OnModelReset(void) {
 void ListGeneratorWidget::OnDataChanged(void) {
   UpdateItemButtons();
 
-  d->list_widget->viewport()->repaint();
+  d->list_view->viewport()->repaint();
 }
 
-void ListGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
-                                               const QModelIndex &) {
+void ListGeneratorWidget::OnItemClicked(const QModelIndex &current_index) {
   auto new_index = d->model_proxy->mapToSource(current_index);
   if (!new_index.isValid()) {
     return;
@@ -367,8 +386,8 @@ void ListGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
   emit RequestPrimaryClick(d->selected_index);
 }
 
-void ListGeneratorWidget::OnOpenItemContextMenu(const QPoint &point) {
-  auto index = d->list_widget->indexAt(point);
+void ListGeneratorWidget::OnOpenItemContextMenu(const QPoint &list_local_mouse_pos) {
+  auto index = d->list_view->indexAt(list_local_mouse_pos);
   d->selected_index = d->model_proxy->mapToSource(index);
   if (!d->selected_index.isValid()) {
     return;
@@ -404,8 +423,8 @@ void ListGeneratorWidget::OnSearchParametersChange(void) {
 }
 
 void ListGeneratorWidget::OnGotoOriginalButtonPressed(void) {
-  auto mouse_pos = d->list_widget->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->model_proxy->mapToSource(d->list_widget->indexAt(mouse_pos));
+  auto mouse_pos = d->list_view->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->list_view->indexAt(mouse_pos));
   if (!index.isValid()) {
     d->updating_buttons = false;
     return;
@@ -417,10 +436,10 @@ void ListGeneratorWidget::OnGotoOriginalButtonPressed(void) {
     return;
   }
 
-  auto sel = d->list_widget->selectionModel();
+  auto sel = d->list_view->selectionModel();
   sel->clearSelection();
   sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
-  d->list_widget->scrollTo(dedup);
+  d->list_view->scrollTo(dedup);
 }
 
 // NOTE(pag): The config manager handles the item delegate automatically.
