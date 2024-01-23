@@ -57,7 +57,7 @@ class ListGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
   //! Used to hide the OSD buttons when focus is lost
   void focusOutEvent(QFocusEvent *event) Q_DECL_FINAL;
 
-  //! Used for the tree view hover events
+  //! Used to handle clicks and hover events
   bool eventFilter(QObject *obj, QEvent *event) Q_DECL_FINAL;
 
   //! Updates the treeview item hover buttons
@@ -72,9 +72,8 @@ class ListGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
   //! ExpansionStatusRole changes
   void OnDataChanged(void);
 
-  //! Called when the user selects an item
-  void OnCurrentItemChanged(const QModelIndex &current_index,
-                            const QModelIndex &previous_index);
+  //! Called when the user clicks an item
+  void OnItemClicked(const QModelIndex &current_index);
 
   //! Custom context menu for the tree view items
   void OnOpenItemContextMenu(const QPoint &point);
