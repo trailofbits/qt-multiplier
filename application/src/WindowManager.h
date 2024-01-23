@@ -29,8 +29,13 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
 
   explicit WindowManager(MainWindow *window);
 
+  void AddToolBarWidget(QWidget *widget) Q_DECL_FINAL;
+
+  QAction *AddToolBarButton(const QIcon &icon,
+                            const NamedAction &action) Q_DECL_FINAL;
+
   void AddCentralWidget(IWindowWidget *widget,
-                                const CentralConfig &config) Q_DECL_FINAL;
+                        const CentralConfig &config) Q_DECL_FINAL;
   void AddDockWidget(IWindowWidget *widget,
                      const DockConfig &config) Q_DECL_FINAL;
 
@@ -44,6 +49,7 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
   QMenu *Menu(const QString &menu_name) Q_DECL_FINAL;
 
  private:
+  void CreateToolBarIfMissing(void);
   void RemoveDockWidget(QDockWidget *dock_widget);
 
  private slots:

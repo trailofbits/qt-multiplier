@@ -17,6 +17,7 @@
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Widgets/CodeWidget.h>
+#include <multiplier/GUI/Widgets/HistoryWidget.h>
 #include <multiplier/GUI/Util.h>
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/Index.h>
@@ -28,6 +29,8 @@
 
 namespace mx::gui {
 namespace {
+
+static const unsigned kMaxHistorySize = 32u;
 
 static const QKeySequence kKeySeqE("E");
 static const QKeySequence kKeySeqP("P");
@@ -74,6 +77,7 @@ struct CodeExplorer::PrivateData {
   ConfigManager &config_manager;
   IWindowManager * const manager;
   CodePreviewWidget *preview{nullptr};
+  HistoryWidget * const history;
 
   std::unordered_map<RawEntityId, CodeWidget *> opened_windows;
 
@@ -91,7 +95,10 @@ struct CodeExplorer::PrivateData {
   inline PrivateData(ConfigManager &config_manager_,
                      IWindowManager *manager_)
       : config_manager(config_manager_),
-        manager(manager_) {}
+        manager(manager_),
+        history(new HistoryWidget(
+            config_manager, kMaxHistorySize,
+            false  /* install shortcuts */)) {}
 };
 
 CodeExplorer::~CodeExplorer(void) {}
@@ -116,6 +123,8 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
   d->open_pinned_preview_trigger = config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenPinnedEntityPreview",
       &CodeExplorer::OnPinnedPreviewEntity);
+
+  parent->AddToolBarWidget(d->history);
 }
 
 void CodeExplorer::ActOnPrimaryClick(IWindowManager *,

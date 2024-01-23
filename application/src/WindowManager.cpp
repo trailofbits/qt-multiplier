@@ -7,12 +7,16 @@
 #include "WindowManager.h"
 
 #include <QDockWidget>
+#include <QIcon>
 #include <QMap>
 #include <QMenu>
 #include <QMenuBar>
 #include <QTabBar>
+#include <QToolBar>
+#include <QToolButton>
 
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Widgets/TabWidget.h>
 #include <unordered_map>
@@ -37,6 +41,7 @@ static  Qt::DockWidgetArea ConvertLocation(IWindowManager::DockLocation loc) {
 struct WindowManager::PrivateData {
   MainWindow * const window;
   TabWidget * const tab_widget;
+  QToolBar * toolbar{nullptr};
 
   std::unordered_map<QDockWidget *, DockConfig> dock_configs;
 
@@ -127,6 +132,44 @@ void WindowManager::AddCentralWidget(IWindowWidget *widget,
   // If the widget requested a context menu, then do it.
   connect(widget, &IWindowWidget::RequestKeyPress,
           d->window, &MainWindow::OnRequestKeyPress);
+}
+
+void WindowManager::CreateToolBarIfMissing(void) {
+  if (!d->toolbar) {
+    d->toolbar = new QToolBar(tr("Main Toolbar"), d->window);
+    d->toolbar->setIconSize(QSize(24, 24));
+    auto view_menu = Menu(tr("View"));
+    view_menu->addAction(d->toolbar->toggleViewAction());
+    d->window->addToolBar(d->toolbar);
+  }
+}
+
+void WindowManager::AddToolBarWidget(QWidget *widget) {
+  CreateToolBarIfMissing();
+
+  for (auto button : widget->findChildren<QToolButton *>()) {
+    button->setIconSize(d->toolbar->iconSize());
+  }
+
+  d->toolbar->addWidget(widget);
+}
+
+QAction *WindowManager::AddToolBarButton(
+    const QIcon &icon, const NamedAction &action) {
+
+  CreateToolBarIfMissing();
+
+  auto tool_action = new QAction(icon, action.name, d->toolbar);
+  tool_action->setCheckable(true);
+  tool_action->setChecked(true);
+  
+  connect(tool_action, &QAction::toggled,
+          [data = action.data, action = action.action] (void) {
+            action.Trigger(data);
+          });
+
+  d->toolbar->addAction(tool_action);
+  return tool_action;
 }
 
 void WindowManager::AddDockWidget(IWindowWidget *widget,

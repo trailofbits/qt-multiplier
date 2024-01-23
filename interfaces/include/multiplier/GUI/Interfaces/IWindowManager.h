@@ -10,15 +10,19 @@
 #include <QStringList>
 
 QT_BEGIN_NAMESPACE
+class QAction;
+class QIcon;
 class QKeySequence;
 class QMainWindow;
 class QMenu;
 class QModelIndex;
+class QWidget;
 QT_END_NAMESPACE
 
 namespace mx::gui {
 
 class IWindowWidget;
+class NamedAction;
 
 //! Manages widgets in a window, including the menu, the docks, etc.
 class IWindowManager : public QObject {
@@ -68,6 +72,14 @@ class IWindowManager : public QObject {
     bool keep_title_up_to_date{true};
   };
 
+  //! Add a widget to the toolbar.
+  virtual void AddToolBarWidget(QWidget *widget) = 0;
+
+  //! Add a button to the toolbar.
+  virtual QAction *AddToolBarButton(
+      const QIcon &icon, const NamedAction &action) = 0;
+
+  //! Add a widget to the central tab view.
   virtual void AddCentralWidget(IWindowWidget *widget,
                                 const CentralConfig &config) = 0;
 
