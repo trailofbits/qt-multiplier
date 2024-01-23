@@ -46,6 +46,8 @@ class FileTreeView Q_DECL_FINAL : public IWindowWidget {
   void SetRoot(const QModelIndex &);
 
  private:
+  //! Used to implement click support without using the selection model
+  virtual bool eventFilter(QObject *object, QEvent *event);
 
   //! Initializes the widgets
   void InitializeWidgets(const ConfigManager &config_manager);
@@ -60,9 +62,6 @@ class FileTreeView Q_DECL_FINAL : public IWindowWidget {
   void ApplyExpandedNodeList(std::vector<QModelIndex> index_list);
 
  private slots:
-  //! Try to open the file related to a specific model index.
-  void SelectionChanged(const QModelIndex &index, const QModelIndex &previous);
-
   //! Called when an item has been clicked in the tree view
   void OnFileTreeItemClicked(const QModelIndex &index);
 

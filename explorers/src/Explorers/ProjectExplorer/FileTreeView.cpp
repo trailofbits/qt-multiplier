@@ -19,6 +19,7 @@
 #include <QHBoxLayout>
 #include <QSortFilterProxyModel>
 #include <QLabel>
+#include <QMouseEvent>
 
 #include "FileTreeModel.h"
 
@@ -66,6 +67,50 @@ FileTreeView::FileTreeView(const ConfigManager &config_manager,
 
   InitializeWidgets(config_manager);
   InstallModel(model);
+}
+
+bool FileTreeView::eventFilter(QObject *object, QEvent *event) {
+  if (object == d->tree_view->viewport()) {
+    if (event->type() == QEvent::MouseButtonPress) {
+      return true;
+
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+      const auto &mouse_event = *static_cast<QMouseEvent *>(event);
+      auto local_mouse_pos = mouse_event.position().toPoint();
+
+      auto index = d->tree_view->indexAt(local_mouse_pos);
+      if (!index.isValid()) {
+        return true;
+      }
+
+      auto &selection_model = *d->tree_view->selectionModel();
+      selection_model.setCurrentIndex(index,
+          QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
+
+      switch (mouse_event.button()) {
+      case Qt::LeftButton: {
+        OnFileTreeItemClicked(index);
+        break;
+      }
+
+      case Qt::RightButton: {
+        OnOpenItemContextMenu(local_mouse_pos);
+        break;
+      }
+
+      default:
+        break;
+      }
+
+      return true;
+
+    } else {
+      return false;
+    }
+
+  } else {
+    return false;
+  }
 }
 
 void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {
@@ -126,9 +171,7 @@ void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {
   layout->addWidget(d->alternative_root_warning);
   setLayout(layout);
 
-  d->tree_view->setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(d->tree_view, &QTreeView::customContextMenuRequested,
-          this, &FileTreeView::OnOpenItemContextMenu);
+  d->tree_view->viewport()->installEventFilter(this);
 
   connect(&theme_manager, &ThemeManager::ThemeChanged,
           this, &FileTreeView::OnThemeChanged);
@@ -149,15 +192,6 @@ void FileTreeView::InstallModel(FileTreeModel *model) {
   d->model_proxy->sort(0, Qt::AscendingOrder);
 
   d->tree_view->setModel(d->model_proxy);
-
-  // Note: this needs to happen after the model has been set in the
-  // tree view!
-  auto tree_selection_model = d->tree_view->selectionModel();
-  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
-          this, &FileTreeView::SelectionChanged);
-
-  connect(d->tree_view, &QAbstractItemView::clicked,
-          this, &FileTreeView::OnFileTreeItemClicked);
 
   connect(d->model, &QAbstractItemModel::modelReset,
           this, &FileTreeView::OnModelReset);
@@ -185,11 +219,6 @@ void FileTreeView::ApplyExpandedNodeList(
     expanded_node = d->model_proxy->mapFromSource(expanded_node);
     d->tree_view->expand(expanded_node);
   }
-}
-
-void FileTreeView::SelectionChanged(const QModelIndex &index,
-                                    const QModelIndex &) {
-  OnFileTreeItemClicked(index);
 }
 
 void FileTreeView::OnFileTreeItemClicked(const QModelIndex &index) {
@@ -251,8 +280,8 @@ void FileTreeView::SortDescending(void) {
   d->model_proxy->sort(0, Qt::DescendingOrder);
 }
 
-void FileTreeView::OnOpenItemContextMenu(const QPoint &point) {
-  auto index = d->tree_view->indexAt(point);
+void FileTreeView::OnOpenItemContextMenu(const QPoint &tree_local_mouse_pos) {
+  auto index = d->tree_view->indexAt(tree_local_mouse_pos);
   d->requested_index = index;
   if (!d->requested_index.isValid()) {
     return;
