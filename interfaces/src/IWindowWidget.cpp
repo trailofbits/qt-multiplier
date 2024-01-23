@@ -8,6 +8,10 @@
 
 namespace mx::gui {
 
+IWindowWidget::IWindowWidget(void) {
+  connect(this, &IWindowWidget::RequestAttention, this, &IWindowWidget::show);
+}
+
 IWindowWidget::~IWindowWidget(void) {}
 
 void IWindowWidget::hideEvent(QHideEvent *event) {

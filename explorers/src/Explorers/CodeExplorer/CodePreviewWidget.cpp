@@ -191,6 +191,8 @@ void CodePreviewWidget::DisplayEntity(
 
   // Dedup check; don't want to reload the model unnecessarily.
   if (EntityId(d->current_entity) == EntityId(entity)) {
+    // Signal the window manager that the contents of this widget have been changed
+    emit RequestAttention();
     return;
   }
 
@@ -235,6 +237,9 @@ void CodePreviewWidget::DisplayEntity(
   }
 
   d->code->OnGoToEntity(d->current_entity);
+
+  // Signal the window manager that the contents of this widget have been changed
+  emit RequestAttention();
 }
 
 void CodePreviewWidget::OnChangeSync(int state) {

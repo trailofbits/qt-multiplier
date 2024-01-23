@@ -23,6 +23,7 @@ class IWindowWidget : public QWidget {
   Q_OBJECT
 
  public:
+  IWindowWidget(void);
   virtual ~IWindowWidget(void);
   using QWidget::QWidget;
 
@@ -32,6 +33,9 @@ class IWindowWidget : public QWidget {
   void closeEvent(QCloseEvent *) Q_DECL_OVERRIDE;
 
  signals:
+  //! Notify the window manager that this widget has changed its state
+  void RequestAttention(void);
+
   //! Notify the window manager that this widget has been shown.
   void Shown(void);
 
