@@ -40,7 +40,7 @@ struct TreeGeneratorWidget::PrivateData final {
   TreeGeneratorModel *model{nullptr};
   SearchFilterModelProxy *model_proxy{nullptr};
 
-  QTreeView *tree_widget{nullptr};
+  QTreeView *tree_view{nullptr};
   SearchWidget *search_widget{nullptr};
   FilterSettingsWidget *filter_settings_widget{nullptr};
   QWidget *status_widget{nullptr};
@@ -98,15 +98,7 @@ void TreeGeneratorWidget::InstallModel(void) {
           d->model_proxy,
           &SearchFilterModelProxy::OnColumnFilterStateListChange);
 
-  d->tree_widget->setModel(d->model_proxy);
-
-  // Note: this needs to happen after the model has been set in the
-  // tree view!
-  auto tree_selection_model = d->tree_widget->selectionModel();
-  connect(tree_selection_model, &QItemSelectionModel::currentChanged,
-          this, [this] (const QModelIndex &a, const QModelIndex &b) {
-                  OnCurrentItemChanged(a, b);
-                });
+  d->tree_view->setModel(d->model_proxy);
 
   connect(d->model_proxy, &QAbstractItemModel::modelReset,
           this, &TreeGeneratorWidget::OnModelReset);
@@ -127,53 +119,44 @@ void TreeGeneratorWidget::InitializeWidgets(
   auto &media_manager = config_manager.MediaManager();
 
   // Initialize the tree view
-  d->tree_widget = new QTreeView(this);
-  d->tree_widget->setSortingEnabled(true);
-  d->tree_widget->sortByColumn(0, Qt::AscendingOrder);
+  d->tree_view = new QTreeView(this);
+  d->tree_view->setSortingEnabled(true);
+  d->tree_view->sortByColumn(0, Qt::AscendingOrder);
 
   // The auto scroll takes care of keeping the active item within the
   // visible viewport region. This is true for mouse clicks but also
   // keyboard navigation (i.e. arrow keys, page up/down, etc).
-  d->tree_widget->setAutoScroll(true);
+  d->tree_view->setAutoScroll(true);
 
   // Smooth scrolling.
-  d->tree_widget->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-  d->tree_widget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  d->tree_view->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+  d->tree_view->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
 
   // We'll potentially have a bunch of columns depending on the configuration,
   // so make sure they span to use all available space.
-  QHeaderView *header = d->tree_widget->header();
+  QHeaderView *header = d->tree_view->header();
   header->setStretchLastSection(true);
 
   // Don't let double click expand things in three; we capture double click so
   // that we can make it open up the use in the code.
-  d->tree_widget->setExpandsOnDoubleClick(false);
+  d->tree_view->setExpandsOnDoubleClick(false);
 
   // Disallow multiple selection. If we have grouping by file enabled, then when
   // a user clicks on a file name, we instead jump down to the first entry
   // grouped under that file. This is to make using the up/down arrows easier.
-  d->tree_widget->setSelectionBehavior(QAbstractItemView::SelectRows);
-  d->tree_widget->setSelectionMode(QAbstractItemView::SingleSelection);
-  d->tree_widget->setAllColumnsShowFocus(true);
-  d->tree_widget->setTreePosition(0);
-  d->tree_widget->setTextElideMode(Qt::TextElideMode::ElideRight);
+  d->tree_view->setSelectionBehavior(QAbstractItemView::SelectRows);
+  d->tree_view->setSelectionMode(QAbstractItemView::SingleSelection);
+  d->tree_view->setAllColumnsShowFocus(true);
+  d->tree_view->setTreePosition(0);
+  d->tree_view->setTextElideMode(Qt::TextElideMode::ElideRight);
 
-  d->tree_widget->setAlternatingRowColors(false);
-  d->tree_widget->installEventFilter(this);
-  d->tree_widget->viewport()->installEventFilter(this);
-  d->tree_widget->viewport()->setMouseTracking(true);
-
-  d->tree_widget->setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(d->tree_widget, &QTreeView::customContextMenuRequested,
-          this, &TreeGeneratorWidget::OnOpenItemContextMenu);
-
-  connect(d->tree_widget, &QAbstractItemView::clicked,
-          this, [this] (const QModelIndex &index) {
-                  OnCurrentItemChanged(index, {});
-                });
+  d->tree_view->setAlternatingRowColors(false);
+  d->tree_view->installEventFilter(this);
+  d->tree_view->viewport()->installEventFilter(this);
+  d->tree_view->viewport()->setMouseTracking(true);
 
   // Make sure we can render tokens, if need be.
-  config_manager.InstallItemDelegate(d->tree_widget);
+  config_manager.InstallItemDelegate(d->tree_view);
 
   // Initialize the treeview item buttons
   d->open = new QPushButton(QIcon(), "", this);
@@ -239,7 +222,7 @@ void TreeGeneratorWidget::InitializeWidgets(
 
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(d->tree_widget, 1);
+  layout->addWidget(d->tree_view, 1);
   layout->addStretch();
   layout->addWidget(d->status_widget);
   layout->addWidget(d->filter_settings_widget);
@@ -258,7 +241,7 @@ void TreeGeneratorWidget::InitializeWidgets(
 
   OnIconsChanged(media_manager);
 
-  config_manager.InstallItemDelegate(d->tree_widget);
+  config_manager.InstallItemDelegate(d->tree_view);
 }
 
 //! Called when we want to act on the context menu.
@@ -328,13 +311,13 @@ void TreeGeneratorWidget::ActOnContextMenu(
 }
 
 bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
-  if (obj == d->tree_widget) {
+  if (obj == d->tree_view) {
     // Disable the overlay buttons while scrolling. It is hard to keep
     // them on screen due to how the scrolling event is propagated.
     if (event->type() == QEvent::Wheel) {
       auto scrolling_enabled =
-          (d->tree_widget->horizontalScrollBar()->isVisible() ||
-           d->tree_widget->verticalScrollBar()->isVisible());
+          (d->tree_view->horizontalScrollBar()->isVisible() ||
+           d->tree_view->verticalScrollBar()->isVisible());
 
       if (scrolling_enabled) {
         UpdateItemButtons();
@@ -347,7 +330,7 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
     } else if (QKeyEvent *kevent = dynamic_cast<QKeyEvent *>(event)) {
       auto ret = false;
-      for (auto index : d->tree_widget->selectionModel()->selectedIndexes()) {
+      for (auto index : d->tree_view->selectionModel()->selectedIndexes()) {
         switch (kevent->key()) {
           case Qt::Key_1:
           case Qt::Key_2:
@@ -371,10 +354,43 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
     return false;
 
-  } else if (obj == d->tree_widget->viewport()) {
+  } else if (obj == d->tree_view->viewport()) {
     if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
       UpdateItemButtons();
       return false;
+
+    } else if (event->type() == QEvent::MouseButtonPress) {
+      return true;
+
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+      const auto &mouse_event = *static_cast<QMouseEvent *>(event);
+      auto local_mouse_pos = mouse_event.position().toPoint();
+
+      auto index = d->tree_view->indexAt(local_mouse_pos);
+      if (!index.isValid()) {
+        return true;
+      }
+
+      auto &selection_model = *d->tree_view->selectionModel();
+      selection_model.setCurrentIndex(index,
+          QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
+
+      switch (mouse_event.button()) {
+      case Qt::LeftButton: {
+        OnItemClicked(index);
+        break;
+      }
+
+      case Qt::RightButton: {
+        OnOpenItemContextMenu(local_mouse_pos);
+        break;
+      }
+
+      default:
+        break;
+      }
+
+      return true;
 
     } else {
       return false;
@@ -411,8 +427,8 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
   // It is important to double check the leave event; it is sent
   // even if the mouse is still inside our treeview item but
   // above the hovering button (which steals the focus)
-  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->tree_widget->indexAt(mouse_pos);
+  auto mouse_pos = d->tree_view->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->tree_view->indexAt(mouse_pos);
   if (!d->model_proxy->mapToSource(index).isValid()) {
     d->updating_buttons = false;
     return;
@@ -440,7 +456,7 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
   };
 
   // Update the button positions
-  auto rect = d->tree_widget->visualRect(index);
+  auto rect = d->tree_view->visualRect(index);
   auto button_margin = rect.height() / 6;
   auto button_size = rect.height() - (button_margin * 2);
   auto button_count = static_cast<int>(kNumButtons);
@@ -448,9 +464,9 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
       (button_count * button_size) + (button_count * button_margin);
 
   auto current_x =
-      d->tree_widget->pos().x() + d->tree_widget->width() - button_area_width;
+      d->tree_view->pos().x() + d->tree_view->width() - button_area_width;
 
-  const auto &vertical_scrollbar = *d->tree_widget->verticalScrollBar();
+  const auto &vertical_scrollbar = *d->tree_view->verticalScrollBar();
   if (vertical_scrollbar.isVisible()) {
     current_x -= vertical_scrollbar.width();
   }
@@ -458,7 +474,7 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
   auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
 
   auto pos =
-      d->tree_widget->viewport()->mapToGlobal(QPoint(current_x, current_y));
+      d->tree_view->viewport()->mapToGlobal(QPoint(current_x, current_y));
 
   pos = mapFromGlobal(pos);
 
@@ -530,21 +546,20 @@ void TreeGeneratorWidget::OnModelReset(void) {
 void TreeGeneratorWidget::OnDataChanged(void) {
   UpdateItemButtons();
   ExpandAllNodes();
-  d->tree_widget->viewport()->repaint();
+  d->tree_view->viewport()->repaint();
 }
 
 void TreeGeneratorWidget::ExpandAllNodes(void) {
-  d->tree_widget->expandAll();
-  d->tree_widget->resizeColumnToContents(0);
+  d->tree_view->expandAll();
+  d->tree_view->resizeColumnToContents(0);
 }
 
 void TreeGeneratorWidget::OnRowsInserted(const QModelIndex &parent, int, int) {
-  d->tree_widget->expandRecursively(parent);
-  d->tree_widget->resizeColumnToContents(0);
+  d->tree_view->expandRecursively(parent);
+  d->tree_view->resizeColumnToContents(0);
 }
 
-void TreeGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
-                                               const QModelIndex &) {
+void TreeGeneratorWidget::OnItemClicked(const QModelIndex &current_index) {
   auto new_index = d->model_proxy->mapToSource(current_index);
   if (!new_index.isValid()) {
     return;
@@ -560,8 +575,8 @@ void TreeGeneratorWidget::OnCurrentItemChanged(const QModelIndex &current_index,
   emit RequestPrimaryClick(d->selected_index);
 }
 
-void TreeGeneratorWidget::OnOpenItemContextMenu(const QPoint &point) {
-  auto index = d->tree_widget->indexAt(point);
+void TreeGeneratorWidget::OnOpenItemContextMenu(const QPoint &tree_local_mouse_pos) {
+  auto index = d->tree_view->indexAt(tree_local_mouse_pos);
   d->selected_index = d->model_proxy->mapToSource(index);
   if (!d->selected_index.isValid()) {
     return;
@@ -598,8 +613,8 @@ void TreeGeneratorWidget::OnSearchParametersChange(void) {
 }
 
 void TreeGeneratorWidget::OnOpenButtonPressed(void) {
-  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->model_proxy->mapToSource(d->tree_widget->indexAt(mouse_pos));
+  auto mouse_pos = d->tree_view->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->tree_view->indexAt(mouse_pos));
   if (!index.isValid()) {
     return;
   }
@@ -608,8 +623,8 @@ void TreeGeneratorWidget::OnOpenButtonPressed(void) {
 }
 
 void TreeGeneratorWidget::OnExpandButtonPressed(void) {
-  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->model_proxy->mapToSource(d->tree_widget->indexAt(mouse_pos));
+  auto mouse_pos = d->tree_view->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->tree_view->indexAt(mouse_pos));
   if (!index.isValid()) {
     return;
   }
@@ -631,15 +646,15 @@ void TreeGeneratorWidget::GotoOriginal(const QModelIndex &index) {
     return;
   }
 
-  auto sel = d->tree_widget->selectionModel();
+  auto sel = d->tree_view->selectionModel();
   sel->clearSelection();
   sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
-  d->tree_widget->scrollTo(dedup);
+  d->tree_view->scrollTo(dedup);
 }
 
 void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
-  auto mouse_pos = d->tree_widget->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->model_proxy->mapToSource(d->tree_widget->indexAt(mouse_pos));
+  auto mouse_pos = d->tree_view->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->model_proxy->mapToSource(d->tree_view->indexAt(mouse_pos));
   GotoOriginal(index);
 }
 

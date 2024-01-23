@@ -57,7 +57,7 @@ class TreeGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
   //! Used to hide the OSD buttons when focus is lost
   void focusOutEvent(QFocusEvent *event) Q_DECL_FINAL;
 
-  //! Used for the tree view hover events
+  //! Used for the tree view clicks and hover events
   bool eventFilter(QObject *obj, QEvent *event) Q_DECL_FINAL;
 
   //! Updates the treeview item hover buttons
@@ -78,12 +78,11 @@ class TreeGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
   //! Used to automatically select the first inserted root
   void OnRowsInserted(const QModelIndex &parent, int first, int last);
 
-  //! Called when the user selects an item
-  void OnCurrentItemChanged(const QModelIndex &current_index,
-                            const QModelIndex &previous_index);
+  //! Called when the user clicks an item
+  void OnItemClicked(const QModelIndex &current_index);
 
   //! Custom context menu for the tree view items
-  void OnOpenItemContextMenu(const QPoint &point);
+  void OnOpenItemContextMenu(const QPoint &tree_local_mouse_pos);
 
   //! Called by the ISearchWidget component whenever search options change
   void OnSearchParametersChange(void);
