@@ -64,8 +64,8 @@ class CallHierarchyItem final : public IGeneratedItem {
     QVariant data;
     switch (col) {
       case 0: data.setValue(name_tokens); break;
-      case 1: data.setValue(location); break;
-      case 2: data.setValue(breadcrumbs); break;
+      case 1: data.setValue(breadcrumbs); break;
+      case 2: data.setValue(location); break;
       default: break;
     }
     return data;
@@ -100,6 +100,8 @@ class CallHierarchyGenerator final : public ITreeGenerator {
 
   int NumColumns(void) const Q_DECL_FINAL;
 
+  int SortColumn(void) const Q_DECL_FINAL;
+
   QString ColumnTitle(int) const Q_DECL_FINAL;
 
   QString Name(const ITreeGeneratorPtr &self) const Q_DECL_FINAL;
@@ -119,11 +121,15 @@ int CallHierarchyGenerator::NumColumns(void) const {
   return 3;
 }
 
+int CallHierarchyGenerator::SortColumn(void) const {
+  return 1;  // The breadcrumbs column.
+}
+
 QString CallHierarchyGenerator::ColumnTitle(int col) const {
   switch (col) {
     case 0: return QObject::tr("Entity");
-    case 1: return QObject::tr("File Name");
-    case 2: return QObject::tr("Breadcrumbs");
+    case 1: return QObject::tr("Breadcrumbs");
+    case 2: return QObject::tr("File Name");
     default: return QString();
   }
 }

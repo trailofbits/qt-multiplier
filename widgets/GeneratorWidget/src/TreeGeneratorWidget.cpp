@@ -57,6 +57,8 @@ struct TreeGeneratorWidget::PrivateData final {
   QIcon goto_item_icon;
   QIcon expand_item_icon_n[kMaxExpansionLevel];
 
+  int sort_column{-1};
+
   QModelIndex selected_index;
   QElapsedTimer selection_timer;
 };
@@ -85,10 +87,10 @@ TreeGeneratorWidget::TreeGeneratorWidget(
 void TreeGeneratorWidget::InstallGenerator(ITreeGeneratorPtr generator) {
   setWindowTitle(generator->Name(generator));
 
-  auto sort_column = generator->SortColumn();
-  if (0 <= sort_column && sort_column < generator->NumColumns()) {
+  d->sort_column = generator->SortColumn();
+  if (0 <= d->sort_column && d->sort_column < generator->NumColumns()) {
     d->tree_view->setSortingEnabled(true);
-    d->tree_view->sortByColumn(sort_column, Qt::AscendingOrder);
+    d->tree_view->sortByColumn(d->sort_column, Qt::AscendingOrder);
   }
 
   d->model->InstallGenerator(std::move(generator));
@@ -557,11 +559,17 @@ void TreeGeneratorWidget::OnDataChanged(void) {
 void TreeGeneratorWidget::ExpandAllNodes(void) {
   d->tree_view->expandAll();
   d->tree_view->resizeColumnToContents(0);
+  if (0 < d->sort_column) {
+    d->tree_view->resizeColumnToContents(d->sort_column);
+  }
 }
 
 void TreeGeneratorWidget::OnRowsInserted(const QModelIndex &parent, int, int) {
   d->tree_view->expandRecursively(parent);
   d->tree_view->resizeColumnToContents(0);
+  if (0 < d->sort_column) {
+    d->tree_view->resizeColumnToContents(d->sort_column);
+  }
 }
 
 void TreeGeneratorWidget::OnItemClicked(const QModelIndex &current_index) {
