@@ -84,6 +84,13 @@ TreeGeneratorWidget::TreeGeneratorWidget(
 //! Install a new generator.
 void TreeGeneratorWidget::InstallGenerator(ITreeGeneratorPtr generator) {
   setWindowTitle(generator->Name(generator));
+
+  auto sort_column = generator->SortColumn();
+  if (0 <= sort_column && sort_column < generator->NumColumns()) {
+    d->tree_view->setSortingEnabled(true);
+    d->tree_view->sortByColumn(sort_column, Qt::AscendingOrder);
+  }
+
   d->model->InstallGenerator(std::move(generator));
 }
 
@@ -120,8 +127,6 @@ void TreeGeneratorWidget::InitializeWidgets(
 
   // Initialize the tree view
   d->tree_view = new QTreeView(this);
-  d->tree_view->setSortingEnabled(true);
-  d->tree_view->sortByColumn(0, Qt::AscendingOrder);
 
   // The auto scroll takes care of keeping the active item within the
   // visible viewport region. This is true for mouse clicks but also

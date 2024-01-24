@@ -25,6 +25,14 @@ class IListGenerator : public ITreeGenerator {
   // Return the number of columns of data. This is always 1.
   int NumColumns(void) const Q_DECL_FINAL;
 
+  // Return the index of the default sort column. This always returns 0.
+  int SortColumn(void) const Q_DECL_FINAL;
+
+  // Return `true` to enable `IGeneratedItem::Entity`- and
+  // `IGeneratedItem::AliasedEntity`-based deduplication. This always returns
+  // `true`.
+  bool EnableDeduplication(void) const Q_DECL_FINAL;
+
   // Return the initialize expansion depth (defaults to `1`).
   unsigned InitialExpansionDepth(void) const Q_DECL_FINAL;
 

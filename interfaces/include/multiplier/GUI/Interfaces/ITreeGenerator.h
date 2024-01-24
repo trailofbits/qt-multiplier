@@ -30,6 +30,15 @@ class ITreeGenerator : public std::enable_shared_from_this<ITreeGenerator> {
   // Return the initialize expansion depth (defaults to `2`).
   virtual unsigned InitialExpansionDepth(void) const;
 
+  // Return the index of the default sort column, or `-1` to disable sorting.
+  // The default implementation of this method returns `0`.
+  virtual int SortColumn(void) const;
+
+  // Return `true` to enable `IGeneratedItem::Entity`- and
+  // `IGeneratedItem::AliasedEntity`-based deduplication. The default
+  // implementation of this method returns `true`.
+  virtual bool EnableDeduplication(void) const;
+
   // Return the number of columns of data.
   //
   // NOTE(pag): This must be non-blocking.

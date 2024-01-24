@@ -466,6 +466,12 @@ void TreeGeneratorModel::ProcessData(void) {
       }
     }
 
+    // Undo any deduplication logic.
+    if (!d->generator->EnableDeduplication()) {
+      entity_node->self_or_duplicate = nullptr;
+      is_duplicate = false;
+    }
+
     add_child(d->entity_to_node[entry.parent_entity_id], entity_node);
     ++num_changes;
 

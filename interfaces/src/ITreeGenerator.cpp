@@ -17,4 +17,17 @@ unsigned ITreeGenerator::InitialExpansionDepth(void) const {
   return 2u;
 }
 
+// Return the index of the default sort column, or `-1` to disable sorting.
+// The default implementation of this method returns `0`.
+int ITreeGenerator::SortColumn(void) const {
+  return 0u;
+}
+
+// Return `true` to enable `IGeneratedItem::Entity`- and
+// `IGeneratedItem::AliasedEntity`-based deduplication. The default
+// implementation of this method returns `true`.
+bool ITreeGenerator::EnableDeduplication(void) const {
+  return true;
+}
+
 }  // namespace mx::gui
