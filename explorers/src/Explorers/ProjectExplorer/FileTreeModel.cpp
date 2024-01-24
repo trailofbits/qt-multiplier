@@ -248,7 +248,9 @@ QVariant FileTreeModel::data(const QModelIndex &index, int role) const {
     return node->full_path;
   
   } else if (role == Qt::DisplayRole) {
-    return node->name;
+    if (node->name.size()) {
+      return node->name;
+    }
 
   } else if (role == IModel::EntityRole) {
     if (node->file_id != kInvalidEntityId) {

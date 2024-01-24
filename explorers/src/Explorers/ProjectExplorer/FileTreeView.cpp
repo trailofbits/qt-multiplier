@@ -223,14 +223,18 @@ void FileTreeView::ApplyExpandedNodeList(
 
 void FileTreeView::OnFileTreeItemClicked(const QModelIndex &index) {
   d->requested_index = {};
-  auto opt_file_id_var =
-      d->model_proxy->data(index, FileTreeModel::FileIdRole);
 
+  auto orig_index = d->model_proxy->mapToSource(index);
+  if (!orig_index.isValid()) {
+    return;
+  }
+
+  auto opt_file_id_var = orig_index.data(FileTreeModel::FileIdRole);
   if (!opt_file_id_var.isValid()) {
     return;
   }
 
-  d->requested_index = index;
+  d->requested_index = orig_index;
   emit RequestPrimaryClick(d->requested_index);
 }
 
@@ -282,7 +286,9 @@ void FileTreeView::SortDescending(void) {
 
 void FileTreeView::OnOpenItemContextMenu(const QPoint &tree_local_mouse_pos) {
   auto index = d->tree_view->indexAt(tree_local_mouse_pos);
-  d->requested_index = index;
+  auto orig_index = d->model_proxy->mapToSource(index);
+
+  d->requested_index = orig_index;
   if (!d->requested_index.isValid()) {
     return;
   }
