@@ -21,6 +21,7 @@
 #include <QToolButton>
 #include <QShortcut>
 
+#include <optional>
 #include <atomic>
 #include <cstdint>
 #include <list>
@@ -96,7 +97,8 @@ struct HistoryWidget::PrivateData {
   void AddToHistory(VariantEntity entity, std::optional<QString> opt_label,
                     HistoryWidget *widget);
   void NavigateBackToHistoryItem(ItemList::iterator next_item_it);
-  void NavigateForwardToHistoryItem(ItemList::iterator next_item_it);
+  std::optional<std::pair<VariantEntity, QString>>
+    NavigateForwardToHistoryItem(ItemList::iterator next_item_it);
 };
 
 HistoryWidget::HistoryWidget(const ConfigManager &config_manager,
@@ -463,7 +465,6 @@ void HistoryWidget::OnNavigateBackToHistoryItem(QAction *action) {
     it = std::next(d->item_list.begin(), index);
   }
 
-
   d->NavigateBackToHistoryItem(it);
   UpdateMenus();
   emit GoToEntity(std::move(original_entity), std::move(canonical_entity));
@@ -481,7 +482,11 @@ void HistoryWidget::OnNavigateForwardToHistoryItem(QAction *action) {
   VariantEntity original_entity = it->original_entity;
   VariantEntity canonical_entity = it->canonical_entity;
 
-  d->NavigateForwardToHistoryItem(it);
+  if (auto opt_next_location = d->NavigateForwardToHistoryItem(it); opt_next_location.has_value()) {
+    auto &next_location = opt_next_location.value();
+    SetCurrentLocation(std::move(next_location.first), std::move(next_location.second));
+  }
+
   UpdateMenus();
   emit GoToEntity(std::move(original_entity), std::move(canonical_entity));
 }
@@ -501,7 +506,8 @@ void HistoryWidget::PrivateData::NavigateBackToHistoryItem(
   current_item_it = next_item_it;
 }
 
-void HistoryWidget::PrivateData::NavigateForwardToHistoryItem(
+std::optional<std::pair<VariantEntity, QString>>
+HistoryWidget::PrivateData::NavigateForwardToHistoryItem(
     ItemList::iterator next_item_it) {
 
   Q_ASSERT(2u <= item_list.size());
@@ -510,13 +516,20 @@ void HistoryWidget::PrivateData::NavigateForwardToHistoryItem(
 
   // If we're back to the present, then take off the previously materialized
   // "present" value.
+  std::optional<std::pair<VariantEntity, QString>> opt_next_location;
+
   if (std::next(next_item_it, 1) == item_list.end()) {
+    auto &item = *next_item_it;
+    opt_next_location = std::make_pair(std::move(item.original_entity), std::move(item.name));
+
     item_list.pop_back();
     current_item_it = item_list.end();
 
   } else {
     current_item_it = next_item_it;
   }
+
+  return opt_next_location;
 }
 
 }  // namespace mx::gui
