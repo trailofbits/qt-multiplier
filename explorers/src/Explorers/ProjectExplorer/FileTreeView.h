@@ -62,8 +62,8 @@ class FileTreeView Q_DECL_FINAL : public IWindowWidget {
   void ApplyExpandedNodeList(std::vector<QModelIndex> index_list);
 
  private slots:
-  //! Called when an item has been clicked in the tree view
-  void OnFileTreeItemClicked(const QModelIndex &index);
+  //! Called when an item has been activated in the tree view
+  void OnFileTreeItemActivated(const QModelIndex &index);
 
   //! Called by the SearchWidget component whenever search options change
   void OnSearchParametersChange(void);

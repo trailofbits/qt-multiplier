@@ -26,6 +26,12 @@
 namespace mx::gui {
 namespace {
 
+// Activate the selected index when pressing this key
+static constexpr auto kActivateSelectedItem{Qt::Key_Return};
+
+// Allow users to avoid activating an item with a click by holding this key down
+static constexpr auto kDisableClickActivationModifier{Qt::ControlModifier};
+
 void SaveExpandedNodeListHelper(std::vector<QModelIndex> &expanded_node_list,
                                 const QTreeView &tree_view,
                                 const QModelIndex &root) {
@@ -70,57 +76,83 @@ FileTreeView::FileTreeView(const ConfigManager &config_manager,
 }
 
 bool FileTreeView::eventFilter(QObject *object, QEvent *event) {
-  if (object != d->tree_view->viewport()) {
-    return false;
-  }
+  if (object == d->tree_view->viewport()) {
+    auto me = dynamic_cast<QMouseEvent *>(event);
+    if (!me) {
+      return false;
+    }
 
-  auto me = dynamic_cast<QMouseEvent *>(event);
-  if (!me) {
-    return false;
-  }
+    auto local_mouse_pos = me->position().toPoint();
 
-  auto local_mouse_pos = me->position().toPoint();
+    auto index = d->tree_view->indexAt(local_mouse_pos);
+    if (!index.isValid()) {
+      return false;
+    }
 
-  auto index = d->tree_view->indexAt(local_mouse_pos);
-  if (!index.isValid()) {
-    return false;
-  }
+    // Detect if we're in the item, or in the whitespace/decoration before
+    // the item.
+    auto rect = d->tree_view->visualRect(index);
+    if (!rect.contains(local_mouse_pos)) {
+      return false;
+    }
 
-  // Detect if we're in the item, or in the whitespace/decoration before
-  // the item.
-  auto rect = d->tree_view->visualRect(index);
-  if (!rect.contains(local_mouse_pos)) {
-    return false;
-  }
+    if (event->type() == QEvent::MouseButtonPress) {
+      return true;
+    }
 
-  if (event->type() == QEvent::MouseButtonPress) {
+    if (event->type() != QEvent::MouseButtonRelease) {
+      return false;
+    }
+
+    auto &selection_model = *d->tree_view->selectionModel();
+    selection_model.setCurrentIndex(index,
+        QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
+
+    switch (me->button()) {
+      case Qt::LeftButton: {
+        if ((me->modifiers() & kDisableClickActivationModifier) == 0) {
+          OnFileTreeItemActivated(index);
+        }
+
+        break;
+      }
+
+      case Qt::RightButton: {
+        OnOpenItemContextMenu(local_mouse_pos);
+        break;
+      }
+
+      default:
+        break;
+    }
+
     return true;
-  }
 
-  if (event->type() != QEvent::MouseButtonRelease) {
+  } else if (object == d->tree_view) {
+    if (event->type() == QEvent::KeyRelease) {
+      const auto &selection_model = *d->tree_view->selectionModel();
+      auto index = selection_model.currentIndex();
+      if (!index.isValid()) {
+        return false;
+      }
+
+      const auto &key_event = *static_cast<QKeyEvent *>(event);
+      switch (key_event.keyCombination().key()) {
+      case kActivateSelectedItem:
+        OnFileTreeItemActivated(index);
+        return true;
+
+      default:
+        return false;
+      }
+
+    } else {
+      return false;
+    }
+
+  } else {
     return false;
   }
-
-  auto &selection_model = *d->tree_view->selectionModel();
-  selection_model.setCurrentIndex(index,
-      QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
-
-  switch (me->button()) {
-    case Qt::LeftButton: {
-      OnFileTreeItemClicked(index);
-      break;
-    }
-
-    case Qt::RightButton: {
-      OnOpenItemContextMenu(local_mouse_pos);
-      break;
-    }
-
-    default:
-      break;
-  }
-
-  return true;
 }
 
 void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {
@@ -181,6 +213,7 @@ void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {
   layout->addWidget(d->alternative_root_warning);
   setLayout(layout);
 
+  d->tree_view->installEventFilter(this);
   d->tree_view->viewport()->installEventFilter(this);
 
   connect(&theme_manager, &ThemeManager::ThemeChanged,
@@ -231,7 +264,7 @@ void FileTreeView::ApplyExpandedNodeList(
   }
 }
 
-void FileTreeView::OnFileTreeItemClicked(const QModelIndex &index) {
+void FileTreeView::OnFileTreeItemActivated(const QModelIndex &index) {
   d->requested_index = {};
 
   auto orig_index = d->model_proxy->mapToSource(index);
