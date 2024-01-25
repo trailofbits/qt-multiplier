@@ -145,6 +145,8 @@ void MainWindow::InitializeIndex(QApplication &application) {
   db_option.setValueName("database");
 
   QCommandLineParser parser;
+  parser.addHelpOption();
+  parser.addVersionOption();
   parser.addOption(theme_option);
   parser.addOption(db_option);
 
