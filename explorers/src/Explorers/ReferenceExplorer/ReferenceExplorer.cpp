@@ -22,6 +22,11 @@
 #include <QVBoxLayout>
 
 namespace mx::gui {
+namespace {
+
+static const QString kModelId = "com.trailofbits.explorer.ReferenceExplorer.TreeModel";
+
+}  // namespace
 
 struct ReferenceExplorer::PrivateData {
   ConfigManager &config_manager;
@@ -84,7 +89,8 @@ void ReferenceExplorer::ActOnContextMenu(
     plugin->ActOnContextMenu(manager, menu, index);
   }
 
-  if (d->view && d->view->isVisible() && index.isValid()) {
+  if (d->view && d->view->isVisible() && index.isValid() &&
+      IModel::ModelId(index) == kModelId) {
     auto current = d->view->currentWidget();
     if (auto tree = dynamic_cast<TreeGeneratorWidget *>(current)) {
       tree->ActOnContextMenu(manager, menu, index);
@@ -195,7 +201,8 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
 
   d->view->show();
 
-  auto tree_view = new TreeGeneratorWidget(d->config_manager, d->view);
+  auto tree_view = new TreeGeneratorWidget(
+      d->config_manager, kModelId, d->view);
 
   connect(tree_view, &TreeGeneratorWidget::OpenItem,
           this, &ReferenceExplorer::OnOpenItem);

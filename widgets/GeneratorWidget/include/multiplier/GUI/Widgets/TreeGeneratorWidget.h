@@ -40,7 +40,7 @@ class TreeGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
 
   //! Constructor
   TreeGeneratorWidget(const ConfigManager &config_manager,
-                      QWidget *parent = nullptr);
+                      const QString &model_id, QWidget *parent = nullptr);
 
   //! Called when we want to act on the context menu.
   void ActOnContextMenu(IWindowManager *manager, QMenu *menu,

@@ -71,6 +71,8 @@ struct QueuedItem {
 }  // namespace
 
 struct TreeGeneratorModel::PrivateData final {
+  const QString model_id;
+  
   //! Root node of our tree.
   Node root;
 
@@ -102,12 +104,15 @@ struct TreeGeneratorModel::PrivateData final {
 
   //! Thread pool for all expansion runnables.
   QThreadPool thread_pool;
+
+  inline PrivateData(const QString &model_id_)
+      : model_id(model_id_) {}
 };
 
 //! Constructor
-TreeGeneratorModel::TreeGeneratorModel(QObject *parent)
+TreeGeneratorModel::TreeGeneratorModel(const QString &model_id, QObject *parent)
     : IModel(parent),
-      d(new PrivateData) {
+      d(new PrivateData(model_id)) {
 
   connect(&d->import_timer, &QTimer::timeout, this,
           &TreeGeneratorModel::ProcessData);
@@ -351,7 +356,7 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
     return QVariant::fromValue(node->item->Entity());
 
   } else if (role == IModel::ModelIdRole) {
-    return "com.trailofbits.model.TreeGeneratorModel";
+    return d->model_id;
 
   } else if (role == TreeGeneratorModel::CanBeExpanded) {
     return QVariant::fromValue(!node->self_or_duplicate);

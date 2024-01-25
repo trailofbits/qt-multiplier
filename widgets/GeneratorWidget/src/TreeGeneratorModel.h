@@ -39,7 +39,7 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
   };
 
   //! Constructor
-  TreeGeneratorModel(QObject *parent = nullptr);
+  TreeGeneratorModel(const QString &model_id, QObject *parent = nullptr);
 
   //! Destructor
   virtual ~TreeGeneratorModel(void);

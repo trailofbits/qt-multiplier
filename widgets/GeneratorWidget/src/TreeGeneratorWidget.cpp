@@ -72,12 +72,13 @@ struct TreeGeneratorWidget::PrivateData final {
 TreeGeneratorWidget::~TreeGeneratorWidget(void) {}
 
 TreeGeneratorWidget::TreeGeneratorWidget(
-    const ConfigManager &config_manager, QWidget *parent)
+    const ConfigManager &config_manager, const QString &model_id,
+    QWidget *parent)
     : IWindowWidget(parent),
       d(new PrivateData) {
 
   d->selection_timer.start();
-  d->model = new TreeGeneratorModel(this);
+  d->model = new TreeGeneratorModel(model_id, this);
 
   // (void) new QAbstractItemModelTester(
   //     d->model, QAbstractItemModelTester::FailureReportingMode::Fatal, this);
@@ -135,6 +136,8 @@ void TreeGeneratorWidget::InitializeWidgets(
 
   // Initialize the tree view
   d->tree_view = new QTreeView(this);
+
+  d->tree_view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
   // The auto scroll takes care of keeping the active item within the
   // visible viewport region. This is true for mouse clicks but also
@@ -602,24 +605,23 @@ void TreeGeneratorWidget::OnRowsInserted(const QModelIndex &parent, int, int) {
 }
 
 void TreeGeneratorWidget::OnItemActivated(const QModelIndex &current_index) {
-  auto new_index = d->model_proxy->mapToSource(current_index);
-  if (!new_index.isValid()) {
+  if (!current_index.isValid()) {
     return;
   }
   
   // Suppress likely duplicate events.
   if (d->selection_timer.restart() < 100 &&
-      d->selected_index == new_index) {
+      d->selected_index == current_index) {
     return;
   }
 
-  d->selected_index = new_index;
+  d->selected_index = current_index;
   emit RequestPrimaryClick(d->selected_index);
 }
 
-void TreeGeneratorWidget::OnOpenItemContextMenu(const QPoint &tree_local_mouse_pos) {
-  auto index = d->tree_view->indexAt(tree_local_mouse_pos);
-  d->selected_index = d->model_proxy->mapToSource(index);
+void TreeGeneratorWidget::OnOpenItemContextMenu(
+    const QPoint &tree_local_mouse_pos) {
+  d->selected_index = d->tree_view->indexAt(tree_local_mouse_pos);
   if (!d->selected_index.isValid()) {
     return;
   }
@@ -656,7 +658,7 @@ void TreeGeneratorWidget::OnSearchParametersChange(void) {
 
 void TreeGeneratorWidget::OnOpenButtonPressed(void) {
   auto mouse_pos = d->tree_view->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->model_proxy->mapToSource(d->tree_view->indexAt(mouse_pos));
+  auto index = d->tree_view->indexAt(mouse_pos);
   if (!index.isValid()) {
     return;
   }
@@ -674,7 +676,8 @@ void TreeGeneratorWidget::OnExpandButtonPressed(void) {
   d->model->Expand(index, 1u);
 }
 
-void TreeGeneratorWidget::GotoOriginal(const QModelIndex &index) {
+void TreeGeneratorWidget::GotoOriginal(const QModelIndex &index_) {
+  auto index = d->model_proxy->mapToSource(index_);
   if (!index.isValid()) {
     return;
   }
@@ -696,8 +699,7 @@ void TreeGeneratorWidget::GotoOriginal(const QModelIndex &index) {
 
 void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
   auto mouse_pos = d->tree_view->viewport()->mapFromGlobal(QCursor::pos());
-  auto index = d->model_proxy->mapToSource(d->tree_view->indexAt(mouse_pos));
-  GotoOriginal(index);
+  GotoOriginal(d->tree_view->indexAt(mouse_pos));
 }
 
 // NOTE(pag): The config manager handles the item delegate automatically.

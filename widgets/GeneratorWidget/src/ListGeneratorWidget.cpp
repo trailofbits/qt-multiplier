@@ -57,12 +57,12 @@ struct ListGeneratorWidget::PrivateData final {
 ListGeneratorWidget::~ListGeneratorWidget(void) {}
 
 ListGeneratorWidget::ListGeneratorWidget(
-    const ConfigManager &config_manager, QWidget *parent)
+    const ConfigManager &config_manager, const QString &model_id, QWidget *parent)
     : IWindowWidget(parent),
       d(new PrivateData) {
 
   d->selection_timer.start();
-  d->model = new ListGeneratorModel(this);
+  d->model = new ListGeneratorModel(model_id, this);
   InitializeWidgets(config_manager);
   InstallModel();
 
@@ -103,6 +103,9 @@ void ListGeneratorWidget::InitializeWidgets(
 
   // Initialize the list view
   d->list_view = new QListView(this);
+
+  // Make it auto stretch.
+  d->list_view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
   // The auto scroll takes care of keeping the active item within the
   // visible viewport region. This is true for mouse clicks but also
@@ -171,7 +174,6 @@ void ListGeneratorWidget::InitializeWidgets(
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->list_view, 1);
-  layout->addStretch();
   layout->addWidget(d->status_widget);
   layout->addWidget(d->search_widget);
   setLayout(layout);
@@ -196,39 +198,41 @@ void ListGeneratorWidget::ActOnContextMenu(
     IWindowManager *, QMenu *menu, const QModelIndex &index) {
   
   auto selected_index = std::move(d->selected_index);
-  if (index != selected_index) {
-    return;
+
+  if (index.isValid() && index == selected_index) {
+    auto tooltip_var = index.data(Qt::ToolTipRole);
+    if (tooltip_var.isValid()) {
+      auto details = tooltip_var.toString();
+      auto copy_details_action = new QAction(tr("Copy Details"), menu);
+      menu->addAction(copy_details_action);
+      connect(copy_details_action, &QAction::triggered,
+              [=] (void) {
+                qApp->clipboard()->setText(details);
+              });
+    }
   }
 
-  auto tooltip_var = index.data(Qt::ToolTipRole);
-  if (tooltip_var.isValid()) {
-    auto details = tooltip_var.toString();
-    auto copy_details_action = new QAction(tr("Copy Details"), menu);
-    menu->addAction(copy_details_action);
-    connect(copy_details_action, &QAction::triggered,
-            [=] (void) {
-              qApp->clipboard()->setText(details);
-            });
+  auto vp = d->list_view->viewport();
+  if (vp->rect().contains(vp->mapFromGlobal(menu->pos()))) {
+    auto sort_menu = new QMenu(tr("Sort..."), menu);
+    auto sort_ascending_order = new QAction(tr("Ascending Order"), sort_menu);
+    sort_menu->addAction(sort_ascending_order);
+
+    auto sort_descending_order = new QAction(tr("Descending Order"), sort_menu);
+    sort_menu->addAction(sort_descending_order);
+
+    menu->addMenu(sort_menu);
+
+    connect(sort_ascending_order, &QAction::triggered,
+            this, [this] (void) {
+                    d->model_proxy->sort(0, Qt::AscendingOrder);
+                  });
+
+    connect(sort_descending_order, &QAction::triggered,
+            this, [this] (void) {
+                    d->model_proxy->sort(0, Qt::DescendingOrder);
+                  });
   }
-
-  auto sort_menu = new QMenu(tr("Sort..."), menu);
-  auto sort_ascending_order = new QAction(tr("Ascending Order"), sort_menu);
-  sort_menu->addAction(sort_ascending_order);
-
-  auto sort_descending_order = new QAction(tr("Descending Order"), sort_menu);
-  sort_menu->addAction(sort_descending_order);
-
-  menu->addMenu(sort_menu);
-
-  connect(sort_ascending_order, &QAction::triggered,
-          this, [this] (void) {
-                  d->model_proxy->sort(0, Qt::AscendingOrder);
-                });
-
-  connect(sort_descending_order, &QAction::triggered,
-          this, [this] (void) {
-                  d->model_proxy->sort(0, Qt::DescendingOrder);
-                });
 }
 
 bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
@@ -394,24 +398,19 @@ void ListGeneratorWidget::OnDataChanged(void) {
 }
 
 void ListGeneratorWidget::OnItemActivated(const QModelIndex &current_index) {
-  auto new_index = d->model_proxy->mapToSource(current_index);
-  if (!new_index.isValid()) {
-    return;
-  }
-  
   // Suppress likely duplicate events.
   if (d->selection_timer.restart() < 100 &&
-      d->selected_index == new_index) {
+      d->selected_index == current_index) {
     return;
   }
 
-  d->selected_index = new_index;
+  d->selected_index = current_index;
   emit RequestPrimaryClick(d->selected_index);
 }
 
-void ListGeneratorWidget::OnOpenItemContextMenu(const QPoint &list_local_mouse_pos) {
-  auto index = d->list_view->indexAt(list_local_mouse_pos);
-  d->selected_index = d->model_proxy->mapToSource(index);
+void ListGeneratorWidget::OnOpenItemContextMenu(
+    const QPoint &list_local_mouse_pos) {
+  d->selected_index = d->list_view->indexAt(list_local_mouse_pos);
   if (!d->selected_index.isValid()) {
     return;
   }

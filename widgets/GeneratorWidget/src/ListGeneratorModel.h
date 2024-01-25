@@ -36,7 +36,7 @@ class ListGeneratorModel Q_DECL_FINAL : public IModel {
   };
 
   //! Constructor
-  ListGeneratorModel(QObject *parent = nullptr);
+  ListGeneratorModel(const QString &model_id, QObject *parent = nullptr);
 
   //! Destructor
   virtual ~ListGeneratorModel(void);

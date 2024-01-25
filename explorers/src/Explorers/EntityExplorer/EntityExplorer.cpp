@@ -11,6 +11,7 @@
 #include <QBrush>
 #include <QCheckBox>
 #include <QListView>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QRadioButton>
@@ -39,6 +40,8 @@
 
 namespace mx::gui {
 namespace {
+
+static const QString kModelId = "com.trailofbits.explorer.EntityExplorer.EntityListModel";
 
 class EntitySearchResult Q_DECL_FINAL : public IGeneratedItem {
 
@@ -194,9 +197,6 @@ struct EntityExplorer::PrivateData {
 
   std::optional<TokenCategory> category;
 
-  QModelIndex context_index;
-  QModelIndex clicked_index;
-
   // Action for opening an entity when the selection is changed.
   const TriggerHandle open_entity_trigger;
 
@@ -268,18 +268,14 @@ void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
   connect(category_combo_box, &CategoryComboBox::CategoryChanged,
           this, &EntityExplorer::OnCategoryChanged);
 
-  d->list_widget = new ListGeneratorWidget(d->config_manager, d->view);
+
+
+  d->list_widget = new ListGeneratorWidget(d->config_manager, kModelId, d->view);
   connect(d->list_widget, &ListGeneratorWidget::RequestSecondaryClick,
-          [=, this] (const QModelIndex &index) {
-            d->context_index = index;
-            manager->OnSecondaryClick(d->context_index);
-          });
+          manager, &IWindowManager::OnSecondaryClick);
 
   connect(d->list_widget, &ListGeneratorWidget::RequestPrimaryClick,
-          [=, this] (const QModelIndex &index) {
-            d->clicked_index = index;
-            manager->OnPrimaryClick(d->clicked_index);
-          });
+          manager, &IWindowManager::OnPrimaryClick);
 
   layout->addLayout(search_parameters_layout);
   layout->addWidget(category_combo_box);
@@ -298,19 +294,22 @@ void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
 void EntityExplorer::ActOnPrimaryClick(
     IWindowManager *, const QModelIndex &index) {
 
-  auto clicked_index = std::move(d->clicked_index);
-  if (!d->view || index != clicked_index || !index.isValid()) {
+  if (!d->view || !d->view->isVisible() || !index.isValid()) {
     return;
   }
 
-  d->open_entity_trigger.Trigger(index.data(IModel::EntityRole));
+  if (IModel::ModelId(index) == kModelId) {
+    d->open_entity_trigger.Trigger(index.data(IModel::EntityRole));
+  }
 }
 
 void EntityExplorer::ActOnContextMenu(IWindowManager *manager, QMenu *menu,
                                       const QModelIndex &index) {
-  auto clicked_index = std::move(d->clicked_index);
-  if (!d->view || index != clicked_index || !index.isValid() ||
-      !d->view->isVisible()) {
+  if (!d->view || !d->view->isVisible()) {
+    return;
+  }
+
+  if (index.isValid() && IModel::ModelId(index) != kModelId) {
     return;
   }
 
@@ -318,12 +317,10 @@ void EntityExplorer::ActOnContextMenu(IWindowManager *manager, QMenu *menu,
 }
 
 void EntityExplorer::OnIndexChanged(const ConfigManager &config_manager) {
-  d->clicked_index = {};
   d->index = config_manager.Index();
 }
 
 void EntityExplorer::QueryParametersChanged(void) {
-  d->clicked_index = {};
   if (!d->list_widget) {
     return;
   }

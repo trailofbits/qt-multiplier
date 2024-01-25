@@ -173,11 +173,14 @@ void MainWindow::InitializeIndex(QApplication &application) {
 
 //! Invoked on an index whose underlying model follows the `IModel` interface.
 void MainWindow::OnRequestSecondaryClick(const QModelIndex &index) {
+  auto position = QCursor::pos();
   QMenu menu(tr("Context Menu"));
+  menu.move(position);
+
   for (const auto &plugin : d->plugins) {
     plugin->ActOnContextMenu(d->window_manager, &menu, index);
   }
-  menu.exec(QCursor::pos());
+  menu.exec(position);
 }
 
 //! Invoked on an index whose underlying model follows the `IModel` interface.
@@ -186,7 +189,6 @@ void MainWindow::OnRequestPrimaryClick(const QModelIndex &index) {
     plugin->ActOnPrimaryClick(d->window_manager, index);
   }
 }
-
 
 //! Invoked on an index whose underlying model follows the `IModel` interface.
 void MainWindow::OnRequestKeyPress(
@@ -211,7 +213,11 @@ void MainWindow::OnRequestKeyPress(
     return;
   }
 
+  auto position = QCursor::pos();
+
   QMenu key_menu(tr("Key Press Menu"));
+  key_menu.move(position);
+
   for (auto &plugin_action : actions) {
     auto action = new QAction(plugin_action.name, &key_menu);
     connect(
@@ -222,7 +228,7 @@ void MainWindow::OnRequestKeyPress(
         });
     key_menu.addAction(action);
   }
-  key_menu.exec(QCursor::pos());
+  key_menu.exec(position);
 }
 
 }  // namespace mx::gui

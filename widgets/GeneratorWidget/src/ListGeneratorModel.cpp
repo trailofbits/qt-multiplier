@@ -63,7 +63,9 @@ using DataBatchQueue = std::list<DataBatch>;
 
 struct ListGeneratorModel::PrivateData final {
 
-    // Data generator.
+  const QString model_id;
+
+  // Data generator.
   IListGeneratorPtr generator;
 
   // The non-uniqued nodes of the tree.
@@ -98,8 +100,9 @@ struct ListGeneratorModel::PrivateData final {
   // Queue of groups of children `IGeneratedItem`s to insert into the model.
   DataBatchQueue data_batch_queue;
 
-  inline PrivateData(void)
-      : version_number(0u) {}
+  inline PrivateData(const QString &model_id_)
+      : model_id(model_id_),
+        version_number(0u) {}
 
   NodeKey *NodeKeyFrom(const QModelIndex &index) const {
     if (!index.isValid()) {
@@ -138,9 +141,9 @@ struct ListGeneratorModel::PrivateData final {
 };
 
 //! Constructor
-ListGeneratorModel::ListGeneratorModel(QObject *parent)
+ListGeneratorModel::ListGeneratorModel(const QString &model_id, QObject *parent)
     : IModel(parent),
-      d(new PrivateData) {
+      d(new PrivateData(model_id)) {
   connect(&d->import_timer, &QTimer::timeout, this,
           &ListGeneratorModel::ProcessDataBatchQueue);
 }
@@ -281,7 +284,7 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
     return QVariant::fromValue(node->item->Entity());
 
   } else if (role == IModel::ModelIdRole) {
-    return "com.trailofbits.model.ListGeneratorModel";
+    return d->model_id;
 
   } else if (role == ListGeneratorModel::IsDuplicate) {
     value.setValue(static_cast<int>(node->alias_index) != node->row);
