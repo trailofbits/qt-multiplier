@@ -79,7 +79,7 @@ class TreeGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
   void OnRowsInserted(const QModelIndex &parent, int first, int last);
 
   //! Called when the user clicks an item
-  void OnItemClicked(const QModelIndex &current_index);
+  void OnItemActivated(const QModelIndex &current_index);
 
   //! Custom context menu for the tree view items
   void OnOpenItemContextMenu(const QPoint &tree_local_mouse_pos);
