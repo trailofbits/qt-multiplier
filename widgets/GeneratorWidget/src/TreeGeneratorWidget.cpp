@@ -268,7 +268,8 @@ void TreeGeneratorWidget::ActOnContextMenu(
     return;
   }
 
-  auto tooltip_var = index.data(Qt::ToolTipRole);
+  auto underlying_index = d->model_proxy->mapToSource(selected_index);
+  auto tooltip_var = underlying_index.data(Qt::ToolTipRole);
   if (tooltip_var.isValid()) {
     auto details = tooltip_var.toString();
     auto copy_details_action = new QAction(tr("Copy Details"), menu);
@@ -286,11 +287,11 @@ void TreeGeneratorWidget::ActOnContextMenu(
                   emit OpenItem(selected_index);
                 });
 
-  auto is_duplicate = index.data(TreeGeneratorModel::IsDuplicate);
+  auto is_duplicate = underlying_index.data(TreeGeneratorModel::IsDuplicate);
   if (!is_duplicate.isValid() || !is_duplicate.toBool()) {
 
     auto i = 0u;
-    auto can_expand = index.data(TreeGeneratorModel::CanBeExpanded);
+    auto can_expand = underlying_index.data(TreeGeneratorModel::CanBeExpanded);
     if (can_expand.isValid() && !can_expand.toBool()) {
       i = 1u;
     }
@@ -312,7 +313,7 @@ void TreeGeneratorWidget::ActOnContextMenu(
 
       connect(action, &QAction::triggered,
               this, [=, this] (void) {
-                      d->model->Expand(selected_index, i + 1u);
+                      d->model->Expand(underlying_index, i + 1u);
                     });
     }
   } else {
