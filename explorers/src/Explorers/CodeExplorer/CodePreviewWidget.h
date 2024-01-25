@@ -55,7 +55,7 @@ class CodePreviewWidget Q_DECL_FINAL : public IWindowWidget {
   void OnRenameEntities(const QMap<RawEntityId, QString> &new_entity_names);
 
   // Invoked when we want to scroll to a specific entity.
-  void OnGoToEntity(const VariantEntity &entity);
+  void OnGoToEntity(const VariantEntity &entity, bool take_focus);
 
  signals:
   void HistoricalEntitySelected(VariantEntity entity);

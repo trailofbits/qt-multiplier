@@ -234,7 +234,8 @@ void CodePreviewWidget::DisplayEntity(
   }
 
   // Scroll.
-  d->code->OnGoToEntity(d->current_entity);
+  d->code->OnGoToEntity(d->current_entity,
+                        is_explicit_request  /* take focus */);
 
   // Signal the window manager that the contents of this widget have been
   // changed
@@ -260,8 +261,9 @@ void CodePreviewWidget::OnRenameEntities(
 }
 
 // Invoked when we want to scroll to a specific entity.
-void CodePreviewWidget::OnGoToEntity(const VariantEntity &entity) {
-  d->code->OnGoToEntity(entity);
+void CodePreviewWidget::OnGoToEntity(const VariantEntity &entity,
+                                     bool take_focus) {
+  d->code->OnGoToEntity(entity, take_focus);
 }
 
 }  // namespace mx::gui

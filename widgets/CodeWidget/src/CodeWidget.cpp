@@ -565,8 +565,9 @@ struct CodeWidget::PrivateData {
   void RecomputeLineNumbers(void);
   void RecomputeHighlights(void);
   void RecomputeSelection(QPainter &blitter);
-  void ScrollToPoint(CodeWidget *self, QPointF, bool set_focus=true);
-  void ScrollToEntityOffset(CodeWidget *self, unsigned offset);
+  void ScrollToPoint(CodeWidget *self, QPointF, bool take_focus);
+  void ScrollToEntityOffset(CodeWidget *self, unsigned offset,
+                            bool take_focus);
 
   void PaintToken(
       QPainter &fg_painter, QPainter &bg_painter, Data &data,
@@ -2307,7 +2308,7 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 }
 
 void CodeWidget::PrivateData::ScrollToPoint(
-    CodeWidget *self, QPointF point, bool set_focus) {
+    CodeWidget *self, QPointF point, bool take_focus) {
 
   auto v_width = viewport.width();
   auto v_height = viewport.height();
@@ -2318,7 +2319,7 @@ void CodeWidget::PrivateData::ScrollToPoint(
     QTimer::singleShot(
         10, self, [=, this, vn = version_number] (void) {
           if (vn == version_number) {
-            ScrollToPoint(self, point, set_focus);
+            ScrollToPoint(self, point, take_focus);
           }
         });
     return;
@@ -2350,13 +2351,13 @@ void CodeWidget::PrivateData::ScrollToPoint(
 
   self->update();
 
-  if (set_focus) {
+  if (take_focus) {
     self->setFocus();
   }
 }
 
 void CodeWidget::PrivateData::ScrollToEntityOffset(
-    CodeWidget *self, unsigned offset) {
+    CodeWidget *self, unsigned offset, bool take_focus) {
 
   if (offset > scene.entities.size()) {
     return;
@@ -2370,7 +2371,7 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
   cursor = CursorPosition(entity_loc);
   current_entity = &entity;
 
-  ScrollToPoint(self, QPointF(entity.x, entity_y));
+  ScrollToPoint(self, QPointF(entity.x, entity_y), take_focus);
 }
 
 // Paint a token.
@@ -2544,7 +2545,8 @@ void CodeWidget::OnHorizontalScroll(int) {
 }
 
 // Invoked when we want to scroll to a specific entity.
-void CodeWidget::OnGoToEntity(const VariantEntity &entity_) {
+void CodeWidget::OnGoToEntity(const VariantEntity &entity_,
+                              bool take_focus) {
 
   // Clear out any selections.
   d->selection_start_cursor.reset();
@@ -2578,7 +2580,7 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_) {
     RawEntityId entity_id = EntityId(entity).Pack();
     auto it = d->scene.entity_begin_offset.find(entity_id);
     if (it != it_end) {
-      d->ScrollToEntityOffset(this, it->second);
+      d->ScrollToEntityOffset(this, it->second, take_focus);
       return;
     }
 
@@ -2613,7 +2615,7 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_) {
         auto max_eo = entities.size();
         for (auto eo = ti; eo < max_eo; ++eo) {
           if (entities[eo].token_index == ti) {
-            d->ScrollToEntityOffset(this, eo);
+            d->ScrollToEntityOffset(this, eo, take_focus);
             return;
           }
         }
@@ -2675,7 +2677,7 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_) {
   // fragment. This code is probably dead.
   auto it = d->scene.entity_begin_offset.find(frag_id);
   if (it != it_end) {
-    d->ScrollToEntityOffset(this, it->second);
+    d->ScrollToEntityOffset(this, it->second, take_focus);
     return;
   }
 
@@ -2716,7 +2718,7 @@ void CodeWidget::OnGoToLineNumber(unsigned line_) {
   auto max_e = d->scene.entities.size();
   for (auto e = 0u; e < max_e; ++e) {
     if (std::abs(d->scene.file_line_number[e]) == line) {
-      d->ScrollToEntityOffset(this, e);
+      d->ScrollToEntityOffset(this, e, true  /* take focus */);
       break;
     }
   }
@@ -2821,7 +2823,7 @@ void CodeWidget::OnShowSearchResult(size_t result_index) {
   }
 
   d->ScrollToPoint(this, d->cursor.value(),
-                   false  /* set focus */);
+                   false  /* take focus */);
 }
 
 //! Called when we want to act on the context menu.

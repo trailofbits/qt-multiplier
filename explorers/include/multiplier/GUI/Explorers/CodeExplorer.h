@@ -38,8 +38,10 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
     const QModelIndex &index) Q_DECL_FINAL;
 
  private slots:
+  void OnImplicitPreviewEntity(const QVariant &data);
+  void OnExplicitPreviewEntity(const QVariant &data);
   void OnOpenEntity(const QVariant &data);
-  void OnPreviewEntity(const QVariant &data);
+  void OnPreviewEntity(const QVariant &data, bool is_explicit);
   void OnPinnedPreviewEntity(const QVariant &data);
 
   void OnExpandMacro(const QVariant &data);

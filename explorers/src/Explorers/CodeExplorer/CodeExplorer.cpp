@@ -82,7 +82,7 @@ struct CodeExplorer::PrivateData {
   std::unordered_map<RawEntityId, CodeWidget *> opened_windows;
 
   TriggerHandle expand_macro_trigger;
-  TriggerHandle open_preview_trigger;
+  TriggerHandle open_user_preview_trigger;
   TriggerHandle open_pinned_preview_trigger;
 
   // TODO(pag): `connect` the same signals to update `scene_options` to keep
@@ -116,9 +116,13 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
       this, "com.trailofbits.action.ExpandMacro",
       &CodeExplorer::OnExpandMacro);
 
-  d->open_preview_trigger = config_manager.ActionManager().Register(
+  (void) config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenEntityPreview",
-      &CodeExplorer::OnPreviewEntity);
+      &CodeExplorer::OnImplicitPreviewEntity);
+
+  d->open_user_preview_trigger = config_manager.ActionManager().Register(
+      this, "com.trailofbits.action.OpenUserRequestedEntityPreview",
+      &CodeExplorer::OnExplicitPreviewEntity);
 
   d->open_pinned_preview_trigger = config_manager.ActionManager().Register(
       this, "com.trailofbits.action.OpenPinnedEntityPreview",
@@ -157,7 +161,7 @@ std::optional<NamedAction> CodeExplorer::ActOnKeyPress(
   QString name;
 
   if (keys == kKeySeqP) {
-    handle = &(d->open_preview_trigger);
+    handle = &(d->open_user_preview_trigger);
     name = tr("Open Preview");
     entity = IModel::EntitySkipThroughTokens(index);
 
@@ -243,7 +247,7 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
   auto &code_widget = d->opened_windows[id];
   if (code_widget) {
     code_widget->show();
-    code_widget->OnGoToEntity(entity);
+    code_widget->OnGoToEntity(entity, true  /* take focus */);
     return;
   }
 
@@ -284,20 +288,27 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
   }
 
   code_widget->ChangeScene(tt, d->scene_options);
-  code_widget->OnGoToEntity(entity);
 
-  // We need C++20 to avoid this copy
-  auto copy_of_id{id};
   connect(code_widget, &IWindowWidget::Closed,
-          this, [=, this] (void) {
-                  d->opened_windows.erase(copy_of_id);
+          this, [id = id, this] (void) {
+                  d->opened_windows.erase(id);
                 });
 
   IWindowManager::CentralConfig config;
   d->manager->AddCentralWidget(code_widget, config);
+
+  code_widget->OnGoToEntity(entity, true  /* take focus */);
 }
 
-void CodeExplorer::OnPreviewEntity(const QVariant &data) {
+void CodeExplorer::OnImplicitPreviewEntity(const QVariant &data) {
+  OnPreviewEntity(data, false);
+}
+
+void CodeExplorer::OnExplicitPreviewEntity(const QVariant &data) {
+  OnPreviewEntity(data, true);
+}
+
+void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
   if (data.isNull() || !data.canConvert<VariantEntity>()) {
     return;
   }
@@ -331,8 +342,7 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data) {
   }
 
   d->preview->DisplayEntity(
-      std::move(entity), false  /* implicit (click) request */,
-      true  /* add to history */);
+      std::move(entity), is_explicit, true  /* add to history */);
 }
 
 void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
