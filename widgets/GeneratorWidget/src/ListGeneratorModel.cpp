@@ -159,6 +159,11 @@ QModelIndex ListGeneratorModel::Deduplicate(const QModelIndex &index) {
     return {};
   }
 
+  node_key = d->child_keys[node_key->second.alias_index];
+  if (!node_key) {
+    return {};
+  }
+
   return createIndex(node_key->second.row, 0, node_key);
 }
 
