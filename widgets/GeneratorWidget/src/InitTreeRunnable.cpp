@@ -24,7 +24,7 @@ void InitTreeRunnable::run(void) {
 
     // Send out a batch.
     if (items.size() >= kMaxBatchSize) {
-      emit NewGeneratedItems(captured_version_number, kInvalidEntityId,
+      emit NewGeneratedItems(captured_version_number, parent_item_id,
                              std::move(items), depth - 1u);
       items.clear();
     }
@@ -35,7 +35,7 @@ void InitTreeRunnable::run(void) {
     return;
   }
 
-  emit NewGeneratedItems(captured_version_number, kInvalidEntityId,
+  emit NewGeneratedItems(captured_version_number, parent_item_id,
                          std::move(items), depth - 1u);
   emit Finished();
 }

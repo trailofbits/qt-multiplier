@@ -63,7 +63,7 @@ struct Node {
 
 struct QueuedItem {
   uint64_t version_number;
-  RawEntityId parent_entity_id;
+  Node *parent_node;
   IGeneratedItemPtr item;
   unsigned remaining_depth;
 };
@@ -191,7 +191,8 @@ void TreeGeneratorModel::Expand(const QModelIndex &index, unsigned depth) {
     if (!node->self_or_duplicate) {
       node->self_or_duplicate = node;
       RunExpansionThread(new ExpandTreeRunnable(
-          d->generator, d->version_number, node->item, depth));
+          d->generator, d->version_number, node->item,
+          reinterpret_cast<uintptr_t>(node), depth));
       continue;
     }
 
@@ -227,6 +228,7 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
     d->root.self_or_duplicate = &(d->root);
     RunExpansionThread(new InitTreeRunnable(
         d->generator, d->version_number, {},
+        reinterpret_cast<uintptr_t>(&(d->root)),
         d->generator->InitialExpansionDepth()));
   }
 }
@@ -379,17 +381,19 @@ void TreeGeneratorModel::CancelRunningRequest(void) {
 
 //! Notify us when there's a batch of new data to update.
 void TreeGeneratorModel::AddData(
-    uint64_t version_number, RawEntityId parent_node_id,
+    uint64_t version_number, uint64_t parent_item_id,
     QVector<IGeneratedItemPtr> child_items, unsigned remaining_depth) {
 
   if (version_number != d->version_number.load()) {
     return;
   }
 
+  auto parent_node = reinterpret_cast<Node *>(parent_item_id);
+
   for (auto &child_item : child_items) {
     QueuedItem &entry = d->insertion_queue.emplace_back();
     entry.version_number = version_number;
-    entry.parent_entity_id = parent_node_id;
+    entry.parent_node = parent_node;
     entry.item = std::move(child_item);
     entry.remaining_depth = remaining_depth;
   }
@@ -477,7 +481,7 @@ void TreeGeneratorModel::ProcessData(void) {
       is_duplicate = false;
     }
 
-    add_child(d->entity_to_node[entry.parent_entity_id], entity_node);
+    add_child(entry.parent_node, entity_node);
     ++num_changes;
 
     if (!is_duplicate && entry.remaining_depth) {
@@ -486,6 +490,7 @@ void TreeGeneratorModel::ProcessData(void) {
       entity_node->self_or_duplicate = entity_node;
       RunExpansionThread(new ExpandTreeRunnable(
           d->generator, d->version_number, entity_node->item,
+          reinterpret_cast<uintptr_t>(entity_node),
           entry.remaining_depth));
     }
   }

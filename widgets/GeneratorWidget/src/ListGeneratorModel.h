@@ -75,7 +75,7 @@ class ListGeneratorModel Q_DECL_FINAL : public IModel {
  private slots:
 
   //! Notify us when there's a batch of new data to update.
-  void OnNewListItems(uint64_t version_number, RawEntityId,
+  void OnNewListItems(uint64_t version_number, uint64_t,
                       QVector<IGeneratedItemPtr> child_items,
                       unsigned);
 

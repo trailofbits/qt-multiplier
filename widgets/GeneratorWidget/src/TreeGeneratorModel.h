@@ -81,7 +81,7 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
  private slots:
 
   //! Notify us when there's a batch of new data to update.
-  void AddData(uint64_t version_number, RawEntityId parent_entity_id,
+  void AddData(uint64_t version_number, uint64_t parent_item_id,
                QVector<IGeneratedItemPtr> child_items,
                unsigned remaining_depth);
 

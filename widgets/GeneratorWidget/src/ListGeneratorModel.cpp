@@ -188,7 +188,7 @@ void ListGeneratorModel::InstallGenerator(IListGeneratorPtr generator_) {
     d->num_pending_requests += 1;
 
     auto runnable = new InitTreeRunnable(
-        d->generator, d->version_number, {}, 1u);
+        d->generator, d->version_number, {}, 0u, 1u);
 
     connect(runnable, &IGenerateTreeRunnable::NewGeneratedItems,
             this, &ListGeneratorModel::OnNewListItems);
@@ -318,7 +318,7 @@ void ListGeneratorModel::CancelRunningRequest(void) {
 
 //! Notify us when there's a batch of new data to update.
 void ListGeneratorModel::OnNewListItems(
-    uint64_t version_number, RawEntityId,
+    uint64_t version_number, uint64_t,
     QVector<IGeneratedItemPtr> child_items, unsigned) {
 
   if (version_number != d->version_number.load()) {

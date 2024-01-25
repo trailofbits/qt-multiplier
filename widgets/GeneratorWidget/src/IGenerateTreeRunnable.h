@@ -33,6 +33,11 @@ class IGenerateTreeRunnable : public QObject, public QRunnable {
   const std::atomic_uint64_t &version_number;
   const uint64_t captured_version_number;
   const IGeneratedItemPtr parent_item;
+  
+  // Some kind of identifier for what the parent item node is in the underlying
+  // model.
+  const uint64_t parent_item_id;
+
   const unsigned depth;
 
  public:
@@ -41,17 +46,18 @@ class IGenerateTreeRunnable : public QObject, public QRunnable {
   inline explicit IGenerateTreeRunnable(
       std::shared_ptr<ITreeGenerator> generator_,
       const std::atomic_uint64_t &version_number_,
-      IGeneratedItemPtr parent_item_, unsigned depth_)
+      IGeneratedItemPtr parent_item_, uint64_t parent_item_id_, unsigned depth_)
       : generator(std::move(generator_)),
         version_number(version_number_),
         captured_version_number(version_number.load()),
         parent_item(std::move(parent_item_)),
+        parent_item_id(parent_item_id_),
         depth(depth_) {
     setAutoDelete(true);        
   }
 
  signals:
-  void NewGeneratedItems(uint64_t version_number, RawEntityId parent_entity_id,
+  void NewGeneratedItems(uint64_t version_number, uint64_t parent_item_id,
                          QVector<IGeneratedItemPtr> child_items,
                          unsigned remaining_depth);
 
