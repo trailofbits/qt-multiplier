@@ -12,9 +12,6 @@
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 #include <multiplier/Types.h>
 
-namespace mx {
-enum class TokenCategory : unsigned char;
-}  // namespace mx
 namespace mx::gui {
 
 class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {

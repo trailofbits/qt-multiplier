@@ -616,22 +616,24 @@ struct CodeWidget::PrivateData {
 // relevant change in the scrollbars.
 template <typename CB>
 void CodeWidget::PrivateData::TriggerScrollbarUpdate(CB cb) {
-  auto old_scroll_x = scroll_x;
-  auto old_scroll_y = scroll_y;
+  auto old_scroll_x = horizontal_scrollbar->value();
+  auto old_scroll_y = vertical_scrollbar->value();
+
+  // Force the values to be in sync.
+  scroll_x = old_scroll_x;
+  scroll_y = old_scroll_y;
 
   cb();
 
   if (horizontal_scrollbar->maximum()) {
     if (auto delta_x = scroll_x - old_scroll_x) {
-      horizontal_scrollbar->setValue(
-          horizontal_scrollbar->value() + delta_x);
+      horizontal_scrollbar->setValue(old_scroll_x + delta_x);
     }
   }
 
   if (vertical_scrollbar->maximum()) {
     if (auto delta_y = scroll_y - old_scroll_y) {
-      vertical_scrollbar->setValue(
-          vertical_scrollbar->value() + delta_y);
+      vertical_scrollbar->setValue(old_scroll_y + delta_y);
     }
   }
 }
@@ -2326,6 +2328,7 @@ void CodeWidget::PrivateData::ScrollToPoint(
   auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
 
   TriggerScrollbarUpdate([=, this] (void) {
+
     // If the entity isn't already visible, then center the window to make it
     // visible.
     if (point.y() < scroll_y ||
@@ -2334,7 +2337,7 @@ void CodeWidget::PrivateData::ScrollToPoint(
           std::max(0, static_cast<int>(point.y() - (v_height / 2))),
           c_height - v_height);
     }
-    
+
     if (point.x() > v_width) {
       scroll_x = std::min(
           std::max(0, static_cast<int>(point.x() - (v_width / 2))),

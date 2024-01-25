@@ -190,55 +190,54 @@ void CodePreviewWidget::DisplayEntity(
   }
 
   // Dedup check; don't want to reload the model unnecessarily.
-  if (EntityId(d->current_entity) == EntityId(entity)) {
-    // Signal the window manager that the contents of this widget have been changed
-    emit RequestAttention();
-    return;
+  if (EntityId(d->current_entity) != EntityId(entity)) {
+
+    TokenTree tt;
+    VariantEntity containing_entity;
+    if (auto type = Type::from(entity)) {
+      containing_entity = type.value();
+      tt = TokenTree::from(type->tokens());
+    
+    } else if (auto frag = Fragment::containing(entity)) {
+      containing_entity = frag.value();
+      tt = TokenTree::from(frag.value());
+    
+    } else if (auto file = File::containing(entity)) {
+      containing_entity = file.value();
+      tt = TokenTree::from(file.value());
+    }
+
+    if (std::holds_alternative<NotAnEntity>(containing_entity)) {
+      return;
+    }
+
+    // Dedup check; don't want to reload the model unnecessarily.
+    auto reuse_token_tree = EntityId(d->containing_entity) ==
+                            EntityId(containing_entity);
+
+    d->current_entity = std::move(entity);
+    d->containing_entity = std::move(containing_entity);
+
+    if (d->pop_out_button) {
+      d->pop_out_button->setEnabled(true);
+    }
+
+    // If we're showing the history widget then keep track of the history.
+    if (add_to_history && d->history) {
+      d->history->CommitCurrentLocationToHistory();
+      d->history->SetCurrentLocation(d->current_entity);
+    }
+
+    if (!reuse_token_tree) {
+      d->code->ChangeScene(tt, d->scene_options);
+    }
   }
 
-  TokenTree tt;
-  VariantEntity containing_entity;
-  if (auto type = Type::from(entity)) {
-    containing_entity = type.value();
-    tt = TokenTree::from(type->tokens());
-  
-  } else if (auto frag = Fragment::containing(entity)) {
-    containing_entity = frag.value();
-    tt = TokenTree::from(frag.value());
-  
-  } else if (auto file = File::containing(entity)) {
-    containing_entity = file.value();
-    tt = TokenTree::from(file.value());
-  }
-
-  if (std::holds_alternative<NotAnEntity>(containing_entity)) {
-    return;
-  }
-
-  // Dedup check; don't want to reload the model unnecessarily.
-  auto reuse_token_tree = EntityId(d->containing_entity) ==
-                          EntityId(containing_entity);
-
-  d->current_entity = std::move(entity);
-  d->containing_entity = std::move(containing_entity);
-
-  if (d->pop_out_button) {
-    d->pop_out_button->setEnabled(true);
-  }
-
-  // If we're showing the history widget then keep track of the history.
-  if (add_to_history && d->history) {
-    d->history->CommitCurrentLocationToHistory();
-    d->history->SetCurrentLocation(d->current_entity);
-  }
-
-  if (!reuse_token_tree) {
-    d->code->ChangeScene(tt, d->scene_options);
-  }
-
+  // Scroll.
   d->code->OnGoToEntity(d->current_entity);
 
-  // Signal the window manager that the contents of this widget have been changed
+  // Signal the window manager that the contents of this widget have been
+  // changed
   emit RequestAttention();
 }
 
