@@ -230,7 +230,6 @@ void TreeGeneratorWidget::InitializeWidgets(
   auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->tree_view, 1);
-  layout->addStretch();
   layout->addWidget(d->status_widget);
   layout->addWidget(d->filter_settings_widget);
   layout->addWidget(d->search_widget);
@@ -337,7 +336,11 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
     } else if (QKeyEvent *kevent = dynamic_cast<QKeyEvent *>(event)) {
       auto ret = false;
-      for (auto index : d->tree_view->selectionModel()->selectedIndexes()) {
+      for (auto index_ : d->tree_view->selectionModel()->selectedIndexes()) {
+        auto index = d->model_proxy->mapToSource(index_);
+        if (!index.isValid()) {
+          continue;
+        }
         switch (kevent->key()) {
           case Qt::Key_1:
           case Qt::Key_2:
@@ -348,8 +351,7 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
           case Qt::Key_7:
           case Qt::Key_8:
           case Qt::Key_9:
-            d->model->Expand(d->model_proxy->mapToSource(index),
-                             static_cast<unsigned>(kevent->key() - Qt::Key_0));
+            d->model->Expand(index, static_cast<unsigned>(kevent->key() - Qt::Key_0));
             ret = true;
             break;
           default: break;
@@ -359,53 +361,58 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
       return ret;
     }
 
-    return false;
-
   } else if (obj == d->tree_view->viewport()) {
     if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
       UpdateItemButtons();
       return false;
 
-    } else if (event->type() == QEvent::MouseButtonPress) {
-      return true;
-
-    } else if (event->type() == QEvent::MouseButtonRelease) {
-      const auto &mouse_event = *static_cast<QMouseEvent *>(event);
-      auto local_mouse_pos = mouse_event.position().toPoint();
+    } else if (auto me = dynamic_cast<QMouseEvent *>(event)) {
+      auto local_mouse_pos = me->position().toPoint();
 
       auto index = d->tree_view->indexAt(local_mouse_pos);
       if (!index.isValid()) {
+        return false;
+      }
+
+      // Detect if we're in the item, or in the whitespace/decoration before
+      // the item.
+      auto rect = d->tree_view->visualRect(index);
+      if (!rect.contains(local_mouse_pos)) {
+        return false;
+      }
+
+      if (event->type() == QEvent::MouseButtonPress) {
         return true;
+      }
+
+      if (event->type() != QEvent::MouseButtonRelease) {
+        return false;
       }
 
       auto &selection_model = *d->tree_view->selectionModel();
       selection_model.setCurrentIndex(index,
           QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
 
-      switch (mouse_event.button()) {
-      case Qt::LeftButton: {
-        OnItemClicked(index);
-        break;
-      }
+      switch (me->button()) {
+        case Qt::LeftButton: {
+          OnItemClicked(index);
+          break;
+        }
 
-      case Qt::RightButton: {
-        OnOpenItemContextMenu(local_mouse_pos);
-        break;
-      }
+        case Qt::RightButton: {
+          OnOpenItemContextMenu(local_mouse_pos);
+          break;
+        }
 
-      default:
-        break;
+        default:
+          break;
       }
 
       return true;
-
-    } else {
-      return false;
     }
-
-  } else {
-    return false;
   }
+
+  return false;
 }
 
 void TreeGeneratorWidget::resizeEvent(QResizeEvent *) {

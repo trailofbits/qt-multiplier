@@ -70,47 +70,57 @@ FileTreeView::FileTreeView(const ConfigManager &config_manager,
 }
 
 bool FileTreeView::eventFilter(QObject *object, QEvent *event) {
-  if (object == d->tree_view->viewport()) {
-    if (event->type() == QEvent::MouseButtonPress) {
-      return true;
-
-    } else if (event->type() == QEvent::MouseButtonRelease) {
-      const auto &mouse_event = *static_cast<QMouseEvent *>(event);
-      auto local_mouse_pos = mouse_event.position().toPoint();
-
-      auto index = d->tree_view->indexAt(local_mouse_pos);
-      if (!index.isValid()) {
-        return true;
-      }
-
-      auto &selection_model = *d->tree_view->selectionModel();
-      selection_model.setCurrentIndex(index,
-          QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
-
-      switch (mouse_event.button()) {
-      case Qt::LeftButton: {
-        OnFileTreeItemClicked(index);
-        break;
-      }
-
-      case Qt::RightButton: {
-        OnOpenItemContextMenu(local_mouse_pos);
-        break;
-      }
-
-      default:
-        break;
-      }
-
-      return true;
-
-    } else {
-      return false;
-    }
-
-  } else {
+  if (object != d->tree_view->viewport()) {
     return false;
   }
+
+  auto me = dynamic_cast<QMouseEvent *>(event);
+  if (!me) {
+    return false;
+  }
+
+  auto local_mouse_pos = me->position().toPoint();
+
+  auto index = d->tree_view->indexAt(local_mouse_pos);
+  if (!index.isValid()) {
+    return false;
+  }
+
+  // Detect if we're in the item, or in the whitespace/decoration before
+  // the item.
+  auto rect = d->tree_view->visualRect(index);
+  if (!rect.contains(local_mouse_pos)) {
+    return false;
+  }
+
+  if (event->type() == QEvent::MouseButtonPress) {
+    return true;
+  }
+
+  if (event->type() != QEvent::MouseButtonRelease) {
+    return false;
+  }
+
+  auto &selection_model = *d->tree_view->selectionModel();
+  selection_model.setCurrentIndex(index,
+      QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
+
+  switch (me->button()) {
+    case Qt::LeftButton: {
+      OnFileTreeItemClicked(index);
+      break;
+    }
+
+    case Qt::RightButton: {
+      OnOpenItemContextMenu(local_mouse_pos);
+      break;
+    }
+
+    default:
+      break;
+  }
+
+  return true;
 }
 
 void FileTreeView::InitializeWidgets(const ConfigManager &config_manager) {

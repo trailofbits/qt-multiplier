@@ -265,29 +265,25 @@ bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
           QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
 
       switch (mouse_event.button()) {
-      case Qt::LeftButton: {
-        OnItemClicked(index);
-        break;
-      }
+        case Qt::LeftButton: {
+          OnItemClicked(index);
+          break;
+        }
 
-      case Qt::RightButton: {
-        OnOpenItemContextMenu(local_mouse_pos);
-        break;
-      }
+        case Qt::RightButton: {
+          OnOpenItemContextMenu(local_mouse_pos);
+          break;
+        }
 
-      default:
-        break;
+        default:
+          break;
       }
 
       return true;
-
-    } else {
-      return false;
     }
-
-  } else {
-    return false;
   }
+
+  return false;
 }
 
 void ListGeneratorWidget::resizeEvent(QResizeEvent *) {
