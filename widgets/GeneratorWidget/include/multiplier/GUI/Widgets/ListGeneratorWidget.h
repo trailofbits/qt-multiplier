@@ -73,7 +73,7 @@ class ListGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
   void OnDataChanged(void);
 
   //! Called when the user clicks an item
-  void OnItemClicked(const QModelIndex &current_index);
+  void OnItemActivated(const QModelIndex &current_index);
 
   //! Custom context menu for the tree view items
   void OnOpenItemContextMenu(const QPoint &point);

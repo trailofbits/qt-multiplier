@@ -45,6 +45,12 @@ namespace {
 
 static constexpr unsigned kMaxHistorySize = 32;
 
+// Activate the selected index when pressing this key
+static constexpr auto kActivateSelectedItem{Qt::Key_Return};
+
+// Allow users to avoid activating an item with a click by holding this key down
+static constexpr auto kDisableClickActivationModifier{Qt::ControlModifier};
+
 bool ShouldAutoExpand(const QModelIndex &index) {
   if (!index.isValid()) {
     return true;
@@ -154,6 +160,7 @@ EntityInformationWidget::EntityInformationWidget(
   d->tree->setHeaderHidden(true);
   d->tree->setSortingEnabled(true);
   d->tree->sortByColumn(0, Qt::AscendingOrder);
+  d->tree->installEventFilter(this);
 
   d->tree->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree->viewport()->installEventFilter(this);
@@ -430,57 +437,74 @@ void EntityInformationWidget::DisplayEntity(
 }
 
 bool EntityInformationWidget::eventFilter(QObject *object, QEvent *event) {
-  if (object != d->tree->viewport()) {
-    return false;
-  }
+  if (object == d->tree->viewport()) {
+    if (event->type() == QEvent::MouseButtonRelease) {
+      auto me = static_cast<QMouseEvent *>(event);
+      auto local_mouse_pos = me->position().toPoint();
 
-  auto me = dynamic_cast<QMouseEvent *>(event);
-  if (!me) {
-    return false;
-  }
+      auto index = d->tree->indexAt(local_mouse_pos);
+      if (!index.isValid()) {
+        return false;
+      }
 
-  auto local_mouse_pos = me->position().toPoint();
+      // Detect if we're in the item, or in the whitespace/decoration before
+      // the item.
+      auto rect = d->tree->visualRect(index);
+      if (!rect.contains(local_mouse_pos)) {
+        return false;
+      }
 
-  auto index = d->tree->indexAt(local_mouse_pos);
-  if (!index.isValid()) {
-    return false;
-  }
+      auto &selection_model = *d->tree->selectionModel();
+      selection_model.setCurrentIndex(index,
+          QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
 
-  // Detect if we're in the item, or in the whitespace/decoration before
-  // the item.
-  auto rect = d->tree->visualRect(index);
-  if (!rect.contains(local_mouse_pos)) {
-    return false;
-  }
+      switch (me->button()) {
+        case Qt::LeftButton: {
+          if ((me->modifiers() & kDisableClickActivationModifier) == 0) {
+            OnItemActivated(index);
+          }
 
-  if (event->type() == QEvent::MouseButtonPress) {
-    return true;
-  }
+          return true;
+        }
 
-  if (event->type() != QEvent::MouseButtonRelease) {
-    return false;
-  }
+        case Qt::RightButton: {
+          OnOpenItemContextMenu(local_mouse_pos);
+          return true;
+        }
 
-  auto &selection_model = *d->tree->selectionModel();
-  selection_model.setCurrentIndex(index,
-      QItemSelectionModel::Clear | QItemSelectionModel::SelectCurrent);
+        default:
+          return false;
+      }
 
-  switch (me->button()) {
-    case Qt::LeftButton: {
-      OnCurrentItemChanged(index);
-      break;
+    } else {
+      return false;
     }
 
-    case Qt::RightButton: {
-      OnOpenItemContextMenu(local_mouse_pos);
-      break;
+  } else if (object == d->tree) {
+    if (event->type() == QEvent::KeyRelease) {
+      const auto &selection_model = *d->tree->selectionModel();
+      auto index = selection_model.currentIndex();
+      if (!index.isValid()) {
+        return false;
+      }
+
+      const auto &key_event = *static_cast<QKeyEvent *>(event);
+      switch (key_event.keyCombination().key()) {
+      case kActivateSelectedItem:
+        OnItemActivated(index);
+        return true;
+
+      default:
+        return false;
+      }
+
+    } else {
+      return false;
     }
 
-    default:
-      break;
+  } else {
+    return false;
   }
-
-  return true;
 }
 
 void EntityInformationWidget::OnAllDataFound(void) {
@@ -502,7 +526,7 @@ void EntityInformationWidget::OnChangeSync(int state) {
   d->sync = Qt::Checked == state;
 }
 
-void EntityInformationWidget::OnCurrentItemChanged(
+void EntityInformationWidget::OnItemActivated(
     const QModelIndex &current_index) {
 
   // auto [time_diff, event_kind] = d->tree->GetLastMouseEvent();

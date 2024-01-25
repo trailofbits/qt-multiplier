@@ -26,6 +26,15 @@
 #include "ListGeneratorModel.h"
 
 namespace mx::gui {
+namespace {
+
+// Activate the selected index when pressing this key
+static constexpr auto kActivateSelectedItem{Qt::Key_Return};
+
+// Allow users to avoid activating an item with a click by holding this key down
+static constexpr auto kDisableClickActivationModifier{Qt::ControlModifier};
+
+}
 
 struct ListGeneratorWidget::PrivateData final {
   ListGeneratorModel *model{nullptr};
@@ -237,11 +246,26 @@ bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
       return false;
 
-    } else if (event->type() != QEvent::KeyRelease) {
+    } else if (event->type() == QEvent::KeyRelease) {
+      const auto &selection_model = *d->list_view->selectionModel();
+      auto index = selection_model.currentIndex();
+      if (!index.isValid()) {
+        return false;
+      }
+
+      const auto &key_event = *static_cast<QKeyEvent *>(event);
+      switch (key_event.keyCombination().key()) {
+      case kActivateSelectedItem:
+        OnItemActivated(index);
+        return true;
+
+      default:
+        return false;
+      }
+
+    } else {
       return false;
     }
-
-    return false;
 
   } else if (obj == d->list_view->viewport()) {
     if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
@@ -266,7 +290,10 @@ bool ListGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
       switch (mouse_event.button()) {
         case Qt::LeftButton: {
-          OnItemClicked(index);
+          if ((mouse_event.modifiers() & kDisableClickActivationModifier) == 0) {
+            OnItemActivated(index);
+          }
+
           break;
         }
 
@@ -366,7 +393,7 @@ void ListGeneratorWidget::OnDataChanged(void) {
   d->list_view->viewport()->repaint();
 }
 
-void ListGeneratorWidget::OnItemClicked(const QModelIndex &current_index) {
+void ListGeneratorWidget::OnItemActivated(const QModelIndex &current_index) {
   auto new_index = d->model_proxy->mapToSource(current_index);
   if (!new_index.isValid()) {
     return;

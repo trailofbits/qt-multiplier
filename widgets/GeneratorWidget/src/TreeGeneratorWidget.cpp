@@ -34,6 +34,12 @@ namespace {
 
 static constexpr unsigned kMaxExpansionLevel = 9u;
 
+// Activate the selected index when pressing this key
+static constexpr auto kActivateSelectedItem{Qt::Key_Return};
+
+// Allow users to avoid activating an item with a click by holding this key down
+static constexpr auto kDisableClickActivationModifier{Qt::ControlModifier};
+
 }  // namespace
 
 struct TreeGeneratorWidget::PrivateData final {
@@ -336,25 +342,38 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
     } else if (QKeyEvent *kevent = dynamic_cast<QKeyEvent *>(event)) {
       auto ret = false;
-      for (auto index_ : d->tree_view->selectionModel()->selectedIndexes()) {
-        auto index = d->model_proxy->mapToSource(index_);
-        if (!index.isValid()) {
-          continue;
-        }
-        switch (kevent->key()) {
-          case Qt::Key_1:
-          case Qt::Key_2:
-          case Qt::Key_3:
-          case Qt::Key_4:
-          case Qt::Key_5:
-          case Qt::Key_6:
-          case Qt::Key_7:
-          case Qt::Key_8:
-          case Qt::Key_9:
-            d->model->Expand(index, static_cast<unsigned>(kevent->key() - Qt::Key_0));
+
+      auto selected_index_list = d->tree_view->selectionModel()->selectedIndexes();
+      if (kevent->key() == kActivateSelectedItem) {
+        if (!selected_index_list.isEmpty()) {
+          const auto &first_selected_index = selected_index_list[0];
+          if (first_selected_index.isValid()) {
+            OnItemActivated(first_selected_index);
             ret = true;
-            break;
-          default: break;
+          }
+        }
+
+      } else {
+        for (auto index_ : selected_index_list) {
+          auto index = d->model_proxy->mapToSource(index_);
+          if (!index.isValid()) {
+            continue;
+          }
+          switch (kevent->key()) {
+            case Qt::Key_1:
+            case Qt::Key_2:
+            case Qt::Key_3:
+            case Qt::Key_4:
+            case Qt::Key_5:
+            case Qt::Key_6:
+            case Qt::Key_7:
+            case Qt::Key_8:
+            case Qt::Key_9:
+              d->model->Expand(index, static_cast<unsigned>(kevent->key() - Qt::Key_0));
+              ret = true;
+              break;
+            default: break;
+          }
         }
       }
 
@@ -395,7 +414,10 @@ bool TreeGeneratorWidget::eventFilter(QObject *obj, QEvent *event) {
 
       switch (me->button()) {
         case Qt::LeftButton: {
-          OnItemClicked(index);
+          if ((me->modifiers() & kDisableClickActivationModifier) == 0) {
+            OnItemActivated(index);
+          }
+
           break;
         }
 
@@ -579,7 +601,7 @@ void TreeGeneratorWidget::OnRowsInserted(const QModelIndex &parent, int, int) {
   }
 }
 
-void TreeGeneratorWidget::OnItemClicked(const QModelIndex &current_index) {
+void TreeGeneratorWidget::OnItemActivated(const QModelIndex &current_index) {
   auto new_index = d->model_proxy->mapToSource(current_index);
   if (!new_index.isValid()) {
     return;
