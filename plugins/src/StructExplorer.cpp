@@ -219,28 +219,10 @@ StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
   rd = rd->canonical_declaration();
   for (const auto &field : rd->fields()) {
     co_yield CreateGeneratedItem(
-        field.type(), NameOfEntity(field, /*qualified=*/false),
+        field, NameOfEntity(field, /*qualified=*/false),
         field.type().tokens(), field.offset_in_bits(), field.offset_in_bits(),
         field.type().size_in_bits());
   }
-}
-
-static TokenRange IndexTokenRange(uint64_t index) {
-  std::vector<CustomToken> toks;
-  UserToken tok;
-  tok.category = TokenCategory::PUNCTUATION;
-  tok.kind = TokenKind::L_SQUARE;
-  tok.data = "[";
-  toks.emplace_back(std::move(tok));
-  tok.category = TokenCategory::LITERAL;
-  tok.kind = TokenKind::NUMERIC_CONSTANT;
-  tok.data = std::to_string(index);
-  toks.emplace_back(std::move(tok));
-  tok.category = TokenCategory::PUNCTUATION;
-  tok.kind = TokenKind::R_SQUARE;
-  tok.data = "]";
-  toks.emplace_back(std::move(tok));
-  return TokenRange::create(std::move(toks));
 }
 
 gap::generator<IGeneratedItemPtr>
@@ -250,8 +232,20 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
   assert(item != nullptr);
   auto entity = item->Entity();
 
-  if (auto rt = RecordType::from(entity)) {
-    auto rd = RecordDecl::from(rt->declaration());
+  auto rd = RecordDecl::from(entity);
+  if (auto fd = FieldDecl::from(entity)) {
+    if (auto rt = RecordType::from(fd->type())) {
+      rd = RecordDecl::from(rt->declaration());
+    }
+    if (auto at = ArrayType::from(fd->type())) {
+      auto elem_ty = at->element_type();
+      if (auto rt = RecordType::from(elem_ty)) {
+        rd = RecordDecl::from(rt->declaration());
+      }
+    }
+  }
+
+  if (rd) {
     for (const auto &rd_field : rd->fields()) {
       std::optional<uint64_t> new_offset;
       if (item->CumulativeOffsetInBits() && rd_field.offset_in_bits()) {
@@ -259,17 +253,10 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
                      item->CumulativeOffsetInBits().value();
       }
       co_yield CreateGeneratedItem(
-          rd_field.type(), NameOfEntity(rd_field, /*qualified=*/false),
+          rd_field, NameOfEntity(rd_field, /*qualified=*/false),
           rd_field.type().tokens(), rd_field.offset_in_bits(), new_offset,
           rd_field.type().size_in_bits());
     }
-  } else if (auto at = ConstantArrayType::from(entity)) {
-    auto elem_size = at->element_type().size_in_bits().value();
-    auto num_elems = at->size_in_bits().value() / elem_size;
-    co_yield CreateGeneratedItem(at->element_type(), IndexTokenRange(num_elems),
-                                 at->element_type().tokens(), 0,
-                                 item->CumulativeOffsetInBits(),
-                                 at->size_in_bits());
   }
 }
 
