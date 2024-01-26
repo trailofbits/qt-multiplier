@@ -35,33 +35,15 @@ static QString ActionName(const VariantEntity &) {
   return QObject::tr("Open Struct Explorer");
 }
 
-static TokenRange BitsToTokenRange(uint64_t num_bits) {
-  std::stringstream ss;
-  ss << num_bits / 8u;
-  if (num_bits % 8 != 0) {
-    ss << "." << num_bits % 8u;
-  }
-  std::vector<CustomToken> toks;
-  UserToken tok;
-  tok.category = TokenCategory::LITERAL;
-  tok.kind = TokenKind::NUMERIC_CONSTANT;
-  tok.data = ss.str();
-  toks.emplace_back(std::move(tok));
-  tok.category = TokenCategory::WHITESPACE;
-  tok.kind = TokenKind::WHITESPACE;
-  tok.data = " ";
-  toks.emplace_back(std::move(tok));
-  return TokenRange::create(std::move(toks));
-}
-
 class StructExplorerItem final : public IGeneratedItem {
   VariantEntity entity;
   VariantEntity aliased_entity;
   TokenRange name_tokens;
   std::optional<TokenRange> type_tokens;
-  std::optional<uint64_t> offset_in_bits;
-  std::optional<uint64_t> cumulative_offset_in_bits;
-  std::optional<uint64_t> size_in_bits;
+  std::optional<TokenRange> offset_tokens;
+  std::optional<TokenRange> cumulative_offset_tokens;
+  std::optional<TokenRange> size_tokens;
+  std::optional<uint64_t> cumulative_offset_bits;
 
  public:
   virtual ~StructExplorerItem(void) = default;
@@ -70,16 +52,18 @@ class StructExplorerItem final : public IGeneratedItem {
                             VariantEntity aliased_entity_,
                             TokenRange name_tokens_,
                             std::optional<TokenRange> type_tokens_,
-                            std::optional<uint64_t> offset_in_bits_,
-                            std::optional<uint64_t> cumulative_offset_in_bits_,
-                            std::optional<uint64_t> size_in_bits_)
+                            std::optional<TokenRange> offset_tokens_,
+                            std::optional<TokenRange> cumulative_offset_tokens_,
+                            std::optional<TokenRange> size_tokens_,
+                            std::optional<uint64_t> cumulative_offset_bits_)
       : entity(std::move(entity_)),
         aliased_entity(std::move(aliased_entity_)),
         name_tokens(std::move(name_tokens_)),
         type_tokens(std::move(type_tokens_)),
-        offset_in_bits(std::move(offset_in_bits_)),
-        cumulative_offset_in_bits(std::move(cumulative_offset_in_bits_)),
-        size_in_bits(std::move(size_in_bits_)) {}
+        offset_tokens(std::move(offset_tokens_)),
+        cumulative_offset_tokens(std::move(cumulative_offset_tokens_)),
+        size_tokens(std::move(size_tokens_)),
+        cumulative_offset_bits(std::move(cumulative_offset_bits_)) {}
 
   VariantEntity Entity(void) const Q_DECL_FINAL {
     return entity;
@@ -90,25 +74,25 @@ class StructExplorerItem final : public IGeneratedItem {
   }
 
   std::optional<uint64_t> CumulativeOffsetInBits(void) const {
-    return cumulative_offset_in_bits;
+    return cumulative_offset_bits;
   }
 
   QVariant Data(int col) const Q_DECL_FINAL {
     QVariant data;
     switch (col) {
       case 0:
-        if (offset_in_bits) {
-          data.setValue(BitsToTokenRange(*offset_in_bits));
+        if (offset_tokens) {
+          data.setValue(*offset_tokens);
         }
         break;
       case 1:
-        if (cumulative_offset_in_bits) {
-          data.setValue(BitsToTokenRange(*cumulative_offset_in_bits));
+        if (cumulative_offset_tokens) {
+          data.setValue(*cumulative_offset_tokens);
         }
         break;
       case 2:
-        if (size_in_bits) {
-          data.setValue(BitsToTokenRange(*size_in_bits));
+        if (size_tokens) {
+          data.setValue(*size_tokens);
         }
         break;
       case 3: data.setValue(name_tokens); break;
@@ -176,19 +160,53 @@ QString StructExplorerGenerator::ColumnTitle(int col) const {
   }
 }
 
+static TokenRange BitsToTokenRange(uint64_t num_bits) {
+  std::stringstream ss;
+  ss << num_bits / 8u;
+  if (num_bits % 8 != 0) {
+    ss << "." << num_bits % 8u;
+  }
+  std::vector<CustomToken> toks;
+  UserToken tok;
+  tok.category = TokenCategory::LITERAL;
+  tok.kind = TokenKind::NUMERIC_CONSTANT;
+  tok.data = ss.str();
+  toks.emplace_back(std::move(tok));
+  tok.category = TokenCategory::WHITESPACE;
+  tok.kind = TokenKind::WHITESPACE;
+  tok.data = " ";
+  toks.emplace_back(std::move(tok));
+  return TokenRange::create(std::move(toks));
+}
+
 static IGeneratedItemPtr
 CreateGeneratedItem(const VariantEntity &entity, TokenRange name,
                     std::optional<TokenRange> type_tokens,
                     std::optional<uint64_t> offset_in_bits,
-                    std::optional<uint64_t> cumulative_offset_in_bits,
+                    std::optional<uint64_t> cumulative_offset_bits,
                     std::optional<uint64_t> size_in_bits) {
   if (type_tokens) {
     type_tokens = InjectWhitespace(*type_tokens);
   }
 
+  std::optional<TokenRange> offset_tokens;
+  if (offset_in_bits) {
+    offset_tokens = BitsToTokenRange(*offset_in_bits);
+  }
+
+  std::optional<TokenRange> cumulative_offset_tokens;
+  if (cumulative_offset_bits) {
+    cumulative_offset_tokens = BitsToTokenRange(*cumulative_offset_bits);
+  }
+
+  std::optional<TokenRange> size_tokens;
+  if (size_in_bits) {
+    size_tokens = BitsToTokenRange(*size_in_bits);
+  }
+
   return std::make_shared<StructExplorerItem>(
-      entity, entity, name, type_tokens, offset_in_bits,
-      cumulative_offset_in_bits, size_in_bits);
+      entity, entity, name, type_tokens, offset_tokens,
+      cumulative_offset_tokens, size_tokens, cumulative_offset_bits);
 }
 
 gap::generator<IGeneratedItemPtr>
@@ -200,11 +218,10 @@ StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
   }
   rd = rd->canonical_declaration();
   for (const auto &field : rd->fields()) {
-    co_yield CreateGeneratedItem(field.type(),
-                                 NameOfEntity(field, /*qualified=*/false),
-                                 field.type().tokens(), field.offset_in_bits(),
-                                 field.offset_in_bits(),
-                                 field.type().size_in_bits());
+    co_yield CreateGeneratedItem(
+        field.type(), NameOfEntity(field, /*qualified=*/false),
+        field.type().tokens(), field.offset_in_bits(), field.offset_in_bits(),
+        field.type().size_in_bits());
   }
 }
 
@@ -241,19 +258,18 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
         new_offset = rd_field.offset_in_bits().value() +
                      item->CumulativeOffsetInBits().value();
       }
-      co_yield CreateGeneratedItem(rd_field.type(),
-                                   NameOfEntity(rd_field, /*qualified=*/false),
-                                   rd_field.type().tokens(),
-                                   rd_field.offset_in_bits(), new_offset,
-                                   rd_field.type().size_in_bits());
+      co_yield CreateGeneratedItem(
+          rd_field.type(), NameOfEntity(rd_field, /*qualified=*/false),
+          rd_field.type().tokens(), rd_field.offset_in_bits(), new_offset,
+          rd_field.type().size_in_bits());
     }
   } else if (auto at = ConstantArrayType::from(entity)) {
     auto elem_size = at->element_type().size_in_bits().value();
     auto num_elems = at->size_in_bits().value() / elem_size;
-    co_yield CreateGeneratedItem(
-        at->element_type(), IndexTokenRange(num_elems),
-        at->element_type().tokens(), 0, item->CumulativeOffsetInBits(),
-        at->size_in_bits());
+    co_yield CreateGeneratedItem(at->element_type(), IndexTokenRange(num_elems),
+                                 at->element_type().tokens(), 0,
+                                 item->CumulativeOffsetInBits(),
+                                 at->size_in_bits());
   }
 }
 
