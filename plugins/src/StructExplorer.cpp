@@ -167,11 +167,11 @@ QString StructExplorerGenerator::Name(const ITreeGeneratorPtr &) const {
 
 QString StructExplorerGenerator::ColumnTitle(int col) const {
   switch (col) {
-    case 1: return QObject::tr("Offset");
-    case 2: return QObject::tr("Cumulative");
-    case 3: return QObject::tr("Size");
-    case 4: return QObject::tr("Name");
-    case 5: return QObject::tr("Type");
+    case 0: return QObject::tr("Offset");
+    case 1: return QObject::tr("Cumulative");
+    case 2: return QObject::tr("Size");
+    case 3: return QObject::tr("Name");
+    case 4: return QObject::tr("Type");
     default: return QString();
   }
 }
@@ -285,7 +285,7 @@ StructExplorerPlugin::ActOnSecondaryClick(IWindowManager *,
 
   auto rd = RecordDecl::from(entity);
   if (auto fd = FieldDecl::from(entity)) {
-    if (auto pd = fd-> parent_declaration()) {
+    if (auto pd = fd->parent_declaration()) {
       rd = RecordDecl::from(pd.value());
     }
   }
@@ -310,7 +310,7 @@ StructExplorerPlugin::ActOnKeyPress(IWindowManager *, const QKeySequence &keys,
 
   auto rd = RecordDecl::from(entity);
   if (auto fd = FieldDecl::from(entity)) {
-    if (auto pd = fd-> parent_declaration()) {
+    if (auto pd = fd->parent_declaration()) {
       rd = RecordDecl::from(pd.value());
     }
   }
