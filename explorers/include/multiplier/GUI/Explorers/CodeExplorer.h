@@ -48,6 +48,7 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
   void OnRenameEntity(QVector<RawEntityId> entity_ids,
                       QString new_name);
+  void OnHistoricalEntitySelected(const QVariant &data);
 
  signals:
 

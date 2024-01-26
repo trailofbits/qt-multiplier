@@ -58,7 +58,7 @@ class CodePreviewWidget Q_DECL_FINAL : public IWindowWidget {
   void OnGoToEntity(const VariantEntity &entity, bool take_focus);
 
  signals:
-  void HistoricalEntitySelected(VariantEntity entity);
+  void HistoricalEntitySelected(const QVariant &entity);
   void SelectedItemChanged(const QModelIndex &index);
 };
 

@@ -74,26 +74,30 @@ InformationExplorer::InformationExplorer(ConfigManager &config_manager,
   CreateDockWidget(parent);
 }
 
+void InformationExplorer::OnHistoricalEntitySelected(const QVariant &data) {
+  d->view->DisplayEntity(data.value<VariantEntity>(),
+                         d->config_manager.FileLocationCache(),
+                         d->plugins, true  /* explicit request */,
+                         false  /* add to history */);
+}
+
+void InformationExplorer::OnSelectedItemChanged(const QModelIndex &index) {
+  auto entity = IModel::Entity(index);
+  if (!std::holds_alternative<NotAnEntity>(entity)) {
+    d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
+  }
+}
+
 void InformationExplorer::CreateDockWidget(IWindowManager *manager) {
   d->view = new EntityInformationWidget(d->config_manager, true);
 
   // When the user navigates the history, make sure that we change what the
   // view shows.
   connect(d->view, &EntityInformationWidget::HistoricalEntitySelected,
-          [this] (VariantEntity entity) {
-            d->view->DisplayEntity(
-                std::move(entity), d->config_manager.FileLocationCache(),
-                d->plugins, true  /* explicit request */,
-                false  /* add to history */);
-          });
+          this, &InformationExplorer::OnHistoricalEntitySelected);
 
   connect(d->view, &EntityInformationWidget::SelectedItemChanged,
-          [this] (const QModelIndex &index) {
-            auto entity = IModel::Entity(index);
-            if (!std::holds_alternative<NotAnEntity>(entity)) {
-              d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
-            }
-          });
+          this, &InformationExplorer::OnSelectedItemChanged);
   
   IWindowManager::DockConfig config;
   config.id = "com.trailofbits.dock.InformationExplorer";
