@@ -216,7 +216,9 @@ StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
   if (!rd) {
     co_return;
   }
-  rd = rd->canonical_declaration();
+  if (!rd->is_definition()) {
+    rd = rd->canonical_declaration();
+  }
   for (const auto &field : rd->fields()) {
     co_yield CreateGeneratedItem(
         field, NameOfEntity(field, /*qualified=*/false),
@@ -234,10 +236,11 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
 
   auto rd = RecordDecl::from(entity);
   if (auto fd = FieldDecl::from(entity)) {
-    if (auto rt = RecordType::from(fd->type())) {
+    auto ty = fd->type().desugared_type();
+    if (auto rt = RecordType::from(ty)) {
       rd = RecordDecl::from(rt->declaration());
     }
-    if (auto at = ArrayType::from(fd->type())) {
+    if (auto at = ArrayType::from(ty)) {
       auto elem_ty = at->element_type();
       if (auto rt = RecordType::from(elem_ty)) {
         rd = RecordDecl::from(rt->declaration());
@@ -246,6 +249,9 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
   }
 
   if (rd) {
+    if (!rd->is_definition()) {
+      rd = rd->canonical_declaration();
+    }
     for (const auto &rd_field : rd->fields()) {
       std::optional<uint64_t> new_offset;
       if (item->CumulativeOffsetInBits() && rd_field.offset_in_bits()) {
