@@ -2411,16 +2411,19 @@ void CodeWidget::PrivateData::PaintToken(
       token_rect_valid = true;
     }
 
+    // Paint the background as a whole, otherwise lines between characters are
+    // observable.
+    if (bg_valid) {
+      token_rect.moveTo(QPointF(x, y));
+      bg_painter.fillRect(token_rect, cs.background_color);
+    }
+
     QRectF glyph_rect = space_rect;
 
     for (QChar ch : data.text) {
       monospace[0] = ch;
-
-      glyph_rect.moveTo(QPointF(x, y));
-      if (bg_valid) {
-        bg_painter.fillRect(glyph_rect, cs.background_color);
-      }
       if (fg_valid) {
+        glyph_rect.moveTo(QPointF(x, y));
         fg_painter.drawText(glyph_rect, monospace, to);
       }
       x += space_width;
