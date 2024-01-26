@@ -46,6 +46,10 @@ class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void OpenInfoImplicit(const QVariant &data);
   void OpenInfoExplicit(const QVariant &data);
   void OpenPinnedInfo(const QVariant &data);
+
+ private slots:
+  void OnHistoricalEntitySelected(const QVariant &data);
+  void OnSelectedItemChanged(const QModelIndex &index);
 };
 
 }  // namespace mx::gui

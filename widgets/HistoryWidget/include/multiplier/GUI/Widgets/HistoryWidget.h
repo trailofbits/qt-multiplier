@@ -51,16 +51,15 @@ class HistoryWidget final : public QWidget {
   void SetIconSize(QSize size);
 
   //! Tells the history what our current location is.
-  void SetCurrentLocation(VariantEntity entity,
-                          std::optional<QString> opt_label = std::nullopt);
+  void SetCurrentItem(const QVariant &item,
+                      std::optional<QString> opt_label = std::nullopt);
 
   //! Commits our "last current" location to the history. This makes our last
   //! current location visible in the history menu.
-  void CommitCurrentLocationToHistory(void);
+  void CommitCurrentItemToHistory(void);
 
  signals:
-  void GoToEntity(VariantEntity original_entity,
-                  VariantEntity canonical_entity);
+  void GoToHistoricalItem(const QVariant &item);
 
  private slots:
   void OnIconsChanged(const MediaManager &media_manager);

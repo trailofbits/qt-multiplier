@@ -328,11 +328,7 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
     // When the user navigates the history, make sure that we change what the
     // view shows.
     connect(d->preview, &CodePreviewWidget::HistoricalEntitySelected,
-            this, [this] (VariantEntity entity) {
-                    d->preview->DisplayEntity(
-                        std::move(entity), true  /* explicit request */,
-                        false  /* add to history */);
-                  });
+            this, &CodeExplorer::OnHistoricalEntitySelected);
   
     IWindowManager::DockConfig config;
     config.id = "com.trailofbits.dock.CodePreview";
@@ -343,6 +339,12 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
 
   d->preview->DisplayEntity(
       std::move(entity), is_explicit, true  /* add to history */);
+}
+
+void CodeExplorer::OnHistoricalEntitySelected(const QVariant &data) {
+  d->preview->DisplayEntity(data.value<VariantEntity>(),
+                            true  /* explicit request */,
+                            false  /* add to history */);
 }
 
 void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {

@@ -69,7 +69,7 @@ class EntityInformationWidget Q_DECL_FINAL : public IWindowWidget {
   void OnPopOutPressed(void);
 
  signals:
-  void HistoricalEntitySelected(VariantEntity entity);
+  void HistoricalEntitySelected(const QVariant &entity);
   void SelectedItemChanged(const QModelIndex &index);
 
   // TODO(pag): IndexChanged should close the widget if it is a pinned info
