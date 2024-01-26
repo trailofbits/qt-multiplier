@@ -19,7 +19,6 @@
 #include <multiplier/GUI/Util.h>
 #include <multiplier/Frontend/DefineMacroDirective.h>
 #include <multiplier/Frontend/MacroParameter.h>
-#include <multiplier/Frontend/File.h>
 #include <multiplier/Index.h>
 #include <memory>
 #include <sstream>
@@ -59,7 +58,6 @@ class StructExplorerItem final : public IGeneratedItem {
   VariantEntity entity;
   VariantEntity aliased_entity;
   TokenRange name_tokens;
-  QString location;
   std::optional<TokenRange> type_tokens;
   std::optional<uint64_t> offset_in_bits;
   std::optional<uint64_t> cumulative_offset_in_bits;
@@ -70,7 +68,7 @@ class StructExplorerItem final : public IGeneratedItem {
 
   inline StructExplorerItem(VariantEntity entity_,
                             VariantEntity aliased_entity_,
-                            TokenRange name_tokens_, QString location_,
+                            TokenRange name_tokens_,
                             std::optional<TokenRange> type_tokens_,
                             std::optional<uint64_t> offset_in_bits_,
                             std::optional<uint64_t> cumulative_offset_in_bits_,
@@ -78,7 +76,6 @@ class StructExplorerItem final : public IGeneratedItem {
       : entity(std::move(entity_)),
         aliased_entity(std::move(aliased_entity_)),
         name_tokens(std::move(name_tokens_)),
-        location(std::move(location_)),
         type_tokens(std::move(type_tokens_)),
         offset_in_bits(std::move(offset_in_bits_)),
         cumulative_offset_in_bits(std::move(cumulative_offset_in_bits_)),
@@ -109,15 +106,15 @@ class StructExplorerItem final : public IGeneratedItem {
           data.setValue(BitsToTokenRange(*cumulative_offset_in_bits));
         }
         break;
-      case 2: data.setValue(name_tokens); break;
-      case 3:
-        if (type_tokens) {
-          data.setValue(InjectWhitespace(*type_tokens));
-        }
-        break;
-      case 4:
+      case 2:
         if (size_in_bits) {
           data.setValue(BitsToTokenRange(*size_in_bits));
+        }
+        break;
+      case 3: data.setValue(name_tokens); break;
+      case 4:
+        if (type_tokens) {
+          data.setValue(InjectWhitespace(*type_tokens));
         }
         break;
       default: break;
@@ -127,16 +124,13 @@ class StructExplorerItem final : public IGeneratedItem {
 };
 
 class StructExplorerGenerator final : public ITreeGenerator {
-  const FileLocationCache file_location_cache;
   const VariantEntity root_entity;
 
  public:
   virtual ~StructExplorerGenerator(void) = default;
 
-  inline StructExplorerGenerator(FileLocationCache file_location_cache_,
-                                 VariantEntity root_entity_)
-      : file_location_cache(std::move(file_location_cache_)),
-        root_entity(std::move(root_entity_)) {}
+  inline StructExplorerGenerator(VariantEntity root_entity_)
+      : root_entity(std::move(root_entity_)) {}
 
   int SortColumn(void) const;
   bool EnableDeduplication(void) const Q_DECL_FINAL;
@@ -173,39 +167,40 @@ QString StructExplorerGenerator::Name(const ITreeGeneratorPtr &) const {
 
 QString StructExplorerGenerator::ColumnTitle(int col) const {
   switch (col) {
-    case 0: return QObject::tr("Offset");
-    case 1: return QObject::tr("Cumulative Offset");
-    case 2: return QObject::tr("Name");
-    case 3: return QObject::tr("Type");
-    case 4: return QObject::tr("Size");
+    case 1: return QObject::tr("Offset");
+    case 2: return QObject::tr("Cumulative");
+    case 3: return QObject::tr("Size");
+    case 4: return QObject::tr("Name");
+    case 5: return QObject::tr("Type");
     default: return QString();
   }
 }
 
 static IGeneratedItemPtr
-CreateGeneratedItem(const FileLocationCache &file_location_cache,
-                    const VariantEntity &entity, TokenRange name,
+CreateGeneratedItem(const VariantEntity &entity, TokenRange name,
                     std::optional<TokenRange> type_tokens,
                     std::optional<uint64_t> offset_in_bits,
                     std::optional<uint64_t> cumulative_offset_in_bits,
                     std::optional<uint64_t> size_in_bits) {
+  if (type_tokens) {
+    type_tokens = InjectWhitespace(*type_tokens);
+  }
 
   return std::make_shared<StructExplorerItem>(
-      entity, entity, name, LocationOfEntity(file_location_cache, entity),
-      type_tokens, offset_in_bits, cumulative_offset_in_bits, size_in_bits);
+      entity, entity, name, type_tokens, offset_in_bits,
+      cumulative_offset_in_bits, size_in_bits);
 }
 
 gap::generator<IGeneratedItemPtr>
 StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
-  // It's only reasonable to ask for references to named entities.
-  if (!RecordDecl::from(root_entity)) {
+  // Roots should only be records
+  auto rd = RecordDecl::from(root_entity);
+  if (!rd) {
     co_return;
   }
-  qDebug() << "Roots!!";
-  auto rd = RecordDecl::from(root_entity);
   rd = rd->canonical_declaration();
   for (const auto &field : rd->fields()) {
-    co_yield CreateGeneratedItem(file_location_cache, field.type(),
+    co_yield CreateGeneratedItem(field.type(),
                                  NameOfEntity(field, /*qualified=*/false),
                                  field.type().tokens(), field.offset_in_bits(),
                                  field.offset_in_bits(),
@@ -238,14 +233,7 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
   assert(item != nullptr);
   auto entity = item->Entity();
 
-  qDebug() << "Children!";
-
-  if (auto ty = Type::from(entity)) {
-    qDebug() << "Type " << ty->tokens().data();
-  }
-
   if (auto rt = RecordType::from(entity)) {
-    qDebug() << "Record";
     auto rd = RecordDecl::from(rt->declaration());
     for (const auto &rd_field : rd->fields()) {
       std::optional<uint64_t> new_offset;
@@ -253,19 +241,17 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
         new_offset = rd_field.offset_in_bits().value() +
                      item->CumulativeOffsetInBits().value();
       }
-      co_yield CreateGeneratedItem(file_location_cache, rd_field.type(),
+      co_yield CreateGeneratedItem(rd_field.type(),
                                    NameOfEntity(rd_field, /*qualified=*/false),
                                    rd_field.type().tokens(),
                                    rd_field.offset_in_bits(), new_offset,
                                    rd_field.type().size_in_bits());
     }
   } else if (auto at = ConstantArrayType::from(entity)) {
-    qDebug() << "Constant Array";
     auto elem_size = at->element_type().size_in_bits().value();
     auto num_elems = at->size_in_bits().value() / elem_size;
-    qDebug() << "Number of elements: " << num_elems;
     co_yield CreateGeneratedItem(
-        file_location_cache, at->element_type(), IndexTokenRange(num_elems),
+        at->element_type(), IndexTokenRange(num_elems),
         at->element_type().tokens(), 0, item->CumulativeOffsetInBits(),
         at->size_in_bits());
   }
@@ -297,9 +283,14 @@ StructExplorerPlugin::ActOnSecondaryClick(IWindowManager *,
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
 
-  // It's only reasonable to ask for references to named entities.
-  if (!NamedDecl::from(entity) && !RecordDecl::from(entity) &&
-      !File::from(entity)) {
+  auto rd = RecordDecl::from(entity);
+  if (auto fd = FieldDecl::from(entity)) {
+    if (auto pd = fd-> parent_declaration()) {
+      rd = RecordDecl::from(pd.value());
+    }
+  }
+  // Struct explorer only works on records
+  if (!rd) {
     return std::nullopt;
   }
 
@@ -307,8 +298,7 @@ StructExplorerPlugin::ActOnSecondaryClick(IWindowManager *,
       .name = ActionName(entity),
       .action = d->open_struct_explorer_trigger,
       .data = QVariant::fromValue<ITreeGeneratorPtr>(
-          std::make_shared<StructExplorerGenerator>(
-              d->config_manager.FileLocationCache(), std::move(entity)))};
+          std::make_shared<StructExplorerGenerator>(std::move(entity)))};
 }
 
 // Allow a main window plugin to act on a key sequence.
@@ -318,9 +308,14 @@ StructExplorerPlugin::ActOnKeyPress(IWindowManager *, const QKeySequence &keys,
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
 
-  // It's only reasonable to ask for references to named entities.
-  if (!DefineMacroDirective::from(entity) && !MacroParameter::from(entity) &&
-      !NamedDecl::from(entity) && !File::from(entity)) {
+  auto rd = RecordDecl::from(entity);
+  if (auto fd = FieldDecl::from(entity)) {
+    if (auto pd = fd-> parent_declaration()) {
+      rd = RecordDecl::from(pd.value());
+    }
+  }
+  // Struct explorer only works on records
+  if (!rd) {
     return std::nullopt;
   }
 
@@ -338,8 +333,7 @@ StructExplorerPlugin::ActOnKeyPress(IWindowManager *, const QKeySequence &keys,
       .name = action_name,
       .action = d->open_struct_explorer_trigger,
       .data = QVariant::fromValue<ITreeGeneratorPtr>(
-          std::make_shared<StructExplorerGenerator>(
-              d->config_manager.FileLocationCache(), std::move(entity)))};
+          std::make_shared<StructExplorerGenerator>(std::move(entity)))};
 }
 
 }  // namespace mx::gui
