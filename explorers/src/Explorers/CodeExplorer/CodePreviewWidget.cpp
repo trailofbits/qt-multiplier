@@ -61,10 +61,10 @@ struct CodePreviewWidget::PrivateData {
 
   inline PrivateData(const ConfigManager &config_manager,
                      const CodeWidget::SceneOptions &scene_options_,
-                     bool enable_history,
+                     bool browse_mode, bool enable_history,
                      QWidget *parent)
       : scene_options(scene_options_),
-        code(new CodeWidget(config_manager, kModelId, parent)),
+        code(new CodeWidget(config_manager, kModelId, browse_mode, parent)),
         toolbar(enable_history ? new QToolBar(parent) : nullptr),
         history(
             enable_history ?
@@ -83,9 +83,10 @@ CodePreviewWidget::~CodePreviewWidget(void) {}
 CodePreviewWidget::CodePreviewWidget(
     const ConfigManager &config_manager,
     const CodeWidget::SceneOptions &scene_options_,
-    bool enable_history, QWidget *parent)
+    bool browse_mode, bool enable_history, QWidget *parent)
     : IWindowWidget(parent),
-      d(new PrivateData(config_manager, scene_options_, enable_history, this)) {
+      d(new PrivateData(config_manager, scene_options_, browse_mode,
+                        enable_history, this)) {
 
   setWindowTitle(tr("Code Preview"));
 

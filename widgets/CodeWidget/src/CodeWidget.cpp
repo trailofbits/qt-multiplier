@@ -38,6 +38,7 @@
 #include <multiplier/Frontend/MacroVAOpt.h>
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
@@ -440,6 +441,10 @@ inline static void InitializePainterOptions(QPainter &p) {
 struct CodeWidget::PrivateData {
 
   uint64_t version_number{0};
+
+  // Should browse mode be enabled or disabled? That is, when a user clicks on
+  // something, should it trigger the `GoToEntity` action or not?
+  bool browse_mode{false};
 
   // The theme being used.
   IThemePtr theme;
@@ -1223,10 +1228,16 @@ std::pair<const Entity *, int> CodeWidget::PrivateData::EntityAtDocumentOffset(
 CodeWidget::~CodeWidget(void) {}
 
 CodeWidget::CodeWidget(const ConfigManager &config_manager,
-                       const QString &model_id,
+                       const QString &model_id, bool browse_mode,
                        QWidget *parent)
     : IWindowWidget(parent),
       d(new PrivateData(model_id)) {
+
+  config_manager.ActionManager().Register(
+      this, "com.trailofbits.action.ToggleBrowseMode",
+      &CodeWidget::OnToggleBrowseMode);
+
+  d->browse_mode = browse_mode;
 
   d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
   d->vertical_scrollbar->setSingleStep(1);
@@ -1440,7 +1451,8 @@ void CodeWidget::mouseReleaseEvent(QMouseEvent *event) {
   if (!d->tracking_selection && click_was_primary && !click_was_secondary) {
     d->selection_start_cursor.reset();
 
-    if (d->current_entity) {
+    if (d->current_entity &&
+        d->browse_mode == !(event->modifiers() & Qt::ControlModifier)) {
       emit RequestPrimaryClick(d->CreateModelIndex(d->current_entity));
     }
     return;
@@ -2840,6 +2852,10 @@ void CodeWidget::ActOnContextMenu(IWindowManager *, QMenu *menu,
                     qApp->clipboard()->setText(d->token_model.selection);
                   });
   }
+}
+
+void CodeWidget::OnToggleBrowseMode(const QVariant &toggled) {
+  d->browse_mode = toggled.toBool();
 }
 
 }  // namespace mx::gui

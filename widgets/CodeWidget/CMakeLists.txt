@@ -23,6 +23,7 @@ add_library("mx_code_widget"
 
 target_link_libraries("mx_code_widget"
   PRIVATE
+    "mx_action_manager"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_interfaces"

@@ -34,6 +34,10 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
   QAction *AddToolBarButton(const QIcon &icon,
                             const NamedAction &action) Q_DECL_FINAL;
 
+  QAction *AddDepressableToolBarButton(
+      const QIcon &icon, const QString &name,
+      const TriggerHandle &trigger) Q_DECL_FINAL;
+
   void AddCentralWidget(IWindowWidget *widget,
                         const CentralConfig &config) Q_DECL_FINAL;
   void AddDockWidget(IWindowWidget *widget,

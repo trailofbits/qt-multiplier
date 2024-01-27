@@ -10,7 +10,7 @@
         <file alias="com.trailofbits.icon.PreviousSearchResult">Icons/show_prev_result.png</file>
         <file alias="com.trailofbits.icon.NextSearchResult">Icons/show_next_result.png</file>
         <file alias="com.trailofbits.icon.Search">Icons/search_icon.png</file>
-        <file alias="com.trailofbits.icon.BrowserMode">Icons/browser_mode.png</file>
+        <file alias="com.trailofbits.icon.BrowseMode">Icons/browse_mode.png</file>
 
         <file alias="com.trailofbits.icon.Activate">Icons/activate_ref_item.png</file>
         <file alias="com.trailofbits.icon.Expand">Icons/expand_ref_item.png</file>

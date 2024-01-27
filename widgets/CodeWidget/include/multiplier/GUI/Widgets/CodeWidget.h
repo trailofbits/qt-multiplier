@@ -72,6 +72,7 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   // signals emitted by this widget.
   CodeWidget(const ConfigManager &config_manager,
              const QString &model_id,
+             bool browse_mode = false,
              QWidget *parent = nullptr);
 
   //! Change the underlying data / model being rendered by this code widget.
@@ -94,6 +95,7 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
  private slots:
   void OnIndexChanged(const ConfigManager &);
   void OnThemeChanged(const ThemeManager &);
+  void OnToggleBrowseMode(const QVariant &toggled);
   void OnVerticalScroll(int change);
   void OnHorizontalScroll(int change);
   void OnGoToLineNumber(unsigned line);

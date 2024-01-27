@@ -23,6 +23,7 @@ namespace mx::gui {
 
 class IWindowWidget;
 class NamedAction;
+class TriggerHandle;
 
 //! Manages widgets in a window, including the menu, the docks, etc.
 class IWindowManager : public QObject {
@@ -78,6 +79,11 @@ class IWindowManager : public QObject {
   //! Add a button to the toolbar.
   virtual QAction *AddToolBarButton(
       const QIcon &icon, const NamedAction &action) = 0;
+
+  //! Add a button to the toolbar, where the value passed to the trigger is the
+  //! toggled state of the button. This is a button that can stay depressed.
+  virtual QAction *AddDepressableToolBarButton(
+      const QIcon &icon, const QString &name, const TriggerHandle &trigger) = 0;
 
   //! Add a widget to the central tab view.
   virtual void AddCentralWidget(IWindowWidget *widget,
