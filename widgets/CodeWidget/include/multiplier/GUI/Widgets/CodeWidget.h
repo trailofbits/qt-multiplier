@@ -17,6 +17,8 @@
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/Index.h>
+#include <optional>
+#include <utility>
 
 QT_BEGIN_NAMESPACE
 class QEvent;
@@ -58,13 +60,24 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
     QMap<RawEntityId, QString> new_entity_names;
   };
 
+  // Opaquely represents the current location in the code.
+  //
+  // TODO(pag): Try to implement the internal code that maintains scroll
+  //            position in terms of this opaque location thing, that way it's
+  //            more reliable and in the critical path.
+  struct OpaqueLocation {
+    qreal x_scale{0};
+    qreal y_scale{0};
+    int y_logical{-1};
+    int y_physical{-1};
+    int z{-1};
+    int y_cursor{-1};
+  };
+
   virtual ~CodeWidget(void);
 
   enum : int {
-    SelectedTextUserRole = IModel::MultiplierUserRole
-
-    // TODO(pag): Eventually expose line/column numbers, and perhaps other
-    //            things relevant to annotations.
+    SelectedTextRole = IModel::MultiplierUserRole
   };
 
   // Create a code widget with the given configuration manager (used for theme
@@ -82,8 +95,15 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
                         const QModelIndex &index);
 
+  // Return the last location from this widget.
+  OpaqueLocation LastLocation(void) const;
+
+  // Try to go to an opaque location.
+  void TryGoToLocation(const OpaqueLocation &location, bool take_focus);
+
  protected:
   bool eventFilter(QObject *object, QEvent *event) Q_DECL_FINAL;
+  void focusInEvent(QFocusEvent *event) Q_DECL_FINAL;
   void focusOutEvent(QFocusEvent *event) Q_DECL_FINAL;
   void paintEvent(QPaintEvent *event) Q_DECL_FINAL;
   void mousePressEvent(QMouseEvent *event) Q_DECL_FINAL;
@@ -115,3 +135,5 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
 };
 
 }  // namespace mx::gui
+
+Q_DECLARE_METATYPE(mx::gui::CodeWidget::OpaqueLocation)

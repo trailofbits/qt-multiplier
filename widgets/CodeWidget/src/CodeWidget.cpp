@@ -417,7 +417,7 @@ class TokenModel Q_DECL_FINAL : public IModel {
         return model_id;
       case Qt::DisplayRole:
         return text;
-      case CodeWidget::SelectedTextUserRole:
+      case CodeWidget::SelectedTextRole:
         return selection;
     }
     return {};
@@ -558,6 +558,8 @@ struct CodeWidget::PrivateData {
   SearchWidget *search_widget{nullptr};
   GoToLineWidget *goto_line_widget{nullptr};
 
+  std::optional<OpaqueLocation> last_location;
+
   inline PrivateData(const QString &model_id)
       : monospace(" "),
         to(Qt::AlignLeft),
@@ -613,6 +615,12 @@ struct CodeWidget::PrivateData {
   QPointF ClampCursorPosition(QPointF point) const;
 
   QModelIndex CreateModelIndex(const Entity *entity);
+
+  // Capture an "opaque" representation of the current location in the code.
+  CodeWidget::OpaqueLocation Location(void);
+
+  void SetLocation(CodeWidget::OpaqueLocation loc);
+  void SetCursor(CodeWidget::OpaqueLocation loc);
 
   template <typename CB>
   void TriggerScrollbarUpdate(CB cb);
@@ -1306,7 +1314,16 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
           this, &CodeWidget::OnThemeChanged);
 }
 
+void CodeWidget::focusInEvent(QFocusEvent *) {
+  if (d->last_location) {
+    d->SetCursor(std::move(d->last_location.value()));
+    d->last_location.reset();
+  }
+}
+
 void CodeWidget::focusOutEvent(QFocusEvent *) {
+  d->last_location = d->Location();
+
   // Requests for context menus trigger `focusOutEvent`s prior to
   // `mouseReleaseEvent`.
   if (d->cursor && !d->click_was_secondary) {
@@ -1492,11 +1509,13 @@ void CodeWidget::mouseMoveEvent(QMouseEvent *event) {
     return;
   }
 
+  d->last_location.reset();
   d->cursor = curr_cursor;
   update();
 }
 
 void CodeWidget::mousePressEvent(QMouseEvent *event) {
+  d->last_location.reset();
 
   QPointF rel_position = event->position();
   auto x = d->scroll_x + rel_position.x();
@@ -1711,9 +1730,9 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       }
     }
 
+    d->last_location.reset();
     d->cursor = new_cursor;
   });
-
 
   if (need_repaint) {
     update();
@@ -1755,76 +1774,81 @@ void CodeWidget::PrivateData::UpdateScrollbars(void) {
   }
 }
 
-void CodeWidget::PrivateData::RecomputeScene(void) {
-  if (!scene_changed) {
-    return;
+// Capture an "opaque" representation of the current location in the code.
+CodeWidget::OpaqueLocation CodeWidget::LastLocation(void) const {
+  if (d->last_location) {
+    return d->last_location.value();
+  } else {
+    return d->Location();
   }
+}
+
+// Capture an "opaque" representation of the current location in the code.
+CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
+  CodeWidget::OpaqueLocation loc;
 
   // Try to maintain scroll position across scene changes.
-  qreal line_multiplier = 0.0;
-  int line_index = 0;
-  int abs_phy_line = 0;
-  int phy_line_rel = 0;
+  loc.y_scale = 0.0;
+  loc.y_logical = 0;
+  loc.y_physical = 0;
+  loc.z = 0;  // Displacement from the first `y_physical`.
   std::vector<std::pair<unsigned, RawEntityId>> eo_to_eid;
   if (scroll_y && !scene.physical_line_number.empty()) {
-    line_multiplier = scroll_y / line_height;
-    line_index = static_cast<int>(std::floor(line_multiplier));
+    
+    loc.y_scale = scroll_y / line_height;
+    loc.y_logical = static_cast<int>(std::floor(loc.y_scale));
+
     auto line_nums = scene.physical_line_number.data();
-    abs_phy_line = std::abs(line_nums[line_index]);
-    for (auto i = line_index - 1; 0 <= i; --i, ++phy_line_rel) {
-      if (std::abs(line_nums[i]) != abs_phy_line) {
+    loc.y_physical = std::abs(line_nums[loc.y_logical]);
+    for (auto i = loc.y_logical - 1; 0 <= i; --i, ++loc.z) {
+      if (std::abs(line_nums[i]) != loc.y_physical) {
         break;
       }
     }
 
-    Q_ASSERT(static_cast<unsigned>(line_index) <
+    Q_ASSERT(static_cast<unsigned>(loc.y_logical) <
              scene.logical_line_index.size());
-
-    for (auto [eid, eo] : scene.entity_begin_offset) {
-      eo_to_eid.emplace_back(eo, eid);
-    }
-
-    std::sort(eo_to_eid.begin(), eo_to_eid.end());
   }
 
-  version_number++;
+  loc.x_scale = 0;
+  loc.y_cursor = -1;
 
-  SceneBuilder builder;  
-  ImportNode(builder, token_tree.root());
+  if (cursor) {
+    loc.y_cursor = static_cast<int>(std::floor(cursor->y() / line_height));
+    loc.x_scale = cursor->x() / space_width;
+  }
 
-  scene = builder.TakeScene();
-  scene_changed = false;
+  return loc;
+}
 
+void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
   int found = 0;
   auto new_line_index = 0;  // Logical line index.
   auto new_line_index_rel = 0;
   for (auto new_phy_line : scene.physical_line_number) {
-    if (found && found > phy_line_rel) {
+    if (found && found > loc.z) {
       break;
     }
 
     auto abs_new_phy_line = std::abs(new_phy_line);
-    if (abs_new_phy_line == abs_phy_line) {
+    if (abs_new_phy_line == loc.y_physical) {
       if (!new_line_index_rel) {
         new_line_index_rel = new_line_index;
       }
       ++found;
-    } else if (found && abs_new_phy_line > abs_phy_line) {
+    } else if (found && abs_new_phy_line > loc.y_physical) {
       break;
     }
     ++new_line_index;
   }
 
-// TODO: the line numbers inside of a macro expansion should come from the
-//       importing process telling us what top-level macro we're in.
-
   if (found) {
 
     // We have enough relative lines, e.g. a macro that expanded to multiple
     // lines.
-    if (found >= phy_line_rel) {
+    if (found >= loc.z) {
       scroll_y = static_cast<int>(
-          (new_line_index_rel + phy_line_rel) * line_height);
+          (new_line_index_rel + loc.z) * line_height);
 
     // We have fewer relative lines, e.g. a macro that spanned multiple lines
     // and was unexpanded.
@@ -1835,8 +1859,36 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
   
   // Backup position. Useful if all that's changed is the theme.
   } else {
-    scroll_y = static_cast<int>(line_height * line_multiplier);
+    scroll_y = static_cast<int>(line_height * loc.y_scale);
   }
+
+  SetCursor(std::move(loc));
+}
+
+void CodeWidget::PrivateData::SetCursor(CodeWidget::OpaqueLocation loc) {
+  if (0 < loc.x_scale && 0 < loc.y_cursor) {
+    cursor = CursorPosition(QPointF(loc.x_scale * space_width,
+                                    loc.y_cursor * line_height));
+  }
+}
+
+void CodeWidget::PrivateData::RecomputeScene(void) {
+  if (!scene_changed) {
+    return;
+  }
+
+  // Try to maintain scroll position across scene changes.
+  auto loc = Location();
+
+  version_number++;
+
+  SceneBuilder builder;  
+  ImportNode(builder, token_tree.root());
+
+  scene = builder.TakeScene();
+  scene_changed = false;
+
+  SetLocation(loc);
 
   // Force a change.
   current_entity = nullptr;
@@ -2432,6 +2484,10 @@ void CodeWidget::PrivateData::PaintToken(
 
     QRectF glyph_rect = space_rect;
 
+    // Allow the glyph rect to be wider so that we don't cut off parts of
+    // italic text.
+    glyph_rect.setWidth(glyph_rect.width() * 2);
+
     for (QChar ch : data.text) {
       monospace[0] = ch;
       if (fg_valid) {
@@ -2562,6 +2618,8 @@ void CodeWidget::OnHorizontalScroll(int) {
 // Invoked when we want to scroll to a specific entity.
 void CodeWidget::OnGoToEntity(const VariantEntity &entity_,
                               bool take_focus) {
+  // Clear out the last location.
+  d->last_location.reset();
 
   // Clear out any selections.
   d->selection_start_cursor.reset();
@@ -2827,6 +2885,7 @@ void CodeWidget::OnShowSearchResult(size_t result_index) {
 
   d->token_model.selection = d->scene.document.sliced(begin, length);
   d->current_entity = nullptr;
+  d->last_location.reset();
   d->cursor = d->CursorPosition(
       eo_to_point(begin_entity, begin_offset));
   d->selection_start_cursor = d->cursor;

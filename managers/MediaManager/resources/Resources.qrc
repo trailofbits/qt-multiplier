@@ -1,6 +1,6 @@
 <RCC>
     <qresource>
-        <file alias="com.trailofbits.icon.Logo">Icons/logo.icns</file>
+        <file alias="com.trailofbits.icon.Logo">logo.png</file>
         <file alias="com.trailofbits.icon.Back">Icons/back.png</file>
         <file alias="com.trailofbits.icon.Forward">Icons/forward.png</file>
         <file alias="com.trailofbits.icon.Close">Icons/close.png</file>

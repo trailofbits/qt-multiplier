@@ -151,7 +151,6 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
 
 void CodeExplorer::OnToggleBrowseMode(const QVariant &data) {
   d->browse_mode = data.toBool();
-  qDebug() << "Browse mode toggled" << d->browse_mode;
 }
 
 void CodeExplorer::ActOnPrimaryClick(IWindowManager *,
@@ -215,7 +214,7 @@ void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
   if (model_id == CodePreviewWidget::kModelId ||
       model_id == kOpenEntityModelId) {
     
-    auto sel_text = index.data(CodeWidget::SelectedTextUserRole).toString();
+    auto sel_text = index.data(CodeWidget::SelectedTextRole).toString();
     if (!sel_text.isEmpty()) {
       auto copy_selection = new QAction(tr("Copy"), menu);
       menu->addAction(copy_selection);
