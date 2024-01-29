@@ -7,6 +7,7 @@
 #include <multiplier/AST/ConstantArrayType.h>
 #include <multiplier/AST/RecordDecl.h>
 #include <multiplier/AST/RecordType.h>
+#include <multiplier/AST/TypedefNameDecl.h>
 #include <multiplier/Frontend/Token.h>
 #include <multiplier/Frontend/TokenCategory.h>
 #include <multiplier/GUI/Plugins/StructExplorerPlugin.h>
@@ -29,7 +30,7 @@ Q_DECLARE_METATYPE(mx::TokenRange);
 namespace mx::gui {
 namespace {
 
-static const QKeySequence kKeySeqX("S");
+static const QKeySequence kKeySeqS("S");
 
 static QString ActionName(const VariantEntity &) {
   return QObject::tr("Open Struct Explorer");
@@ -39,7 +40,7 @@ class StructExplorerItem final : public IGeneratedItem {
   VariantEntity entity;
   VariantEntity aliased_entity;
   TokenRange name_tokens;
-  std::optional<TokenRange> type_tokens;
+  TokenRange type_tokens;
   std::optional<TokenRange> offset_tokens;
   std::optional<TokenRange> cumulative_offset_tokens;
   std::optional<TokenRange> size_tokens;
@@ -51,7 +52,7 @@ class StructExplorerItem final : public IGeneratedItem {
   inline StructExplorerItem(VariantEntity entity_,
                             VariantEntity aliased_entity_,
                             TokenRange name_tokens_,
-                            std::optional<TokenRange> type_tokens_,
+                            TokenRange type_tokens_,
                             std::optional<TokenRange> offset_tokens_,
                             std::optional<TokenRange> cumulative_offset_tokens_,
                             std::optional<TokenRange> size_tokens_,
@@ -97,9 +98,7 @@ class StructExplorerItem final : public IGeneratedItem {
         break;
       case 3: data.setValue(name_tokens); break;
       case 4:
-        if (type_tokens) {
-          data.setValue(InjectWhitespace(*type_tokens));
-        }
+        data.setValue(type_tokens);
         break;
       default: break;
     }
@@ -181,13 +180,11 @@ static TokenRange BitsToTokenRange(uint64_t num_bits) {
 
 static IGeneratedItemPtr
 CreateGeneratedItem(const VariantEntity &entity, TokenRange name,
-                    std::optional<TokenRange> type_tokens,
+                    TokenRange type_tokens,
                     std::optional<uint64_t> offset_in_bits,
                     std::optional<uint64_t> cumulative_offset_bits,
                     std::optional<uint64_t> size_in_bits) {
-  if (type_tokens) {
-    type_tokens = InjectWhitespace(*type_tokens);
-  }
+  type_tokens = InjectWhitespace(type_tokens);
 
   std::optional<TokenRange> offset_tokens;
   if (offset_in_bits) {
@@ -216,6 +213,9 @@ StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
   if (!rd) {
     co_return;
   }
+  // If the struct already has a definition, use the one
+  // that is being asked for, otherwise use the canonical
+  // definition
   if (!rd->is_definition()) {
     rd = rd->canonical_declaration();
   }
@@ -241,28 +241,27 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
       rd = RecordDecl::from(rt->declaration());
     }
     if (auto at = ArrayType::from(ty)) {
-      auto elem_ty = at->element_type();
+      auto elem_ty = at->element_type().desugared_type();
       if (auto rt = RecordType::from(elem_ty)) {
         rd = RecordDecl::from(rt->declaration());
       }
     }
   }
 
-  if (rd) {
-    if (!rd->is_definition()) {
-      rd = rd->canonical_declaration();
+  if (!rd) {
+    co_return;
+  }
+
+  for (const auto &rd_field : rd->fields()) {
+    std::optional<uint64_t> new_offset;
+    if (item->CumulativeOffsetInBits() && rd_field.offset_in_bits()) {
+      new_offset = rd_field.offset_in_bits().value() +
+                   item->CumulativeOffsetInBits().value();
     }
-    for (const auto &rd_field : rd->fields()) {
-      std::optional<uint64_t> new_offset;
-      if (item->CumulativeOffsetInBits() && rd_field.offset_in_bits()) {
-        new_offset = rd_field.offset_in_bits().value() +
-                     item->CumulativeOffsetInBits().value();
-      }
-      co_yield CreateGeneratedItem(
-          rd_field, NameOfEntity(rd_field, /*qualified=*/false),
-          rd_field.type().tokens(), rd_field.offset_in_bits(), new_offset,
-          rd_field.type().size_in_bits());
-    }
+    co_yield CreateGeneratedItem(
+        rd_field, NameOfEntity(rd_field, /*qualified=*/false),
+        rd_field.type().tokens(), rd_field.offset_in_bits(), new_offset,
+        rd_field.type().size_in_bits());
   }
 }
 
@@ -281,6 +280,22 @@ struct StructExplorerPlugin::PrivateData {
 
 StructExplorerPlugin::~StructExplorerPlugin(void) {}
 
+static std::optional<RecordDecl> GetRecordDecl(VariantEntity entity) {
+  auto rd = RecordDecl::from(entity);
+  if (auto td = TypedefNameDecl::from(entity)) {
+    auto ty = td->underlying_type().desugared_type();
+    if (auto rt = RecordType::from(ty)) {
+      rd = RecordDecl::from(rt->declaration());
+    }
+  }
+  if (auto fd = FieldDecl::from(entity)) {
+    if (auto pd = fd->parent_declaration()) {
+      rd = RecordDecl::from(pd.value());
+    }
+  }
+  return rd;
+}
+
 StructExplorerPlugin::StructExplorerPlugin(ConfigManager &config_manager,
                                            QObject *parent)
     : IReferenceExplorerPlugin(config_manager, parent),
@@ -289,16 +304,10 @@ StructExplorerPlugin::StructExplorerPlugin(ConfigManager &config_manager,
 std::optional<NamedAction>
 StructExplorerPlugin::ActOnSecondaryClick(IWindowManager *,
                                           const QModelIndex &index) {
-
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
 
-  auto rd = RecordDecl::from(entity);
-  if (auto fd = FieldDecl::from(entity)) {
-    if (auto pd = fd->parent_declaration()) {
-      rd = RecordDecl::from(pd.value());
-    }
-  }
   // Struct explorer only works on records
+  auto rd = GetRecordDecl(entity);
   if (!rd) {
     return std::nullopt;
   }
@@ -307,42 +316,30 @@ StructExplorerPlugin::ActOnSecondaryClick(IWindowManager *,
       .name = ActionName(entity),
       .action = d->open_struct_explorer_trigger,
       .data = QVariant::fromValue<ITreeGeneratorPtr>(
-          std::make_shared<StructExplorerGenerator>(std::move(entity)))};
+          std::make_shared<StructExplorerGenerator>(std::move(rd.value())))};
 }
 
 // Allow a main window plugin to act on a key sequence.
 std::optional<NamedAction>
 StructExplorerPlugin::ActOnKeyPress(IWindowManager *, const QKeySequence &keys,
                                     const QModelIndex &index) {
+  if (keys == kKeySeqS) {
+    return std::nullopt;
+  }
 
   VariantEntity entity = IModel::EntitySkipThroughTokens(index);
 
-  auto rd = RecordDecl::from(entity);
-  if (auto fd = FieldDecl::from(entity)) {
-    if (auto pd = fd->parent_declaration()) {
-      rd = RecordDecl::from(pd.value());
-    }
-  }
   // Struct explorer only works on records
+  auto rd = GetRecordDecl(entity);
   if (!rd) {
     return std::nullopt;
   }
 
-  QString action_name;
-
-  if (keys == kKeySeqX) {
-    action_name = ActionName(entity);
-  }
-
-  if (action_name.isEmpty()) {
-    return std::nullopt;
-  }
-
   return NamedAction{
-      .name = action_name,
+      .name = ActionName(entity),
       .action = d->open_struct_explorer_trigger,
       .data = QVariant::fromValue<ITreeGeneratorPtr>(
-          std::make_shared<StructExplorerGenerator>(std::move(entity)))};
+          std::make_shared<StructExplorerGenerator>(std::move(rd.value())))};
 }
 
 }  // namespace mx::gui
