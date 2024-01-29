@@ -375,16 +375,21 @@ void ListGeneratorWidget::UpdateItemButtons(void) {
 }
 
 void ListGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
+  auto pixmap = media_manager.Pixmap("com.trailofbits.icon.Goto");
+
+  auto required_width = QFontMetrics(font()).height() / 2;
+  auto icon_size = pixmap.deviceIndependentSize()
+                         .scaled(required_width, required_width, Qt::KeepAspectRatio);
+
   d->goto_item_icon = {};
-  d->goto_item_icon.addPixmap(
-      media_manager.Pixmap("com.trailofbits.icon.Goto"),
-      QIcon::Normal, QIcon::On);
+  d->goto_item_icon.addPixmap(std::move(pixmap), QIcon::Normal, QIcon::On);
   d->goto_item_icon.addPixmap(
       media_manager.Pixmap("com.trailofbits.icon.Goto",
                            ITheme::IconStyle::DISABLED),
       QIcon::Disabled, QIcon::On);
 
   d->goto_->setIcon(d->goto_item_icon);
+  d->goto_->setIconSize(icon_size.toSize());
 }
 
 void ListGeneratorWidget::OnModelReset(void) {
