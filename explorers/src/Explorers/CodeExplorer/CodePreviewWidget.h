@@ -33,7 +33,8 @@ class CodePreviewWidget Q_DECL_FINAL : public IWindowWidget {
   //! Constructor
   CodePreviewWidget(const ConfigManager &config_manager,
                     const CodeWidget::SceneOptions &scene_options,
-                    bool enable_history, QWidget *parent = nullptr);
+                    bool browse_mode, bool enable_history,
+                    QWidget *parent = nullptr);
 
   //! Destructor
   virtual ~CodePreviewWidget(void);

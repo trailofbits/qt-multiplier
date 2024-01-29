@@ -1,6 +1,6 @@
 <RCC>
     <qresource>
-        <file alias="com.trailofbits.icon.Logo">Icons/logo.icns</file>
+        <file alias="com.trailofbits.icon.Logo">logo.png</file>
         <file alias="com.trailofbits.icon.Back">Icons/back.png</file>
         <file alias="com.trailofbits.icon.Forward">Icons/forward.png</file>
         <file alias="com.trailofbits.icon.Close">Icons/close.png</file>
@@ -10,7 +10,7 @@
         <file alias="com.trailofbits.icon.PreviousSearchResult">Icons/show_prev_result.png</file>
         <file alias="com.trailofbits.icon.NextSearchResult">Icons/show_next_result.png</file>
         <file alias="com.trailofbits.icon.Search">Icons/search_icon.png</file>
-        <file alias="com.trailofbits.icon.BrowserMode">Icons/browser_mode.png</file>
+        <file alias="com.trailofbits.icon.BrowseMode">Icons/browse_mode.png</file>
 
         <file alias="com.trailofbits.icon.Activate">Icons/activate_ref_item.png</file>
         <file alias="com.trailofbits.icon.Expand">Icons/expand_ref_item.png</file>

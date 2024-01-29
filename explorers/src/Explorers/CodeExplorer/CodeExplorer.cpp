@@ -16,6 +16,7 @@
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/CodeWidget.h>
 #include <multiplier/GUI/Widgets/HistoryWidget.h>
 #include <multiplier/GUI/Util.h>
@@ -84,6 +85,7 @@ struct CodeExplorer::PrivateData {
   TriggerHandle expand_macro_trigger;
   TriggerHandle open_user_preview_trigger;
   TriggerHandle open_pinned_preview_trigger;
+  TriggerHandle browse_mode_trigger;
 
   // TODO(pag): `connect` the same signals to update `scene_options` to keep
   //            them in sync with other things.
@@ -91,6 +93,9 @@ struct CodeExplorer::PrivateData {
 
   ExpandedMacrosModel *macro_explorer_model{nullptr};
   MacroExplorer *macro_explorer{nullptr};
+
+  bool browse_mode{false};
+  QAction *browse_mode_action{nullptr};
 
   inline PrivateData(ConfigManager &config_manager_,
                      IWindowManager *manager_)
@@ -108,27 +113,44 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
     : IMainWindowPlugin(config_manager, parent),
       d(new PrivateData(config_manager, parent)) {
 
-  config_manager.ActionManager().Register(
+  auto &action_manager = config_manager.ActionManager();
+  auto &media_manager = config_manager.MediaManager();
+
+  action_manager.Register(
       this, "com.trailofbits.action.OpenEntity",
       &CodeExplorer::OnOpenEntity);
 
-  d->expand_macro_trigger = config_manager.ActionManager().Register(
+  d->expand_macro_trigger = action_manager.Register(
       this, "com.trailofbits.action.ExpandMacro",
       &CodeExplorer::OnExpandMacro);
 
-  (void) config_manager.ActionManager().Register(
+  (void) action_manager.Register(
       this, "com.trailofbits.action.OpenEntityPreview",
       &CodeExplorer::OnImplicitPreviewEntity);
 
-  d->open_user_preview_trigger = config_manager.ActionManager().Register(
+  d->open_user_preview_trigger = action_manager.Register(
       this, "com.trailofbits.action.OpenUserRequestedEntityPreview",
       &CodeExplorer::OnExplicitPreviewEntity);
 
-  d->open_pinned_preview_trigger = config_manager.ActionManager().Register(
+  d->open_pinned_preview_trigger = action_manager.Register(
       this, "com.trailofbits.action.OpenPinnedEntityPreview",
       &CodeExplorer::OnPinnedPreviewEntity);
 
+  d->browse_mode_trigger = action_manager.Register(
+      this, "com.trailofbits.action.ToggleBrowseMode",
+      &CodeExplorer::OnToggleBrowseMode);
+
   parent->AddToolBarWidget(d->history);
+
+  d->browse_mode_action = parent->AddDepressableToolBarButton(
+      media_manager.Pixmap("com.trailofbits.icon.BrowseMode"),
+      tr("Browse Mode"), d->browse_mode_trigger);
+
+  d->browse_mode_action->setChecked(true);
+}
+
+void CodeExplorer::OnToggleBrowseMode(const QVariant &data) {
+  d->browse_mode = data.toBool();
 }
 
 void CodeExplorer::ActOnPrimaryClick(IWindowManager *,
@@ -192,7 +214,7 @@ void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
   if (model_id == CodePreviewWidget::kModelId ||
       model_id == kOpenEntityModelId) {
     
-    auto sel_text = index.data(CodeWidget::SelectedTextUserRole).toString();
+    auto sel_text = index.data(CodeWidget::SelectedTextRole).toString();
     if (!sel_text.isEmpty()) {
       auto copy_selection = new QAction(tr("Copy"), menu);
       menu->addAction(copy_selection);
@@ -251,7 +273,8 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
     return;
   }
 
-  code_widget = new CodeWidget(d->config_manager, kOpenEntityModelId);
+  code_widget = new CodeWidget(
+      d->config_manager, kOpenEntityModelId, d->browse_mode);
 
   connect(this, &CodeExplorer::ExpandMacros,
           code_widget, &CodeWidget::OnExpandMacros);
@@ -320,7 +343,7 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
 
   if (!d->preview) {
     d->preview = new CodePreviewWidget(
-        d->config_manager, d->scene_options, true);
+        d->config_manager, d->scene_options, d->browse_mode, true);
 
     connect(this, &CodeExplorer::ExpandMacros,
             d->preview, &CodePreviewWidget::OnExpandMacros);
@@ -358,7 +381,7 @@ void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
   }
 
   auto preview = new CodePreviewWidget(
-      d->config_manager, d->scene_options, false);
+      d->config_manager, d->scene_options, d->browse_mode, false);
 
   connect(this, &CodeExplorer::ExpandMacros,
           preview, &CodePreviewWidget::OnExpandMacros);

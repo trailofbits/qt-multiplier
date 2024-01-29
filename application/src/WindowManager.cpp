@@ -159,13 +159,33 @@ QAction *WindowManager::AddToolBarButton(
 
   CreateToolBarIfMissing();
 
-  auto tool_action = new QAction(icon, action.name, d->toolbar);
+  auto tool_action = new QAction(icon, action.name, d->toolbar);  
+  connect(tool_action, &QAction::toggled,
+          [data = action.data, action = action.action] (bool toggled) {
+            if (data.isValid()) {
+              action.Trigger(data);
+            } else {
+              action.Trigger(QVariant::fromValue(toggled));
+            }
+          });
+
+  d->toolbar->addAction(tool_action);
+  return tool_action;
+}
+
+//! Add a button to the toolbar, where the value passed to the trigger is the
+//! toggled state of the button. This is a button that can stay depressed.
+QAction *WindowManager::AddDepressableToolBarButton(
+    const QIcon &icon, const QString &name, const TriggerHandle &trigger) {
+
+  CreateToolBarIfMissing();
+
+  auto tool_action = new QAction(icon, name, d->toolbar);
   tool_action->setCheckable(true);
-  tool_action->setChecked(true);
   
   connect(tool_action, &QAction::toggled,
-          [data = action.data, action = action.action] (void) {
-            action.Trigger(data);
+          [action = trigger] (bool toggled) {
+            action.Trigger(QVariant::fromValue(toggled));
           });
 
   d->toolbar->addAction(tool_action);

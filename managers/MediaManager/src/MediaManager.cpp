@@ -90,7 +90,7 @@ QFont MediaManager::Font(const QString &id) const {
 }
 
 QIcon MediaManager::Icon(const QString &id, ITheme::IconStyle style) const {
-  return QIcon(Pixmap(":" + id, style));
+  return QIcon(Pixmap(id, style));
 }
 
 QPixmap MediaManager::Pixmap(const QString &id, ITheme::IconStyle style) const {

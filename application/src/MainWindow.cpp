@@ -57,15 +57,16 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
     : QMainWindow(parent),
       d(new PrivateData(application, this)) {
 
+  setWindowTitle("Multiplier");
+
   InitializeMenus();
   InitializeThemes();
   InitializeIndex(application);
   InitializeDocks();
   InitializePlugins();
-  // auto file = d->config_manager.Index().file(1152921504606847251ull);
-  // auto code = new CodeWidget(d->config_manager, TokenTree::from(file.value()),
-  //                            this);
-  // setCentralWidget(code);
+
+  setWindowIcon(
+      d->config_manager.MediaManager().Icon("com.trailofbits.icon.Logo"));
 }
 
 void MainWindow::InitializePlugins(void) {
