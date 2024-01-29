@@ -331,6 +331,7 @@ void EntityInformationWidget::DisplayEntity(
   // If we don't have this info browser synchronized with implicit events, then
   // ignore this request to display the entity.
   if (!is_explicit_request && !d->sync) {
+    emit RequestAttention();
     return;
   }
 
@@ -382,6 +383,7 @@ void EntityInformationWidget::DisplayEntity(
 
   // Dedup check; don't want to reload the model unnecessarily.
   if (EntityId(d->current_entity) == EntityId(entity)) {
+    emit RequestAttention();
     return;
   }
 
@@ -432,6 +434,8 @@ void EntityInformationWidget::DisplayEntity(
       d->thread_pool.start(runnable);
     }
   }
+
+  emit RequestAttention();
 }
 
 bool EntityInformationWidget::eventFilter(QObject *object, QEvent *event) {
