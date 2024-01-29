@@ -696,6 +696,10 @@ void TreeGeneratorWidget::GotoOriginal(const QModelIndex &index_) {
   sel->clearSelection();
   sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
   d->tree_view->scrollTo(dedup);
+
+  d->goto_->hide();
+  d->open->hide();
+  d->expand->hide();
 }
 
 void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
