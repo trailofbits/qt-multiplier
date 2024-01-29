@@ -78,6 +78,7 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
     OpaquePosition current_y;
     OpaquePosition cursor_y;
 
+    qreal scroll_y_offset_scale{0};
     qreal scroll_x_scale{0};
     qreal cursor_x_scale{0};
     int cursor_index{-1};

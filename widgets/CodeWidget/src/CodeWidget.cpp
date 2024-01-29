@@ -1354,6 +1354,7 @@ bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
       QSize new_size = re->size();
       d->viewport.setWidth(new_size.width());
       d->viewport.setHeight(new_size.height());
+      d->RecomputeLineNumbers();
       d->UpdateScrollbars();
       update();
     }
@@ -1797,8 +1798,9 @@ CodeWidget::OpaqueLocation CodeWidget::LastLocation(void) const {
   }
 }
 
-CodeWidget::OpaquePosition
-CodeWidget::PrivateData::YDimensionToPosition(qreal y) const {
+CodeWidget::OpaquePosition CodeWidget::PrivateData::YDimensionToPosition(
+    qreal y) const {
+
   CodeWidget::OpaquePosition pos;
 
   // Try to maintain scroll position across scene changes.
@@ -1806,13 +1808,13 @@ CodeWidget::PrivateData::YDimensionToPosition(qreal y) const {
   pos.physical = 0;
   pos.relative = 0;  // Displacement from the first `physical`.
   if (0 < y && !scene.physical_line_number.empty()) {
-    
+
     pos.scale = y / line_height;
     auto logical = static_cast<int>(std::floor(pos.scale));
 
     auto line_nums = scene.physical_line_number.data();
     pos.physical = std::abs(line_nums[logical]);
-    
+
     for (auto i = logical - 1; 0 <= i; --i, ++pos.relative) {
       if (std::abs(line_nums[i]) != pos.physical) {
         break;
@@ -1826,8 +1828,9 @@ CodeWidget::PrivateData::YDimensionToPosition(qreal y) const {
   return pos;
 }
 
-qreal
-CodeWidget::PrivateData::PositionToYDimension(CodeWidget::OpaquePosition pos) const {
+qreal CodeWidget::PrivateData::PositionToYDimension(
+    CodeWidget::OpaquePosition pos) const {
+
   if (0 > pos.physical) {
     return 0;
   }
@@ -1879,15 +1882,28 @@ CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
 
   loc.scroll_y = YDimensionToPosition(scroll_y);
   
+  // Figure out of offset within the current logical line in terms of a scaling
+  // factor of the line height.  
+  auto scaled_y = static_cast<int>(std::floor(
+      std::floor(loc.scroll_y.scale) * line_height));
+  Q_ASSERT(scaled_y <= scroll_y);
+  loc.scroll_y_offset_scale = (scroll_y - scaled_y) / qreal(line_height);
+
+  // Represent the scroll X position in terms of a scaling factor of the font's
+  // space width. This is so that if a scene recompute due to 
   loc.scroll_x_scale = (scroll_x - left_margin) / space_width;
 
+  // Try to figure out where the cursor should go.
   if (cursor) {
     loc.cursor_y = YDimensionToPosition(cursor->y());
-    loc.current_y = loc.cursor_y;  // Force them to match.
+
+    // If there is a cursor, then use it as the current line for line
+    // highlighting.
+    loc.current_y = loc.cursor_y;
 
     loc.cursor_x_scale = cursor->x() / space_width;
 
-    // Calculate the character index.
+    // Calculate the character index. This is the logical column, minus one.
     if (auto entity = EntityUnderPoint(cursor.value())) {
       loc.cursor_index = CharacterPosition(cursor.value(), entity).first;
       auto li = static_cast<unsigned>(entity->logical_line_number - 1);
@@ -1897,6 +1913,8 @@ CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
             scene.data[lie->data_index_and_config >> kFormatShift].text.size());
       }
     }
+
+  // If there is no cursor, try to keep track of the current highlighted line.
   } else if (current_line_index != -1) {
     loc.current_y = YDimensionToPosition(current_line_index * line_height);
   }
@@ -1904,7 +1922,8 @@ CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
 }
 
 void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
-  scroll_y = static_cast<int>(PositionToYDimension(loc.scroll_y));
+  scroll_y = static_cast<int>(PositionToYDimension(loc.scroll_y) +
+                              (loc.scroll_y_offset_scale * line_height));
   scroll_x = static_cast<int>(left_margin + (loc.scroll_x_scale * space_width));
   
   if (loc.current_y.physical >= 0) {
@@ -2150,7 +2169,7 @@ void CodeWidget::PrivateData::RecomputeLineNumbers(void) {
 
   QFontMetricsF fm(theme_font);
 
-  auto height = std::max(canvas_rect.height(), viewport.height()) * dpi_ratio;
+  auto height = std::max(canvas_rect.height(), viewport.height());
   auto width = (space_width * 3) + (fm.maxWidth() * num_digits);
   left_margin = width;
 
@@ -2174,44 +2193,46 @@ void CodeWidget::PrivateData::RecomputeLineNumbers(void) {
 
   QTextOption gutter_to(Qt::AlignRight);
 
-  auto max_i = scene.logical_line_index.size() - 1u;
-  QRectF bounding_rect(space_width, 0, width - (space_width * 3), line_height);
+  if (!scene.logical_line_index.empty()) {
+    auto max_i = scene.logical_line_index.size() - 1u;
+    QRectF bounding_rect(space_width, 0, width - (space_width * 3), line_height);
 
-  int last_line_num = 0;
+    int last_line_num = 0;
 
-  // Paint the line numbers.
-  for (auto i = 0u; i < max_i; ++i) {
-    int line_number = 0;
-    auto max_e = scene.logical_line_index[i + 1u];
-    
-    // Go get the minimum line number. Some might be negative because of a
-    // macro expansion on the line, so we want to highlight that an expansion
-    // happened somewhere on the line.
-    for (auto e = scene.logical_line_index[i]; e < max_e; ++e) {
-      if (auto ln = scene.file_line_number[e]) {
-        if (!line_number) {
-          line_number = ln;
-        } else {
-          line_number = std::min(line_number, ln);
+    // Paint the line numbers.
+    for (auto i = 0u; i < max_i; ++i) {
+      int line_number = 0;
+      auto max_e = scene.logical_line_index[i + 1u];
+      
+      // Go get the minimum line number. Some might be negative because of a
+      // macro expansion on the line, so we want to highlight that an expansion
+      // happened somewhere on the line.
+      for (auto e = scene.logical_line_index[i]; e < max_e; ++e) {
+        if (auto ln = scene.file_line_number[e]) {
+          if (!line_number) {
+            line_number = ln;
+          } else {
+            line_number = std::min(line_number, ln);
+          }
         }
       }
+
+      if (!line_number) {
+        line_number = last_line_num;
+      }
+
+      if (line_number) {
+        QString text = QString::number(std::abs(line_number));
+        font.setUnderline(0 > line_number);
+        blitter.setFont(font);
+        blitter.drawText(bounding_rect, text, gutter_to);
+
+        last_line_num = -std::abs(line_number);
+      }
+
+      bounding_rect.moveTo(
+          QPointF(bounding_rect.x(), bounding_rect.y() + line_height));
     }
-
-    if (!line_number) {
-      line_number = last_line_num;
-    }
-
-    if (line_number) {
-      QString text = QString::number(std::abs(line_number));
-      font.setUnderline(0 > line_number);
-      blitter.setFont(font);
-      blitter.drawText(bounding_rect, text, gutter_to);
-
-      last_line_num = -std::abs(line_number);
-    }
-
-    bounding_rect.moveTo(
-        QPointF(bounding_rect.x(), bounding_rect.y() + line_height));
   }
 
   // Paint a right margin one space wide.
@@ -2875,6 +2896,12 @@ void CodeWidget::ChangeScene(const TokenTree &token_tree,
   d->search_result_list.clear();
   d->macros_to_expand = options.macros_to_expand;
   d->new_entity_names = options.new_entity_names;
+  if (d->horizontal_scrollbar->value()) {
+    d->horizontal_scrollbar->setValue(0);
+  }
+  if (d->vertical_scrollbar->value()) {
+    d->vertical_scrollbar->setValue(0);
+  }
   d->UpdateScrollbars();
   update();
 }
