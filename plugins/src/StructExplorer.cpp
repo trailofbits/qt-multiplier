@@ -277,19 +277,18 @@ struct StructExplorerPlugin::PrivateData {
 StructExplorerPlugin::~StructExplorerPlugin(void) {}
 
 static std::optional<RecordDecl> GetRecordDecl(VariantEntity entity) {
-  auto rd = RecordDecl::from(entity);
   if (auto td = TypedefNameDecl::from(entity)) {
     auto ty = td->underlying_type().desugared_type();
     if (auto rt = RecordType::from(ty)) {
-      rd = RecordDecl::from(rt->declaration());
+      return RecordDecl::from(rt->declaration());
     }
   }
   if (auto fd = FieldDecl::from(entity)) {
     if (auto pd = fd->parent_declaration()) {
-      rd = RecordDecl::from(pd.value());
+      return RecordDecl::from(pd.value());
     }
   }
-  return rd;
+  return RecordDecl::from(entity);
 }
 
 StructExplorerPlugin::StructExplorerPlugin(ConfigManager &config_manager,
@@ -319,7 +318,7 @@ StructExplorerPlugin::ActOnSecondaryClick(IWindowManager *,
 std::optional<NamedAction>
 StructExplorerPlugin::ActOnKeyPress(IWindowManager *, const QKeySequence &keys,
                                     const QModelIndex &index) {
-  if (keys == kKeySeqS) {
+  if (keys != kKeySeqS) {
     return std::nullopt;
   }
 
