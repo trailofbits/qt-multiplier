@@ -107,12 +107,12 @@ class StructExplorerItem final : public IGeneratedItem {
 };
 
 class StructExplorerGenerator final : public ITreeGenerator {
-  const VariantEntity root_entity;
+  const RecordDecl root_entity;
 
  public:
   virtual ~StructExplorerGenerator(void) = default;
 
-  inline StructExplorerGenerator(VariantEntity root_entity_)
+  inline StructExplorerGenerator(RecordDecl root_entity_)
       : root_entity(std::move(root_entity_)) {}
 
   int SortColumn(void) const;
@@ -144,7 +144,7 @@ QString StructExplorerGenerator::Name(const ITreeGeneratorPtr &) const {
   if (name) {
     return QObject::tr("Struct of `%1`").arg(name.value());
   } else {
-    return QObject::tr("Struct of entity %1").arg(EntityId(root_entity).Pack());
+    return QObject::tr("Struct of entity %1").arg(root_entity.id().Pack());
   }
 }
 
@@ -208,18 +208,14 @@ CreateGeneratedItem(const VariantEntity &entity, TokenRange name,
 
 gap::generator<IGeneratedItemPtr>
 StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
-  // Roots should only be records
-  auto rd = RecordDecl::from(root_entity);
-  if (!rd) {
-    co_return;
-  }
+  auto rd = root_entity;
   // If the struct already has a definition, use the one
   // that is being asked for, otherwise use the canonical
   // definition
-  if (!rd->is_definition()) {
-    rd = rd->canonical_declaration();
+  if (!rd.is_definition()) {
+    rd = rd.canonical_declaration();
   }
-  for (const auto &field : rd->fields()) {
+  for (const auto &field : rd.fields()) {
     co_yield CreateGeneratedItem(
         field, NameOfEntity(field, /*qualified=*/false),
         field.type().tokens(), field.offset_in_bits(), field.offset_in_bits(),
