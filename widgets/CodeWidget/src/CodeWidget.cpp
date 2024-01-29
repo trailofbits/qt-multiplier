@@ -1336,7 +1336,10 @@ void CodeWidget::focusInEvent(QFocusEvent *) {
 }
 
 void CodeWidget::focusOutEvent(QFocusEvent *) {
-  d->last_location = d->Location();
+  d->last_location.reset();
+  if (0 < d->space_width && 0 < d->line_height) {
+    d->last_location = d->Location();
+  }
 
   // Requests for context menus trigger `focusOutEvent`s prior to
   // `mouseReleaseEvent`.
@@ -1890,8 +1893,9 @@ CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
   loc.scroll_y_offset_scale = (scroll_y - scaled_y) / qreal(line_height);
 
   // Represent the scroll X position in terms of a scaling factor of the font's
-  // space width. This is so that if a scene recompute due to 
-  loc.scroll_x_scale = (scroll_x - left_margin) / space_width;
+  // space width. This is so that if a scene recompute due to theme change,
+  // we'll be able to put ourselves back approximately correctly.
+  loc.scroll_x_scale = scroll_x / space_width;
 
   // Try to figure out where the cursor should go.
   if (cursor) {
@@ -1924,7 +1928,7 @@ CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
 void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
   scroll_y = static_cast<int>(PositionToYDimension(loc.scroll_y) +
                               (loc.scroll_y_offset_scale * line_height));
-  scroll_x = static_cast<int>(left_margin + (loc.scroll_x_scale * space_width));
+  scroll_x = static_cast<int>(loc.scroll_x_scale * space_width);
   
   if (loc.current_y.physical >= 0) {
     current_line_index = static_cast<int>(
@@ -1985,7 +1989,10 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
   }
 
   // Try to maintain scroll position across scene changes.
-  auto loc = Location();
+  std::optional<OpaqueLocation> loc;
+  if (0 < space_width && 0 < line_height) {
+    loc = Location();
+  }
 
   version_number++;
 
@@ -1996,7 +2003,9 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
   scene_changed = false;
   current_entity = nullptr;
 
-  SetLocation(loc);
+  if (loc) {
+    SetLocation(std::move(loc.value()));
+  }
 
   // Force a change.
   canvas_changed = true;

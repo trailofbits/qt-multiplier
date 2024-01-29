@@ -159,7 +159,10 @@ QAction *WindowManager::AddToolBarButton(
 
   CreateToolBarIfMissing();
 
-  auto tool_action = new QAction(icon, action.name, d->toolbar);  
+  auto tool_button = new QToolButton(d->toolbar);
+  auto tool_action = new QAction(icon, action.name, tool_button);
+  tool_button->setDefaultAction(tool_action);
+
   connect(tool_action, &QAction::toggled,
           [data = action.data, action = action.action] (bool toggled) {
             if (data.isValid()) {
@@ -169,7 +172,7 @@ QAction *WindowManager::AddToolBarButton(
             }
           });
 
-  d->toolbar->addAction(tool_action);
+  d->toolbar->addWidget(tool_button);
   return tool_action;
 }
 
@@ -180,15 +183,17 @@ QAction *WindowManager::AddDepressableToolBarButton(
 
   CreateToolBarIfMissing();
 
-  auto tool_action = new QAction(icon, name, d->toolbar);
+  auto tool_button = new QToolButton(d->toolbar);
+  auto tool_action = new QAction(icon, name, tool_button);
   tool_action->setCheckable(true);
+  tool_button->setDefaultAction(tool_action);
   
   connect(tool_action, &QAction::toggled,
           [action = trigger] (bool toggled) {
             action.Trigger(QVariant::fromValue(toggled));
           });
 
-  d->toolbar->addAction(tool_action);
+  d->toolbar->addWidget(tool_button);
   return tool_action;
 }
 
