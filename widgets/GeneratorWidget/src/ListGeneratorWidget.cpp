@@ -462,6 +462,7 @@ void ListGeneratorWidget::OnGotoOriginalButtonPressed(void) {
   sel->clearSelection();
   sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
   d->list_view->scrollTo(dedup);
+  d->goto_->hide();
 }
 
 // NOTE(pag): The config manager handles the item delegate automatically.
