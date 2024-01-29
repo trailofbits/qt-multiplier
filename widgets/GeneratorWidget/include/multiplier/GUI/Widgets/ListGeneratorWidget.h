@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <QMenu>
 #include <QPoint>
 #include <QResizeEvent>
 #include <QWidget>

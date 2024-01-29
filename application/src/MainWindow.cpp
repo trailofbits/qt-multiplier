@@ -25,6 +25,7 @@
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h>
 #include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
+#include <multiplier/GUI/Plugins/StructExplorerPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
 #include <multiplier/Index.h>
 #include <vector>
@@ -43,7 +44,7 @@ struct MainWindow::PrivateData {
   QMenu *view_explorers_menu{nullptr};
   QMenu *view_theme_menu{nullptr};
 
-  WindowManager * const window_manager;
+  WindowManager *const window_manager;
 
   inline PrivateData(QApplication &application, MainWindow *main_window)
       : config_manager(application, main_window),
@@ -80,6 +81,8 @@ void MainWindow::InitializePlugins(void) {
 
   auto ref_explorer = new ReferenceExplorer(d->config_manager, wm);
   ref_explorer->EmplacePlugin<CallHierarchyPlugin>(
+      d->config_manager, ref_explorer);
+  ref_explorer->EmplacePlugin<StructExplorerPlugin>(
       d->config_manager, ref_explorer);
   d->plugins.emplace_back(ref_explorer);
 
@@ -146,6 +149,8 @@ void MainWindow::InitializeIndex(QApplication &application) {
   db_option.setValueName("database");
 
   QCommandLineParser parser;
+  parser.addHelpOption();
+  parser.addVersionOption();
   parser.addOption(theme_option);
   parser.addOption(db_option);
 
