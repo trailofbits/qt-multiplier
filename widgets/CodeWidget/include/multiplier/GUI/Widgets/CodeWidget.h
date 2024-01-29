@@ -60,18 +60,27 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
     QMap<RawEntityId, QString> new_entity_names;
   };
 
-  // Opaquely represents the current location in the code.
+  // Opaque representing for a Y-axis position in a document.
+  struct OpaquePosition {
+    qreal scale{0};
+    int relative{-1};
+    int physical{-1};
+  };
+
+  // Opaquely represents the current location in the code. This captures the
+  // scroll configuration and the cursor location.
   //
   // TODO(pag): Try to implement the internal code that maintains scroll
   //            position in terms of this opaque location thing, that way it's
   //            more reliable and in the critical path.
   struct OpaqueLocation {
-    qreal x_scale{0};
-    qreal y_scale{0};
-    int y_logical{-1};
-    int y_physical{-1};
-    int z{-1};
-    int y_cursor{-1};
+    OpaquePosition scroll_y;
+    OpaquePosition current_y;
+    OpaquePosition cursor_y;
+
+    qreal scroll_x_scale{0};
+    qreal cursor_x_scale{0};
+    int cursor_index{-1};
   };
 
   virtual ~CodeWidget(void);
@@ -136,4 +145,5 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
 
 }  // namespace mx::gui
 
+Q_DECLARE_METATYPE(mx::gui::CodeWidget::OpaquePosition)
 Q_DECLARE_METATYPE(mx::gui::CodeWidget::OpaqueLocation)

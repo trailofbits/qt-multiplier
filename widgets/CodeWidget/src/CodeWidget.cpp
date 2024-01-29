@@ -436,6 +436,13 @@ inline static void InitializePainterOptions(QPainter &p) {
                    QPainter::SmoothPixmapTransform);
 }
 
+struct Position {
+  qreal scale{0};
+  int logical{-1};
+  int relative{-1};
+  int physical{-1};
+};
+
 }  // namespace
 
 struct CodeWidget::PrivateData {
@@ -522,7 +529,7 @@ struct CodeWidget::PrivateData {
   int max_char_width{0};
   bool is_monospaced{false};
 
-  // The index of the current line to highlight.
+  // The index of the current line to highlight. This is a logical line index.
   int current_line_index{-1};
 
   // The current entity under the cursor.
@@ -616,8 +623,13 @@ struct CodeWidget::PrivateData {
 
   QModelIndex CreateModelIndex(const Entity *entity);
 
+  CodeWidget::OpaquePosition YDimensionToPosition(qreal y) const;
+  qreal PositionToYDimension(CodeWidget::OpaquePosition pos) const;
+
   // Capture an "opaque" representation of the current location in the code.
   CodeWidget::OpaqueLocation Location(void);
+
+  void ClampScrollXY(void);
 
   void SetLocation(CodeWidget::OpaqueLocation loc);
   void SetCursor(CodeWidget::OpaqueLocation loc);
@@ -638,6 +650,8 @@ void CodeWidget::PrivateData::TriggerScrollbarUpdate(CB cb) {
   scroll_y = old_scroll_y;
 
   cb();
+
+  ClampScrollXY();
 
   if (horizontal_scrollbar->maximum()) {
     if (auto delta_x = scroll_x - old_scroll_x) {
@@ -1783,60 +1797,56 @@ CodeWidget::OpaqueLocation CodeWidget::LastLocation(void) const {
   }
 }
 
-// Capture an "opaque" representation of the current location in the code.
-CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
-  CodeWidget::OpaqueLocation loc;
+CodeWidget::OpaquePosition
+CodeWidget::PrivateData::YDimensionToPosition(qreal y) const {
+  CodeWidget::OpaquePosition pos;
 
   // Try to maintain scroll position across scene changes.
-  loc.y_scale = 0.0;
-  loc.y_logical = 0;
-  loc.y_physical = 0;
-  loc.z = 0;  // Displacement from the first `y_physical`.
-  std::vector<std::pair<unsigned, RawEntityId>> eo_to_eid;
-  if (scroll_y && !scene.physical_line_number.empty()) {
+  pos.scale = 0.0;
+  pos.physical = 0;
+  pos.relative = 0;  // Displacement from the first `physical`.
+  if (0 < y && !scene.physical_line_number.empty()) {
     
-    loc.y_scale = scroll_y / line_height;
-    loc.y_logical = static_cast<int>(std::floor(loc.y_scale));
+    pos.scale = y / line_height;
+    auto logical = static_cast<int>(std::floor(pos.scale));
 
     auto line_nums = scene.physical_line_number.data();
-    loc.y_physical = std::abs(line_nums[loc.y_logical]);
-    for (auto i = loc.y_logical - 1; 0 <= i; --i, ++loc.z) {
-      if (std::abs(line_nums[i]) != loc.y_physical) {
+    pos.physical = std::abs(line_nums[logical]);
+    
+    for (auto i = logical - 1; 0 <= i; --i, ++pos.relative) {
+      if (std::abs(line_nums[i]) != pos.physical) {
         break;
       }
     }
 
-    Q_ASSERT(static_cast<unsigned>(loc.y_logical) <
+    Q_ASSERT(static_cast<unsigned>(logical) <
              scene.logical_line_index.size());
   }
 
-  loc.x_scale = 0;
-  loc.y_cursor = -1;
-
-  if (cursor) {
-    loc.y_cursor = static_cast<int>(std::floor(cursor->y() / line_height));
-    loc.x_scale = cursor->x() / space_width;
-  }
-
-  return loc;
+  return pos;
 }
 
-void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
+qreal
+CodeWidget::PrivateData::PositionToYDimension(CodeWidget::OpaquePosition pos) const {
+  if (0 > pos.physical) {
+    return 0;
+  }
+
   int found = 0;
   auto new_line_index = 0;  // Logical line index.
   auto new_line_index_rel = 0;
   for (auto new_phy_line : scene.physical_line_number) {
-    if (found && found > loc.z) {
+    if (found && found > pos.relative) {
       break;
     }
 
     auto abs_new_phy_line = std::abs(new_phy_line);
-    if (abs_new_phy_line == loc.y_physical) {
+    if (abs_new_phy_line == pos.physical) {
       if (!new_line_index_rel) {
         new_line_index_rel = new_line_index;
       }
       ++found;
-    } else if (found && abs_new_phy_line > loc.y_physical) {
+    } else if (found && abs_new_phy_line > pos.physical) {
       break;
     }
     ++new_line_index;
@@ -1846,29 +1856,107 @@ void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
 
     // We have enough relative lines, e.g. a macro that expanded to multiple
     // lines.
-    if (found >= loc.z) {
-      scroll_y = static_cast<int>(
-          (new_line_index_rel + loc.z) * line_height);
+    if (found >= pos.relative) {
+      return (new_line_index_rel + pos.relative) * line_height;
 
     // We have fewer relative lines, e.g. a macro that spanned multiple lines
     // and was unexpanded.
     } else {
-      scroll_y = static_cast<int>(
-          (new_line_index_rel + (found - 1)) * line_height);
+      return (new_line_index_rel + (found - 1)) * line_height;
     }
   
   // Backup position. Useful if all that's changed is the theme.
   } else {
-    scroll_y = static_cast<int>(line_height * loc.y_scale);
+    return pos.scale * line_height;
+  }
+}
+
+// Capture an "opaque" representation of the current location in the code. This
+// can be used to maintain scroll and cursor positions across scene changes,
+// such as when macros are expanded.
+CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
+  CodeWidget::OpaqueLocation loc;
+
+  loc.scroll_y = YDimensionToPosition(scroll_y);
+  
+  loc.scroll_x_scale = (scroll_x - left_margin) / space_width;
+
+  if (cursor) {
+    loc.cursor_y = YDimensionToPosition(cursor->y());
+    loc.current_y = loc.cursor_y;  // Force them to match.
+
+    loc.cursor_x_scale = cursor->x() / space_width;
+
+    // Calculate the character index.
+    if (auto entity = EntityUnderPoint(cursor.value())) {
+      loc.cursor_index = CharacterPosition(cursor.value(), entity).first;
+      auto li = static_cast<unsigned>(entity->logical_line_number - 1);
+      auto lie = scene.entities.data() + scene.logical_line_index[li];
+      for (; lie < entity; ++lie) {
+        loc.cursor_index += static_cast<int>(
+            scene.data[lie->data_index_and_config >> kFormatShift].text.size());
+      }
+    }
+  } else if (current_line_index != -1) {
+    loc.current_y = YDimensionToPosition(current_line_index * line_height);
+  }
+  return loc;
+}
+
+void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
+  scroll_y = static_cast<int>(PositionToYDimension(loc.scroll_y));
+  scroll_x = static_cast<int>(left_margin + (loc.scroll_x_scale * space_width));
+  
+  if (loc.current_y.physical >= 0) {
+    current_line_index = static_cast<int>(
+        std::floor(PositionToYDimension(loc.current_y) / line_height));
   }
 
   SetCursor(std::move(loc));
 }
 
 void CodeWidget::PrivateData::SetCursor(CodeWidget::OpaqueLocation loc) {
-  if (0 < loc.x_scale && 0 < loc.y_cursor) {
-    cursor = CursorPosition(QPointF(loc.x_scale * space_width,
-                                    loc.y_cursor * line_height));
+  if (0 > loc.cursor_y.physical) {
+    cursor.reset();
+    current_entity = nullptr;
+    return;
+  }
+
+  QPointF pt(left_margin + (loc.scroll_x_scale * space_width),
+             PositionToYDimension(loc.cursor_y));
+
+  current_line_index = static_cast<int>(std::floor(pt.y() / line_height));
+
+  auto li = static_cast<unsigned>(std::floor(pt.y() / line_height));
+  if (0 < loc.cursor_index && (li + 1u) < scene.logical_line_index.size()) {
+    pt.setX(left_margin);
+    while (0 < loc.cursor_index) {
+      pt = NextCursorPosition(pt, 1, 0);
+      --loc.cursor_index;
+    }
+  }
+
+  cursor = CursorPosition(pt);
+  current_entity = EntityUnderPoint(cursor.value());
+}
+
+// Clamp the scroll positions.
+void CodeWidget::PrivateData::ClampScrollXY(void) {
+  auto v_width = viewport.width();
+  auto v_height = viewport.height();
+  if (v_width && v_height) {
+    auto c_width = static_cast<int>(foreground_canvas.width() / dpi_ratio);
+    auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
+    
+    scroll_y = std::max(0, scroll_y);
+    if (c_height > v_height) {
+      scroll_y = std::min(scroll_y, c_height - v_height);
+    }
+
+    scroll_x = std::max(0, scroll_x);
+    if (c_width > v_width) {
+      scroll_x = std::min(scroll_x, c_width - v_width);
+    }
   }
 }
 
@@ -1887,11 +1975,11 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
 
   scene = builder.TakeScene();
   scene_changed = false;
+  current_entity = nullptr;
 
   SetLocation(loc);
 
   // Force a change.
-  current_entity = nullptr;
   canvas_changed = true;
 }
 
@@ -2374,8 +2462,8 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 void CodeWidget::PrivateData::ScrollToPoint(
     CodeWidget *self, QPointF point, bool take_focus) {
 
-  auto v_width = viewport.width();
-  auto v_height = viewport.height();
+  int v_width = viewport.width();
+  int v_height = viewport.height();
 
   // If we don't yet have a viewport width/height, then schedule this function
   // to run later.
@@ -2389,24 +2477,24 @@ void CodeWidget::PrivateData::ScrollToPoint(
     return;
   }
 
-  auto c_width = static_cast<int>(foreground_canvas.width() / dpi_ratio);
-  auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
-
+  // NOTE(pag): This function calls `ClampScrollXY` to keep them in range.
   TriggerScrollbarUpdate([=, this] (void) {
 
     // If the entity isn't already visible, then center the window to make it
     // visible.
+    //
+    // NOTE(pag): The `5` divisor is to say: if less than 1/5th of the viewport
+    //            is below the point, then center the point in the viewport.
+    //            It can be odd when you go to an entity/point, and it brings
+    //            you to the file, but the entity is way at the bottom of the
+    //            screen.
     if (point.y() < scroll_y ||
-        (point.y() + line_height) > (scroll_y + v_height)) {
-      scroll_y = std::min(
-          std::max(0, static_cast<int>(point.y() - (v_height / 2))),
-          c_height - v_height);
+        (point.y() + line_height + (v_height / 5)) > (scroll_y + v_height)) {
+      scroll_y = static_cast<int>(point.y() - (v_height / 2));
     }
 
     if (point.x() > v_width) {
-      scroll_x = std::min(
-          std::max(0, static_cast<int>(point.x() - (v_width / 2))),
-          c_width - v_width);
+      scroll_x = static_cast<int>(point.x() - (v_width / 2));
 
     } else {
       scroll_x = 0;
@@ -2590,9 +2678,14 @@ void CodeWidget::OnExpandMacros(const QSet<RawEntityId> &macros_to_expand) {
 
   d->macros_to_expand = macros_to_expand;
 
-  if (d->scene_changed) {
-    update();
+  if (!d->scene_changed) {
+    return;
   }
+
+  d->TriggerScrollbarUpdate([this] (void) {
+    d->RecomputeScene();
+  });
+  update();
 }
 
 // Invoked when the set of entities to be renamed changes.
