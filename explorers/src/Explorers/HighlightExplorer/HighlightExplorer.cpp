@@ -30,6 +30,25 @@
 
 namespace mx::gui {
 
+namespace {
+
+// Since our logic is not inside a class deriving from IWindowWidget, we
+// have to define a method that lets HighlightExplorer issue the
+// RequestAttention signal.
+//
+// Without this, the main window won't know when to show again the dock
+// widget once it gets closed.
+class HighlightExplorerWindowWidget Q_DECL_FINAL : public IWindowWidget {
+ public:
+  HighlightExplorerWindowWidget(void) = default;
+
+  void EmitRequestAttention(void) {
+    emit RequestAttention();
+  }
+};
+
+}  // namespace
+
 struct HighlightExplorer::PrivateData {
   ConfigManager &config_manager;
   ThemeManager &theme_manager;
@@ -41,7 +60,7 @@ struct HighlightExplorer::PrivateData {
   HighlightedItemsModel *model{nullptr};
   QListView *view{nullptr};
   IWindowManager *manager{nullptr};
-  IWindowWidget *dock{nullptr};
+  HighlightExplorerWindowWidget *dock{nullptr};
 
   inline PrivateData(ConfigManager &config_manager_)
       : config_manager(config_manager_),
@@ -65,7 +84,7 @@ HighlightExplorer::HighlightExplorer(ConfigManager &config_manager,
 
 void HighlightExplorer::CreateDockWidget(void) {
 
-  d->dock = new IWindowWidget;
+  d->dock = new HighlightExplorerWindowWidget;
   d->dock->setWindowTitle(tr("Highlight Explorer"));
   d->dock->setContentsMargins(0, 0, 0, 0);
 
@@ -221,6 +240,8 @@ void HighlightExplorer::SetColor(void) {
   } else {
     ColorsUpdated();
   }
+
+  d->dock->EmitRequestAttention();
 }
 
 void HighlightExplorer::RemoveColor(void) {
@@ -239,6 +260,8 @@ void HighlightExplorer::RemoveColor(void) {
   d->view->setCurrentIndex(QModelIndex());
   d->model->RemoveEntity(d->eids);
   ColorsUpdated();
+
+  d->dock->EmitRequestAttention();
 }
 
 void HighlightExplorer::ClearAllColors(void) {

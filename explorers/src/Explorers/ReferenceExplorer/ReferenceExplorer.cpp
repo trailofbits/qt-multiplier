@@ -26,6 +26,21 @@ namespace {
 
 static const QString kModelId = "com.trailofbits.explorer.ReferenceExplorer.TreeModel";
 
+// Since our logic is not inside a class deriving from IWindowWidget, we
+// have to define a method that lets ReferenceExplorer issue the
+// RequestAttention signal.
+//
+// Without this, the main window won't know when to show again the dock
+// widget once it gets closed.
+class RefExplorerWindowWidget Q_DECL_FINAL : public IWindowWidget {
+ public:
+  RefExplorerWindowWidget(void) = default;
+
+  void EmitRequestAttention(void) {
+    emit RequestAttention();
+  }
+};
+
 }  // namespace
 
 struct ReferenceExplorer::PrivateData {
@@ -35,7 +50,7 @@ struct ReferenceExplorer::PrivateData {
 
   // The tabbed reference explorer widget docked inside of the main window.
   TabWidget *view{nullptr};
-  IWindowWidget *dock{nullptr};
+  RefExplorerWindowWidget *dock{nullptr};
 
   // List of plugins.
   std::vector<IReferenceExplorerPluginPtr> plugins;
@@ -127,7 +142,7 @@ std::vector<NamedAction> ReferenceExplorer::ActOnKeyPressEx(
 }
 
 void ReferenceExplorer::CreateDockWidget(void) {
-  d->dock = new IWindowWidget;
+  d->dock = new RefExplorerWindowWidget;
   d->dock->setWindowTitle(tr("Reference Explorer"));
   d->dock->setContentsMargins(0, 0, 0, 0);
 
@@ -220,6 +235,7 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
 
   d->view->InsertTab(0, tree_view);
   d->dock->show();
+  d->dock->EmitRequestAttention();
 }
 
 void ReferenceExplorer::AddPlugin(IReferenceExplorerPluginPtr plugin) {
