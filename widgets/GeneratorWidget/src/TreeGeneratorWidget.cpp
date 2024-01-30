@@ -533,9 +533,16 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
 }
 
 void TreeGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
+  // Note that we'll only get the height since we are passing in an invalid
+  // model index
+  auto cell_size_hint = d->tree_view->itemDelegate()
+                                    ->sizeHint(QStyleOptionViewItem{}, QModelIndex());
+
   auto pixmap = media_manager.Pixmap("com.trailofbits.icon.Activate");
 
-  auto required_width = QFontMetrics(font()).height() / 2;
+  auto button_margin = cell_size_hint.height() / 6;
+  auto required_width = cell_size_hint.height() - (button_margin * 2);
+
   auto icon_size = pixmap.deviceIndependentSize()
                          .scaled(required_width, required_width, Qt::KeepAspectRatio);
 

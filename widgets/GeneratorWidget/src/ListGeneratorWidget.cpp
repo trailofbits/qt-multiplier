@@ -184,13 +184,13 @@ void ListGeneratorWidget::InitializeWidgets(
 
   OnThemeChanged(theme_manager);
 
+  config_manager.InstallItemDelegate(d->list_view);
+
   // Set the icons.
   connect(&media_manager, &MediaManager::IconsChanged,
           this, &ListGeneratorWidget::OnIconsChanged);
 
   OnIconsChanged(media_manager);
-
-  config_manager.InstallItemDelegate(d->list_view);
 }
 
 //! Called when we want to act on the context menu.
@@ -375,9 +375,16 @@ void ListGeneratorWidget::UpdateItemButtons(void) {
 }
 
 void ListGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
+  // Note that we'll only get the height since we are passing in an invalid
+  // model index
+  auto cell_size_hint = d->list_view->itemDelegate()
+                                    ->sizeHint(QStyleOptionViewItem{}, QModelIndex());
+
   auto pixmap = media_manager.Pixmap("com.trailofbits.icon.Goto");
 
-  auto required_width = QFontMetrics(font()).height() / 2;
+  auto button_margin = cell_size_hint.height() / 6;
+  auto required_width = cell_size_hint.height() - (button_margin * 2);
+
   auto icon_size = pixmap.deviceIndependentSize()
                          .scaled(required_width, required_width, Qt::KeepAspectRatio);
 
