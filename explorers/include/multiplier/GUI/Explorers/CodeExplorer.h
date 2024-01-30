@@ -10,7 +10,7 @@
 #include <QVector>
 
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
-#include <multiplier/Types.h>
+#include <multiplier/Entity.h>
 
 namespace mx::gui {
 
@@ -37,6 +37,9 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
     IWindowManager *, const QKeySequence &keys,
     const QModelIndex &index) Q_DECL_FINAL;
 
+ private:
+  void OpenEntity(const VariantEntity &entity, bool add_to_history);
+
  private slots:
   void OnImplicitPreviewEntity(const QVariant &data);
   void OnExplicitPreviewEntity(const QVariant &data);
@@ -48,7 +51,8 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
   void OnRenameEntity(QVector<RawEntityId> entity_ids,
                       QString new_name);
-  void OnHistoricalEntitySelected(const QVariant &data);
+  void OnGoToHistoricalItem(const QVariant &data);
+  void OnHistoricalPreviewedEntitySelected(const QVariant &data);
   void OnToggleBrowseMode(const QVariant &data);
 
  signals:

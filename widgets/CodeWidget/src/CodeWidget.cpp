@@ -566,6 +566,7 @@ struct CodeWidget::PrivateData {
   GoToLineWidget *goto_line_widget{nullptr};
 
   std::optional<OpaqueLocation> last_location;
+  VariantEntity last_entity_for_location;
 
   inline PrivateData(const QString &model_id)
       : monospace(" "),
@@ -579,9 +580,10 @@ struct CodeWidget::PrivateData {
   void RecomputeLineNumbers(void);
   void RecomputeHighlights(void);
   void RecomputeSelection(QPainter &blitter);
-  void ScrollToPoint(CodeWidget *self, QPointF, bool take_focus);
+  void ScrollToPoint(CodeWidget *self, QPointF, bool take_focus,
+                     LocationChangeReason reason);
   void ScrollToEntityOffset(CodeWidget *self, unsigned offset,
-                            bool take_focus);
+                            bool take_focus, LocationChangeReason reason);
 
   void PaintToken(
       QPainter &fg_painter, QPainter &bg_painter, Data &data,
@@ -1333,12 +1335,17 @@ void CodeWidget::focusInEvent(QFocusEvent *) {
     d->SetCursor(std::move(d->last_location.value()));
     d->last_location.reset();
   }
+
+  if (0 < d->space_width && 0 < d->line_height) {
+    emit LocationChanged(kExternalFocusChange);
+  }
 }
 
 void CodeWidget::focusOutEvent(QFocusEvent *) {
   d->last_location.reset();
   if (0 < d->space_width && 0 < d->line_height) {
     d->last_location = d->Location();
+    emit LocationChanged(kExternalFocusChange);
   }
 
   // Requests for context menus trigger `focusOutEvent`s prior to
@@ -1397,6 +1404,8 @@ void CodeWidget::wheelEvent(QWheelEvent *event) {
     d->ScrollBy(static_cast<int>(horizontal_pixel_delta * mult),
                 static_cast<int>(vertical_pixel_delta * mult));
   });
+
+  emit LocationChanged(kExternalScrollChange);
 }
 
 void CodeWidget::paintEvent(QPaintEvent *) {
@@ -1533,7 +1542,6 @@ void CodeWidget::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void CodeWidget::mousePressEvent(QMouseEvent *event) {
-  d->last_location.reset();
 
   QPointF rel_position = event->position();
   auto x = d->scroll_x + rel_position.x();
@@ -1544,6 +1552,8 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
   const Entity *entity = d->EntityUnderPoint(scrolled_xy);
 
+  d->last_location.reset();
+  d->last_entity_for_location = {};
   d->token_model.token = {};
   d->click_was_primary = event->buttons() & Qt::LeftButton;
   d->click_was_secondary = event->buttons() & Qt::RightButton;
@@ -1562,7 +1572,12 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   // we right click and don't have a selection, when we want to move the cursor.
   if (d->click_was_primary ||
       ((d->click_was_secondary && !d->selection_start_cursor))) {
+
     d->cursor = new_cursor;
+
+    if (!d->tracking_selection) {
+      emit LocationChanged(kExternalMousePress);
+    }
 
     // Calculate the current line index based on the clamped cursor.
     auto new_current_line_index = static_cast<int>(
@@ -1748,6 +1763,7 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       }
     }
 
+    d->last_entity_for_location = {};
     d->last_location.reset();
     d->cursor = new_cursor;
   });
@@ -1755,6 +1771,8 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
   if (need_repaint) {
     update();
   }
+
+  emit LocationChanged(kExternalKeyPress);
 }
 
 void CodeWidget::PrivateData::UpdateScrollbars(void) {
@@ -1796,8 +1814,11 @@ void CodeWidget::PrivateData::UpdateScrollbars(void) {
 CodeWidget::OpaqueLocation CodeWidget::LastLocation(void) const {
   if (d->last_location) {
     return d->last_location.value();
-  } else {
+  } else if (0 < d->space_width && 0 < d->line_height) {
     return d->Location();
+  } else {
+    Q_ASSERT(false);
+    return {};
   }
 }
 
@@ -1883,6 +1904,7 @@ qreal CodeWidget::PrivateData::PositionToYDimension(
 CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
   CodeWidget::OpaqueLocation loc;
 
+  loc.entity = last_entity_for_location;
   loc.scroll_y = YDimensionToPosition(scroll_y);
   
   // Figure out of offset within the current logical line in terms of a scaling
@@ -1935,6 +1957,7 @@ void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
         std::floor(PositionToYDimension(loc.current_y) / line_height));
   }
 
+  last_location = loc;
   SetCursor(std::move(loc));
 }
 
@@ -1942,6 +1965,7 @@ void CodeWidget::PrivateData::SetCursor(CodeWidget::OpaqueLocation loc) {
   if (0 > loc.cursor_y.physical) {
     cursor.reset();
     current_entity = nullptr;
+    last_entity_for_location = std::move(loc.entity);
     return;
   }
 
@@ -1961,6 +1985,7 @@ void CodeWidget::PrivateData::SetCursor(CodeWidget::OpaqueLocation loc) {
 
   cursor = CursorPosition(pt);
   current_entity = EntityUnderPoint(cursor.value());
+  last_entity_for_location = std::move(loc.entity);
 }
 
 // Clamp the scroll positions.
@@ -2490,7 +2515,8 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 }
 
 void CodeWidget::PrivateData::ScrollToPoint(
-    CodeWidget *self, QPointF point, bool take_focus) {
+    CodeWidget *self, QPointF point, bool take_focus,
+    LocationChangeReason reason) {
 
   int v_width = viewport.width();
   int v_height = viewport.height();
@@ -2501,7 +2527,7 @@ void CodeWidget::PrivateData::ScrollToPoint(
     QTimer::singleShot(
         10, self, [=, this, vn = version_number] (void) {
           if (vn == version_number) {
-            ScrollToPoint(self, point, take_focus);
+            ScrollToPoint(self, point, take_focus, reason);
           }
         });
     return;
@@ -2536,10 +2562,13 @@ void CodeWidget::PrivateData::ScrollToPoint(
   if (take_focus) {
     self->setFocus();
   }
+
+  self->EmitLocationChanged(reason);
 }
 
 void CodeWidget::PrivateData::ScrollToEntityOffset(
-    CodeWidget *self, unsigned offset, bool take_focus) {
+    CodeWidget *self, unsigned offset, bool take_focus,
+    LocationChangeReason reason) {
 
   if (offset > scene.entities.size()) {
     return;
@@ -2553,7 +2582,7 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
   cursor = CursorPosition(entity_loc);
   current_entity = &entity;
 
-  ScrollToPoint(self, QPointF(entity.x, entity_y), take_focus);
+  ScrollToPoint(self, QPointF(entity.x, entity_y), take_focus, reason);
 }
 
 // Paint a token.
@@ -2730,24 +2759,26 @@ void CodeWidget::OnVerticalScroll(int) {
   auto change = d->vertical_scrollbar->value() - d->scroll_y;
   d->ScrollBy(0, change);
   update();
+  emit LocationChanged(kExternalScrollChange);
 }
 
 void CodeWidget::OnHorizontalScroll(int) {
   auto change = d->horizontal_scrollbar->value() - d->scroll_x;
   d->ScrollBy(change, 0);
   update();
+  emit LocationChanged(kExternalScrollChange);
 }
 
 // Invoked when we want to scroll to a specific entity.
-void CodeWidget::OnGoToEntity(const VariantEntity &entity_,
-                              bool take_focus) {
+void CodeWidget::OnGoToEntity(const VariantEntity &entity_, bool take_focus) {
   // Clear out the last location.
   d->last_location.reset();
 
   // Clear out any selections.
   d->selection_start_cursor.reset();
   d->tracking_selection = false;
-
+  
+  d->last_entity_for_location = entity_;
   VariantEntity entity = entity_;
 
   // TODO(pag): Eventually handle nested fragments.
@@ -2776,7 +2807,8 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_,
     RawEntityId entity_id = EntityId(entity).Pack();
     auto it = d->scene.entity_begin_offset.find(entity_id);
     if (it != it_end) {
-      d->ScrollToEntityOffset(this, it->second, take_focus);
+      d->ScrollToEntityOffset(this, it->second, take_focus,
+                              kExternalGoToEntity);
       return;
     }
 
@@ -2811,7 +2843,7 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_,
         auto max_eo = entities.size();
         for (auto eo = ti; eo < max_eo; ++eo) {
           if (entities[eo].token_index == ti) {
-            d->ScrollToEntityOffset(this, eo, take_focus);
+            d->ScrollToEntityOffset(this, eo, take_focus, kExternalGoToEntity);
             return;
           }
         }
@@ -2840,6 +2872,7 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_,
     // Keep us where we are.
     } else if (std::holds_alternative<File>(entity)) {
       update();
+      emit LocationChanged(kExternalGoToEntity);
       return;
 
     } else {
@@ -2873,11 +2906,12 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_,
   // fragment. This code is probably dead.
   auto it = d->scene.entity_begin_offset.find(frag_id);
   if (it != it_end) {
-    d->ScrollToEntityOffset(this, it->second, take_focus);
+    d->ScrollToEntityOffset(this, it->second, take_focus, kExternalGoToEntity);
     return;
   }
 
   update();
+  emit LocationChanged(kExternalGoToEntity);
 }
 
 //! Change the underlying data / model being rendered by this code widget.
@@ -2905,6 +2939,9 @@ void CodeWidget::ChangeScene(const TokenTree &token_tree,
   d->search_result_list.clear();
   d->macros_to_expand = options.macros_to_expand;
   d->new_entity_names = options.new_entity_names;
+  d->last_entity_for_location = {};
+  d->last_location.reset();
+
   if (d->horizontal_scrollbar->value()) {
     d->horizontal_scrollbar->setValue(0);
   }
@@ -2913,14 +2950,26 @@ void CodeWidget::ChangeScene(const TokenTree &token_tree,
   }
   d->UpdateScrollbars();
   update();
+  emit LocationChanged(kExternalSceneChange);
+}
+
+void CodeWidget::EmitLocationChanged(LocationChangeReason reason) {
+  emit LocationChanged(reason);
 }
 
 void CodeWidget::OnGoToLineNumber(unsigned line_) {
+  d->current_entity = nullptr;
+  d->selection_start_cursor.reset();
+  d->tracking_selection = false;
+  d->last_location.reset();
+  d->last_entity_for_location = {};
+
   auto line = static_cast<int>(line_);
   auto max_e = d->scene.entities.size();
   for (auto e = 0u; e < max_e; ++e) {
     if (std::abs(d->scene.file_line_number[e]) == line) {
-      d->ScrollToEntityOffset(this, e, true  /* take focus */);
+      d->ScrollToEntityOffset(this, e, true  /* take focus */,
+                              kInternalGoToLine);
       break;
     }
   }
@@ -2983,29 +3032,29 @@ void CodeWidget::OnShowSearchResult(size_t result_index) {
   }
 
   auto eo_to_point =
-    [this] (const Entity *entity, int entity_offset) -> QPointF {
-      const Data &data = d->scene.data[
-          entity->data_index_and_config >> kFormatShift];
-      QRectF entity_rect = data.bounding_rect[
-          entity->data_index_and_config & kFormatMask];
+      [this] (const Entity *entity, int entity_offset) -> QPointF {
+        const Data &data = d->scene.data[
+            entity->data_index_and_config >> kFormatShift];
+        QRectF entity_rect = data.bounding_rect[
+            entity->data_index_and_config & kFormatMask];
 
-      // Figure out the starting position of the selection.
-      qreal entity_y = (entity->logical_line_number - 1) * d->line_height;
-      qreal incr = d->is_monospaced ? d->space_width : (d->space_width / 16.0);
-      qreal shift = 0;
+        // Figure out the starting position of the selection.
+        qreal entity_y = (entity->logical_line_number - 1) * d->line_height;
+        qreal incr = d->is_monospaced ? d->space_width : (d->space_width / 16.0);
+        qreal shift = 0;
 
-      for (qreal max_width = entity_rect.width(); ; shift += incr) {
-        auto [index, width] = d->CharacterPosition(
-            QPointF(entity->x + shift, entity_y), entity);
+        for (qreal max_width = entity_rect.width(); ; shift += incr) {
+          auto [index, width] = d->CharacterPosition(
+              QPointF(entity->x + shift, entity_y), entity);
 
-        if (index >= entity_offset || shift >= max_width) {
-          shift = width;
-          break;
+          if (index >= entity_offset || shift >= max_width) {
+            shift = width;
+            break;
+          }
         }
-      }
 
-      return QPointF(entity->x + shift, entity_y);
-    };
+        return QPointF(entity->x + shift, entity_y);
+      };
 
   auto [begin_entity, begin_offset] = d->EntityAtDocumentOffset(begin);
   if (!begin_entity) {
@@ -3014,10 +3063,12 @@ void CodeWidget::OnShowSearchResult(size_t result_index) {
 
   d->token_model.selection = d->scene.document.sliced(begin, length);
   d->current_entity = nullptr;
+  d->last_entity_for_location = {};
   d->last_location.reset();
   d->cursor = d->CursorPosition(
       eo_to_point(begin_entity, begin_offset));
   d->selection_start_cursor = d->cursor;
+  d->tracking_selection = false;
 
   auto [end_entity, end_offset] = d->EntityAtDocumentOffset(end);
   if (end_entity) {
@@ -3025,8 +3076,8 @@ void CodeWidget::OnShowSearchResult(size_t result_index) {
         = d->CursorPosition(eo_to_point(end_entity, end_offset));
   }
 
-  d->ScrollToPoint(this, d->cursor.value(),
-                   false  /* take focus */);
+  d->ScrollToPoint(this, d->cursor.value(), false  /* take focus */,
+                   kInternalGoToSearchResult);
 }
 
 //! Called when we want to act on the context menu.
@@ -3044,6 +3095,43 @@ void CodeWidget::ActOnContextMenu(IWindowManager *, QMenu *menu,
 
 void CodeWidget::OnToggleBrowseMode(const QVariant &toggled) {
   d->browse_mode = toggled.toBool();
+}
+
+void CodeWidget::TryGoToLocation(const OpaqueLocation &location,
+                                 bool take_focus) {
+
+  d->TriggerScrollbarUpdate([&, this] (void) {
+    d->SetLocation(location);
+  });
+
+  update();
+
+  if (take_focus) {
+    setFocus();
+  }
+
+  emit LocationChanged(kExternalSetOpaqueLocation);
+}
+
+// Returns `0` if not valid.
+unsigned CodeWidget::OpaqueLocation::Line(void) const {
+  if (cursor_y.physical != -1) {
+    return static_cast<unsigned>(std::max(0, cursor_y.physical));
+  
+  } else if (current_y.physical != -1) {
+    return static_cast<unsigned>(std::max(0, current_y.physical));
+  
+  } else if (scroll_y.physical != -1) {
+    return static_cast<unsigned>(std::max(0, current_y.physical));
+  
+  } else {
+    return 0u;
+  }
+}
+
+// Returns `0` if not valid.
+unsigned CodeWidget::OpaqueLocation::Column(void) const {
+  return cursor_index >= 0 ? static_cast<unsigned>(cursor_index + 1) : 0u;
 }
 
 }  // namespace mx::gui

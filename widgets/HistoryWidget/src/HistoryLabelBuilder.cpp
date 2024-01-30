@@ -49,9 +49,14 @@ void HistoryLabelBuilder::run(void) {
       if (auto maybe_line_col = file_loc.location(file_cache);
           maybe_line_col && !(maybe_line_col->first == 1u &&
                               maybe_line_col->second == 1u)) {
-        line_col_label = ":" + QString::number(maybe_line_col->first) +
-                         ":" + QString::number(maybe_line_col->second);
+        line_col_label = QString(":%1:%2").arg(maybe_line_col->first)
+                                          .arg(maybe_line_col->second);
       }
+    }
+
+    // Override.
+    if (line && column) {
+      line_col_label = QString(":%1:%2").arg(line).arg(column);
     }
   }
 

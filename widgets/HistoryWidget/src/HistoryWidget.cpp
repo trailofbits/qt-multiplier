@@ -13,6 +13,7 @@
 #include <multiplier/Frontend/File.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Widgets/CodeWidget.h>
 
 #include <QHBoxLayout>
 #include <QIcon>
@@ -158,10 +159,14 @@ void HistoryWidget::CommitCurrentItemToHistory(void) {
   UpdateMenus();
 }
 
+using ContainedLocation = std::pair<VariantEntity, CodeWidget::OpaqueLocation>;
+
 void HistoryWidget::PrivateData::AddToHistory(
     QVariant item, std::optional<QString> opt_label, HistoryWidget *widget) {
 
   VariantEntity label_entity;
+  unsigned line = 0;
+  unsigned column = 0;
 
   if (item.canConvert<VariantEntity>()) {
     label_entity = item.value<VariantEntity>();
@@ -170,6 +175,18 @@ void HistoryWidget::PrivateData::AddToHistory(
     if (std::holds_alternative<Compilation>(label_entity)) {
       label_entity = std::get<Compilation>(label_entity).main_source_file();
     }
+  
+  } else if (item.canConvert<ContainedLocation>()) {
+    auto loc = item.value<ContainedLocation>();
+    
+    if (std::holds_alternative<NotAnEntity>(loc.second.entity)) {
+      label_entity = loc.first;
+    } else {
+      label_entity = loc.second.entity;
+    }
+
+    line = loc.second.Line();
+    column = loc.second.Column();
   }
 
   // Truncate the "previous future" history.
@@ -199,7 +216,9 @@ void HistoryWidget::PrivateData::AddToHistory(
           QString("Entity %1").arg(EntityId(label_entity).Pack()));
 
       auto labeller = new HistoryLabelBuilder(
-          file_cache, std::move(label_entity), history_item.item_id);
+          file_cache, std::move(label_entity), history_item.item_id,
+          line, column);
+
       labeller->setAutoDelete(true);
 
       connect(labeller, &HistoryLabelBuilder::LabelForItem,

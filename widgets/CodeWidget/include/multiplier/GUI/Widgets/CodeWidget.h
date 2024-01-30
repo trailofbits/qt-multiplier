@@ -82,6 +82,26 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
     qreal scroll_x_scale{0};
     qreal cursor_x_scale{0};
     int cursor_index{-1};
+
+    VariantEntity entity;
+
+    // Returns `0` if not valid.
+    unsigned Line(void) const;
+
+    // Returns `0` if not valid.
+    unsigned Column(void) const;
+  };
+
+  enum LocationChangeReason {
+    kInternalGoToSearchResult,
+    kInternalGoToLine,
+    kExternalGoToEntity,
+    kExternalSetOpaqueLocation,
+    kExternalSceneChange,
+    kExternalMousePress,
+    kExternalKeyPress,
+    kExternalScrollChange,
+    kExternalFocusChange,
   };
 
   virtual ~CodeWidget(void);
@@ -110,6 +130,10 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
 
   // Try to go to an opaque location.
   void TryGoToLocation(const OpaqueLocation &location, bool take_focus);
+
+ private:
+  friend struct PrivateData;
+  void EmitLocationChanged(LocationChangeReason reason);
 
  protected:
   bool eventFilter(QObject *object, QEvent *event) Q_DECL_FINAL;
@@ -142,6 +166,9 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
 
   // Invoked when we want to scroll to a specific entity.
   void OnGoToEntity(const VariantEntity &entity, bool take_focus);
+
+ signals:
+  void LocationChanged(LocationChangeReason reason);
 };
 
 }  // namespace mx::gui

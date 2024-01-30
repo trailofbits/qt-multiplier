@@ -24,17 +24,22 @@ class HistoryLabelBuilder Q_DECL_FINAL : public QObject, public QRunnable {
   const FileLocationCache file_cache;
   const VariantEntity entity;
   const uint64_t item_id;
+  const unsigned line;
+  const unsigned column;
 
  public:
   virtual ~HistoryLabelBuilder(void);
 
   inline HistoryLabelBuilder(const FileLocationCache &file_cache_,
                              VariantEntity entity_, uint64_t item_id_,
+                             unsigned line_=0, unsigned column_=0,
                              QObject *parent=nullptr)
       : QObject(parent),
         file_cache(file_cache_),
         entity(std::move(entity_)),
-        item_id(item_id_) {}
+        item_id(item_id_),
+        line(line_),
+        column(column_) {}
 
   virtual void run(void) Q_DECL_FINAL;
 

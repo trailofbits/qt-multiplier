@@ -72,6 +72,8 @@ static VariantEntity EntityForExpansion(VariantEntity entity) {
   }
 }
 
+using Location = std::pair<VariantEntity, CodeWidget::OpaqueLocation>;
+
 }  // namespace
 
 struct CodeExplorer::PrivateData {
@@ -80,7 +82,8 @@ struct CodeExplorer::PrivateData {
   CodePreviewWidget *preview{nullptr};
   HistoryWidget * const history;
 
-  std::unordered_map<RawEntityId, CodeWidget *> opened_windows;
+  std::unordered_map<RawEntityId, std::pair<VariantEntity, CodeWidget *>>
+      opened_windows;
 
   TriggerHandle expand_macro_trigger;
   TriggerHandle open_user_preview_trigger;
@@ -104,6 +107,23 @@ struct CodeExplorer::PrivateData {
         history(new HistoryWidget(
             config_manager, kMaxHistorySize,
             false  /* install shortcuts */)) {}
+
+  std::pair<VariantEntity, CodeWidget *> CurrentOpenCodeWidget(void) const {
+    for (auto &[id, entity_widget] : opened_windows) {
+      if (entity_widget.second->isVisible()) {
+        return entity_widget;
+      }
+    }
+    return {{}, nullptr};
+  }
+
+  void AddCurrentToHistory(void) {
+    auto [ent, prev_widget] = CurrentOpenCodeWidget();
+    if (prev_widget) {
+      auto loc = prev_widget->LastLocation();
+      history->SetCurrentItem(QVariant::fromValue(Location(ent, loc)));
+    }
+  }
 };
 
 CodeExplorer::~CodeExplorer(void) {}
@@ -147,6 +167,11 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
       tr("Browse Mode"), d->browse_mode_trigger);
 
   d->browse_mode_action->setChecked(true);
+
+  // When the user navigates the history, make sure that we change what the
+  // view shows.
+  connect(d->history, &HistoryWidget::GoToHistoricalItem,
+          this, &CodeExplorer::OnGoToHistoricalItem);
 }
 
 void CodeExplorer::OnToggleBrowseMode(const QVariant &data) {
@@ -246,35 +271,44 @@ void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
   }
 }
 
-void CodeExplorer::OnOpenEntity(const QVariant &data) {
-  if (data.isNull() || !data.canConvert<VariantEntity>()) {
-    return;
-  }
-
-  VariantEntity entity = data.value<VariantEntity>();
+void CodeExplorer::OpenEntity(const VariantEntity &entity,
+                              bool add_to_history) {
   auto file = File::containing(entity);
   auto frag = Fragment::containing(entity);
   if (!file && !frag) {
     return;
   }
 
-  auto [id, tt] = ([&] (void) -> std::pair<RawEntityId, TokenTree> {
-    if (file) {
-      return {file->id().Pack(), TokenTree::from(file.value())};
-    } else {
-      return {frag->id().Pack(), TokenTree::from(frag.value())};
-    }
-  })();
+  VariantEntity containing_entity;
+  if (file) {
+    containing_entity = file.value();
+  } else {
+    containing_entity = frag.value();
+  }
 
-  auto &code_widget = d->opened_windows[id];
-  if (code_widget) {
-    code_widget->show();
-    code_widget->OnGoToEntity(entity, true  /* take focus */);
+  const auto id = EntityId(containing_entity).Pack();
+  auto tt = file ? TokenTree::from(file.value()) : TokenTree::from(frag.value());
+
+  // If we're adding to history, then find the currently open window and
+  // record its location.
+  if (add_to_history) {
+    d->history->CommitCurrentItemToHistory();
+  }
+
+  // Try to get the alread-opened code widget. If we have it, then we just
+  // need to show it and go to the relevant entity.
+  auto &entity_widget = d->opened_windows[id];
+  if (entity_widget.second) {
+    entity_widget.second->show();
+    entity_widget.second->OnGoToEntity(entity, true  /* take focus */);
     return;
   }
 
-  code_widget = new CodeWidget(
-      d->config_manager, kOpenEntityModelId, d->browse_mode);
+  auto code_widget = new CodeWidget(
+    d->config_manager, kOpenEntityModelId, d->browse_mode);
+
+  entity_widget.first = entity;
+  entity_widget.second = code_widget;
 
   connect(this, &CodeExplorer::ExpandMacros,
           code_widget, &CodeWidget::OnExpandMacros);
@@ -314,13 +348,47 @@ void CodeExplorer::OnOpenEntity(const QVariant &data) {
 
   connect(code_widget, &IWindowWidget::Closed,
           this, [id = id, this] (void) {
+                  d->history->CommitCurrentItemToHistory();
                   d->opened_windows.erase(id);
                 });
+
+  connect(code_widget, &CodeWidget::LocationChanged,
+          this, [=, this] (CodeWidget::LocationChangeReason reason) {
+            switch (reason) {
+              case CodeWidget::kExternalGoToEntity:
+              case CodeWidget::kExternalSceneChange:
+              case CodeWidget::kExternalMousePress:
+              case CodeWidget::kExternalKeyPress:
+              case CodeWidget::kExternalScrollChange:
+              case CodeWidget::kExternalFocusChange:
+                break;
+              case CodeWidget::kInternalGoToSearchResult:
+              case CodeWidget::kInternalGoToLine:
+              case CodeWidget::kExternalSetOpaqueLocation:
+                return;
+            }
+            d->history->SetCurrentItem(QVariant::fromValue(
+                Location(containing_entity, code_widget->LastLocation())));
+          });
 
   IWindowManager::CentralConfig config;
   d->manager->AddCentralWidget(code_widget, config);
 
-  code_widget->OnGoToEntity(entity, true  /* take focus */);
+  // NOTE(pag): If we're not adding to history, then we're called from
+  //            `OnGoToHistoricalItem` and it uses the `OpaqueLocation` to
+  //            go to the relevant entity. We want to make sure we use that
+  //            so that we don't trigger an external-looking location change.
+  if (add_to_history) {
+    code_widget->OnGoToEntity(entity, true  /* take focus */);
+  }
+}
+
+void CodeExplorer::OnOpenEntity(const QVariant &data) {
+  if (data.isNull() || !data.canConvert<VariantEntity>()) {
+    return;
+  }
+
+  OpenEntity(data.value<VariantEntity>(), true);
 }
 
 void CodeExplorer::OnImplicitPreviewEntity(const QVariant &data) {
@@ -351,7 +419,7 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
     // When the user navigates the history, make sure that we change what the
     // view shows.
     connect(d->preview, &CodePreviewWidget::HistoricalEntitySelected,
-            this, &CodeExplorer::OnHistoricalEntitySelected);
+            this, &CodeExplorer::OnHistoricalPreviewedEntitySelected);
   
     IWindowManager::DockConfig config;
     config.id = "com.trailofbits.dock.CodePreview";
@@ -364,7 +432,14 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
       std::move(entity), is_explicit, true  /* add to history */);
 }
 
-void CodeExplorer::OnHistoricalEntitySelected(const QVariant &data) {
+void CodeExplorer::OnGoToHistoricalItem(const QVariant &data) {
+  auto [ent, loc] = data.value<Location>();
+  OpenEntity(ent, false  /* don't add to history */);
+  d->CurrentOpenCodeWidget().second->TryGoToLocation(
+      loc, true  /* take focus */);
+}
+
+void CodeExplorer::OnHistoricalPreviewedEntitySelected(const QVariant &data) {
   d->preview->DisplayEntity(data.value<VariantEntity>(),
                             true  /* explicit request */,
                             false  /* add to history */);
