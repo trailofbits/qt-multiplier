@@ -498,7 +498,7 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
   // Update the button positions
   auto rect = d->tree_view->visualRect(index);
   auto button_margin = rect.height() / 6;
-  auto button_size = rect.height() - (button_margin * 2);
+  auto button_size = rect.height();
   auto button_count = static_cast<int>(kNumButtons);
   auto button_area_width =
       (button_count * button_size) + (button_count * button_margin);
@@ -533,9 +533,14 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
 }
 
 void TreeGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
-  auto pixmap = media_manager.Pixmap("com.trailofbits.icon.Activate");
+  // Note that we'll only get the height since we are passing in an invalid
+  // model index
+  auto cell_size_hint = d->tree_view->itemDelegate()
+                                    ->sizeHint(QStyleOptionViewItem{}, QModelIndex());
 
-  auto required_width = QFontMetrics(font()).height() / 2;
+  auto required_width = cell_size_hint.height();
+
+  auto pixmap = media_manager.Pixmap("com.trailofbits.icon.Activate");
   auto icon_size = pixmap.deviceIndependentSize()
                          .scaled(required_width, required_width, Qt::KeepAspectRatio);
 
