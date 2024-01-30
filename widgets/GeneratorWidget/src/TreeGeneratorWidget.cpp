@@ -533,9 +533,15 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
 }
 
 void TreeGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
+  auto pixmap = media_manager.Pixmap("com.trailofbits.icon.Activate");
+
+  auto required_width = QFontMetrics(font()).height() / 2;
+  auto icon_size = pixmap.deviceIndependentSize()
+                         .scaled(required_width, required_width, Qt::KeepAspectRatio);
+
   d->open_item_icon = {};
   d->open_item_icon.addPixmap(
-      media_manager.Pixmap("com.trailofbits.icon.Activate"),
+      std::move(pixmap),
       QIcon::Normal, QIcon::On);
   d->open_item_icon.addPixmap(
       media_manager.Pixmap("com.trailofbits.icon.Activate",
@@ -561,8 +567,13 @@ void TreeGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
       QIcon::Disabled, QIcon::On);
 
   d->open->setIcon(d->open_item_icon);
+  d->open->setIconSize(icon_size.toSize());
+
   d->expand->setIcon(d->expand_item_icon);
+  d->expand->setIconSize(icon_size.toSize());
+
   d->goto_->setIcon(d->goto_item_icon);
+  d->goto_->setIconSize(icon_size.toSize());
 
   for (auto i = 0u; i < kMaxExpansionLevel; ++i) {
     d->expand_item_icon_n[i] = {};
@@ -696,6 +707,10 @@ void TreeGeneratorWidget::GotoOriginal(const QModelIndex &index_) {
   sel->clearSelection();
   sel->setCurrentIndex(dedup, QItemSelectionModel::Select);
   d->tree_view->scrollTo(dedup);
+
+  d->goto_->hide();
+  d->open->hide();
+  d->expand->hide();
 }
 
 void TreeGeneratorWidget::OnGotoOriginalButtonPressed(void) {
