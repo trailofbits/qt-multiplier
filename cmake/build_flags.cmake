@@ -23,9 +23,14 @@ set_target_properties("qtmx_common_flags" PROPERTIES
     true
 )
 
+if(MXQT_EVAL_COPY)
+  set(eval_copy_flag MXQT_EVAL_COPY=1)
+endif()
+
 target_compile_definitions("qtmx_common_flags" INTERFACE
   QTMULTIPLIER_VERSION="${QTMULTIPLIER_VERSION}"
   MULTIPLIER_VERSION="${MXQT_MULTIPLIER_VERSION}"
+  ${eval_copy_flag}
 )
 
 add_library("mx_cxx_flags" INTERFACE)

@@ -79,6 +79,7 @@ WindowManager::WindowManager(MainWindow *window)
   d->tab_widget->setTabBarAutoHide(false);
   window->setCentralWidget(d->tab_widget);
 
+#ifdef MXQT_EVAL_COPY
   auto eval = new QDockWidget(window);
   auto label = new QLabel("<b>NOT DISTRIBUTION A.</b> <u>FOR EVALUATION PURPOSES ONLY.</u> Feedback or questions? Email <a href=\"mailto:peter@trailofbits.com\">peter@trailofbits.com</a>.");
   connect(label, &QLabel::linkActivated,
@@ -93,6 +94,7 @@ WindowManager::WindowManager(MainWindow *window)
   eval->setTitleBarWidget(new QWidget(eval));
   eval->setWidget(label);
   d->window->addDockWidget(Qt::TopDockWidgetArea, eval);
+#endif
 }
 
 void WindowManager::OnTabBarClose(int i) {
@@ -220,9 +222,15 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
   widget->setParent(d->window);
 
   auto dock_widget = new QDockWidget(widget->windowTitle(), d->window);
+
+#ifdef MXQT_EVAL_COPY
   dock_widget->setAllowedAreas(Qt::LeftDockWidgetArea |
                                Qt::RightDockWidgetArea |
                                Qt::BottomDockWidgetArea);
+#else
+  dock_widget->setAllowedAreas(Qt::AllDockWidgetAreas);
+#endif
+
   dock_widget->setWidget(widget);
 
   d->dock_configs.emplace(dock_widget, config);
