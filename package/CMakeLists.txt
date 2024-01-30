@@ -11,8 +11,8 @@ project("qt-multiplier")
 
 include("${CMAKE_SOURCE_DIR}/../cmake/version.cmake")
 
-set(QT_MULTIPLIER_DATA_PATH "" CACHE PATH "This is where the Multiplier.app application was installed")
-set(MULTIPLIER_DATA_PATH "" CACHE PATH "This is where multiplier has been installed, along with all its dependencies")
+set(QT_MULTIPLIER_DATA_PATH "" CACHE PATH "This is where both multiplier and qt-multiplier have been installed")
+set(QT_REDIST_PATH "" CACHE PATH "Path to the Qt SDK redist folder")
 
 set(CPACK_PACKAGE_VERSION "${QTMULTIPLIER_VERSION}" CACHE STRING "Package version")
 
@@ -22,8 +22,14 @@ else()
   set(QT_MULTIPLIER_PACKAGE_RELEASE "1.macos")
 endif()
 
-if(NOT EXISTS "${MULTIPLIER_DATA_PATH}/bin/mx-index")
-  message(FATAL_ERROR "Invalid MULTIPLIER_DATA_PATH path")
+if(NOT EXISTS "${QT_MULTIPLIER_DATA_PATH}/bin/mx-index" OR
+   NOT EXISTS "${QT_MULTIPLIER_DATA_PATH}/bin/multiplier")
+
+  message(FATAL_ERROR "Invalid QT_MULTIPLIER_DATA_PATH path.")
+endif()
+
+if(NOT EXISTS "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/bin/qmake")
+  message(FATAL_ERROR "Invalid QT_REDIST_PATH path.")
 endif()
 
 if(NOT CPACK_GENERATOR)
@@ -38,7 +44,7 @@ set(CPACK_PACKAGE_HOMEPAGE_URL "https://trailofbits.com")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}_${QT_MULTIPLIER_PACKAGE_RELEASE}_${CMAKE_SYSTEM_PROCESSOR}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)
-  set(CPACK_RESOURCE_FILE_LICENSE "${QT_MULTIPLIER_DATA_PATH}/usr/local/share/multiplier/LICENSE.txt")
+  set(CPACK_RESOURCE_FILE_LICENSE "${QT_MULTIPLIER_DATA_PATH}/share/multiplier/LICENSE.txt")
 else()
   set(CPACK_RESOURCE_FILE_LICENSE "${QT_MULTIPLIER_DATA_PATH}/opt/multiplier/control/LICENSE.txt")
 endif()

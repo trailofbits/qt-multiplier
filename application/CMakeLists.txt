@@ -110,6 +110,10 @@ if(MXQT_ENABLE_INSTALL)
     set(install_destination ".")
   endif()
 
+  set_target_properties("Multiplier" PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../lib"
+  )
+
   install(
     TARGETS "Multiplier"
     DESTINATION "${install_destination}"

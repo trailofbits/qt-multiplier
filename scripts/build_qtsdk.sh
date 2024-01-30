@@ -5,12 +5,15 @@ QTSDK_VERSION="v6.5.2"
 BUILD_TYPE=Release
 RELEASE_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -gline-tables-only"
 DEBUG_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -O0 -g3"
+REDIST_FLAGS="${RELEASE_FLAGS} --disable_new_dtags -no-prefix -Wl,-rpath=\$ORIGIN/../lib"
 FLAGS="${RELEASE_FLAGS}"
 CONFIG_EXTRA=-release
 
 export CCC_OVERRIDE_OPTIONS="x-Werror"
 
 main() {
+  local is_redist_build=0
+
   while [[ $# -gt 0 ]]; do
     key="$1"
 
@@ -29,6 +32,12 @@ main() {
       FLAGS="${RELEASE_FLAGS}"
       CONFIG_EXTRA=-release
       ;;
+    --redist)
+      BUILD_TYPE=Release
+      FLAGS="${REDIST_FLAGS}"
+      CONFIG_EXTRA=-release
+      is_redist_build=1
+      ;;
     *)
       ADD_ARGS+=("$1")
       ;;
@@ -36,15 +45,29 @@ main() {
     shift
   done
 
-
   clone_or_update_qtsdk
-  configure_build
+  configure_build ${is_redist_build}
   build_project
 
-  echo "Append the following path to the CMAKE_PREFIX_PATH: $(realpath qt5-build/qtbase/lib/cmake)"
-  echo "If you already have a path, use ; as separator"
+  if [[ $is_redist_build != 0 ]] ; then
+    install_project
+
+    echo "Append the following path to the CMAKE_PREFIX_PATH: $(realpath qt5-install/usr/local/Qt-6.5.2)"
+    echo "If you already have a path, use ; as separator"
+
+  else
+    echo "Append the following path to the CMAKE_PREFIX_PATH: $(realpath qt5-build/qtbase/lib/cmake)"
+    echo "If you already have a path, use ; as separator"
+  fi
 
   return 0
+}
+
+install_project() {
+  mkdir "qt5-install"
+  export DESTDIR=$(realpath "qt5-install")
+
+  ( cd "qt5-build" &&  cmake --build . --parallel --target install ) || panic "The install target has failed"
 }
 
 build_project() {
@@ -52,11 +75,16 @@ build_project() {
 }
 
 configure_build() {
+  local is_redist_build="$1"
+  if [[ $is_redist_build == 0 ]] ; then
+    local optional_developer_build_flag="-developer-build"
+  fi
+
   mkdir -p "qt5-build"
   ( cd "qt5-build" && CC=`which clang` CXX=`which clang++` \
                       ../qt5/configure \
                       ${CONFIG_EXTRA} \
-                      -developer-build \
+                      ${optional_developer_build_flag} \
                       -opensource \
                       -nomake examples \
                       -nomake tests \
