@@ -352,7 +352,7 @@ void ListGeneratorWidget::UpdateItemButtons(void) {
   auto rect = d->list_view->visualRect(index);
 
   auto button_margin = rect.height() / 6;
-  auto button_size = rect.height() - (button_margin * 2);
+  auto button_size = rect.height();
   auto button_area_width = button_size + button_margin;
 
   auto current_x =
@@ -380,11 +380,9 @@ void ListGeneratorWidget::OnIconsChanged(const MediaManager &media_manager) {
   auto cell_size_hint = d->list_view->itemDelegate()
                                     ->sizeHint(QStyleOptionViewItem{}, QModelIndex());
 
+  auto required_width = cell_size_hint.height();
+
   auto pixmap = media_manager.Pixmap("com.trailofbits.icon.Goto");
-
-  auto button_margin = cell_size_hint.height() / 6;
-  auto required_width = cell_size_hint.height() - (button_margin * 2);
-
   auto icon_size = pixmap.deviceIndependentSize()
                          .scaled(required_width, required_width, Qt::KeepAspectRatio);
 
