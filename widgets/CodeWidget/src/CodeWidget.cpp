@@ -1906,6 +1906,10 @@ CodeWidget::OpaqueLocation CodeWidget::PrivateData::Location(void) {
 
   loc.entity = last_entity_for_location;
   loc.scroll_y = YDimensionToPosition(scroll_y);
+
+  if (current_entity) {
+    loc.token = scene.tokens[current_entity->token_index];
+  }
   
   // Figure out of offset within the current logical line in terms of a scaling
   // factor of the line height.  

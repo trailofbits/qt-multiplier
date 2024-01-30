@@ -6,14 +6,17 @@
 
 #include "WindowManager.h"
 
+#include <QDesktopServices>
 #include <QDockWidget>
 #include <QIcon>
+#include <QLabel>
 #include <QMap>
 #include <QMenu>
 #include <QMenuBar>
 #include <QTabBar>
 #include <QToolBar>
 #include <QToolButton>
+#include <QUrl>
 
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
@@ -75,6 +78,21 @@ WindowManager::WindowManager(MainWindow *window)
   d->tab_widget->setDocumentMode(true);
   d->tab_widget->setTabBarAutoHide(false);
   window->setCentralWidget(d->tab_widget);
+
+  auto eval = new QDockWidget(window);
+  auto label = new QLabel("<b>NOT DISTRIBUTION A.</b> <u>FOR EVALUATION PURPOSES ONLY.</u> Feedback or questions? Email <a href=\"mailto:peter@trailofbits.com\">peter@trailofbits.com</a>.");
+  connect(label, &QLabel::linkActivated,
+          [] (const QString &url) {
+            QDesktopServices::openUrl(QUrl(url));
+          });
+
+  label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  label->setAlignment(Qt::AlignCenter | Qt::AlignVCenter);
+
+  eval->setFeatures(QDockWidget::NoDockWidgetFeatures);
+  eval->setTitleBarWidget(new QWidget(eval));
+  eval->setWidget(label);
+  d->window->addDockWidget(Qt::TopDockWidgetArea, eval);
 }
 
 void WindowManager::OnTabBarClose(int i) {
@@ -202,7 +220,9 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
   widget->setParent(d->window);
 
   auto dock_widget = new QDockWidget(widget->windowTitle(), d->window);
-  dock_widget->setAllowedAreas(Qt::AllDockWidgetAreas);
+  dock_widget->setAllowedAreas(Qt::LeftDockWidgetArea |
+                               Qt::RightDockWidgetArea |
+                               Qt::BottomDockWidgetArea);
   dock_widget->setWidget(widget);
 
   d->dock_configs.emplace(dock_widget, config);

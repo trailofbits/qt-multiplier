@@ -84,6 +84,7 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
     int cursor_index{-1};
 
     VariantEntity entity;
+    Token token;
 
     // Returns `0` if not valid.
     unsigned Line(void) const;
