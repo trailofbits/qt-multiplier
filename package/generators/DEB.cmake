@@ -10,7 +10,8 @@ set(CPACK_STRIP_FILES ON)
 set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "extra")
 set(CPACK_DEBIAN_PACKAGE_SECTION "default")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>=2.35), libglx0 (>=1.6.0), libxcb1 (>=1.15)")
+# TODO: Downgrade the version numbers to match the Ubuntu 22.04 packages
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>=2.35), libglx0 (>=1.6.0), libxcb1 (>=1.15), libxcb-xinput0 (>=1.15), libinput-bin (>=1.22.1), libx11-xcb1 (>=1.8.4), libxcb-util1 (>=0.4.0), libxcb-composite0 (>= 1.15), libxcb-cursor0 (>= 0.1.1), libxcb-dpms0 (>= 1.15), libxcb-ewmh2 (>= 0.4.1), libxcb-imdkit1 (>= 1.0.4), libxcb-record0 (>= 1.15), libxcb-screensaver0 (>= 1.15), libxcb-xf86dri0 (>= 1.15), libxcb-xinerama0 (>= 1.15), libxcb-xrm0 (>= 1.0), libxcb-xtest0 (>= 1.15), libxcb-xvmc0 (>= 1.15)")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
 
 foreach(folder_name "bin" "include" "lib" "share")
@@ -33,6 +34,8 @@ set(qt_library_list
   "libQt6Test.so.6"
   "libQt6Core.so.6"
   "libQt6DBus.so.6"
+  "libQt6OpenGL.so.6"
+  "libQt6XcbQpa.so.6"
 )
 
 foreach(qt_library ${qt_library_list})
