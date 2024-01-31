@@ -48,7 +48,7 @@ else()
     INTERFACE
       "multiplier::multiplier"
   )
-endif(MX_ENABLE_PYTHON_BINDINGS)
+endif()
 
 add_library("mx_gap_library" INTERFACE)
 target_link_libraries("mx_gap_library"
