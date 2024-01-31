@@ -140,8 +140,13 @@ clone_or_update_qtsdk() {
   fi
 
   ( cd "qt5" && git fetch --tags )
+
+  # Ensure we won't get conflicts when switching version
   ( cd "qt5" && git reset --hard && git clean -ffdx )
   ( cd "qt5" && git reset "${QTSDK_VERSION}" ) || panic "Failed to update the Qt SDK repository"
+
+  # As we are now tracking a different tree, clean it up again
+  ( cd "qt5" && git reset --hard && git clean -ffdx )
   ( cd "qt5" && perl init-repository -f --module-subset=qtbase,qt5compat,-qtwebengine ) || panic "Failed to initialize the git submodules"
 }
 
