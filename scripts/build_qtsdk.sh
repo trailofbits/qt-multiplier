@@ -19,7 +19,13 @@ main() {
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     dpkg -l | grep 'libxcb1-dev' > /dev/null 2>&1
     if [[ $? != 0 ]] ; then
-      sudo apt install 'libxcb1-dev' -y
+      sudo apt install -y '^libxcb.*-dev' \
+                          libx11-xcb-dev \
+                          libglu1-mesa-dev \
+                          libxrender-dev \
+                          libxi-dev \
+                          libxkbcommon-dev \
+                          libxkbcommon-x11-dev
     fi
   fi
 
@@ -91,6 +97,12 @@ configure_build() {
 
   if [[ "$OSTYPE" == "darwin"* ]]; then
     local opengl_flag="-no-opengl"
+    local xcb_flag="-no-xcb"
+  else
+    local opengl_flag="-opengl desktop"
+    local xcb_flag="-xcb-xlib -xcb -bundled-xcb-xinput"
+    local input_flags="-libinput -evdev"
+    local default_qpa="-qpa xcb"
   fi
 
   mkdir -p "qt5-build"
@@ -99,6 +111,9 @@ configure_build() {
                       ${CONFIG_EXTRA} \
                       ${opengl_flag} \
                       ${optional_developer_build_flag} \
+                      ${default_qpa} \
+                      ${xcb_flag} \
+                      ${input_flags} \
                       -opensource \
                       -nomake examples \
                       -nomake tests \
@@ -108,7 +123,6 @@ configure_build() {
                       -qt-harfbuzz \
                       -qt-libjpeg \
                       -qt-libpng \
-                      -no-xcb \
                       -no-gtk ) || panic "The configuration step has failed"
   
   CXXFLAGS="${FLAGS} ${OS_CXXFLAGS}" \
