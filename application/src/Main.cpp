@@ -23,6 +23,8 @@ int main(int argc, char *argv[]) {
   QStyle *phantom_style = new PhantomStyle;
   QStyle *mx_style = new mx::gui::MultiplierStyle(phantom_style);
   QApplication::setStyle(mx_style);
+#else
+  QApplication::setStyle("Fusion");
 #endif
 
   QApplication application(argc, argv);

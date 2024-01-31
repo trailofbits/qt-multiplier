@@ -133,6 +133,8 @@ class DarkTheme Q_DECL_FINAL : public IBuiltinTheme {
   void Apply(QApplication &) Q_DECL_FINAL {
 #ifdef __APPLE__
     SetNSAppToDarkTheme();
+#else
+    qApp->setPalette(Palette());
 #endif
   }
 

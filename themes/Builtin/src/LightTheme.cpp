@@ -132,6 +132,8 @@ class LightTheme Q_DECL_FINAL : public IBuiltinTheme {
   void Apply(QApplication &) Q_DECL_FINAL {
 #ifdef __APPLE__
     SetNSAppToLightTheme();
+#else
+    qApp->setPalette(Palette());
 #endif
   }
 
