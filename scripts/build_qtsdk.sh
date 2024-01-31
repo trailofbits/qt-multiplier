@@ -14,6 +14,11 @@ export CCC_OVERRIDE_OPTIONS="x-Werror"
 main() {
   local is_redist_build=0
 
+  dpkg -l | grep 'libxcb1-dev' > /dev/null 2>&1
+  if [[ $? != 0 ]] ; then
+    sudo apt install 'libxcb1-dev' -y
+  fi
+
   while [[ $# -gt 0 ]]; do
     key="$1"
 
