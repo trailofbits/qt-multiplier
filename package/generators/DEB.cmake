@@ -13,7 +13,7 @@ set(CPACK_DEBIAN_PACKAGE_SECTION "default")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>=2.35)")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
 
-foreach("folder_name" "bin" "include" "lib" "libexec" "share")
+foreach(folder_name "bin" "include" "lib" "share")
   install(
     DIRECTORY
       "${QT_MULTIPLIER_DATA_PATH}/${folder_name}"
@@ -39,6 +39,7 @@ foreach(qt_library ${qt_library_list})
   install(
     FILES
       "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/lib/${qt_library}"
+      "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/lib/${qt_library}.5.2"
 
     DESTINATION
       "lib"
