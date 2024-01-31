@@ -48,7 +48,7 @@ endforeach()
 
 install(
   DIRECTORY
-    "${QT_REDIST_PATH}/plugins"
+    "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/plugins"
 
   DESTINATION
     "."
