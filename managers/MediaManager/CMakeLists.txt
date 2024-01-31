@@ -33,3 +33,13 @@ target_include_directories("mx_media_manager" SYSTEM INTERFACE
 )
 
 enable_qt_properties("mx_media_manager")
+
+if(MXQT_ENABLE_INSTALL)
+  install(
+    FILES
+      "${CMAKE_CURRENT_SOURCE_DIR}/resources/logo.png"
+
+    DESTINATION
+      "share/icons"
+  )
+endif()

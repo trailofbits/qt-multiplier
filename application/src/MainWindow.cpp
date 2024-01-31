@@ -169,11 +169,16 @@ void MainWindow::InitializeIndex(QApplication &application) {
       Index::from_database(db_path.toStdString())));
 
   // Set the theme.
+  QString theme_name;
   if (parser.isSet(theme_option)) {
-    auto &theme_manager = d->config_manager.ThemeManager();
-    if (auto theme = theme_manager.Find(parser.value(theme_option))) {
-      theme_manager.SetTheme(std::move(theme));
-    }
+    theme_name = parser.value(theme_option);
+  } else {
+    theme_name = "com.trailofbits.theme.Dark";
+  }
+
+  auto &theme_manager = d->config_manager.ThemeManager();
+  if (auto theme = theme_manager.Find(parser.value(theme_option))) {
+    theme_manager.SetTheme(std::move(theme));
   }
 }
 
