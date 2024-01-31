@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Multiplier
+Exec=/opt/multiplier/bin/multiplier
+Icon=/opt/multiplier/share/icons/logo.png
+Terminal=false
+Type=Application

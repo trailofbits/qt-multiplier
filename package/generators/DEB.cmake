@@ -73,3 +73,10 @@ foreach(public_binary "multiplier" "mx-index")
   )
 endforeach()
 
+install(
+  FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/data/linux/multiplier.desktop"
+
+  DESTINATION
+    "/usr/share/applications"
+)
