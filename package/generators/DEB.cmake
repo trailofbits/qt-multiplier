@@ -10,7 +10,7 @@ set(CPACK_STRIP_FILES ON)
 set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "extra")
 set(CPACK_DEBIAN_PACKAGE_SECTION "default")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>=2.35)")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>=2.35), libglx0 (>=1.6.0), libxcb1 (>=1.15)")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
 
 foreach(folder_name "bin" "include" "lib" "share")
@@ -45,3 +45,13 @@ foreach(qt_library ${qt_library_list})
       "lib"
   )
 endforeach()
+
+install(
+  DIRECTORY
+    "${QT_REDIST_PATH}/plugins"
+
+  DESTINATION
+    "."
+
+  USE_SOURCE_PERMISSIONS
+)
