@@ -20,7 +20,7 @@ foreach(folder_name "bin" "include" "lib" "share")
       "${QT_MULTIPLIER_DATA_PATH}/${folder_name}"
 
     DESTINATION
-      "."
+      "/opt/multiplier"
 
     USE_SOURCE_PERMISSIONS
   )
@@ -45,7 +45,7 @@ foreach(qt_library ${qt_library_list})
       "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/lib/${qt_library}.5.2"
 
     DESTINATION
-      "lib"
+      "/opt/multiplier/lib"
   )
 endforeach()
 
@@ -54,7 +54,22 @@ install(
     "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/plugins"
 
   DESTINATION
-    "."
+    "/opt/multiplier"
 
   USE_SOURCE_PERMISSIONS
 )
+
+foreach(public_binary "multiplier" "mx-index")
+  execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E create_symlink "/opt/multiplier/bin/${public_binary}" "${CMAKE_CURRENT_BINARY_DIR}/${public_binary}"
+  )
+
+  install(
+    FILES
+      "${CMAKE_CURRENT_BINARY_DIR}/${public_binary}"
+
+    DESTINATION
+      "/usr/local/bin"
+  )
+endforeach()
+
