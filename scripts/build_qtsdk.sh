@@ -7,6 +7,7 @@ RELEASE_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -gline-tables
 DEBUG_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -O0 -g3"
 REDIST_FLAGS="${RELEASE_FLAGS} --disable_new_dtags -no-prefix -Wl,-rpath=\$ORIGIN/../lib"
 FLAGS="${RELEASE_FLAGS}"
+OS_FLAGS=
 CONFIG_EXTRA=-release
 
 export CCC_OVERRIDE_OPTIONS="x-Werror"
@@ -14,9 +15,12 @@ export CCC_OVERRIDE_OPTIONS="x-Werror"
 main() {
   local is_redist_build=0
 
-  dpkg -l | grep 'libxcb1-dev' > /dev/null 2>&1
-  if [[ $? != 0 ]] ; then
-    sudo apt install 'libxcb1-dev' -y
+  # Get Linux dependencies.
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    dpkg -l | grep 'libxcb1-dev' > /dev/null 2>&1
+    if [[ $? != 0 ]] ; then
+      sudo apt install 'libxcb1-dev' -y
+    fi
   fi
 
   while [[ $# -gt 0 ]]; do
@@ -85,10 +89,15 @@ configure_build() {
     local optional_developer_build_flag="-developer-build"
   fi
 
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    local opengl_flag="-no-opengl"
+  fi
+
   mkdir -p "qt5-build"
   ( cd "qt5-build" && CC=`which clang` CXX=`which clang++` \
                       ../qt5/configure \
                       ${CONFIG_EXTRA} \
+                      ${opengl_flag} \
                       ${optional_developer_build_flag} \
                       -opensource \
                       -nomake examples \
@@ -102,8 +111,8 @@ configure_build() {
                       -no-xcb \
                       -no-gtk ) || panic "The configuration step has failed"
   
-  CXXFLAGS="${FLAGS}" \
-  CCFLAGS="${FLAGS}" \
+  CXXFLAGS="${FLAGS} ${OS_CXXFLAGS}" \
+  CCFLAGS="${FLAGS} ${OS_CCFLAGS}" \
   cmake \
       "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" 
       -DCMAKE_C_COMPILER=`which clang` \
