@@ -733,7 +733,8 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
   const RawEntityId macro_id = macro->id().Pack();
 
   // Keep track of which macros were expanded.
-  auto expanded = macros_to_expand.contains(macro_id);
+  auto expanded = macros_to_expand.contains(macro_id) ||
+                  macro->kind() == MacroKind::CONCATENATE;
   if (def_id != kInvalidEntityId) {
     expanded = expanded || macros_to_expand.contains(def_id);
     b.scene.expanded_macros.emplace(def_id, expanded);
