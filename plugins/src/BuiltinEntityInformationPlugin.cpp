@@ -683,12 +683,17 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
   }
 }
 
-// Generate information about functions. This focuses on their enumerators.
+// Generate information about variables.
 template <>
-gap::generator<IInfoGenerator::Item> EntityInfoGenerator<VarDecl>::Items(
+gap::generator<IInfoGenerator::Item> EntityInfoGenerator<ValueDecl>::Items(
     IInfoGeneratorPtr, FileLocationCache file_location_cache) {
 
   IInfoGenerator::Item item;
+
+  item.category = QObject::tr("Type");
+  item.tokens = InjectWhitespace(entity.type().tokens());
+  FillLocation(file_location_cache, item);
+  co_yield std::move(item);
 
   for (Reference ref : Reference::to(entity)) {
     auto brk = ref.builtin_reference_kind();
@@ -744,18 +749,6 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<VarDecl>::Items(
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
   }
-}
-
-// Generate the type of a value decl.
-template <>
-gap::generator<IInfoGenerator::Item> EntityInfoGenerator<ValueDecl>::Items(
-    IInfoGeneratorPtr, FileLocationCache file_location_cache) {
-
-  IInfoGenerator::Item item;
-  item.category = QObject::tr("Type");
-  item.tokens = InjectWhitespace(entity.type().tokens());
-  FillLocation(file_location_cache, item);
-  co_yield std::move(item);
 }
 
 // Generate information about named declarations.
@@ -872,11 +865,6 @@ BuiltinEntityInformationPlugin::CreateInformationCollectors(
   if (auto fd = FunctionDecl::from(entity)) {
     co_yield std::make_shared<EntityInfoGenerator<FunctionDecl>>(
         std::move(fd.value()));
-  }
-
-  if (auto vd = VarDecl::from(entity)) {
-    co_yield std::make_shared<EntityInfoGenerator<VarDecl>>(
-        std::move(vd.value()));
   }
 
   if (auto xd = ValueDecl::from(entity)) {
