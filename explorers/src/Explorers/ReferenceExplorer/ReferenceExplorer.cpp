@@ -184,6 +184,7 @@ void ReferenceExplorer::OnTabBarDoubleClick(int i) {
 
   SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,
                                d->view);
+  dialog.setWindowTitle(tr("Rename Tab"));
   if (dialog.exec() != QDialog::Accepted) {
     return;
   }
