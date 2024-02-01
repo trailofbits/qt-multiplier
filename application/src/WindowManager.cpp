@@ -298,7 +298,10 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
   // Automatically show the dock container if the inner widget
   // requests attention
   connect(widget, &IWindowWidget::RequestAttention,
-          dock_widget, &QDockWidget::show);
+          dock_widget, [=] (void) {
+            dock_widget->show();
+            dock_widget->raise();
+          });
 
   // If the dock wants to be removed when closed then delete it.
   if (config.delete_on_close) {

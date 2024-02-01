@@ -27,6 +27,8 @@ class IWindowWidget : public QWidget {
   virtual ~IWindowWidget(void);
   using QWidget::QWidget;
 
+  void EmitRequestAttention(void);
+
  protected:
   void hideEvent(QHideEvent *) Q_DECL_OVERRIDE;
   void showEvent(QShowEvent *) Q_DECL_OVERRIDE;

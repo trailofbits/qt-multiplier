@@ -10,11 +10,13 @@
 #include <QApplication>
 #include <QBrush>
 #include <QCheckBox>
+#include <QKeySequence>
 #include <QListView>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QRadioButton>
+#include <QShortcut>
 #include <QSortFilterProxyModel>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -42,6 +44,8 @@ namespace mx::gui {
 namespace {
 
 static const QString kModelId = "com.trailofbits.explorer.EntityExplorer.EntityListModel";
+
+static const QKeySequence kKeqSeqCtrlShiftF("Ctrl+Shift+F");
 
 class EntitySearchResult Q_DECL_FINAL : public IGeneratedItem {
 
@@ -194,6 +198,7 @@ struct EntityExplorer::PrivateData {
   LineEditWidget *search_input{nullptr};
   QRadioButton *exact_match_radio{nullptr};
   QRadioButton *containing_radio{nullptr};
+  QShortcut *shortcut{nullptr};
 
   std::optional<TokenCategory> category;
 
@@ -230,7 +235,9 @@ void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
 
   d->search_input = new LineEditWidget(d->view);
   d->search_input->setClearButtonEnabled(true);
-  d->search_input->setPlaceholderText(tr("Search"));
+  d->search_input->setPlaceholderText(
+      tr("Search (%1)").arg(
+          kKeqSeqCtrlShiftF.toString(QKeySequence::NativeText)));
 
   // Keep the font up-to-date.
   d->search_input->setFont(theme_manager.Theme()->Font());
@@ -268,8 +275,7 @@ void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
   connect(category_combo_box, &CategoryComboBox::CategoryChanged,
           this, &EntityExplorer::OnCategoryChanged);
 
-
-
+  // Make the list generator that will show the results.
   d->list_widget = new ListGeneratorWidget(d->config_manager, kModelId, d->view);
   connect(d->list_widget, &ListGeneratorWidget::RequestSecondaryClick,
           manager, &IWindowManager::OnSecondaryClick);
@@ -289,6 +295,16 @@ void EntityExplorer::CreateDockWidget(IWindowManager *manager) {
   config.id = "com.trailofbits.dock.EntityExplorer";
   config.app_menu_location = {tr("View"), tr("Explorers")};
   manager->AddDockWidget(d->view, config);
+
+  // Add the `ctrl-shift-f` global shortcut.
+  d->shortcut = new QShortcut(
+      kKeqSeqCtrlShiftF, d->view, this,
+      &EntityExplorer::OnSearchShortcutTriggered, Qt::ApplicationShortcut);
+}
+
+void EntityExplorer::OnSearchShortcutTriggered(void) {
+  d->view->EmitRequestAttention();
+  d->search_input->setFocus();
 }
 
 void EntityExplorer::ActOnPrimaryClick(
