@@ -29,4 +29,8 @@ void IWindowWidget::closeEvent(QCloseEvent *event) {
   emit Closed();
 }
 
+void IWindowWidget::EmitRequestAttention(void) {
+  emit RequestAttention();
+}
+
 }  // namespace mx::gui

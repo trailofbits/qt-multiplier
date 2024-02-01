@@ -35,6 +35,7 @@ class EntityExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void CreateDockWidget(IWindowManager *manager);
 
  private slots:
+  void OnSearchShortcutTriggered(void);
   void QueryParametersChanged(void);
   void OnIndexChanged(const ConfigManager &config_manager);
   void OnCategoryChanged(std::optional<TokenCategory> token_category);

@@ -108,6 +108,7 @@ void WindowManager::OnTabBarDoubleClick(int i) {
 
   SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,
                                d->tab_widget);
+  dialog.setWindowTitle(tr("Rename Tab"));
   if (dialog.exec() != QDialog::Accepted) {
     return;
   }
@@ -297,7 +298,10 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
   // Automatically show the dock container if the inner widget
   // requests attention
   connect(widget, &IWindowWidget::RequestAttention,
-          dock_widget, &QDockWidget::show);
+          dock_widget, [=] (void) {
+            dock_widget->show();
+            dock_widget->raise();
+          });
 
   // If the dock wants to be removed when closed then delete it.
   if (config.delete_on_close) {

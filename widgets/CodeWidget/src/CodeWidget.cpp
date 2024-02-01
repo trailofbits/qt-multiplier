@@ -733,7 +733,8 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
   const RawEntityId macro_id = macro->id().Pack();
 
   // Keep track of which macros were expanded.
-  auto expanded = macros_to_expand.contains(macro_id);
+  auto expanded = macros_to_expand.contains(macro_id) ||
+                  macro->kind() == MacroKind::CONCATENATE;
   if (def_id != kInvalidEntityId) {
     expanded = expanded || macros_to_expand.contains(def_id);
     b.scene.expanded_macros.emplace(def_id, expanded);
@@ -1343,10 +1344,6 @@ void CodeWidget::focusInEvent(QFocusEvent *) {
 
 void CodeWidget::focusOutEvent(QFocusEvent *) {
   d->last_location.reset();
-  if (0 < d->space_width && 0 < d->line_height) {
-    d->last_location = d->Location();
-    emit LocationChanged(kExternalFocusChange);
-  }
 
   // Requests for context menus trigger `focusOutEvent`s prior to
   // `mouseReleaseEvent`.
@@ -1354,6 +1351,12 @@ void CodeWidget::focusOutEvent(QFocusEvent *) {
     d->cursor.reset();
     d->selection_start_cursor.reset();
     d->tracking_selection = false;
+
+    if (0 < d->space_width && 0 < d->line_height) {
+      d->last_location = d->Location();
+      emit LocationChanged(kExternalFocusChange);
+    }
+
     update();
   }
 }

@@ -46,7 +46,9 @@ static VariantEntity EntityForExpansion(VariantEntity entity) {
   if (std::holds_alternative<Token>(entity)) {
     for (Macro macro : Macro::containing(std::get<Token>(entity))) {
       entity = macro;
-      break;
+      if (!IncludeLikeMacroDirective::from(macro)) {
+        break;
+      }
     }
   }
 
@@ -106,7 +108,7 @@ struct CodeExplorer::PrivateData {
         manager(manager_),
         history(new HistoryWidget(
             config_manager, kMaxHistorySize,
-            false  /* install shortcuts */)) {}
+            true  /* install global shortcuts */)) {}
 
   std::pair<VariantEntity, CodeWidget *> CurrentOpenCodeWidget(void) const {
     for (auto &[id, entity_widget] : opened_windows) {

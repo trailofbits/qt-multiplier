@@ -279,11 +279,11 @@ void HistoryWidget::InitializeWidgets(QWidget *parent,
   QWidget *shortcut_parent{nullptr};
   Qt::ShortcutContext shortcut_context{};
   if (install_global_shortcuts) {
-    // Since we install the keyboard shortcuts on the widget, the parent
-    // parameters must always be valid
-    Q_ASSERT(parent != nullptr);
-
     shortcut_parent = parent;
+    if (!shortcut_parent) {
+      shortcut_parent = this;
+    }
+
     shortcut_context = Qt::ApplicationShortcut;
 
   } else {
