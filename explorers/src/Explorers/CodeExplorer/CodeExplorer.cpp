@@ -108,7 +108,7 @@ struct CodeExplorer::PrivateData {
         manager(manager_),
         history(new HistoryWidget(
             config_manager, kMaxHistorySize,
-            false  /* install shortcuts */)) {}
+            true  /* install global shortcuts */)) {}
 
   std::pair<VariantEntity, CodeWidget *> CurrentOpenCodeWidget(void) const {
     for (auto &[id, entity_widget] : opened_windows) {
