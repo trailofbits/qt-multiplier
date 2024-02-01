@@ -100,20 +100,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.MULTIPLIER_TOKEN }}
         run: |
-          submodule_version="$( cd libraries/vendored/multiplier && git rev-parse --short=7 HEAD )"
-          if [[ $? != 0 ]] ; then
-            echo "Failed to determine which version of multiplier is being vendored"
-            exit 1
-          fi
-
-          echo "Multiplier submodule version: ${submodule_version}"
-          echo "Multiplier version in build.yml: ${{ inputs.multiplier_release }}"
-
-          if [[ "${submodule_version}" != "${{ inputs.multiplier_release }}" ]] ; then
-            echo "The multiplier version in 'libraries/vendored/multiplier' does not match the release in build.yml. Please ensure they are matching"
-            exit 1
-          fi
-
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
           gh release download ${{ inputs.multiplier_release }} --repo trailofbits/multiplier

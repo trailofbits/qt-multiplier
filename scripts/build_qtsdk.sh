@@ -17,16 +17,15 @@ main() {
 
   # Get Linux dependencies.
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    dpkg -l | grep 'libxcb1-dev' > /dev/null 2>&1
-    if [[ $? != 0 ]] ; then
-      sudo apt install -y '^libxcb.*-dev' \
-                          libx11-xcb-dev \
-                          libglu1-mesa-dev \
-                          libxrender-dev \
-                          libxi-dev \
-                          libxkbcommon-dev \
-                          libxkbcommon-x11-dev
-    fi
+    sudo apt install -y '^libxcb.*-dev' \
+                        libx11-xcb-dev \
+                        libglu1-mesa-dev \
+                        libxrender-dev \
+                        libxi-dev \
+                        libxkbcommon-dev \
+                        libxkbcommon-x11-dev \
+                        libinput-dev \
+                        xserver-xorg-input-libinput
   fi
 
   while [[ $# -gt 0 ]]; do
@@ -101,7 +100,7 @@ configure_build() {
   else
     local opengl_flag="-opengl desktop"
     local xcb_flag="-xcb-xlib -xcb -bundled-xcb-xinput"
-    local input_flags="-libinput -evdev"
+    local input_flags="-libinput -evdev -libudev"
     local default_qpa="-qpa xcb"
   fi
 
