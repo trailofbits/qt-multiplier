@@ -46,7 +46,9 @@ static VariantEntity EntityForExpansion(VariantEntity entity) {
   if (std::holds_alternative<Token>(entity)) {
     for (Macro macro : Macro::containing(std::get<Token>(entity))) {
       entity = macro;
-      break;
+      if (!IncludeLikeMacroDirective::from(macro)) {
+        break;
+      }
     }
   }
 
