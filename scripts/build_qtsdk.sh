@@ -17,15 +17,21 @@ main() {
 
   # Get Linux dependencies.
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    sudo apt install -y '^libxcb.*-dev' \
-                        libx11-xcb-dev \
-                        libglu1-mesa-dev \
-                        libxrender-dev \
-                        libxi-dev \
-                        libxkbcommon-dev \
-                        libxkbcommon-x11-dev \
-                        libinput-dev \
-                        xserver-xorg-input-libinput
+    sudo apt --purge autoremove -y \
+      libicu-dev \
+      python3.10-dev
+
+    sudo apt install -y \
+      '^libxcb.*-dev' \
+      libx11-xcb-dev \
+      libglu1-mesa-dev \
+      libxrender-dev \
+      libxi-dev \
+      libxkbcommon-dev \
+      libxkbcommon-x11-dev \
+      libinput-dev \
+      xserver-xorg-input-libinput \
+      python3.11-dev
   fi
 
   while [[ $# -gt 0 ]]; do
