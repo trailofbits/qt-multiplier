@@ -69,6 +69,9 @@ class IWindowManager : public QObject {
     //! This is optional and can be left empty.
     QString id;
 
+    //! Tooltip for this item.
+    QString tooltip;
+
     //! Should the dock title change with the widget title?
     bool keep_title_up_to_date{true};
   };

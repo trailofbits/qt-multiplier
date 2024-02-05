@@ -129,6 +129,10 @@ void WindowManager::AddCentralWidget(IWindowWidget *widget,
                                      const CentralConfig &config) {
   d->tab_widget->InsertTab(0, widget, config.keep_title_up_to_date);
 
+  if (!config.tooltip.isEmpty()) {
+    d->tab_widget->setTabToolTip(0, config.tooltip);
+  }
+
   connect(widget, &IWindowWidget::Shown,
           d->tab_widget, [=, this] (void) {
                             d->tab_widget->setCurrentWidget(widget);

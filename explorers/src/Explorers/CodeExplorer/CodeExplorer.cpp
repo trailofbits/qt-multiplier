@@ -374,6 +374,10 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
           });
 
   IWindowManager::CentralConfig config;
+  if (auto name = NameOfEntityAsString(entity)) {
+    config.tooltip = name.value();
+  }
+
   d->manager->AddCentralWidget(code_widget, config);
 
   // NOTE(pag): If we're not adding to history, then we're called from
