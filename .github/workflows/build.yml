@@ -37,6 +37,6 @@ jobs:
       platform: ubuntu-22.04
       build_type: ${{ matrix.build_type }}
       # git rev-parse --short=7
-      multiplier_release: eed283c
+      multiplier_release: 3f3f65c
       python_version: 3.11
       llvm_version: 17
