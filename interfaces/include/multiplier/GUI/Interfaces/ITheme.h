@@ -113,9 +113,12 @@ class ITheme : public QObject {
   //! Helper to compute a high-contrast foreground color given a background
   //! color.
   static QColor ContrastingColor(const QColor &background_color);
- 
+  
+  //! Emits a `ThemeChanged` signal.
+  void EmitThemeChanged(void);
+
  signals:
-  // Emitted when this theme changes some of its own colors.
+  //! Emitted when this theme changes some of its own colors.
   void ThemeChanged(void);
 };
 

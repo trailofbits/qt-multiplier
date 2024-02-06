@@ -16,55 +16,67 @@ void IThemeProxy::UninstallFromOwningManager(void) {
   emit Uninstall(this);
 }
 
-QFont IThemeProxy::Font(QFont theme_font) const {
+QFont IThemeProxy::Font(const ITheme &, QFont theme_font) const {
   return theme_font;
 }
 
-QColor IThemeProxy::CursorColor(QColor theme_color) const {
+QColor IThemeProxy::CursorColor(const ITheme &, QColor theme_color) const {
   return theme_color;
 }
 
-QColor IThemeProxy::SelectionColor(QColor theme_color) const {
+QColor IThemeProxy::SelectionColor(const ITheme &, QColor theme_color) const {
   return theme_color;
 }
 
-QColor IThemeProxy::IconColor(QColor theme_color, ITheme::IconStyle) const {
+QColor IThemeProxy::IconColor(const ITheme &, QColor theme_color,
+                              ITheme::IconStyle) const {
   return theme_color;
 }
 
-QColor IThemeProxy::GutterForegroundColor(QColor theme_color) const {
+QColor IThemeProxy::GutterForegroundColor(
+    const ITheme &, QColor theme_color) const {
   return theme_color;
 }
 
-QColor IThemeProxy::GutterBackgroundColor(QColor theme_color) const {
+QColor IThemeProxy::GutterBackgroundColor(
+    const ITheme &, QColor theme_color) const {
   return theme_color;
 }
 
-QColor IThemeProxy::DefaultForegroundColor(QColor theme_color) const {
+QColor IThemeProxy::DefaultForegroundColor(
+    const ITheme &, QColor theme_color) const {
   return theme_color;
 }
 
-QColor IThemeProxy::DefaultBackgroundColor(QColor theme_color) const {
+QColor IThemeProxy::DefaultBackgroundColor(
+    const ITheme &, QColor theme_color) const {
   return theme_color;
 }
 
-QColor IThemeProxy::CurrentLineBackgroundColor(QColor theme_color) const {
+QColor IThemeProxy::CurrentLineBackgroundColor(
+    const ITheme &, QColor theme_color) const {
   return theme_color;
 }
 
 QColor IThemeProxy::CurrentEntityBackgroundColor(
-    QColor theme_color, const VariantEntity &) const {
+    const ITheme &, QColor theme_color, const VariantEntity &) const {
   return theme_color;
 }
 
 ITheme::ColorAndStyle IThemeProxy::TokenColorAndStyle(
-    ITheme::ColorAndStyle theme_color_and_style, const Token &) const {
+    const ITheme &, ITheme::ColorAndStyle theme_color_and_style,
+    const Token &) const {
   return theme_color_and_style;
 }
 
 std::optional<QColor> IThemeProxy::EntityBackgroundColor(
-    std::optional<QColor> theme_color, const VariantEntity &) const {
+    const ITheme &, std::optional<QColor> theme_color,
+    const VariantEntity &) const {
   return theme_color;
+}
+
+void IThemeProxy::EmitThemeProxyChanged(void) {
+  emit ThemeProxyChanged();
 }
 
 }  // namespace mx::gui

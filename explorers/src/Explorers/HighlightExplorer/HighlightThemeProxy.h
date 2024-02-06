@@ -21,11 +21,11 @@ class HighlightThemeProxy Q_DECL_FINAL : public IThemeProxy {
   virtual ~HighlightThemeProxy(void);
 
   ITheme::ColorAndStyle TokenColorAndStyle(
-      ITheme::ColorAndStyle theme_color_and_style,
+      const ITheme &, ITheme::ColorAndStyle theme_color_and_style,
       const Token &token) const Q_DECL_FINAL;
 
   std::optional<QColor> EntityBackgroundColor(
-      std::optional<QColor> theme_color,
+      const ITheme &, std::optional<QColor> theme_color,
       const VariantEntity &entity) const Q_DECL_FINAL;
 
   void SendUpdate(void);

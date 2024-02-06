@@ -50,4 +50,8 @@ QColor ITheme::ContrastingColor(const QColor &background_color) {
   return foreground_color;
 }
 
+void ITheme::EmitThemeChanged(void) {
+  emit ThemeChanged();
+}
+
 }  // namespace mx::gui

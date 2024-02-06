@@ -14,7 +14,7 @@ namespace mx::gui {
 HighlightThemeProxy::~HighlightThemeProxy(void) {}
 
 ITheme::ColorAndStyle HighlightThemeProxy::TokenColorAndStyle(
-    ITheme::ColorAndStyle cs, const Token &token) const {
+    const ITheme &, ITheme::ColorAndStyle cs, const Token &token) const {
 
   auto eid = token.related_entity_id().Pack();
   if (auto color_it = color_map.find(eid); color_it != color_map.end()) {
@@ -25,7 +25,8 @@ ITheme::ColorAndStyle HighlightThemeProxy::TokenColorAndStyle(
 }
 
 std::optional<QColor> HighlightThemeProxy::EntityBackgroundColor(
-    std::optional<QColor> theme_color, const VariantEntity &entity) const {
+    const ITheme &, std::optional<QColor> theme_color,
+    const VariantEntity &entity) const {
   auto eid = EntityId(entity).Pack();
   if (auto color_it = color_map.find(eid); color_it != color_map.end()) {
     return color_it->second.second;

@@ -67,7 +67,7 @@ QString ProxyTheme::Id(void) const {
 QFont ProxyTheme::Font(void) const {
   auto font = current_theme->Font();
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    font = (*it)->Font(std::move(font));
+    font = (*it)->Font(*current_theme, std::move(font));
   }
   return font;
 }
@@ -75,7 +75,7 @@ QFont ProxyTheme::Font(void) const {
 QColor ProxyTheme::CursorColor(void) const {
   auto color = current_theme->CursorColor();
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->CursorColor(std::move(color));
+    color = (*it)->CursorColor(*current_theme, std::move(color));
   }
   return color;
 }
@@ -83,7 +83,7 @@ QColor ProxyTheme::CursorColor(void) const {
 QColor ProxyTheme::SelectionColor(void) const {
   auto color = current_theme->SelectionColor();
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->SelectionColor(std::move(color));
+    color = (*it)->SelectionColor(*current_theme, std::move(color));
   }
   return color;
 }
@@ -91,7 +91,7 @@ QColor ProxyTheme::SelectionColor(void) const {
 QColor ProxyTheme::IconColor(IconStyle style) const {
   auto color = current_theme->IconColor(style);
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->IconColor(std::move(color), style);
+    color = (*it)->IconColor(*current_theme, std::move(color), style);
   }
   return color;
 }
@@ -99,7 +99,7 @@ QColor ProxyTheme::IconColor(IconStyle style) const {
 QColor ProxyTheme::GutterForegroundColor(void) const {
   auto color = current_theme->GutterForegroundColor();
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->GutterForegroundColor(std::move(color));
+    color = (*it)->GutterForegroundColor(*current_theme, std::move(color));
   }
   return color;
 }
@@ -107,7 +107,7 @@ QColor ProxyTheme::GutterForegroundColor(void) const {
 QColor ProxyTheme::GutterBackgroundColor(void) const {
   auto color = current_theme->GutterBackgroundColor();
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->GutterBackgroundColor(std::move(color));
+    color = (*it)->GutterBackgroundColor(*current_theme, std::move(color));
   }
   return color;
 }
@@ -115,7 +115,7 @@ QColor ProxyTheme::GutterBackgroundColor(void) const {
 QColor ProxyTheme::DefaultForegroundColor(void) const {
   auto color = current_theme->DefaultForegroundColor();
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->DefaultForegroundColor(std::move(color));
+    color = (*it)->DefaultForegroundColor(*current_theme, std::move(color));
   }
   return color;
 }
@@ -123,7 +123,7 @@ QColor ProxyTheme::DefaultForegroundColor(void) const {
 QColor ProxyTheme::DefaultBackgroundColor(void) const {
   auto color = current_theme->DefaultBackgroundColor();
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->DefaultBackgroundColor(std::move(color));
+    color = (*it)->DefaultBackgroundColor(*current_theme, std::move(color));
   }
   return color;
 }
@@ -131,7 +131,7 @@ QColor ProxyTheme::DefaultBackgroundColor(void) const {
 QColor ProxyTheme::CurrentLineBackgroundColor(void) const {
   auto color = current_theme->CurrentLineBackgroundColor();
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->CurrentLineBackgroundColor(std::move(color));
+    color = (*it)->CurrentLineBackgroundColor(*current_theme, std::move(color));
   }
   return color;
 }
@@ -140,7 +140,8 @@ QColor ProxyTheme::CurrentEntityBackgroundColor(
     const VariantEntity &entity) const {
   auto color = current_theme->CurrentEntityBackgroundColor(entity);
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->CurrentEntityBackgroundColor(std::move(color), entity);
+    color = (*it)->CurrentEntityBackgroundColor(
+        *current_theme, std::move(color), entity);
   }
   return color;
 }
@@ -148,7 +149,7 @@ QColor ProxyTheme::CurrentEntityBackgroundColor(
 ITheme::ColorAndStyle ProxyTheme::TokenColorAndStyle(const Token &token) const {
   auto cs = current_theme->TokenColorAndStyle(token);
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    cs = (*it)->TokenColorAndStyle(std::move(cs), token);
+    cs = (*it)->TokenColorAndStyle(*current_theme, std::move(cs), token);
   }
   return cs;
 }
@@ -157,7 +158,8 @@ std::optional<QColor> ProxyTheme::EntityBackgroundColor(
     const VariantEntity &entity) const {
   auto color = current_theme->EntityBackgroundColor(entity);
   for (auto it = proxies.rbegin(); it != proxies.rend(); ++it) {
-    color = (*it)->EntityBackgroundColor(std::move(color), entity);
+    color = (*it)->EntityBackgroundColor(
+        *current_theme, std::move(color), entity);
   }
   return color;
 }
