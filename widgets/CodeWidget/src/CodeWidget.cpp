@@ -1567,8 +1567,9 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   }
 
   // A shift-click should create or extend a selection.
+  auto mods = event->modifiers() & ~Qt::KeypadModifier;
   if (d->click_was_primary && !d->click_was_secondary &&
-      (event->modifiers() & Qt::ShiftModifier) == Qt::ShiftModifier) {
+      mods == Qt::ShiftModifier) {
 
     d->tracking_selection = true;
     if (!d->selection_start_cursor) {
@@ -1640,26 +1641,30 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
   qreal dx = 0;
   qreal dy = 0;
 
-  QString modifier;
+  auto mods = event->modifiers() & ~Qt::KeypadModifier;
 
-  if (event->modifiers() & Qt::ShiftModifier) {
+  QString modifier;
+  if (mods & Qt::ShiftModifier) {
     modifier += "Shift+";
     d->shift_was_held = true;
   }
 
-  if (event->modifiers() & Qt::ControlModifier) {
+  if (mods & Qt::ControlModifier) {
     modifier += "Ctrl+";
   }
 
-  if (event->modifiers() & Qt::AltModifier) {
+  if (mods & Qt::AltModifier) {
     modifier += "Alt+";
   }
 
-  if (event->modifiers() & Qt::MetaModifier) {
+  if (mods & Qt::MetaModifier) {
     modifier += "Meta+";
   }
 
   QKeySequence ks(modifier + QKeySequence(event->key()).toString());
+
+  auto prev_tracking_selection = d->tracking_selection;
+  auto prev_selection_start_cursor = d->selection_start_cursor;
 
   switch (event->key()) {
 
@@ -1792,6 +1797,23 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
     d->last_entity_for_location = {};
     d->last_location.reset();
+
+    // Shift with arrows introduces a selection.
+    if (mods == Qt::ShiftModifier) {
+      d->tracking_selection = true;
+      d->selection_start_cursor = prev_selection_start_cursor;
+      if (!d->selection_start_cursor) {
+        d->selection_start_cursor = d->cursor;
+        if (!d->selection_start_cursor) {
+          d->selection_start_cursor = new_cursor;
+        }
+      }
+
+      if (!prev_tracking_selection) {
+        need_repaint = true;
+      }
+    }
+
     d->cursor = new_cursor;
   });
 
