@@ -265,14 +265,24 @@ void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
   }
 
   auto entity = IModel::EntitySkipThroughTokens(index);
-  if (!std::holds_alternative<NotAnEntity>(entity)) {
-    auto preview_action = new QAction(tr("Open Pinned Preview"), menu);
-    menu->addAction(preview_action);
-    connect(preview_action, &QAction::triggered,
-            [entity, action = d->open_pinned_preview_trigger] (void) {
-              action.Trigger(QVariant::fromValue(entity));
-            });
+  if (std::holds_alternative<NotAnEntity>(entity)) {
+    return;
   }
+
+  auto preview_action = new QAction(tr("Open Pinned Preview"), menu);
+  menu->addAction(preview_action);
+  connect(preview_action, &QAction::triggered,
+          [entity, action = d->open_pinned_preview_trigger] (void) {
+            action.Trigger(QVariant::fromValue(entity));
+          });
+
+  auto extract_menu = new QMenu(tr("Extract"), menu);
+  auto extract_code = new QAction(tr("Code"), extract_menu);
+  auto extract_types = new QAction(tr("Types"), extract_menu);
+
+  menu->addMenu(extract_menu);
+  extract_menu->addAction(extract_code);
+  extract_menu->addAction(extract_types);
 }
 
 void CodeExplorer::OpenEntity(const VariantEntity &entity,

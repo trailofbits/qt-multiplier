@@ -523,6 +523,7 @@ struct CodeWidget::PrivateData {
   bool click_was_secondary{false};
 
   bool tracking_selection{false};
+  bool shift_was_held{false};
 
   // Determined during painting.
   int line_height{0};
@@ -1565,8 +1566,21 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
     d->goto_line_widget->Deactivate();
   }
 
-  if (d->selection_start_cursor && !d->tracking_selection &&
-      (d->click_was_primary || !d->click_was_secondary)) {
+  // A shift-click should create or extend a selection.
+  if (d->click_was_primary && !d->click_was_secondary &&
+      (event->modifiers() & Qt::ShiftModifier) == Qt::ShiftModifier) {
+
+    d->tracking_selection = true;
+    if (!d->selection_start_cursor) {
+      d->selection_start_cursor = d->cursor;
+      if (!d->selection_start_cursor) {
+        d->selection_start_cursor = new_cursor;
+      }
+    }
+
+  // Some other kind of click.
+  } else if (d->selection_start_cursor && !d->tracking_selection &&
+             (d->click_was_primary || !d->click_was_secondary)) {
     d->selection_start_cursor.reset();
   }
 
@@ -1613,6 +1627,15 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
   }
 }
 
+void CodeWidget::keyReleaseEvent(QKeyEvent *event) {
+  if (!(event->modifiers() & Qt::ShiftModifier)) {
+    if (d->shift_was_held && d->tracking_selection) {
+      d->tracking_selection = false;
+    } 
+    d->shift_was_held = false;
+  }
+}
+
 void CodeWidget::keyPressEvent(QKeyEvent *event) {
   qreal dx = 0;
   qreal dy = 0;
@@ -1621,6 +1644,7 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
   if (event->modifiers() & Qt::ShiftModifier) {
     modifier += "Shift+";
+    d->shift_was_held = true;
   }
 
   if (event->modifiers() & Qt::ControlModifier) {

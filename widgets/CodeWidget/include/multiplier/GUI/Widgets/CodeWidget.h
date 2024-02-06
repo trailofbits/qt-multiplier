@@ -146,6 +146,7 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   void mouseReleaseEvent(QMouseEvent *event) Q_DECL_FINAL;
   void wheelEvent(QWheelEvent *event) Q_DECL_FINAL;
   void keyPressEvent(QKeyEvent *event) Q_DECL_FINAL;
+  void keyReleaseEvent(QKeyEvent *event) Q_DECL_FINAL;
 
  private slots:
   void OnIndexChanged(const ConfigManager &);
