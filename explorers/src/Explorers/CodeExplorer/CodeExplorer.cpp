@@ -282,8 +282,10 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
   }
 
   VariantEntity containing_entity;
+  VariantEntity tooltip_entity = entity;
   if (file) {
     containing_entity = file.value();
+    tooltip_entity = containing_entity;
   } else {
     containing_entity = frag.value();
   }
@@ -374,7 +376,7 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
           });
 
   IWindowManager::CentralConfig config;
-  if (auto name = NameOfEntityAsString(entity)) {
+  if (auto name = NameOfEntityAsString(tooltip_entity)) {
     config.tooltip = name.value();
   }
 
