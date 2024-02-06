@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QKeySequence>
+#include <QMainWindow>
 #include <QMenu>
 
 #include <multiplier/GUI/Interfaces/IModel.h>
@@ -108,7 +109,8 @@ struct CodeExplorer::PrivateData {
         manager(manager_),
         history(new HistoryWidget(
             config_manager, kMaxHistorySize,
-            true  /* install global shortcuts */)) {}
+            true  /* install global shortcuts */,
+            manager->Window())) {}
 
   std::pair<VariantEntity, CodeWidget *> CurrentOpenCodeWidget(void) const {
     for (auto &[id, entity_widget] : opened_windows) {

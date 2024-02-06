@@ -37,10 +37,10 @@ namespace {
 static std::atomic<uint64_t> gNextItemId(0);
 
 static const char *const kBackButtonToolTip =
-    "Go back in the navigation history";
+    "Go back in the navigation history%1";
 
 static const char *const kForwardButtonToolTip =
-    "Go forward in the navigation history";
+    "Go forward in the navigation history%1";
 
 struct Item final {
   uint64_t item_id;
@@ -239,8 +239,8 @@ void HistoryWidget::InitializeWidgets(QWidget *parent,
   d->back_action = new QAction(tr("Back"), this);
   d->forward_action = new QAction(tr("Forward"), this);
 
-  d->back_action->setToolTip(tr(kBackButtonToolTip));
-  d->forward_action->setToolTip(tr(kForwardButtonToolTip));
+  d->back_action->setToolTip(tr(kBackButtonToolTip).arg(""));
+  d->forward_action->setToolTip(tr(kForwardButtonToolTip).arg(""));
 
   d->back_button = new QToolButton(this);
   d->back_button->setPopupMode(QToolButton::MenuButtonPopup);
@@ -268,36 +268,38 @@ void HistoryWidget::InitializeWidgets(QWidget *parent,
   layout->addWidget(d->back_button);
   layout->addWidget(d->forward_button);
 
+  if (!install_global_shortcuts) {
+    return;
+  }
+
+  if (!parent) {
+    throw std::logic_error("Missing parent for global shortcut");
+  }
+
   // Initialize the keyboard shortcuts for the parent window
   static bool global_shortcut_installed{false};
   if (install_global_shortcuts && global_shortcut_installed) {
     throw std::logic_error("Global shortcuts can only be installed once");
   }
 
-  global_shortcut_installed = install_global_shortcuts;
-
-  QWidget *shortcut_parent{nullptr};
-  Qt::ShortcutContext shortcut_context{};
-  if (install_global_shortcuts) {
-    shortcut_parent = parent;
-    if (!shortcut_parent) {
-      shortcut_parent = this;
-    }
-
-    shortcut_context = Qt::ApplicationShortcut;
-
-  } else {
-    shortcut_parent = this;
-    shortcut_context = Qt::WidgetWithChildrenShortcut;
-  }
+  global_shortcut_installed = true;
 
   d->back_shortcut =
-      new QShortcut(QKeySequence::Back, shortcut_parent, this,
-                    &HistoryWidget::OnNavigateBack, shortcut_context);
+      new QShortcut(QKeySequence::Back, parent, this,
+                    &HistoryWidget::OnNavigateBack, Qt::ApplicationShortcut);
 
   d->forward_shortcut =
-      new QShortcut(QKeySequence::Forward, shortcut_parent, this,
-                    &HistoryWidget::OnNavigateForward, shortcut_context);
+      new QShortcut(QKeySequence::Forward, parent, this,
+                    &HistoryWidget::OnNavigateForward, Qt::ApplicationShortcut);
+
+  QString key(" (%1)");
+  d->back_action->setToolTip(
+      tr(kBackButtonToolTip).arg(key.arg(
+          QKeySequence(QKeySequence::Back).toString(QKeySequence::NativeText))));
+
+  d->forward_action->setToolTip(
+      tr(kForwardButtonToolTip).arg(key.arg(
+          QKeySequence(QKeySequence::Forward).toString(QKeySequence::NativeText))));
 }
 
 void HistoryWidget::UpdateMenus(void) {
@@ -367,22 +369,39 @@ void HistoryWidget::UpdateMenus(void) {
     }
   }
 
+  QString back_shortcut;
+  QString forward_shortcut;
+
+  if (d->back_shortcut) {
+    back_shortcut = QString(" (%1)").arg(
+        QKeySequence(QKeySequence::Back).toString(QKeySequence::NativeText));
+  }
+
+  if (d->forward_shortcut) {
+    forward_shortcut = QString(" (%1)").arg(
+        QKeySequence(QKeySequence::Forward).toString(QKeySequence::NativeText));
+  }
+
   // Enable/disable and customize the tool tip for the backward button.
   d->back_button->setMenu(history_back_menu);
   if (num_back_actions) {
-    d->back_action->setToolTip(tr("Go back to ") +
-                               history_back_menu->actions().first()->text());
+    d->back_action->setToolTip(
+        tr("Go back to %1%2")
+            .arg(history_back_menu->actions().first()->text())
+            .arg(back_shortcut));
   } else {
-    d->back_action->setToolTip(tr(kBackButtonToolTip));
+    d->back_action->setToolTip(tr(kBackButtonToolTip).arg(back_shortcut));
   }
 
   // Enable/disable and customize the tool tip for the forward button.
   d->forward_button->setMenu(history_forward_menu);
   if (num_forward_actions) {
     d->forward_action->setToolTip(
-        tr("Go forward to ") + history_forward_menu->actions().first()->text());
+        tr("Go forward to %1%2")
+            .arg(history_forward_menu->actions().first()->text())
+            .arg(forward_shortcut));
   } else {
-    d->forward_action->setToolTip(tr(kForwardButtonToolTip));
+    d->forward_action->setToolTip(tr(kForwardButtonToolTip).arg(forward_shortcut));
   }
 
   // NOTE(pag): For some reason, resetting the tooltips removes the icons,

@@ -68,7 +68,8 @@ struct CodePreviewWidget::PrivateData {
         toolbar(enable_history ? new QToolBar(parent) : nullptr),
         history(
             enable_history ?
-            new HistoryWidget(config_manager, kMaxHistorySize, false, toolbar) :
+            new HistoryWidget(config_manager, kMaxHistorySize,
+                              false  /* install_global_shortcuts */, parent) :
             nullptr),
         pop_out_button(enable_history ? new QPushButton(toolbar) : nullptr),
         pinned_entity_info_trigger(config_manager.ActionManager().Find(
