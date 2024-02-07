@@ -32,7 +32,9 @@ endif()
 
 add_subdirectory("libraries")
 
-find_package("multiplier" REQUIRED GLOBAL)
+find_package(doctest CONFIG REQUIRED)
+find_package(multiplier CONFIG REQUIRED)
+find_package(xxHash CONFIG REQUIRED)
 
 add_library("thirdparty_multiplier" INTERFACE)
 

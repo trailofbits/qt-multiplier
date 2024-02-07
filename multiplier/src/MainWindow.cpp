@@ -268,8 +268,7 @@ void MainWindow::InitializeWidgets() {
 
   connect(about_action, &QAction::triggered, this, [this](const bool &) {
     QMessageBox::about(this, windowTitle(),
-                       QString("User interface: ") + QTMULTIPLIER_VERSION +
-                           "\n" + "Library: " + MULTIPLIER_VERSION);
+                       QString("User interface: ") + QTMULTIPLIER_VERSION);
   });
 
   setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
