@@ -190,7 +190,7 @@ static void GenerateLineHashes(IndexedTokenRangeData &res) {
 
       const auto &token_str = column.data;
       succeeded = XXH64_update(xxhash_state, token_str.data(),
-                               token_str.size()) != XXH_ERROR;
+                               static_cast<size_t>(token_str.size())) != XXH_ERROR;
 
       Assert(succeeded, "Failed to update the xxHash state");
 
