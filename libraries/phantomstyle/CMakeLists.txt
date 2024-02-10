@@ -10,7 +10,7 @@ set(library_root
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-add_library("mx_phantomstyle_library" STATIC
+add_library("mx_phantomstyle_library" SHARED
   "${library_root}/src/phantom/phantomtweak.h"
 
   "${library_root}/src/phantom/phantomcolor.h"
@@ -60,3 +60,20 @@ target_link_libraries("mx_phantomstyle_library"
   PRIVATE
     "mx_phantomstyle_library_disable_warnings"
 )
+
+if(MXQT_ENABLE_INSTALL)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(install_destination "lib")
+  else()
+    set(install_destination ".")
+  endif()
+
+  set_target_properties("mx_phantomstyle_library" PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../lib"
+  )
+
+  install(
+    TARGETS "mx_phantomstyle_library"
+    DESTINATION "${install_destination}"
+  )
+endif()
