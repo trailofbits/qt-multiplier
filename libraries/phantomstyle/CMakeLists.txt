@@ -10,7 +10,7 @@ set(library_root
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-add_library("thirdparty_phantomstyle" STATIC
+add_library("thirdparty_phantomstyle" SHARED
   "${library_root}/src/phantom/phantomtweak.h"
 
   "${library_root}/src/phantom/phantomcolor.h"
