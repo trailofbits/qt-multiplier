@@ -21,6 +21,8 @@
 #include <multiplier/GUI/Widgets/CodeWidget.h>
 #include <multiplier/GUI/Widgets/HistoryWidget.h>
 #include <multiplier/GUI/Util.h>
+#include <multiplier/Frontend/MacroConcatenate.h>
+#include <multiplier/Frontend/MacroExpansion.h>
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/Index.h>
 #include <unordered_map>
@@ -45,17 +47,46 @@ static VariantEntity EntityForExpansion(VariantEntity entity) {
 
   // It's a token; see if we can find it inside of a macro.
   if (std::holds_alternative<Token>(entity)) {
-    for (Macro macro : Macro::containing(std::get<Token>(entity))) {
-      entity = macro;
-      if (!IncludeLikeMacroDirective::from(macro)) {
+    auto token = std::get<Token>(entity);
+    entity = token.related_entity();
+
+    for (Macro macro : Macro::containing(token)) {
+
+      // If we've found an `#include` directive, then keep going, because we
+      // might find this include nested inside of a substitution because this
+      // include is embedded in a fragment.
+      //
+      // We also skip concatenates, because we auto-expand them in `CodeWidget`
+      // so that people don't need to expand through them.
+      if (IncludeLikeMacroDirective::from(macro) ||
+          MacroConcatenate::from(macro)) {
+        continue;
+      }
+
+      auto exp = MacroExpansion::from(macro);
+      if (!exp) {
+        entity = macro;
+        break;
+      }
+
+      auto def = exp->definition();
+      if (!def) {
+        entity = macro;
+        break;
+      }
+
+      // If we've found the most likely expansion corresponding to the macro
+      // referenced. It can happen [1] that the left corner of an expansion is
+      // an expansion, and that the upper macro to be expanded is only revealed
+      // by the lower macro.
+      //
+      // [1] Multiplier test: tests/Macros/DeferredExpansionFromConcatenation.c
+      if (!std::holds_alternative<Macro>(entity) ||
+          std::get<Macro>(entity) == def.value()) {
+        entity = macro;
         break;
       }
     }
-  }
-
-  // It's still a token; get the related entity.
-  if (std::holds_alternative<Token>(entity)) {
-    entity = std::get<Token>(entity).related_entity();
   }
 
   if (!std::holds_alternative<Macro>(entity)) {
@@ -275,14 +306,6 @@ void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
           [entity, action = d->open_pinned_preview_trigger] (void) {
             action.Trigger(QVariant::fromValue(entity));
           });
-
-  auto extract_menu = new QMenu(tr("Extract"), menu);
-  auto extract_code = new QAction(tr("Code"), extract_menu);
-  auto extract_types = new QAction(tr("Types"), extract_menu);
-
-  menu->addMenu(extract_menu);
-  extract_menu->addAction(extract_code);
-  extract_menu->addAction(extract_types);
 }
 
 void CodeExplorer::OpenEntity(const VariantEntity &entity,
@@ -303,7 +326,7 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
   }
 
   const auto id = EntityId(containing_entity).Pack();
-  auto tt = file ? TokenTree::from(file.value()) : TokenTree::from(frag.value());
+  auto tt = file ? TokenTree::create(file.value()) : TokenTree::create(frag.value());
 
   // If we're adding to history, then find the currently open window and
   // record its location.

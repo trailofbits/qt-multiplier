@@ -2161,6 +2161,10 @@ void CodeWidget::PrivateData::RecomputeSelection(QPainter &blitter) {
 
   // Go through only the entities on the relevant lines.
   for (auto l = start_index; l <= stop_index; ++l) {
+    if ((l + 1) >= scene.logical_line_index.size()) {
+      break;
+    }
+
     auto i = scene.logical_line_index[l];
     auto max_i = scene.logical_line_index[l + 1];
 
@@ -2253,6 +2257,8 @@ void CodeWidget::PrivateData::RecomputeLineNumbers(void) {
   for (auto i = scene.num_file_lines; i; ++num_digits) {
     i /= 10;
   }
+
+  num_digits = std::max(num_digits, 2);
 
   QFontMetricsF fm(theme_font);
 

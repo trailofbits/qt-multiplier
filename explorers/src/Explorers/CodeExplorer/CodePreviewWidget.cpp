@@ -196,15 +196,15 @@ void CodePreviewWidget::DisplayEntity(
     VariantEntity containing_entity;
     if (auto type = Type::from(entity)) {
       containing_entity = type.value();
-      tt = TokenTree::from(type->tokens());
+      tt = TokenTree::create(type->tokens());
     
     } else if (auto frag = Fragment::containing(entity)) {
       containing_entity = frag.value();
-      tt = TokenTree::from(frag.value());
+      tt = TokenTree::create(frag.value());
     
     } else if (auto file = File::containing(entity)) {
       containing_entity = file.value();
-      tt = TokenTree::from(file.value());
+      tt = TokenTree::create(file.value());
     }
 
     if (std::holds_alternative<NotAnEntity>(containing_entity)) {
