@@ -56,9 +56,15 @@ target_compile_options("mx_phantomstyle_library_disable_warnings" INTERFACE
   -Wno-error
 )
 
+add_library("mx_phantomstyle_library_extra_flags" INTERFACE)
+target_compile_options("mx_phantomstyle_library_extra_flags" INTERFACE
+  -fvisibility=default
+)
+
 target_link_libraries("mx_phantomstyle_library"
   PRIVATE
     "mx_phantomstyle_library_disable_warnings"
+    "mx_phantomstyle_library_extra_flags"
 )
 
 if(MXQT_ENABLE_INSTALL)
