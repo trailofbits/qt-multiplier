@@ -30,6 +30,7 @@ class IInfoGenerator : public std::enable_shared_from_this<IInfoGenerator> {
     VariantEntity entity;
     VariantEntity referenced_entity;
     TokenRange tokens;
+    bool is_location;
     QString location;
 
     Item(void) = default;
@@ -43,6 +44,7 @@ class IInfoGenerator : public std::enable_shared_from_this<IInfoGenerator> {
       that.entity = NotAnEntity{};
       that.referenced_entity = NotAnEntity{};
       that.tokens = TokenRange();
+      that.is_location = false;
       that.location = {};
     }
 
@@ -51,6 +53,7 @@ class IInfoGenerator : public std::enable_shared_from_this<IInfoGenerator> {
       entity = std::move(that.entity);
       referenced_entity = std::move(that.referenced_entity);
       tokens = std::move(that.tokens);
+      is_location = std::move(that.is_location);
       location = std::move(that.location);
       return *this;
     }

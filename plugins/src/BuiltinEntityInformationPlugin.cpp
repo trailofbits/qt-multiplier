@@ -247,6 +247,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
     }
 
     item.category = QObject::tr("Included By");
+    item.is_location = true;
     item.entity = std::move(inc.value());
     item.referenced_entity = file.value();
     item.tokens = TokenRange();

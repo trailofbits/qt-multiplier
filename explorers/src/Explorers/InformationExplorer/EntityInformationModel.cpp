@@ -186,7 +186,7 @@ QVariant EntityInformationModel::data(
       }
     }
 
-  } else if (index.column() == 1 && !node->is_category) {
+  } else if (index.column() == 1 && !node->is_category && !node->item.is_location) {
       if (role == Qt::DisplayRole) {
         return node->item.location;
       }
