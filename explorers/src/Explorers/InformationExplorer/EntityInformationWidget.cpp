@@ -161,6 +161,7 @@ EntityInformationWidget::EntityInformationWidget(
   d->tree->setSortingEnabled(true);
   d->tree->sortByColumn(0, Qt::AscendingOrder);
   d->tree->installEventFilter(this);
+  d->tree->header()->setStretchLastSection(true);
 
   d->tree->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree->viewport()->installEventFilter(this);
@@ -294,7 +295,10 @@ void EntityInformationWidget::OnSearchParametersChange(void) {
 
   d->sort_model->setFilterRegularExpression(regex);
   d->tree->expandRecursively(QModelIndex());
-  d->tree->resizeColumnToContents(0);
+
+  for (int column{}; column < 2; ++column) {
+    d->tree->resizeColumnToContents(column);
+  }
 }
 
 void EntityInformationWidget::ExpandAllBelow(const QModelIndex &parent) {
@@ -320,7 +324,9 @@ void EntityInformationWidget::ExpandAllBelow(const QModelIndex &parent) {
     }
   }
 
-  d->tree->resizeColumnToContents(0);
+  for (int column{}; column < 2; ++column) {
+    d->tree->resizeColumnToContents(column);
+  }
 }
 
 void EntityInformationWidget::DisplayEntity(
