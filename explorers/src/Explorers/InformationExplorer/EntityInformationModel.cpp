@@ -186,9 +186,9 @@ QVariant EntityInformationModel::data(
       }
     }
 
-  } else if (index.column() == 1 && !node->is_category && !node->item.is_location) {
-      if (role == Qt::DisplayRole) {
-        return node->item.location;
+  } else if (index.column() == 1 && node->item.file_name_location.has_value()) {
+      if (role == TokenRangeDisplayRole) {
+        return QVariant::fromValue(node->item.file_name_location.value());
       }
   }
 

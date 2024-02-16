@@ -22,15 +22,23 @@
 #include <multiplier/GUI/Util.h>
 #include <multiplier/Index.h>
 
+#include <cstdlib>
 #include <memory>
 #include <sstream>
 
 namespace mx::gui {
 namespace {
 
-// Fill the location entry in an generated item.
-static void FillLocation(const FileLocationCache &file_location_cache,
-                         IInfoGenerator::Item &item) {
+struct Location final {
+  std::filesystem::path path;
+  unsigned int line{};
+  unsigned int column{};
+};
+
+// Returns the location based on the tokens inside `item`
+static std::optional<Location>
+GetItemLocationFromTokens(const FileLocationCache &file_location_cache,
+                          const IInfoGenerator::Item &item) {
   
   // Start by using the tokens. If we can, we use the tokens because sometimes
   // we use some "higher level" context than the specific entity. E.g. the
@@ -44,19 +52,112 @@ static void FillLocation(const FileLocationCache &file_location_cache,
 
     if (auto line_col = tok.location(file_location_cache)) {
       for (auto path : file->paths()) {
-        item.location = 
-            QString("%1:%2:%3")
-                .arg(QString::fromStdString(path.generic_string()))
-                .arg(line_col->first)
-                .arg(line_col->second);
-        return;
+        return Location {
+          path,
+          line_col->first,
+          line_col->second
+        };
       }
     }
+  }
+
+  return std::nullopt;
+}
+
+// Parses the given path and returns a Location struct
+static std::optional<Location>
+GetLocationFromStringPath(const QString &string_path) {
+  std::vector<std::string> std_string_parts;
+  for (const auto &qstring : string_path.split(":")) {
+    std_string_parts.push_back(qstring.toStdString());
+  }
+
+  if (std_string_parts.size() != 3) {
+    qDebug() << "GetLocationFromStringPath() failed to parse the following path:"
+             << string_path << " in " << __FILE__;
+
+    return std::nullopt;
+  }
+
+  return Location {
+    std::filesystem::path(std_string_parts[0]),
+    static_cast<unsigned int>(std::stoul(std_string_parts[1])),
+    static_cast<unsigned int>(std::stoul(std_string_parts[2])),
+  };
+}
+
+// Builds a TokenRange for the given Location
+static TokenRange
+GetLocationFileName(const Location &location,
+                    const VariantEntity &referenced_entity) {
+  UserToken user_tok;
+  user_tok.category = TokenCategory::FILE_NAME;
+  user_tok.kind = TokenKind::HEADER_NAME;
+  user_tok.related_entity = referenced_entity;
+  user_tok.data = location.path.filename();
+
+  std::vector<CustomToken> toks;
+  toks.emplace_back(std::move(user_tok));
+
+  user_tok.category = TokenCategory::PUNCTUATION;
+  user_tok.kind = TokenKind::COLON;
+  user_tok.data = ":";
+  toks.emplace_back(std::move(user_tok));
+
+  user_tok.category = TokenCategory::LINE_NUMBER;
+  user_tok.kind = TokenKind::NUMERIC_CONSTANT;
+  user_tok.data = std::to_string(location.line);
+  toks.emplace_back(std::move(user_tok));
+
+  user_tok.category = TokenCategory::PUNCTUATION;
+  user_tok.kind = TokenKind::COLON;
+  user_tok.data = ":";
+  toks.emplace_back(std::move(user_tok));
+
+  user_tok.category = TokenCategory::LINE_NUMBER;
+  user_tok.kind = TokenKind::NUMERIC_CONSTANT;
+  user_tok.data = std::to_string(location.column);
+  toks.emplace_back(std::move(user_tok));
+
+  return TokenRange::create(std::move(toks));
+}
+
+// Fill the location entry in an generated item.
+static void FillLocation(const FileLocationCache &file_location_cache,
+                         IInfoGenerator::Item &item,
+                         const bool &skip_file_name_loc = false) {
+
+  item.file_name_location = std::nullopt;
+
+  auto opt_location = GetItemLocationFromTokens(file_location_cache, item);
+  if (opt_location.has_value()) {
+    const auto &location = opt_location.value();
+
+    item.location =
+        QString("%1:%2:%3")
+            .arg(QString::fromStdString(location.path.generic_string()))
+            .arg(location.line)
+            .arg(location.column);
+
+    if (!skip_file_name_loc) {
+      item.file_name_location = GetLocationFileName(location, item.referenced_entity);
+    }
+
+    return;
   }
 
   // Backup path: get the entity's location.
   item.location = LocationOfEntity(file_location_cache, item.entity);
   if (!item.location.isEmpty()) {
+    if (!skip_file_name_loc) {
+      opt_location = GetLocationFromStringPath(item.location);
+      if (opt_location.has_value()) {
+        const auto &location = opt_location.value();
+        item.file_name_location = GetLocationFileName(location,
+                                                      item.referenced_entity);
+      }
+    }
+
     return;
   }
 
@@ -247,11 +348,10 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
     }
 
     item.category = QObject::tr("Included By");
-    item.is_location = true;
     item.entity = std::move(inc.value());
     item.referenced_entity = file.value();
     item.tokens = TokenRange();
-    FillLocation(file_location_cache, item);
+    FillLocation(file_location_cache, item, true);
 
     tok.category = TokenCategory::FILE_NAME;
     tok.kind = TokenKind::HEADER_NAME;
