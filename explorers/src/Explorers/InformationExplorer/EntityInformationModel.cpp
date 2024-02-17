@@ -25,35 +25,6 @@ namespace {
 
 static constexpr int kBatchIntervalTime = 250;
 
-struct Node;
-
-using NodePtr = std::unique_ptr<Node>;
-using NodePtrList = std::vector<std::unique_ptr<Node>>;
-
-struct Node {
-  QString name;
-  IInfoGenerator::Item item;
-
-  // Parent node.
-  Node *parent{nullptr};
-
-  // List of child nodes.
-  NodePtrList nodes;
-
-  // Maps from a node name to an index in `nodes`.
-  QMap<QString, size_t> node_index;
-
-  // Index of this node within `parent`.
-  int row{0};
-
-  // Is this node a category node (one with children), or an entity node
-  // (a leaf node)?
-  bool is_category{true};
-
-  // Should the name be what is rendered for the `Qt::DisplayRole`?
-  bool render_name{true};
-};
-
 }  // namespace
 
 struct EntityInformationModel::PrivateData {
@@ -184,12 +155,29 @@ QVariant EntityInformationModel::data(
           !std::holds_alternative<NotAnEntity>(node->item.referenced_entity)) {
         return QVariant::fromValue(node->item.referenced_entity);
       }
+
+    } else if (role == EntityInformationModel::StringLocationRole) {
+      return node->item.location;
+
+    } else if (role == EntityInformationModel::StringFileNameLocationRole) {
+      QVariant value;
+      if (node->item.file_name_location.has_value()) {
+        const auto &file_name_location = node->item.file_name_location.value();
+        value = TokensToString(file_name_location);
+      }
+
+      return value;
     }
 
   } else if (index.column() == 1 && node->item.file_name_location.has_value()) {
-      if (role == TokenRangeDisplayRole) {
-        return QVariant::fromValue(node->item.file_name_location.value());
-      }
+    const auto &file_name_location = node->item.file_name_location.value();
+
+    if (role == Qt::DisplayRole) {
+      return TokensToString(file_name_location);
+
+    } else if (role == TokenRangeDisplayRole) {
+      return QVariant::fromValue(file_name_location);
+    }
   }
 
   return {};

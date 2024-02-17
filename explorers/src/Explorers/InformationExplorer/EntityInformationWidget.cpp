@@ -17,6 +17,8 @@
 #include <QToolBar>
 #include <QTreeView>
 #include <QVBoxLayout>
+#include <QComboBox>
+#include <QToolButton>
 
 #include <multiplier/AST/AddrLabelExpr.h>
 #include <multiplier/AST/CallExpr.h>
@@ -89,6 +91,9 @@ struct EntityInformationWidget::PrivateData {
   // Toolbar of buttons.
   QToolBar * const toolbar;
 
+  // Sort order button
+  QToolButton * const sort_order;
+
   // Widget keeping track of the history of the entity information browser. May
   // be `nullptr`.
   HistoryWidget * const history;
@@ -131,6 +136,7 @@ struct EntityInformationWidget::PrivateData {
             config_manager.FileLocationCache(), version_number, tree)),
         sort_model(new SortFilterProxyModel(tree)),
         toolbar(enable_history ? new QToolBar(parent) : nullptr),
+        sort_order(new QToolButton(parent)),
         history(
             enable_history ?
             new HistoryWidget(config_manager, kMaxHistorySize, false, toolbar) :
@@ -208,6 +214,55 @@ EntityInformationWidget::EntityInformationWidget(
     d->toolbar->addWidget(new QLabel(" "));
     d->toolbar->addWidget(sync);
 
+    // Create the sort options
+    auto sort_options_layout = new QHBoxLayout();
+
+    auto sort_label = new QLabel(tr("Sort By:"));
+    sort_options_layout->addWidget(sort_label);
+
+    auto sort_options = new QComboBox(this);
+    sort_options_layout->addWidget(sort_options);
+
+    d->sort_order->setCheckable(true);
+    d->sort_order->setChecked(true);
+    d->sort_model->sort(0, Qt::AscendingOrder);
+
+    connect(
+      d->sort_order,
+      &QToolButton::toggled,
+      this,
+      [this](bool checked) {
+        auto sort_mode = checked ? Qt::AscendingOrder : Qt::DescendingOrder;
+        d->sort_model->sort(0, sort_mode);
+      }
+    );
+
+    sort_options_layout->addWidget(d->sort_order);
+
+    auto sort_options_widget = new QWidget(this);
+    sort_options_widget->setLayout(sort_options_layout);
+
+    d->toolbar->addWidget(sort_options_widget);
+
+    sort_options->addItem(tr("Name"), Qt::DisplayRole);
+    d->sort_model->setSortRole(Qt::DisplayRole);
+
+    sort_options->addItem(tr("Location"),
+                          EntityInformationModel::StringLocationRole);
+
+    sort_options->addItem(tr("File name"),
+                          EntityInformationModel::StringFileNameLocationRole);
+
+    connect(
+      sort_options,
+      &QComboBox::currentIndexChanged,
+      this,
+      [sort_options, this](int index) {
+        auto sort_role = sort_options->itemData(index).toInt();
+        d->sort_model->setSortRole(sort_role);
+      }
+    );
+
 #ifndef QT_NO_TOOLTIP
     sync->setToolTip(tr("Keep in sync with clicks in other views"));
 #endif
@@ -267,6 +322,17 @@ void EntityInformationWidget::OnIconsChanged(
 
   d->pop_out_button->setIcon(pop_out_icon);
   d->pop_out_button->setIconSize(d->toolbar->iconSize());
+
+  QIcon sort_order_icon;
+  sort_order_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.SortAscending"),
+                                              QIcon::Normal, QIcon::On);
+
+  sort_order_icon.addPixmap(media_manager.Pixmap("com.trailofbits.icon.SortAscending",
+                                              ITheme::IconStyle::DISABLED),
+                                              QIcon::Disabled, QIcon::On);
+
+  d->sort_order->setIcon(sort_order_icon);
+  d->sort_order->setIconSize(d->toolbar->iconSize());
 }
 
 void EntityInformationWidget::OnSearchParametersChange(void) {

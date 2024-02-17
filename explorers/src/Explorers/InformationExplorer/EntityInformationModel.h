@@ -14,6 +14,34 @@
 namespace mx::gui {
 
 class ConfigManager;
+struct Node;
+
+using NodePtr = std::unique_ptr<Node>;
+using NodePtrList = std::vector<std::unique_ptr<Node>>;
+
+struct Node {
+  QString name;
+  IInfoGenerator::Item item;
+
+  // Parent node.
+  Node *parent{nullptr};
+
+  // List of child nodes.
+  NodePtrList nodes;
+
+  // Maps from a node name to an index in `nodes`.
+  QMap<QString, size_t> node_index;
+
+  // Index of this node within `parent`.
+  int row{0};
+
+  // Is this node a category node (one with children), or an entity node
+  // (a leaf node)?
+  bool is_category{true};
+
+  // Should the name be what is rendered for the `Qt::DisplayRole`?
+  bool render_name{true};
+};
 
 class EntityInformationModel Q_DECL_FINAL : public IModel {
   Q_OBJECT
@@ -26,8 +54,9 @@ class EntityInformationModel Q_DECL_FINAL : public IModel {
   enum {
     // Returns `true` if this node should be auto-expanded.
     AutoExpandRole = IModel::MultiplierUserRole,
-
     ReferencedEntityRole,
+    StringLocationRole,
+    StringFileNameLocationRole,
   };
 
   virtual ~EntityInformationModel(void);
