@@ -1023,15 +1023,11 @@ std::optional<QString> NameOfEntityAsString(const VariantEntity &ent,
 
 namespace {
 
-static QString FilePath(const File &file) {
+static std::filesystem::path FilePath(const File &file) {
   for (auto path : file.paths()) {
-    return QString::fromStdString(path.generic_string());
+    return path;
   }
-  return QString();
-}
-
-static QString FileLineColumn(const File &file, unsigned line, unsigned col) {
-  return QString("%1:%2:%3").arg(FilePath(file)).arg(line).arg(col);
+  return {};
 }
 
 }  // namespace
@@ -1039,21 +1035,45 @@ static QString FileLineColumn(const File &file, unsigned line, unsigned col) {
 QString LocationOfEntity(const FileLocationCache &file_location_cache,
                          const VariantEntity &entity) {
 
-  QString location;
+  if (std::optional<EntityLocation> opt_loc =
+      LocationOfEntityEx(file_location_cache, entity)) {
+
+    const auto &location = opt_loc.value();
+
+    return QString("%1:%2:%3")
+          .arg(QString::fromStdString(location.path.generic_string()))
+          .arg(location.line)
+          .arg(location.column);
+  }
+
+  return {};
+}
+
+std::optional<EntityLocation>
+LocationOfEntityEx(const FileLocationCache &file_location_cache,
+                   const VariantEntity &entity) {
+
+  std::filesystem::path location;
   for (Token tok : FileTokens(entity)) {
     auto file = File::containing(tok);
     if (!file) {
       continue;
     }
 
-    if (auto line_col = tok.location(file_location_cache)) {
-      return FileLineColumn(file.value(), line_col->first, line_col->second);
-    }
-
     location = FilePath(file.value());
+
+    if (auto line_col = tok.location(file_location_cache)) {
+      return EntityLocation{location,
+                            line_col->first,
+                            line_col->second};
+    }
   }
 
-  return location;
+  if (location.empty()) {
+    return std::nullopt;
+  }
+
+  return EntityLocation{location, 0, 0};
 }
 
 //! Return the tokens of `tokens` as a string.

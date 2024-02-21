@@ -26,6 +26,7 @@
         <file alias="com.trailofbits.icon.Goto">Icons/goto_ref_item.png</file>
         <file alias="com.trailofbits.icon.PopOut">Icons/save_as_new_tab.png</file>
         <file alias="com.trailofbits.icon.Close">Icons/close.png</file>
+        <file alias="com.trailofbits.icon.SortAscending">Icons/sort_ascending.png</file>
     </qresource>
     <qresource>
         <file alias="com.trailofbits.font.SourceCodePro-Black">Fonts/Source_Code_Pro/static/SourceCodePro-Black.ttf</file>

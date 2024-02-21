@@ -25,35 +25,6 @@ namespace {
 
 static constexpr int kBatchIntervalTime = 250;
 
-struct Node;
-
-using NodePtr = std::unique_ptr<Node>;
-using NodePtrList = std::vector<std::unique_ptr<Node>>;
-
-struct Node {
-  QString name;
-  IInfoGenerator::Item item;
-
-  // Parent node.
-  Node *parent{nullptr};
-
-  // List of child nodes.
-  NodePtrList nodes;
-
-  // Maps from a node name to an index in `nodes`.
-  QMap<QString, size_t> node_index;
-
-  // Index of this node within `parent`.
-  int row{0};
-
-  // Is this node a category node (one with children), or an entity node
-  // (a leaf node)?
-  bool is_category{true};
-
-  // Should the name be what is rendered for the `Qt::DisplayRole`?
-  bool render_name{true};
-};
-
 }  // namespace
 
 struct EntityInformationModel::PrivateData {
@@ -89,7 +60,7 @@ QModelIndex EntityInformationModel::index(
     return {};
   }
 
-  if (column != 0) {
+  if (column > 1) {
     return {};
   }
 
@@ -110,11 +81,11 @@ QModelIndex EntityInformationModel::index(
   auto child_node = parent_node->nodes[row_index].get();
   Q_ASSERT(row == child_node->row);
 
-  return createIndex(row, 0, child_node);
+  return createIndex(row, column, child_node);
 }
 
 QModelIndex EntityInformationModel::parent(const QModelIndex &child) const {
-  if (!child.isValid() || child.column() != 0) {
+  if (!child.isValid() || child.column() > 1) {
     return {};
   }
 
@@ -124,11 +95,11 @@ QModelIndex EntityInformationModel::parent(const QModelIndex &child) const {
     return {};
   }
 
-  return createIndex(parent_node->row, 0, parent_node);
+  return createIndex(parent_node->row, child.column(), parent_node);
 }
 
 int EntityInformationModel::rowCount(const QModelIndex &parent) const {
-  if (parent.column() >= 1) {
+  if (parent.column() > 1) {
     return 0;
   }
 
@@ -141,47 +112,71 @@ int EntityInformationModel::rowCount(const QModelIndex &parent) const {
 }
 
 int EntityInformationModel::columnCount(const QModelIndex &) const {
-  return 1;
+  return 2;
 }
 
 QVariant EntityInformationModel::data(
     const QModelIndex &index, int role) const {
-  if (!index.isValid() || index.column()) {
+  if (!index.isValid()) {
     return {};
   }
 
   auto node = reinterpret_cast<Node *>(index.internalPointer());
 
-  if (role == Qt::DisplayRole) {
-    if (!node->render_name && node->item.tokens) {
-      return TokensToString(node->item.tokens);
-    }
-    return node->name;
+  if (index.column() == 0) {
+    if (role == Qt::DisplayRole) {
+      if (!node->render_name && node->item.tokens) {
+        return TokensToString(node->item.tokens);
+      }
+      return node->name;
 
-  } else if (role == IModel::TokenRangeDisplayRole) {
-    if (!node->render_name && node->item.tokens) {
-      return QVariant::fromValue(node->item.tokens);
-    }
-  
-  } else if (role == IModel::EntityRole) {
-    if (!node->is_category &&
-        !std::holds_alternative<NotAnEntity>(node->item.entity)) {
-      return QVariant::fromValue(node->item.entity);
+    } else if (role == IModel::TokenRangeDisplayRole) {
+      if (!node->render_name && node->item.tokens) {
+        return QVariant::fromValue(node->item.tokens);
+      }
+
+    } else if (role == IModel::EntityRole) {
+      if (!node->is_category &&
+          !std::holds_alternative<NotAnEntity>(node->item.entity)) {
+        return QVariant::fromValue(node->item.entity);
+      }
+
+    } else if (role == IModel::ModelIdRole) {
+      return ConstantModelId();
+
+    // Auto-expand the root and the categories, but nothing else.
+    } else if (role == AutoExpandRole) {
+      return {!node->parent || node->parent == &(d->root)};
+
+    // Referenced entity. Used to enable info browser to open itself on its
+    // own items.
+    } else if (role == ReferencedEntityRole) {
+      if (!node->is_category &&
+          !std::holds_alternative<NotAnEntity>(node->item.referenced_entity)) {
+        return QVariant::fromValue(node->item.referenced_entity);
+      }
+
+    } else if (role == EntityInformationModel::StringLocationRole) {
+      return node->item.location;
+
+    } else if (role == EntityInformationModel::StringFileNameLocationRole) {
+      QVariant value;
+      if (node->item.file_name_location.has_value()) {
+        const auto &file_name_location = node->item.file_name_location.value();
+        value = TokensToString(file_name_location);
+      }
+
+      return value;
     }
 
-  } else if (role == IModel::ModelIdRole) {
-    return ConstantModelId();
+  } else if (index.column() == 1 && node->item.file_name_location.has_value()) {
+    const auto &file_name_location = node->item.file_name_location.value();
 
-  // Auto-expand the root and the categories, but nothing else.
-  } else if (role == AutoExpandRole) {
-    return {!node->parent || node->parent == &(d->root)};
-  
-  // Referenced entity. Used to enable info browser to open itself on its
-  // own items.
-  } else if (role == ReferencedEntityRole) {
-    if (!node->is_category &&
-        !std::holds_alternative<NotAnEntity>(node->item.referenced_entity)) {
-      return QVariant::fromValue(node->item.referenced_entity);
+    if (role == Qt::DisplayRole) {
+      return TokensToString(file_name_location);
+
+    } else if (role == TokenRangeDisplayRole) {
+      return QVariant::fromValue(file_name_location);
     }
   }
 
