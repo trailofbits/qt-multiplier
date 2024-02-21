@@ -113,6 +113,16 @@ std::optional<QString> NameOfEntityAsString(const VariantEntity &ent,
 QString LocationOfEntity(const FileLocationCache &file_location_cache,
                          const VariantEntity &entity);
 
+struct EntityLocation final {
+  std::filesystem::path path;
+  std::uint32_t line{};
+  std::uint32_t column{};
+};
+
+std::optional<EntityLocation>
+LocationOfEntityEx(const FileLocationCache &file_location_cache,
+                   const VariantEntity &entity);
+
 //! Return the tokens of `tokens` as a string.
 QString TokensToString(const TokenRange &tokens);
 

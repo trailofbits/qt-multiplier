@@ -1030,14 +1030,28 @@ static QString FilePath(const File &file) {
   return QString();
 }
 
-static QString FileLineColumn(const File &file, unsigned line, unsigned col) {
-  return QString("%1:%2:%3").arg(FilePath(file)).arg(line).arg(col);
-}
-
 }  // namespace
 
 QString LocationOfEntity(const FileLocationCache &file_location_cache,
                          const VariantEntity &entity) {
+
+  if (auto opt_location = LocationOfEntityEx(file_location_cache, entity);
+      opt_location.has_value()) {
+
+    const auto &location = opt_location.value();
+
+    return QString("%1:%2:%3")
+          .arg(QString::fromStdString(location.path.generic_string()))
+          .arg(location.line)
+          .arg(location.column);
+  }
+
+  return {};
+}
+
+std::optional<EntityLocation>
+LocationOfEntityEx(const FileLocationCache &file_location_cache,
+                   const VariantEntity &entity) {
 
   QString location;
   for (Token tok : FileTokens(entity)) {
@@ -1047,13 +1061,18 @@ QString LocationOfEntity(const FileLocationCache &file_location_cache,
     }
 
     if (auto line_col = tok.location(file_location_cache)) {
-      return FileLineColumn(file.value(), line_col->first, line_col->second);
+      return EntityLocation{FilePath(file.value()).toStdString(),
+                            line_col->first, line_col->second};
     }
 
     location = FilePath(file.value());
   }
 
-  return location;
+  if (location.isEmpty()) {
+    return std::nullopt;
+  }
+
+  return EntityLocation{location.toStdString(), 0, 0};
 }
 
 //! Return the tokens of `tokens` as a string.
