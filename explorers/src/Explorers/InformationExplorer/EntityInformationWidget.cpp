@@ -254,14 +254,13 @@ EntityInformationWidget::EntityInformationWidget(
                           EntityInformationModel::StringFileNameLocationRole);
 
     connect(
-      sort_options,
-      &QComboBox::currentIndexChanged,
-      this,
-      [sort_options, this](int index) {
-        auto sort_role = sort_options->itemData(index).toInt();
-        d->sort_model->setSortRole(sort_role);
-      }
-    );
+        sort_options,
+        &QComboBox::currentIndexChanged,
+        this,
+        [sort_options, this](int index) {
+          auto sort_role = sort_options->itemData(index).toInt();
+          d->sort_model->setSortRole(sort_role);
+        });
 
 #ifndef QT_NO_TOOLTIP
     sync->setToolTip(tr("Keep in sync with clicks in other views"));

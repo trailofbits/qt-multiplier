@@ -38,31 +38,31 @@ bool SortFilterProxyModel::lessThan(const QModelIndex &source_left,
   if (!source_left.parent().isValid()) {
     // Ignore sort ordering
     switch (sortOrder()) {
-    case Qt::AscendingOrder:
-      return source_left.row() < source_right.row();
+      case Qt::AscendingOrder:
+        return source_left.row() < source_right.row();
 
-    case Qt::DescendingOrder:
-      return source_right.row() < source_left.row();
+      case Qt::DescendingOrder:
+        return source_right.row() < source_left.row();
     }
   }
 
   switch (sort_role) {
-  case Qt::DisplayRole:
-  case EntityInformationModel::StringLocationRole:
-  case EntityInformationModel::StringFileNameLocationRole:
-    return source_left.data(sort_role).toString() <
-           source_right.data(sort_role).toString();
+    case Qt::DisplayRole:
+    case EntityInformationModel::StringLocationRole:
+    case EntityInformationModel::StringFileNameLocationRole:
+      return source_left.data(sort_role).toString() <
+            source_right.data(sort_role).toString();
 
-  case IModel::TokenRangeDisplayRole: {
-    auto left_token_range = qvariant_cast<TokenRange>(source_left.data(sort_role));
-    auto right_token_range = qvariant_cast<TokenRange>(source_right.data(sort_role));
+    case IModel::TokenRangeDisplayRole: {
+      auto left_token_range = qvariant_cast<TokenRange>(source_left.data(sort_role));
+      auto right_token_range = qvariant_cast<TokenRange>(source_right.data(sort_role));
 
-    return TokensToString(left_token_range) <
-           TokensToString(right_token_range);
-  }
+      return TokensToString(left_token_range) <
+            TokensToString(right_token_range);
+    }
 
-  default:
-    return source_left.row() < source_right.row();
+    default:
+      return source_left.row() < source_right.row();
   }
 }
 
