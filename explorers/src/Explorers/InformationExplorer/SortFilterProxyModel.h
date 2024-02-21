@@ -34,6 +34,10 @@ class SortFilterProxyModel Q_DECL_FINAL : public QSortFilterProxyModel {
   bool lessThan(const QModelIndex &source_left,
                 const QModelIndex &source_right) const Q_DECL_FINAL;
 
+ private:
+  //! \return The sort order for `index` or -1 if it's an unknown category
+  int GetCategorySortOrder(const QModelIndex &index) const;
+
  // private slots:
  //  void OnBeginInsertRows(const QModelIndex &, int, int);
  //  void OnDataChanged(const QModelIndex &, const QModelIndex &,
