@@ -13,6 +13,77 @@
 
 namespace mx::gui {
 
+namespace {
+
+QMap<QString, int> GetCategorySortingOrderMap() {
+  static const char *kCategoryList[] {
+    "Size",
+    "Members",
+    "Enumerators",
+    "Enums",
+    "Classes",
+    "Structures",
+    "Type",
+    "Types",
+    "Unions",
+    "Top Level Entities",
+    "Static Local Variables",
+    "Address Ofs",
+    "Align Ofs",
+    "Address Taken By",
+    "Functions",
+    "Class Methods",
+    "Instance Methods",
+    "Constructors",
+    "Destructors",
+    "Concepts",
+    "Conversion Operators",
+    "Copied Into",
+    "Declarations",
+    "Declaration Uses",
+    "Deduction Guides",
+    "Defined Macros",
+    "Definitions",
+    "Dereferenced By",
+    "Called By",
+    "Callees",
+    "Callers",
+    "Casted By",
+    "Expansions",
+    "Global Variables",
+    "Included By",
+    "Includes",
+    "Interfaces",
+    "Local Variables",
+    "Macros Used",
+    "Overloaded Operators",
+    "Parameters",
+    "Parentage",
+    "Passed As Argument To",
+    "Security Type Traits",
+    "Size Ofs",
+    "Statement Uses",
+    "Tested By",
+    "Thread Local Variables",
+    "Trait Uses",
+    "Type Casts",
+    "Updated By",
+    "Used By",
+    "Written By",
+    "Users",
+    "Vector Type Traits",
+  };
+
+  QMap<QString, int> category_map;
+  for (int i = 0; i < sizeof(kCategoryList) / sizeof(const char *); ++i) {
+    category_map.insert(QObject::tr(kCategoryList[i]), i);
+  }
+
+  return category_map;
+}
+
+}
+
 SortFilterProxyModel::SortFilterProxyModel(QObject *parent)
     : QSortFilterProxyModel(parent) {}
 
@@ -32,18 +103,34 @@ void SortFilterProxyModel::setSourceModel(QAbstractItemModel *source_model) {
 
 bool SortFilterProxyModel::lessThan(const QModelIndex &source_left,
                                     const QModelIndex &source_right) const {
+
   // The original `struct Node` can now be acquired from the model
   // indexes for additional sorting methods
   auto sort_role = sortRole();
   if (!source_left.parent().isValid()) {
-    // Ignore sort ordering
-    switch (sortOrder()) {
-      case Qt::AscendingOrder:
-        return source_left.row() < source_right.row();
+    // Well known categories follow our hardcoded sorting order
+    auto lhs_sort_order = GetCategorySortOrder(source_left);
+    auto rhs_sort_order = GetCategorySortOrder(source_right);
 
-      case Qt::DescendingOrder:
-        return source_right.row() < source_left.row();
+    if (lhs_sort_order != -1 && rhs_sort_order != -1) {
+      // Ensure that the category sorting is stable by negating
+      // the sort ordering when needed
+      if (sortOrder() == Qt::DescendingOrder) {
+        std::swap(lhs_sort_order, rhs_sort_order);
+      }
+
+      return lhs_sort_order < rhs_sort_order;
     }
+
+    // Sort everything else alphabetically
+    auto lhs_display_role = source_left.data().toString();
+    auto rhs_display_role = source_right.data().toString();
+
+    if (sortOrder() == Qt::DescendingOrder) {
+      std::swap(lhs_display_role, rhs_display_role);
+    }
+
+    return lhs_display_role < rhs_display_role;
   }
 
   switch (sort_role) {
@@ -64,6 +151,17 @@ bool SortFilterProxyModel::lessThan(const QModelIndex &source_left,
     default:
       return source_left.row() < source_right.row();
   }
+}
+
+int SortFilterProxyModel::GetCategorySortOrder(const QModelIndex &index) const {
+  static const auto kCategorySortingOrderMap{GetCategorySortingOrderMap()};
+
+  auto display_role = index.data(Qt::DisplayRole).toString();
+  if (display_role.isEmpty()) {
+    return -1;
+  }
+
+  return kCategorySortingOrderMap.value(display_role, -1);
 }
 
 // void SortFilterProxyModel::OnBeginInsertRows(
