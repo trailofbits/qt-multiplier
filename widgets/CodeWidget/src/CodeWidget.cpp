@@ -1293,10 +1293,24 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   connect(d->search_widget, &SearchWidget::SearchParametersChanged,
           this, &CodeWidget::OnSearchParametersChange);
 
+  connect(d->search_widget,
+          &SearchWidget::ShowSearchResult,
+          this,
+          [this]() {
+            d->hovered_entity = {};
+          });
+
   connect(d->search_widget, &SearchWidget::ShowSearchResult,
           this, &CodeWidget::OnShowSearchResult);
 
   d->goto_line_widget = new GoToLineWidget(this);
+  connect(d->goto_line_widget,
+          &GoToLineWidget::LineNumberChanged,
+          this,
+          [this]() {
+            d->hovered_entity = {};
+          });
+
   connect(d->goto_line_widget, &GoToLineWidget::LineNumberChanged,
           this, &CodeWidget::OnGoToLineNumber);
 
@@ -1392,7 +1406,7 @@ bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
       auto mouse_event = static_cast<QMouseEvent *>(event);
 
       // Always start with the default cursor
-      setCursor(Qt::IBeamCursor);
+      auto cursor_type{Qt::IBeamCursor};
       auto request_update{false};
 
       QPointF rel_position = mouse_event->position();
@@ -1434,13 +1448,15 @@ bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
           }
 
           if (is_clickable) {
-            setCursor(Qt::PointingHandCursor);
+            cursor_type = Qt::PointingHandCursor;
           }
 
         } else {
           d->hovered_entity.entity = {};
         }
       }
+
+      setCursor(cursor_type);
 
       if (request_update) {
         update();
@@ -2112,11 +2128,11 @@ void CodeWidget::PrivateData::ClampScrollXY(void) {
 }
 
 void CodeWidget::PrivateData::RecomputeScene(void) {
-  hovered_entity = {};
-
   if (!scene_changed) {
     return;
   }
+
+  hovered_entity = {};
 
   // Try to maintain scroll position across scene changes.
   std::optional<OpaqueLocation> loc;
@@ -2681,11 +2697,11 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
     CodeWidget *self, unsigned offset, bool take_focus,
     LocationChangeReason reason) {
 
-  hovered_entity = {};
-
   if (offset > scene.entities.size()) {
     return;
   }
+
+  hovered_entity = {};
 
   const Entity &entity = scene.entities[offset];
   current_line_index = entity.logical_line_number - 1;
@@ -2781,8 +2797,6 @@ void CodeWidget::OnIndexChanged(const ConfigManager &) {
 }
 
 void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
-  d->hovered_entity = {};
-
   QFont old_font;
   if (d->theme) {
     old_font = d->theme->Font();
@@ -2815,6 +2829,7 @@ void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   d->cursor.reset();
   d->selection_start_cursor.reset();
   d->tracking_selection = false;
+  d->hovered_entity = {};
 
   QPalette p = palette();
   p.setColor(QPalette::Window, d->theme_background_color);
@@ -3141,8 +3156,6 @@ void CodeWidget::OnSearchParametersChange(void) {
 }
 
 void CodeWidget::OnShowSearchResult(size_t result_index) {
-  d->hovered_entity = {};
-
   if (result_index >= d->search_result_list.size()) {
     return;
   }
