@@ -44,6 +44,7 @@
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Util.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
+#include <multiplier/Types.h>
 
 #include "GoToLineWidget.h"
 
@@ -446,6 +447,18 @@ struct Position {
 }  // namespace
 
 struct CodeWidget::PrivateData {
+  // Use to track the hovered entity in order to update
+  // the mouse cursor
+  struct HoveredEntity final {
+    // A pointer to the currently hovered entity
+    const Entity * entity{nullptr};
+
+    // True if this entity is clickable
+    bool is_clickable{false};
+  };
+
+  // Hovered entity status
+  HoveredEntity hovered_entity;
 
   uint64_t version_number{0};
 
@@ -1378,6 +1391,10 @@ bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
     } else if (event->type() == QEvent::MouseMove) {
       auto mouse_event = static_cast<QMouseEvent *>(event);
 
+      // Always start with the default cursor
+      setCursor(Qt::IBeamCursor);
+      auto request_update{false};
+
       QPointF rel_position = mouse_event->position();
       auto x = d->scroll_x + rel_position.x();
       auto y = d->scroll_y + rel_position.y();
@@ -1392,13 +1409,41 @@ bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
             d->selection_start_cursor = d->cursor;
           }
 
-          mousePressEvent(mouse_event);
-
-
           d->last_location.reset();
           d->cursor = curr_cursor;
-          update();
+
+          mousePressEvent(mouse_event);
+          request_update = true;
+
+        } else if (auto entity = d->EntityUnderPoint(curr_cursor)) {
+          auto is_clickable{false};
+
+          if (d->hovered_entity.entity == entity) {
+            is_clickable = d->hovered_entity.is_clickable;
+
+          } else {
+            const auto &token = d->scene.tokens[entity->token_index];
+            auto variant_id = token.related_entity_id().Unpack();
+
+            is_clickable = std::holds_alternative<MacroId>(variant_id) ||
+                           std::holds_alternative<DeclId>(variant_id) ||
+                           std::holds_alternative<FileId>(variant_id);
+
+            d->hovered_entity.entity = entity;
+            d->hovered_entity.is_clickable = is_clickable;
+          }
+
+          if (is_clickable) {
+            setCursor(Qt::PointingHandCursor);
+          }
+
+        } else {
+          d->hovered_entity.entity = {};
         }
+      }
+
+      if (request_update) {
+        update();
       }
     }
   }
