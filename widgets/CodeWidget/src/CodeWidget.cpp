@@ -1288,6 +1288,7 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
           this, &CodeWidget::OnGoToLineNumber);
 
   d->code_area = new QWidget();
+  d->code_area->setMouseTracking(true);
   d->code_area->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   d->code_area->setMinimumWidth(200);
   d->code_area->setMinimumHeight(100);
@@ -1364,15 +1365,44 @@ void CodeWidget::focusOutEvent(QFocusEvent *) {
 
 bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
   if (object == d->code_area) {
-    if (auto re = dynamic_cast<QResizeEvent *>(event)) {
+    if (event->type() == QEvent::Resize) {
+      auto re = static_cast<QResizeEvent *>(event);
+
       QSize new_size = re->size();
       d->viewport.setWidth(new_size.width());
       d->viewport.setHeight(new_size.height());
       d->RecomputeLineNumbers();
       d->UpdateScrollbars();
       update();
+
+    } else if (event->type() == QEvent::MouseMove) {
+      auto mouse_event = static_cast<QMouseEvent *>(event);
+
+      QPointF rel_position = mouse_event->position();
+      auto x = d->scroll_x + rel_position.x();
+      auto y = d->scroll_y + rel_position.y();
+
+      QPointF scrolled_xy(x, y);
+      auto curr_cursor = d->CursorPosition(scrolled_xy);
+      if (!d->cursor.has_value() || curr_cursor != d->cursor.value()) {
+        // Handle selection
+        if ((mouse_event->buttons() & Qt::LeftButton) != 0) {
+          if (!d->selection_start_cursor && d->cursor && d->click_was_primary) {
+            d->tracking_selection = true;
+            d->selection_start_cursor = d->cursor;
+          }
+
+          mousePressEvent(mouse_event);
+
+
+          d->last_location.reset();
+          d->cursor = curr_cursor;
+          update();
+        }
+      }
     }
   }
+
   return false;
 }
 
@@ -1515,33 +1545,6 @@ void CodeWidget::mouseReleaseEvent(QMouseEvent *event) {
     }
   }
 
-  update();
-}
-
-void CodeWidget::mouseMoveEvent(QMouseEvent *event) {
-  if (!(event->buttons() & Qt::LeftButton)) {
-    return;
-  }
-
-  if (!d->selection_start_cursor && d->cursor && d->click_was_primary) {
-    d->tracking_selection = true;
-    d->selection_start_cursor = d->cursor;
-  }
-
-  mousePressEvent(event);
-
-  QPointF rel_position = event->position();
-  auto x = d->scroll_x + rel_position.x();
-  auto y = d->scroll_y + rel_position.y();
-
-  QPointF scrolled_xy(x, y);
-  auto curr_cursor = d->CursorPosition(scrolled_xy);
-  if (curr_cursor == d->cursor.value()) {
-    return;
-  }
-
-  d->last_location.reset();
-  d->cursor = curr_cursor;
   update();
 }
 
