@@ -2063,6 +2063,8 @@ void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
 }
 
 void CodeWidget::PrivateData::SetCursor(CodeWidget::OpaqueLocation loc) {
+  hovered_entity = {};
+
   if (0 > loc.cursor_y.physical) {
     cursor.reset();
     current_entity = nullptr;
@@ -2110,6 +2112,8 @@ void CodeWidget::PrivateData::ClampScrollXY(void) {
 }
 
 void CodeWidget::PrivateData::RecomputeScene(void) {
+  hovered_entity = {};
+
   if (!scene_changed) {
     return;
   }
@@ -2677,6 +2681,8 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
     CodeWidget *self, unsigned offset, bool take_focus,
     LocationChangeReason reason) {
 
+  hovered_entity = {};
+
   if (offset > scene.entities.size()) {
     return;
   }
@@ -2775,6 +2781,8 @@ void CodeWidget::OnIndexChanged(const ConfigManager &) {
 }
 
 void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
+  d->hovered_entity = {};
+
   QFont old_font;
   if (d->theme) {
     old_font = d->theme->Font();
@@ -2878,6 +2886,8 @@ void CodeWidget::OnHorizontalScroll(int) {
 
 // Invoked when we want to scroll to a specific entity.
 void CodeWidget::OnGoToEntity(const VariantEntity &entity_, bool take_focus) {
+  d->hovered_entity = {};
+
   // Clear out the last location.
   d->last_location.reset();
 
@@ -3024,6 +3034,8 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_, bool take_focus) {
 //! Change the underlying data / model being rendered by this code widget.
 void CodeWidget::ChangeScene(const TokenTree &token_tree,
                              const SceneOptions &options) {
+  d->hovered_entity = {};
+
   d->version_number++;
   d->scene_changed = true;
   d->canvas_changed = true;
@@ -3065,6 +3077,8 @@ void CodeWidget::EmitLocationChanged(LocationChangeReason reason) {
 }
 
 void CodeWidget::OnGoToLineNumber(unsigned line_) {
+  d->hovered_entity = {};
+
   d->current_entity = nullptr;
   d->selection_start_cursor.reset();
   d->tracking_selection = false;
@@ -3127,6 +3141,8 @@ void CodeWidget::OnSearchParametersChange(void) {
 }
 
 void CodeWidget::OnShowSearchResult(size_t result_index) {
+  d->hovered_entity = {};
+
   if (result_index >= d->search_result_list.size()) {
     return;
   }
