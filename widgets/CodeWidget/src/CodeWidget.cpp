@@ -44,6 +44,7 @@
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Util.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
+#include <multiplier/Types.h>
 
 #include "GoToLineWidget.h"
 
@@ -446,6 +447,18 @@ struct Position {
 }  // namespace
 
 struct CodeWidget::PrivateData {
+  // Use to track the hovered entity in order to update
+  // the mouse cursor
+  struct HoveredEntity final {
+    // A pointer to the currently hovered entity
+    const Entity * entity{nullptr};
+
+    // True if this entity is clickable
+    bool is_clickable{false};
+  };
+
+  // Hovered entity status
+  HoveredEntity hovered_entity;
 
   uint64_t version_number{0};
 
@@ -1280,14 +1293,29 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   connect(d->search_widget, &SearchWidget::SearchParametersChanged,
           this, &CodeWidget::OnSearchParametersChange);
 
+  connect(d->search_widget,
+          &SearchWidget::ShowSearchResult,
+          this,
+          [this]() {
+            d->hovered_entity = {};
+          });
+
   connect(d->search_widget, &SearchWidget::ShowSearchResult,
           this, &CodeWidget::OnShowSearchResult);
 
   d->goto_line_widget = new GoToLineWidget(this);
+  connect(d->goto_line_widget,
+          &GoToLineWidget::LineNumberChanged,
+          this,
+          [this]() {
+            d->hovered_entity = {};
+          });
+
   connect(d->goto_line_widget, &GoToLineWidget::LineNumberChanged,
           this, &CodeWidget::OnGoToLineNumber);
 
   d->code_area = new QWidget();
+  d->code_area->setMouseTracking(true);
   d->code_area->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   d->code_area->setMinimumWidth(200);
   d->code_area->setMinimumHeight(100);
@@ -1364,15 +1392,78 @@ void CodeWidget::focusOutEvent(QFocusEvent *) {
 
 bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
   if (object == d->code_area) {
-    if (auto re = dynamic_cast<QResizeEvent *>(event)) {
+    if (event->type() == QEvent::Resize) {
+      auto re = static_cast<QResizeEvent *>(event);
+
       QSize new_size = re->size();
       d->viewport.setWidth(new_size.width());
       d->viewport.setHeight(new_size.height());
       d->RecomputeLineNumbers();
       d->UpdateScrollbars();
       update();
+
+    } else if (event->type() == QEvent::MouseMove) {
+      auto mouse_event = static_cast<QMouseEvent *>(event);
+
+      // Always start with the default cursor
+      auto cursor_type{Qt::IBeamCursor};
+      auto request_update{false};
+
+      QPointF rel_position = mouse_event->position();
+      auto x = d->scroll_x + rel_position.x();
+      auto y = d->scroll_y + rel_position.y();
+
+      QPointF scrolled_xy(x, y);
+      auto curr_cursor = d->CursorPosition(scrolled_xy);
+      if (!d->cursor.has_value() || curr_cursor != d->cursor.value()) {
+        // Handle selection
+        if ((mouse_event->buttons() & Qt::LeftButton) != 0) {
+          if (!d->selection_start_cursor && d->cursor && d->click_was_primary) {
+            d->tracking_selection = true;
+            d->selection_start_cursor = d->cursor;
+          }
+
+          d->last_location.reset();
+          d->cursor = curr_cursor;
+
+          mousePressEvent(mouse_event);
+          request_update = true;
+
+        } else if (auto entity = d->EntityUnderPoint(curr_cursor)) {
+          auto is_clickable{false};
+
+          if (d->hovered_entity.entity == entity) {
+            is_clickable = d->hovered_entity.is_clickable;
+
+          } else {
+            const auto &token = d->scene.tokens[entity->token_index];
+            auto variant_id = token.related_entity_id().Unpack();
+
+            is_clickable = std::holds_alternative<MacroId>(variant_id) ||
+                           std::holds_alternative<DeclId>(variant_id) ||
+                           std::holds_alternative<FileId>(variant_id);
+
+            d->hovered_entity.entity = entity;
+            d->hovered_entity.is_clickable = is_clickable;
+          }
+
+          if (is_clickable) {
+            cursor_type = Qt::PointingHandCursor;
+          }
+
+        } else {
+          d->hovered_entity.entity = {};
+        }
+      }
+
+      setCursor(cursor_type);
+
+      if (request_update) {
+        update();
+      }
     }
   }
+
   return false;
 }
 
@@ -1515,33 +1606,6 @@ void CodeWidget::mouseReleaseEvent(QMouseEvent *event) {
     }
   }
 
-  update();
-}
-
-void CodeWidget::mouseMoveEvent(QMouseEvent *event) {
-  if (!(event->buttons() & Qt::LeftButton)) {
-    return;
-  }
-
-  if (!d->selection_start_cursor && d->cursor && d->click_was_primary) {
-    d->tracking_selection = true;
-    d->selection_start_cursor = d->cursor;
-  }
-
-  mousePressEvent(event);
-
-  QPointF rel_position = event->position();
-  auto x = d->scroll_x + rel_position.x();
-  auto y = d->scroll_y + rel_position.y();
-
-  QPointF scrolled_xy(x, y);
-  auto curr_cursor = d->CursorPosition(scrolled_xy);
-  if (curr_cursor == d->cursor.value()) {
-    return;
-  }
-
-  d->last_location.reset();
-  d->cursor = curr_cursor;
   update();
 }
 
@@ -2015,6 +2079,8 @@ void CodeWidget::PrivateData::SetLocation(CodeWidget::OpaqueLocation loc) {
 }
 
 void CodeWidget::PrivateData::SetCursor(CodeWidget::OpaqueLocation loc) {
+  hovered_entity = {};
+
   if (0 > loc.cursor_y.physical) {
     cursor.reset();
     current_entity = nullptr;
@@ -2065,6 +2131,8 @@ void CodeWidget::PrivateData::RecomputeScene(void) {
   if (!scene_changed) {
     return;
   }
+
+  hovered_entity = {};
 
   // Try to maintain scroll position across scene changes.
   std::optional<OpaqueLocation> loc;
@@ -2633,6 +2701,8 @@ void CodeWidget::PrivateData::ScrollToEntityOffset(
     return;
   }
 
+  hovered_entity = {};
+
   const Entity &entity = scene.entities[offset];
   current_line_index = entity.logical_line_number - 1;
   qreal entity_y = current_line_index * line_height;
@@ -2759,6 +2829,7 @@ void CodeWidget::OnThemeChanged(const ThemeManager &theme_manager) {
   d->cursor.reset();
   d->selection_start_cursor.reset();
   d->tracking_selection = false;
+  d->hovered_entity = {};
 
   QPalette p = palette();
   p.setColor(QPalette::Window, d->theme_background_color);
@@ -2830,6 +2901,8 @@ void CodeWidget::OnHorizontalScroll(int) {
 
 // Invoked when we want to scroll to a specific entity.
 void CodeWidget::OnGoToEntity(const VariantEntity &entity_, bool take_focus) {
+  d->hovered_entity = {};
+
   // Clear out the last location.
   d->last_location.reset();
 
@@ -2976,6 +3049,8 @@ void CodeWidget::OnGoToEntity(const VariantEntity &entity_, bool take_focus) {
 //! Change the underlying data / model being rendered by this code widget.
 void CodeWidget::ChangeScene(const TokenTree &token_tree,
                              const SceneOptions &options) {
+  d->hovered_entity = {};
+
   d->version_number++;
   d->scene_changed = true;
   d->canvas_changed = true;
@@ -3017,6 +3092,8 @@ void CodeWidget::EmitLocationChanged(LocationChangeReason reason) {
 }
 
 void CodeWidget::OnGoToLineNumber(unsigned line_) {
+  d->hovered_entity = {};
+
   d->current_entity = nullptr;
   d->selection_start_cursor.reset();
   d->tracking_selection = false;
