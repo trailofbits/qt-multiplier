@@ -5,6 +5,14 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MacroExplorer.h"
+#include "ExpandedMacrosModel.h"
+
+#include <multiplier/GUI/Managers/ActionManager.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Util.h>
+
+#include <multiplier/Index.h>
 
 #include <QEvent>
 #include <QHeaderView>
@@ -14,13 +22,7 @@
 #include <QSortFilterProxyModel>
 #include <QTableView>
 #include <QVBoxLayout>
-
-#include <multiplier/GUI/Managers/ActionManager.h>
-#include <multiplier/GUI/Managers/ConfigManager.h>
-#include <multiplier/GUI/Managers/MediaManager.h>
-#include <multiplier/Index.h>
-
-#include "ExpandedMacrosModel.h"
+#include <QMouseEvent>
 
 namespace mx::gui {
 
@@ -187,6 +189,20 @@ bool MacroExplorer::eventFilter(QObject *obj, QEvent *event) {
   } else if (obj == d->table->viewport()) {
     if (event->type() == QEvent::Leave || event->type() == QEvent::MouseMove) {
       UpdateItemButtons();
+
+    } else if (event->type() == QEvent::MouseButtonPress) {
+      const auto mouse_event = static_cast<QMouseEvent *>(event);
+      if ((mouse_event->buttons() & Qt::RightButton) != 0) {
+        auto local_mouse_pos{mouse_event->pos()};
+
+        auto model_index = d->table->indexAt(local_mouse_pos);
+        if (!model_index.isValid()){
+          return false;
+        }
+
+        auto global_mouse_pos{d->table->viewport()->mapToGlobal(local_mouse_pos)};
+        OnContextMenu(global_mouse_pos, model_index);
+      }
     }
   }
   return false;
@@ -269,6 +285,14 @@ void MacroExplorer::UpdateItemButtons(void) {
   }
 
   d->updating_buttons = false;
+}
+
+void
+MacroExplorer::OnContextMenu(const QPoint &pos, const QModelIndex &index) {
+  auto menu = new QMenu(tr("Context Menu"), this);
+  GenerateCopySubMenu(menu, index);
+
+  menu->exec(pos);
 }
 
 }  // namespace mx::gui
