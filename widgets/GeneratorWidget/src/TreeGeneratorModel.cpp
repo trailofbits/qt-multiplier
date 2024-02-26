@@ -366,6 +366,18 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
   } else if (role == TreeGeneratorModel::IsDuplicate) {
     return QVariant::fromValue(
         node->self_or_duplicate && node->self_or_duplicate != node);
+
+  } else if (role == IModel::CopyableRoleMapIdRole) {
+    auto column_name = d->generator->ColumnTitle(index.column());
+
+    CopyableRoleMap copyable_role_map{
+      { column_name, Qt::DisplayRole },
+      { tr("Summary"), Qt::ToolTipRole },
+    };
+
+    QVariant value;
+    value.setValue(copyable_role_map);
+    return value;
   }
 
   return {};

@@ -7,6 +7,9 @@
 #include <multiplier/GUI/Explorers/InformationExplorer.h>
 
 #include <QThreadPool>
+#include <QClipboard>
+#include <QMenu>
+#include <QAction>
 
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
@@ -86,6 +89,18 @@ void InformationExplorer::OnSelectedItemChanged(const QModelIndex &index) {
   if (!std::holds_alternative<NotAnEntity>(entity)) {
     d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
   }
+}
+
+void
+InformationExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
+                                      const QModelIndex &index) {
+
+  // Do not generate a copy menu for categories
+  if (!index.parent().isValid()) {
+    return;
+  }
+
+  GenerateCopySubMenu(menu, index);
 }
 
 void InformationExplorer::CreateDockWidget(IWindowManager *manager) {

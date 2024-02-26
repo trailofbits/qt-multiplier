@@ -34,6 +34,7 @@
 #include <QColor>
 #include <QModelIndex>
 #include <QString>
+#include <QMenu>
 
 #include <optional>
 #include <unordered_map>
@@ -78,6 +79,9 @@ static VariantEntity NamedDeclContaining(const T &thing) requires(
 
   return NotAnEntity{};
 }
+
+//! Generates the `Copy` menu subsection for an IModel index
+void GenerateCopySubMenu(QMenu *menu, const QModelIndex &index);
 
 //! Return the named declaration containing `thing`, or `NotAnEntity`.
 VariantEntity NamedDeclContaining(const VariantEntity &thing);

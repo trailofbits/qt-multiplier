@@ -167,9 +167,30 @@ QVariant EntityInformationModel::data(
       }
 
       return value;
+
+    } else if (role == Qt::ToolTipRole) {
+      auto tooltip =
+        tr("Entity Name: ") + index.data().toString() + "\n" +
+        tr("Location: ") + index.data(EntityInformationModel::StringLocationRole).toString();
+
+      return tooltip;
+
+    } else if (role == IModel::CopyableRoleMapIdRole) {
+      static const CopyableRoleMap copyable_role_map{
+        { tr("Entity Name"), Qt::DisplayRole },
+        { tr("Location (full path)"), StringLocationRole },
+        { tr("Location (file name)"), StringFileNameLocationRole },
+        { tr("Summary"), Qt::ToolTipRole },
+      };
+
+      QVariant value;
+      value.setValue(copyable_role_map);
+
+      return value;
     }
 
   } else if (index.column() == 1 && node->item.file_name_location.has_value()) {
+    // This is only used for the location
     const auto &file_name_location = node->item.file_name_location.value();
 
     if (role == Qt::DisplayRole) {

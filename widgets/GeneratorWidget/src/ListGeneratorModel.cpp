@@ -293,6 +293,14 @@ QVariant ListGeneratorModel::data(const QModelIndex &index, int role) const {
 
   } else if (role == ListGeneratorModel::IsDuplicate) {
     value.setValue(static_cast<int>(node->alias_index) != node->row);
+
+  } else if (role == IModel::CopyableRoleMapIdRole) {
+    static const CopyableRoleMap copyable_role_map{
+      { tr("Entity Name"), Qt::DisplayRole },
+      { tr("Summary"), Qt::ToolTipRole },
+    };
+
+    value.setValue(copyable_role_map);
   }
 
   return value;
