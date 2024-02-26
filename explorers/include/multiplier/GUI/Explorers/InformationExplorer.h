@@ -41,6 +41,10 @@ class InformationExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   }
 
  private:
+  //! Called when we want to act on the context menu.
+  void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
+                        const QModelIndex &index);
+
   void CreateDockWidget(IWindowManager *manager);
   void OpenInfo(const QVariant &data, bool is_explicit);
   void OpenInfoImplicit(const QVariant &data);

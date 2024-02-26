@@ -6,7 +6,15 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
+#include "SearchFilterModelProxy.h"
+#include "TreeGeneratorModel.h"
+
 #include <multiplier/GUI/Widgets/TreeGeneratorWidget.h>
+#include <multiplier/GUI/Util.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Widgets/FilterSettingsWidget.h>
+#include <multiplier/GUI/Widgets/SearchWidget.h>
 
 #include <QAction>
 #include <QClipboard>
@@ -18,16 +26,6 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTreeView>
-
-// #include <QAbstractItemModelTester>
-
-#include <multiplier/GUI/Managers/ConfigManager.h>
-#include <multiplier/GUI/Managers/MediaManager.h>
-#include <multiplier/GUI/Widgets/FilterSettingsWidget.h>
-#include <multiplier/GUI/Widgets/SearchWidget.h>
-
-#include "SearchFilterModelProxy.h"
-#include "TreeGeneratorModel.h"
 
 namespace mx::gui {
 namespace {
@@ -269,16 +267,7 @@ void TreeGeneratorWidget::ActOnContextMenu(
   }
 
   auto underlying_index = d->model_proxy->mapToSource(selected_index);
-  auto tooltip_var = underlying_index.data(Qt::ToolTipRole);
-  if (tooltip_var.isValid()) {
-    auto details = tooltip_var.toString();
-    auto copy_details_action = new QAction(tr("Copy Details"), menu);
-    menu->addAction(copy_details_action);
-    connect(copy_details_action, &QAction::triggered,
-            [=] (void) {
-              qApp->clipboard()->setText(details);
-            });
-  }
+  GenerateCopySubMenu(menu, underlying_index);
 
   auto open_action = new QAction(tr("Open"), menu);
   menu->addAction(open_action);

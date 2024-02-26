@@ -6,8 +6,17 @@
 
 #include "Util.h"
 
-#include <QDebug>
 #include <cassert>
+#include <iostream>
+
+#include <QDebug>
+#include <QAction>
+#include <QApplication>
+#include <QClipboard>
+#include <QMessageBox>
+
+#include <multiplier/GUI/Interfaces/IModel.h>
+
 #include <multiplier/AST.h>
 #include <multiplier/Fragment.h>
 #include <multiplier/Frontend.h>
@@ -15,9 +24,106 @@
 #include <multiplier/Iterator.h>
 #include <multiplier/IR/Block.h>
 
-#include <iostream>
-
 namespace mx::gui {
+
+namespace {
+
+static const QString kGeneratedCopyMenuSignature{"GeneratedCopyMenu"};
+
+}
+
+void GenerateCopySubMenu(QMenu *menu, const QModelIndex &index) {
+  // BUG: As the context menu is not always handled in the same
+  // level in the component hierarchy, we can end up with a
+  // duplicated menu
+  //
+  // An example of this is the InformationExplorer, which will
+  // eventually populate the context menu of external widgets
+  // by mistake, due to how plugins are handled
+  //
+  // Submenus are typically really small: 4-5 entries, with at most
+  // a single submenu (typically, a Copy menu we already generated).
+  //
+  // This still provides a complete scan for the sake of correctness
+  auto next_action_queue{menu->actions()};
+
+  while (!next_action_queue.empty()) {
+    auto action_queue = std::move(next_action_queue);
+    next_action_queue.clear();
+
+    for (const auto &action : action_queue) {
+      if (action->isSeparator()) {
+        continue;
+
+      } else if (action->menu() != nullptr) {
+        for (const auto &sub_action : action->menu()->actions()) {
+          next_action_queue.push_back(sub_action);
+        }
+
+      } else if (action->data().toString() == kGeneratedCopyMenuSignature) {
+        return;
+      }
+    }
+  }
+
+  auto copyable_role_map_var = index.data(IModel::CopyableRoleMapIdRole);
+
+  if (!copyable_role_map_var.isValid() ||
+      !copyable_role_map_var.canConvert<CopyableRoleMap>()) {
+
+    return;
+  }
+
+  auto copyable_role_map = qvariant_cast<CopyableRoleMap>(copyable_role_map_var);
+
+  std::vector<QAction *> action_list;
+  for (auto [key, value] : copyable_role_map.asKeyValueRange()) {
+    // Make a copy for the lambda
+    auto role_name = key;
+    auto role_id = value;
+
+    auto action = new QAction(role_name);
+    action->setData(kGeneratedCopyMenuSignature);
+    QObject::connect(action, &QAction::triggered,
+            [=](void) {
+              QString text;
+
+              auto var = index.data(role_id);
+              if (var.canConvert<QString>()) {
+                text = var.toString();
+              } else if (var.canConvert<unsigned long long int>()) {
+                text = QString::number(var.toULongLong());
+              }
+
+              if (text.isEmpty()) {
+                QMessageBox::critical(menu, QObject::tr("Copy error"),
+                                      QObject::tr("The selected property is empty!"));
+
+              } else {
+                qApp->clipboard()->setText(text);
+              }
+            });
+
+    action_list.push_back(action);
+  }
+
+  if (action_list.size() == 1) {
+    auto action = action_list[0];
+    action->setParent(menu);
+
+    action->setText(QObject::tr("Copy") + "`" + action->text() + "`");
+    menu->addAction(action);
+
+  } else if (action_list.size() > 1) {
+    auto copy_menu = new QMenu(QObject::tr("Copy..."), menu);
+    for (auto action : action_list) {
+      action->setParent(copy_menu);
+      copy_menu->addAction(action);
+    }
+
+    menu->addMenu(copy_menu);
+  }
+}
 
 VariantEntity NamedEntityContaining(const VariantEntity &entity) {
   if (std::holds_alternative<Decl>(entity)) {

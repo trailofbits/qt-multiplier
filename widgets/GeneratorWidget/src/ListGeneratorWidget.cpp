@@ -6,7 +6,14 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
+#include "SearchFilterModelProxy.h"
+#include "ListGeneratorModel.h"
+
 #include <multiplier/GUI/Widgets/ListGeneratorWidget.h>
+#include <multiplier/GUI/Util.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Widgets/SearchWidget.h>
 
 #include <QAction>
 #include <QClipboard>
@@ -17,13 +24,6 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QScrollBar>
-
-#include <multiplier/GUI/Managers/ConfigManager.h>
-#include <multiplier/GUI/Managers/MediaManager.h>
-#include <multiplier/GUI/Widgets/SearchWidget.h>
-
-#include "SearchFilterModelProxy.h"
-#include "ListGeneratorModel.h"
 
 namespace mx::gui {
 namespace {
@@ -198,18 +198,8 @@ void ListGeneratorWidget::ActOnContextMenu(
     IWindowManager *, QMenu *menu, const QModelIndex &index) {
   
   auto selected_index = std::move(d->selected_index);
-
   if (index.isValid() && index == selected_index) {
-    auto tooltip_var = index.data(Qt::ToolTipRole);
-    if (tooltip_var.isValid()) {
-      auto details = tooltip_var.toString();
-      auto copy_details_action = new QAction(tr("Copy Details"), menu);
-      menu->addAction(copy_details_action);
-      connect(copy_details_action, &QAction::triggered,
-              [=] (void) {
-                qApp->clipboard()->setText(details);
-              });
-    }
+    GenerateCopySubMenu(menu, index);
   }
 
   auto vp = d->list_view->viewport();

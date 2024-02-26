@@ -13,6 +13,9 @@
 
 namespace mx::gui {
 
+//! A map of roles that can be copied
+using CopyableRoleMap = QMap<QString, int>;
+
 class IModel : public QAbstractItemModel {
  public:
   virtual ~IModel(void);
@@ -29,6 +32,9 @@ class IModel : public QAbstractItemModel {
 
     // Returns a `QString` of the model name.
     ModelIdRole,
+
+    // Returns a list of roles that can be copied
+    CopyableRoleMapIdRole,
 
     MultiplierUserRole = Qt::UserRole + 100
   };
