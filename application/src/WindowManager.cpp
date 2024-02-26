@@ -5,6 +5,15 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "WindowManager.h"
+#include "MainWindow.h"
+
+#include <multiplier/GUI/Interfaces/IWindowWidget.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
+#include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
+#include <multiplier/GUI/Widgets/TabWidget.h>
+
+#include <unordered_map>
+#include <filesystem>
 
 #include <QDesktopServices>
 #include <QDockWidget>
@@ -17,14 +26,8 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QUrl>
-
-#include <multiplier/GUI/Interfaces/IWindowWidget.h>
-#include <multiplier/GUI/Managers/ActionManager.h>
-#include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
-#include <multiplier/GUI/Widgets/TabWidget.h>
-#include <unordered_map>
-
-#include "MainWindow.h"
+#include <QClipboard>
+#include <QAction>
 
 namespace mx::gui {
 namespace {
@@ -71,8 +74,17 @@ WindowManager::WindowManager(MainWindow *window)
   connect(d->tab_widget->tabBar(), &QTabBar::tabCloseRequested,
           this, &WindowManager::OnTabBarClose);
 
-  connect(d->tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
-          this, &WindowManager::OnTabBarDoubleClick);
+  connect(d->tab_widget->tabBar(), &QTabBar::tabBarClicked,
+          this, &WindowManager::OnTabBarClicked);
+
+  connect(d->tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked, this,
+          [=](int tab_index) {
+            if ((QApplication::mouseButtons() & Qt::LeftButton) == 0) {
+              return;
+            }
+
+            this->OnRenameTabBar(tab_index);
+          });
 
   d->tab_widget->setTabsClosable(true);
   d->tab_widget->setDocumentMode(true);
@@ -103,7 +115,58 @@ void WindowManager::OnTabBarClose(int i) {
   widget->close();
 }
 
-void WindowManager::OnTabBarDoubleClick(int i) {
+void WindowManager::OnTabBarClicked(int i) {
+  if ((QApplication::mouseButtons() & Qt::RightButton) == 0) {
+    return;
+  }
+
+  auto full_path = d->tab_widget->tabToolTip(i);
+  auto file_name = QString::fromStdString(
+                       std::filesystem::path(full_path.toStdString())
+                       .filename()
+                       .generic_string());
+
+  // We can't use `this` as a parent, so make sure we release the menu
+  // by using a unique_ptr
+  auto menu = std::make_unique<QMenu>(tr("Context Menu"));
+
+  // Rename and close actions
+  auto action = new QAction(tr("Close"));
+  menu->addAction(action);
+  connect(action, &QAction::triggered,
+          [=](void) {
+            this->OnTabBarClose(i);
+          });
+
+  action = new QAction(tr("Rename"));
+  menu->addAction(action);
+  connect(action, &QAction::triggered,
+          [=](void) {
+            this->OnRenameTabBar(i);
+          });
+
+  // Copy menu
+  auto copy_menu = new QMenu(tr("Copy..."), menu.get());
+  menu->addMenu(copy_menu);
+
+  action = new QAction(tr("Full path"));
+  copy_menu->addAction(action);
+  connect(action, &QAction::triggered,
+          [=](void) {
+            qApp->clipboard()->setText(full_path);
+          });
+
+  action = new QAction(tr("File name"));
+  copy_menu->addAction(action);
+  connect(action, &QAction::triggered,
+          [=](void) {
+            qApp->clipboard()->setText(file_name);
+          });
+
+  menu->exec(QCursor::pos());
+}
+
+void WindowManager::OnRenameTabBar(int i) {
   auto current_tab_name = d->tab_widget->tabText(i);
 
   SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,

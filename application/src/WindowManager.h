@@ -58,7 +58,8 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
 
  private slots:
   void OnTabBarClose(int i);
-  void OnTabBarDoubleClick(int i);
+  void OnTabBarClicked(int i);
+  void OnRenameTabBar(int i);
 };
 
 }  // namespace mx::gui
