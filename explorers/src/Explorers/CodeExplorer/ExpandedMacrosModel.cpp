@@ -139,6 +139,36 @@ QVariant ExpandedMacrosModel::data(const QModelIndex &index, int role) const {
                .arg(display)
                .arg(location);
 
+  } else if (role == IModel::CopyableRoleMapIdRole) {
+    QString label;
+    switch (col) {
+      case 0:
+        label = tr("Entity Name");
+        break;
+
+      case 1:
+        label = tr("Kind");
+        break;
+
+      case 2:
+        label = tr("Location");
+        break;
+
+      default:
+        label = tr("Unimplemented label for column ") + QString::number(col);
+        break;
+    }
+
+    CopyableRoleMap copyable_role_map{
+      { tr("Summary"), Qt::ToolTipRole },
+      { label, Qt::DisplayRole },
+    };
+
+    QVariant value;
+    value.setValue(copyable_role_map);
+
+    return value;
+
   } else if (role == IModel::EntityRole) {
     return QVariant::fromValue<VariantEntity>(macro);
 

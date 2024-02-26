@@ -38,6 +38,7 @@ class MacroExplorer Q_DECL_FINAL : public IWindowWidget {
  
  private:
   void UpdateItemButtons(void);
+  void OnContextMenu(const QPoint &pos, const QModelIndex &index);
 
  protected:
   bool eventFilter(QObject *obj, QEvent *event) Q_DECL_FINAL;
