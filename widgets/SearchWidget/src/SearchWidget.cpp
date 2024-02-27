@@ -114,7 +114,7 @@ void SearchWidget::InitializeWidgets(void) {
   search_widget_layout->addStretch();
 
   if (d->mode == Mode::Search) {
-    d->show_prev_result = new QPushButton(d->show_prev_result_icon, "");
+    d->show_prev_result = new QPushButton(d->show_prev_result_icon, "", this);
     d->show_prev_result->setEnabled(false);
 
     connect(d->show_prev_result, &QPushButton::clicked, this,
@@ -122,7 +122,7 @@ void SearchWidget::InitializeWidgets(void) {
 
     search_widget_layout->addWidget(d->show_prev_result);
 
-    d->show_next_result = new QPushButton(d->show_next_result_icon, "");
+    d->show_next_result = new QPushButton(d->show_next_result_icon, "", this);
     d->show_next_result->setEnabled(false);
 
     connect(d->show_next_result, &QPushButton::clicked, this,
@@ -132,7 +132,7 @@ void SearchWidget::InitializeWidgets(void) {
   }
 
   // The main layout contains the search layout and the error display
-  d->search_input_error_display = new QLineEdit();
+  d->search_input_error_display = new QLineEdit(this);
   d->search_input_error_display->setVisible(false);
 
   auto main_layout = new QVBoxLayout();
@@ -145,10 +145,10 @@ void SearchWidget::InitializeWidgets(void) {
   setLayout(main_layout);
 
   // Setup the input box
-  d->search_icon_action = new QAction(QIcon(), tr("Search"));
+  d->search_icon_action = new QAction(QIcon(), tr("Search"), this);
 
   d->case_sensitive_search_action =
-      new QAction(tr("Enable case sensitive search"));
+      new QAction(tr("Enable case sensitive search"), this);
 
   d->case_sensitive_search_action->setCheckable(true);
   d->case_sensitive_search_action->setChecked(false);
@@ -157,7 +157,7 @@ void SearchWidget::InitializeWidgets(void) {
                              QLineEdit::TrailingPosition);
 
   d->whole_word_search_action =
-      new QAction(QIcon(), tr("Enable whole word search"));
+      new QAction(QIcon(), tr("Enable whole word search"), this);
 
   d->whole_word_search_action->setCheckable(true);
   d->whole_word_search_action->setChecked(false);
@@ -166,7 +166,7 @@ void SearchWidget::InitializeWidgets(void) {
                              QLineEdit::TrailingPosition);
 
   d->regex_search_action = new QAction(
-      QIcon(), tr("Enable regex search"));
+      QIcon(), tr("Enable regex search"), this);
 
   d->regex_search_action->setCheckable(true);
   d->regex_search_action->setChecked(false);

@@ -427,7 +427,7 @@ QMenu *WindowManager::Menu(const QString &menu_name) {
     return it.value();
   }
 
-  auto menu = new QMenu(menu_name);
+  auto menu = new QMenu(menu_name, d->window);
   d->window->menuBar()->addMenu(menu);
   d->app_menus.insert(menu_name, menu);
   return menu;
