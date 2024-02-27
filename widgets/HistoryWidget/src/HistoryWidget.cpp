@@ -217,7 +217,7 @@ void HistoryWidget::PrivateData::AddToHistory(
 
       auto labeller = new HistoryLabelBuilder(
           file_cache, std::move(label_entity), history_item.item_id,
-          line, column);
+          line, column, widget);
 
       labeller->setAutoDelete(true);
 
@@ -320,11 +320,11 @@ void HistoryWidget::UpdateMenus(void) {
     }
   }
 
-  QMenu *history_back_menu = new QMenu(tr("Previous history menu"));
+  QMenu *history_back_menu = new QMenu(tr("Previous history menu"), this);
   connect(history_back_menu, &QMenu::triggered, this,
           &HistoryWidget::OnNavigateBackToHistoryItem);
 
-  QMenu *history_forward_menu = new QMenu(tr("Next history menu"));
+  QMenu *history_forward_menu = new QMenu(tr("Next history menu"), this);
   connect(history_forward_menu, &QMenu::triggered, this,
           &HistoryWidget::OnNavigateForwardToHistoryItem);
 
@@ -338,7 +338,7 @@ void HistoryWidget::UpdateMenus(void) {
        ++item_it) {
 
     const Item &item = *item_it;
-    QAction *action = new QAction(item.name);
+    QAction *action = new QAction(item.name, this);
     action->setData(item_index++);
 
     back_history_action_list.push_back(action);
@@ -361,7 +361,7 @@ void HistoryWidget::UpdateMenus(void) {
          item_it != d->item_list.end(); ++item_it) {
 
       const Item &item = *item_it;
-      QAction *action = new QAction(item.name);
+      QAction *action = new QAction(item.name, this);
       action->setData(++item_index);
 
       history_forward_menu->addAction(action);
