@@ -60,6 +60,7 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
   void OnTabBarClose(int i);
   void OnTabBarClicked(int i);
   void OnRenameTabBar(int i);
+  void OnTabBarContextMenu(int i);
 };
 
 }  // namespace mx::gui
