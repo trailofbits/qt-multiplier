@@ -116,54 +116,12 @@ void WindowManager::OnTabBarClose(int i) {
 }
 
 void WindowManager::OnTabBarClicked(int i) {
-  if ((QApplication::mouseButtons() & Qt::RightButton) == 0) {
-    return;
+  if ((QApplication::mouseButtons() & Qt::MiddleButton) != 0) {
+    OnTabBarClose(i);
+
+  } else if ((QApplication::mouseButtons() & Qt::RightButton) != 0) {
+    OnTabBarContextMenu(i);
   }
-
-  auto full_path = d->tab_widget->tabToolTip(i);
-  auto file_name = QString::fromStdString(
-                       std::filesystem::path(full_path.toStdString())
-                       .filename()
-                       .generic_string());
-
-  // We can't use `this` as a parent, so make sure we release the menu
-  // by using a unique_ptr
-  auto menu = std::make_unique<QMenu>(tr("Context Menu"));
-
-  // Rename and close actions
-  auto action = new QAction(tr("Close"));
-  menu->addAction(action);
-  connect(action, &QAction::triggered,
-          [=](void) {
-            this->OnTabBarClose(i);
-          });
-
-  action = new QAction(tr("Rename"));
-  menu->addAction(action);
-  connect(action, &QAction::triggered,
-          [=](void) {
-            this->OnRenameTabBar(i);
-          });
-
-  // Copy menu
-  auto copy_menu = new QMenu(tr("Copy..."), menu.get());
-  menu->addMenu(copy_menu);
-
-  action = new QAction(tr("Full path"));
-  copy_menu->addAction(action);
-  connect(action, &QAction::triggered,
-          [=](void) {
-            qApp->clipboard()->setText(full_path);
-          });
-
-  action = new QAction(tr("File name"));
-  copy_menu->addAction(action);
-  connect(action, &QAction::triggered,
-          [=](void) {
-            qApp->clipboard()->setText(file_name);
-          });
-
-  menu->exec(QCursor::pos());
 }
 
 void WindowManager::OnRenameTabBar(int i) {
@@ -186,6 +144,53 @@ void WindowManager::OnRenameTabBar(int i) {
   }
 
   d->tab_widget->setTabText(i, new_tab_name);
+}
+
+void WindowManager::OnTabBarContextMenu(int i) {
+  auto full_path = d->tab_widget->tabToolTip(i);
+  auto file_name = QString::fromStdString(
+                       std::filesystem::path(full_path.toStdString())
+                       .filename()
+                       .generic_string());
+
+  // We can't use `this` as a parent, so make sure we release the menu
+  // by using a unique_ptr
+  auto menu = std::make_unique<QMenu>(tr("Context Menu"));
+
+  // Rename and close actions
+  auto action = new QAction(tr("Close"), menu.get());
+  menu->addAction(action);
+  connect(action, &QAction::triggered,
+          [=](void) {
+            this->OnTabBarClose(i);
+          });
+
+  action = new QAction(tr("Rename"), menu.get());
+  menu->addAction(action);
+  connect(action, &QAction::triggered,
+          [=](void) {
+            this->OnRenameTabBar(i);
+          });
+
+  // Copy menu
+  auto copy_menu = new QMenu(tr("Copy..."), menu.get());
+  menu->addMenu(copy_menu);
+
+  action = new QAction(tr("Full path"), menu.get());
+  copy_menu->addAction(action);
+  connect(action, &QAction::triggered,
+          [=](void) {
+            qApp->clipboard()->setText(full_path);
+          });
+
+  action = new QAction(tr("File name"), menu.get());
+  copy_menu->addAction(action);
+  connect(action, &QAction::triggered,
+          [=](void) {
+            qApp->clipboard()->setText(file_name);
+          });
+
+  menu->exec(QCursor::pos());
 }
 
 void WindowManager::AddCentralWidget(IWindowWidget *widget,
