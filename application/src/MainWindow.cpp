@@ -103,7 +103,7 @@ void MainWindow::InitializePlugins(void) {
 
 void MainWindow::InitializeMenus(void) {
   d->view_menu = d->window_manager->Menu(tr("View"));
-  d->view_theme_menu = new QMenu(tr("Themes"));
+  d->view_theme_menu = new QMenu(tr("Themes"), this);
   d->view_menu->addMenu(d->view_theme_menu);
 
   menuBar()->addMenu(d->view_menu);
