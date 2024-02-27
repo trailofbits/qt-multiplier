@@ -135,6 +135,15 @@ void TreeGeneratorWidget::InitializeWidgets(
   // Initialize the tree view
   d->tree_view = new QTreeView(this);
 
+  connect(
+    d->tree_view->header(),
+    &QHeaderView::sectionResized,
+    this,
+    [&](int, int, int) {
+      UpdateItemButtons();
+    }
+  );
+
   d->tree_view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
   // The auto scroll takes care of keeping the active item within the
@@ -492,14 +501,11 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
   auto button_area_width =
       (button_count * button_size) + (button_count * button_margin);
 
-  auto current_x =
-      d->tree_view->pos().x() + d->tree_view->width() - button_area_width;
+  auto section_width = std::min(d->tree_view->viewport()->width(),
+                                d->tree_view->header()->sectionPosition(0) +
+                                d->tree_view->header()->sectionSize(0));
 
-  const auto &vertical_scrollbar = *d->tree_view->verticalScrollBar();
-  if (vertical_scrollbar.isVisible()) {
-    current_x -= vertical_scrollbar.width();
-  }
-
+  auto current_x = section_width - button_area_width;
   auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
 
   auto pos =
