@@ -38,6 +38,40 @@ static constexpr auto kActivateSelectedItem{Qt::Key_Return};
 // Allow users to avoid activating an item with a click by holding this key down
 static constexpr auto kDisableClickActivationModifier{Qt::ControlModifier};
 
+// A custom QTreeView with an autoscroll implementation that
+// won't change the viewport if the cell is already partially
+// visible
+class LazyAutoScrollTreeView final : public QTreeView {
+public:
+  LazyAutoScrollTreeView(QWidget *parent) : QTreeView(parent) {}
+  virtual ~LazyAutoScrollTreeView() = default;
+
+  virtual void
+  scrollTo(const QModelIndex &index,
+           QAbstractItemView::ScrollHint hint) {
+
+    if (hint == QAbstractItemView::EnsureVisible) {
+      int x{};
+      if (auto scrollbar = horizontalScrollBar(); scrollbar != nullptr) {
+        x = scrollbar->value();
+      }
+
+      int y{};
+      if (auto scrollbar = verticalScrollBar(); scrollbar != nullptr) {
+        y = scrollbar->value();
+      }
+
+      if (visualRect(index)
+            .translated(x, y)
+            .intersects(viewport()->rect().translated(x, y))) {
+        return;
+      }
+    }
+
+    QTreeView::scrollTo(index, hint);
+  }
+};
+
 }  // namespace
 
 struct TreeGeneratorWidget::PrivateData final {
@@ -133,7 +167,16 @@ void TreeGeneratorWidget::InitializeWidgets(
   auto &media_manager = config_manager.MediaManager();
 
   // Initialize the tree view
-  d->tree_view = new QTreeView(this);
+  d->tree_view = new LazyAutoScrollTreeView(this);
+
+  connect(
+    d->tree_view->header(),
+    &QHeaderView::sectionResized,
+    this,
+    [&](int, int, int) {
+      UpdateItemButtons();
+    }
+  );
 
   d->tree_view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
@@ -492,14 +535,11 @@ void TreeGeneratorWidget::UpdateItemButtons(void) {
   auto button_area_width =
       (button_count * button_size) + (button_count * button_margin);
 
-  auto current_x =
-      d->tree_view->pos().x() + d->tree_view->width() - button_area_width;
+  auto section_width = std::min(d->tree_view->viewport()->width(),
+                                d->tree_view->header()->sectionPosition(0) +
+                                d->tree_view->header()->sectionSize(0));
 
-  const auto &vertical_scrollbar = *d->tree_view->verticalScrollBar();
-  if (vertical_scrollbar.isVisible()) {
-    current_x -= vertical_scrollbar.width();
-  }
-
+  auto current_x = section_width - button_area_width;
   auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
 
   auto pos =
