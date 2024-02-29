@@ -4,7 +4,21 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
+#include "HighlightedItemsModel.h"
+#include "HighlightThemeProxy.h"
+#include "ColorGenerator.h"
+
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
+#include <multiplier/GUI/Interfaces/IModel.h>
+#include <multiplier/GUI/Interfaces/IWindowManager.h>
+#include <multiplier/GUI/Interfaces/IWindowWidget.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/ThemeManager.h>
+
+#include <multiplier/AST/NamedDecl.h>
+#include <multiplier/Frontend/DefineMacroDirective.h>
+#include <multiplier/Frontend/MacroParameter.h>
 
 #include <QColor>
 #include <QColorDialog>
@@ -14,24 +28,18 @@
 #include <QPoint>
 #include <QVBoxLayout>
 
-#include <multiplier/AST/NamedDecl.h>
-#include <multiplier/GUI/Interfaces/IModel.h>
-#include <multiplier/GUI/Interfaces/IWindowManager.h>
-#include <multiplier/GUI/Interfaces/IWindowWidget.h>
-#include <multiplier/GUI/Managers/ActionManager.h>
-#include <multiplier/GUI/Managers/ConfigManager.h>
-#include <multiplier/GUI/Managers/ThemeManager.h>
-#include <multiplier/Frontend/DefineMacroDirective.h>
-#include <multiplier/Frontend/MacroParameter.h>
-#include <multiplier/Index.h>
 #include <vector>
-
-#include "HighlightedItemsModel.h"
-#include "HighlightThemeProxy.h"
 
 namespace mx::gui {
 
 namespace {
+
+static const QKeySequence kToggleHighlightColorKeySeq("h");
+
+// Color generator parameters; we are using a predictable
+// sequence for now.
+constexpr float kRandomColorSaturation{0.7f};
+constexpr int kRandomColorSeed{0};
 
 // Since our logic is not inside a class deriving from IWindowWidget, we
 // have to define a method that lets HighlightExplorer issue the
@@ -63,6 +71,9 @@ struct HighlightExplorer::PrivateData {
   IWindowManager *manager{nullptr};
   HighlightExplorerWindowWidget *dock{nullptr};
 
+  TriggerHandle set_rand_highlight;
+  std::unique_ptr<ColorGenerator> color_generator;
+
   inline PrivateData(ConfigManager &config_manager_)
       : config_manager(config_manager_),
         theme_manager(config_manager.ThemeManager()),
@@ -83,6 +94,16 @@ HighlightExplorer::HighlightExplorer(ConfigManager &config_manager,
           this, &HighlightExplorer::OnIndexChanged);
 
   d->manager = parent;
+
+  connect(&d->theme_manager, &ThemeManager::ThemeChanged,
+          this, &HighlightExplorer::OnThemeChanged);
+
+  OnThemeChanged(d->theme_manager);
+
+  auto &action_manager = config_manager.ActionManager();
+  d->set_rand_highlight = action_manager.Register(
+      this, "com.trailofbits.action.ToggleHighlightColor",
+      &HighlightExplorer::OnToggleHighlightColorAction);
 }
 
 void HighlightExplorer::CreateDockWidget(void) {
@@ -129,11 +150,15 @@ void HighlightExplorer::CreateDockWidget(void) {
   d->manager->AddDockWidget(d->dock, config);
 }
 
-void HighlightExplorer::ActOnContextMenu(
-    IWindowManager *, QMenu *menu, const QModelIndex &index) {
+void
+HighlightExplorer::InitializeFromModelIndex(const QModelIndex &index) {
+  InitializeFromVariantEntity(IModel::EntitySkipThroughTokens(index));
+}
 
+void
+HighlightExplorer::InitializeFromVariantEntity(const VariantEntity &var_entity) {
   d->eids.clear();
-  d->entity = IModel::EntitySkipThroughTokens(index);
+  d->entity = var_entity;
 
   // It's only reasonable to add highlights on named entities.
   if (!DefineMacroDirective::from(d->entity) &&
@@ -159,6 +184,12 @@ void HighlightExplorer::ActOnContextMenu(
   if (d->eids.empty() || d->eids.back() == kInvalidEntityId) {
     return;
   }
+}
+
+void HighlightExplorer::ActOnContextMenu(
+    IWindowManager *, QMenu *menu, const QModelIndex &index) {
+
+  InitializeFromModelIndex(index);
 
   auto present = false;
   if (d->proxy) {
@@ -171,9 +202,27 @@ void HighlightExplorer::ActOnContextMenu(
   auto set_entity_highlight = new QAction(tr("Set Color"), highlight_menu);
   highlight_menu->addAction(set_entity_highlight);
   connect(set_entity_highlight, &QAction::triggered,
-          this, &HighlightExplorer::SetColor);
+          this, &HighlightExplorer::SetUserColor);
+
+  auto set_rand_entity_highlight = new QAction(tr("Set Random Color"), highlight_menu);
+  highlight_menu->addAction(set_rand_entity_highlight);
+  connect(set_rand_entity_highlight, &QAction::triggered,
+          this, &HighlightExplorer::SetRandomColor);
+
+  bool menu_separator_added{false};
+  const auto L_addMenuSeparator = [&menu_separator_added,
+                                   &highlight_menu]() {
+    if (menu_separator_added) {
+      return;
+    }
+
+    menu_separator_added = true;
+    highlight_menu->addSeparator();
+  };
 
   if (present) {
+    L_addMenuSeparator();
+
     auto remove_entity_highlight = new QAction(tr("Remove"), highlight_menu);
     highlight_menu->addAction(remove_entity_highlight);
     connect(remove_entity_highlight, &QAction::triggered,
@@ -181,11 +230,28 @@ void HighlightExplorer::ActOnContextMenu(
   }
 
   if (d->proxy && !d->proxy->color_map.empty()) {
+    L_addMenuSeparator();
+
     auto reset_entity_highlights = new QAction(tr("Reset All"), highlight_menu);
     highlight_menu->addAction(reset_entity_highlights);
     connect(reset_entity_highlights, &QAction::triggered,
             this, &HighlightExplorer::ClearAllColors);
   }
+}
+
+std::optional<NamedAction>
+HighlightExplorer::ActOnKeyPress(IWindowManager *,
+                                 const QKeySequence &keys,
+                                 const QModelIndex &index) {
+
+  if (keys == kToggleHighlightColorKeySeq) {
+    return NamedAction{
+        .name = "com.trailofbits.action.ToggleHighlightColor",
+        .action = d->set_rand_highlight,
+        .data = index};
+  }
+
+  return std::nullopt;
 }
 
 void HighlightExplorer::ColorsUpdated(void) {
@@ -202,18 +268,8 @@ void HighlightExplorer::ColorsUpdated(void) {
   }
 }
 
-void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
-  d->ClearAllColors(this);
-}
-
-void HighlightExplorer::SetColor(void) {
+void HighlightExplorer::SetColor(const QColor &color) {
   if (d->eids.empty() || std::holds_alternative<NotAnEntity>(d->entity)) {
-    return;
-  }
-
-  QColor color = QColorDialog::getColor();
-  if (!color.isValid()) {
-    d->eids.clear();
     return;
   }
 
@@ -245,6 +301,23 @@ void HighlightExplorer::SetColor(void) {
   }
 
   d->dock->EmitRequestAttention();
+}
+
+void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
+  d->ClearAllColors(this);
+}
+
+void HighlightExplorer::SetUserColor(void) {
+  QColor color = QColorDialog::getColor();
+  if (!color.isValid()) {
+    return;
+  }
+
+  SetColor(color);
+}
+
+void HighlightExplorer::SetRandomColor(void) {
+  SetColor(d->color_generator->Next());
 }
 
 void HighlightExplorer::RemoveColor(void) {
@@ -285,6 +358,51 @@ void HighlightExplorer::ClearAllColors(void) {
       QMessageBox::Yes | QMessageBox::No);
   if (reply == QMessageBox::Yes) {
     d->ClearAllColors(this);
+  }
+}
+
+void HighlightExplorer::OnThemeChanged(const ThemeManager &theme_manager) {
+  if (d->color_generator != nullptr) {
+    return;
+  }
+
+  auto background_color{theme_manager.Theme()->DefaultBackgroundColor()};
+  d->color_generator = std::make_unique<ColorGenerator>(kRandomColorSeed,
+                                                        background_color,
+                                                        kRandomColorSaturation);
+}
+
+void HighlightExplorer::OnToggleHighlightColorAction(const QVariant &data) {
+  if (data.isNull()) {
+    return;
+  }
+
+  if (data.canConvert<VariantEntity>()) {
+    const auto &var_entity = data.value<VariantEntity>();
+    InitializeFromVariantEntity(var_entity);
+
+  } else if (data.canConvert<QModelIndex>()) {
+    const auto &model_index = data.value<QModelIndex>();
+    InitializeFromModelIndex(model_index);
+
+  } else {
+    return;
+  }
+
+  auto present{false};
+  if (d->proxy != nullptr) {
+    for (const auto &entity_id : d->eids) {
+      if (d->proxy->color_map.count(entity_id) > 0) {
+        present = true;
+        break;
+      }
+    }
+  }
+
+  if (present) {
+    RemoveColor();
+  } else {
+    SetRandomColor();
   }
 }
 

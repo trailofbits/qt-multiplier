@@ -8,6 +8,8 @@
 
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 
+#include <multiplier/Index.h>
+
 namespace mx::gui {
 
 class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
@@ -25,15 +27,25 @@ class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
                         const QModelIndex &index) Q_DECL_FINAL;
 
+  virtual std::optional<NamedAction> ActOnKeyPress(
+      IWindowManager *manager, const QKeySequence &keys,
+      const QModelIndex &index) Q_DECL_FINAL;
+
  private:
   void CreateDockWidget(void);
   void ColorsUpdated(void);
+  void InitializeFromModelIndex(const QModelIndex &index);
+  void InitializeFromVariantEntity(const VariantEntity &var_entity);
+  void SetColor(const QColor &color);
 
  private slots:
   void OnIndexChanged(const ConfigManager &config_manager);
-  void SetColor(void);
+  void SetUserColor(void);
+  void SetRandomColor(void);
   void RemoveColor(void);
   void ClearAllColors(void);
+  void OnThemeChanged(const ThemeManager &theme_manager);
+  void OnToggleHighlightColorAction(const QVariant &data);
 };
 
 }  // namespace mx::gui
