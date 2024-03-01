@@ -18,6 +18,7 @@ public:
 
   ~ColorGenerator();
 
+  const QColor &ReferenceBackgroundColor() const;
   QColor Next();
 
 private:

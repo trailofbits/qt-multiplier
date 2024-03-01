@@ -14,6 +14,7 @@ namespace mx::gui {
 constexpr float kGoldenRatioConjugate{0.618033988749895f};
 
 struct ColorGenerator::PrivateData final {
+  QColor ref_background_color;
   float hue{};
   float saturation{};
   float value{};
@@ -23,6 +24,8 @@ ColorGenerator::ColorGenerator(const unsigned int &seed,
                                const QColor &background_color,
                                const float &saturation) :
                                  d(new PrivateData()) {
+  d->ref_background_color = background_color;
+
   d->value = background_color.toHsv().valueF();
   if (d->value > 0.5f) {
     d->value /= 2.0f;
@@ -38,6 +41,10 @@ ColorGenerator::ColorGenerator(const unsigned int &seed,
 }
 
 ColorGenerator::~ColorGenerator() {}
+
+const QColor &ColorGenerator::ReferenceBackgroundColor() const {
+  return d->ref_background_color;
+}
 
 QColor ColorGenerator::Next() {
   d->hue = std::fmod(d->hue + kGoldenRatioConjugate, 1.0f);

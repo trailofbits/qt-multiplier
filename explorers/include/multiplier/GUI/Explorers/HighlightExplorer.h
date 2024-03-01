@@ -10,6 +10,10 @@
 
 #include <multiplier/Index.h>
 
+#include <QColor>
+
+#include <optional>
+
 namespace mx::gui {
 
 class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
@@ -34,15 +38,29 @@ class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
  private:
   void CreateDockWidget(void);
   void ColorsUpdated(void);
-  void InitializeFromModelIndex(const QModelIndex &index);
-  void InitializeFromVariantEntity(const VariantEntity &var_entity);
-  void SetColor(const QColor &color);
+
+  struct EntityInformation final {
+    VariantEntity var_entity;
+    VariantEntity deref_var_entity;
+    std::vector<RawEntityId> id_list;
+  };
+
+  std::optional<EntityInformation>
+  QueryEntityInformation(const VariantEntity &var_entity);
+
+  std::optional<EntityInformation>
+  QueryEntityInformation(const QModelIndex &index);
+
+  std::optional<EntityInformation>
+  QueryEntityInformation(const QVariant &var);
+
+  bool IsEntityHighlighted(const EntityInformation &entity_info);
+  void RemoveEntityHighlight(const EntityInformation &entity_info);
+  void SetEntityHighlight(const EntityInformation &entity_info,
+                          const std::optional<QColor> &opt_color = std::nullopt);
 
  private slots:
   void OnIndexChanged(const ConfigManager &config_manager);
-  void SetUserColor(void);
-  void SetRandomColor(void);
-  void RemoveColor(void);
   void ClearAllColors(void);
   void OnThemeChanged(const ThemeManager &theme_manager);
   void OnToggleHighlightColorAction(const QVariant &data);

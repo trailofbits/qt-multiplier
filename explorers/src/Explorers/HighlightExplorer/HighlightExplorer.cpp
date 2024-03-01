@@ -20,7 +20,6 @@
 #include <multiplier/Frontend/DefineMacroDirective.h>
 #include <multiplier/Frontend/MacroParameter.h>
 
-#include <QColor>
 #include <QColorDialog>
 #include <QListView>
 #include <QMenu>
@@ -64,15 +63,14 @@ struct HighlightExplorer::PrivateData {
   const TriggerHandle open_entity_trigger;
 
   HighlightThemeProxy *proxy{nullptr};
-  VariantEntity entity;
-  std::vector<RawEntityId> eids;
   HighlightedItemsModel *model{nullptr};
   QListView *view{nullptr};
   IWindowManager *manager{nullptr};
   HighlightExplorerWindowWidget *dock{nullptr};
 
-  TriggerHandle set_rand_highlight;
+  TriggerHandle toggle_highlight_color_trigger;
   std::unique_ptr<ColorGenerator> color_generator;
+  std::vector<EntityInformation> random_highlight_list;
 
   inline PrivateData(ConfigManager &config_manager_)
       : config_manager(config_manager_),
@@ -99,7 +97,7 @@ HighlightExplorer::HighlightExplorer(ConfigManager &config_manager,
   OnThemeChanged(d->theme_manager);
 
   auto &action_manager = config_manager.ActionManager();
-  d->set_rand_highlight = action_manager.Register(
+  d->toggle_highlight_color_trigger = action_manager.Register(
       this, "com.trailofbits.action.ToggleHighlightColor",
       &HighlightExplorer::OnToggleHighlightColorAction);
 }
@@ -148,64 +146,53 @@ void HighlightExplorer::CreateDockWidget(void) {
   d->manager->AddDockWidget(d->dock, config);
 }
 
-void
-HighlightExplorer::InitializeFromModelIndex(const QModelIndex &index) {
-  InitializeFromVariantEntity(IModel::EntitySkipThroughTokens(index));
-}
-
-void
-HighlightExplorer::InitializeFromVariantEntity(const VariantEntity &var_entity) {
-  d->eids.clear();
-  d->entity = var_entity;
-
-  // It's only reasonable to add highlights on named entities.
-  if (!DefineMacroDirective::from(d->entity) &&
-      !MacroParameter::from(d->entity) && !NamedDecl::from(d->entity)) {
-    d->entity = {};
-    return;
-  }
-
-  // If the entity is a declaration then go get the canonical declaration, and
-  // collect the set of all redeclaration IDs, so that we can highlight all
-  // variants of this entity.
-  if (std::holds_alternative<Decl>(d->entity)) {
-    auto decl = std::get<Decl>(d->entity).canonical_declaration();
-    d->entity = decl;
-
-    for (auto redecl : decl.redeclarations()) {
-      d->eids.push_back(redecl.id().Pack());
-    }
-  } else {
-    d->eids.push_back(EntityId(d->entity).Pack());
-  }
-
-  if (d->eids.empty() || d->eids.back() == kInvalidEntityId) {
-    return;
-  }
-}
-
 void HighlightExplorer::ActOnContextMenu(
     IWindowManager *, QMenu *menu, const QModelIndex &index) {
 
-  InitializeFromModelIndex(index);
-
-  auto present = false;
-  if (d->proxy) {
-    present = d->proxy->color_map.count(d->eids[0]) != 0;
+  auto opt_entity_info = QueryEntityInformation(index);
+  if (!opt_entity_info.has_value()) {
+    return;
   }
+
+  const auto &entity_information = opt_entity_info.value();
 
   auto highlight_menu = new QMenu(tr("Highlights"), menu);
   menu->addMenu(highlight_menu);
 
   auto set_entity_highlight = new QAction(tr("Set Color"), highlight_menu);
   highlight_menu->addAction(set_entity_highlight);
-  connect(set_entity_highlight, &QAction::triggered,
-          this, &HighlightExplorer::SetUserColor);
+  connect(
+    set_entity_highlight,
+    &QAction::triggered,
+    this,
+    [=, this]() {
+      QColor color = QColorDialog::getColor();
+      if (!color.isValid()) {
+        return;
+      }
+
+      if (IsEntityHighlighted(entity_information)) {
+        RemoveEntityHighlight(entity_information);
+      }
+
+      SetEntityHighlight(entity_information, color);
+    }
+  );
 
   auto set_rand_entity_highlight = new QAction(tr("Set Random Color"), highlight_menu);
   highlight_menu->addAction(set_rand_entity_highlight);
-  connect(set_rand_entity_highlight, &QAction::triggered,
-          this, &HighlightExplorer::SetRandomColor);
+  connect(
+    set_rand_entity_highlight,
+    &QAction::triggered,
+    this,
+    [=, this]() {
+      if (IsEntityHighlighted(entity_information)) {
+        RemoveEntityHighlight(entity_information);
+      }
+
+      SetEntityHighlight(entity_information);
+    }
+  );
 
   bool menu_separator_added{false};
   const auto L_addMenuSeparator = [&menu_separator_added,
@@ -218,13 +205,19 @@ void HighlightExplorer::ActOnContextMenu(
     highlight_menu->addSeparator();
   };
 
-  if (present) {
+  if (IsEntityHighlighted(entity_information)) {
     L_addMenuSeparator();
 
     auto remove_entity_highlight = new QAction(tr("Remove"), highlight_menu);
     highlight_menu->addAction(remove_entity_highlight);
-    connect(remove_entity_highlight, &QAction::triggered,
-            this, &HighlightExplorer::RemoveColor);
+    connect(
+      remove_entity_highlight,
+      &QAction::triggered,
+      this,
+      [=, this]() {
+        RemoveEntityHighlight(entity_information);
+      }
+    );
   }
 
   if (d->proxy && !d->proxy->color_map.empty()) {
@@ -245,7 +238,7 @@ HighlightExplorer::ActOnKeyPress(IWindowManager *,
   if (keys == kToggleHighlightColorKeySeq) {
     return NamedAction{
         .name = "com.trailofbits.action.ToggleHighlightColor",
-        .action = d->set_rand_highlight,
+        .action = d->toggle_highlight_color_trigger,
         .data = index};
   }
 
@@ -253,8 +246,7 @@ HighlightExplorer::ActOnKeyPress(IWindowManager *,
 }
 
 void HighlightExplorer::ColorsUpdated(void) {
-  d->eids.clear();
-  if (!d->proxy) {
+  if (d->proxy == nullptr) {
     return;
   }
 
@@ -266,76 +258,8 @@ void HighlightExplorer::ColorsUpdated(void) {
   }
 }
 
-void HighlightExplorer::SetColor(const QColor &color) {
-  if (d->eids.empty() || std::holds_alternative<NotAnEntity>(d->entity)) {
-    return;
-  }
-
-  if (!d->dock) {
-    CreateDockWidget();
-  }
-
-  auto made_proxy = false;
-  if (!d->proxy) {
-    made_proxy = true;
-    d->proxy = new HighlightThemeProxy;
-  }
-
-  d->view->setCurrentIndex(QModelIndex());
-  if (!d->proxy->color_map.count(d->eids[0])) {
-    d->model->AddEntity(d->entity);
-  }
-
-  for (auto eid : d->eids) {
-    d->proxy->color_map.erase(eid);
-    d->proxy->color_map.try_emplace(
-        eid, ITheme::ContrastingColor(color), color);
-  }
-  
-  if (made_proxy) {
-    d->theme_manager.AddProxy(IThemeProxyPtr(d->proxy));
-  } else {
-    ColorsUpdated();
-  }
-
-  d->dock->EmitRequestAttention();
-}
-
 void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
   ClearAllColors();
-}
-
-void HighlightExplorer::SetUserColor(void) {
-  QColor color = QColorDialog::getColor();
-  if (!color.isValid()) {
-    return;
-  }
-
-  SetColor(color);
-}
-
-void HighlightExplorer::SetRandomColor(void) {
-  SetColor(d->color_generator->Next());
-}
-
-void HighlightExplorer::RemoveColor(void) {
-  if (!d->proxy || !d->model) {
-    return;
-  }
-
-  if (d->eids.empty() || std::holds_alternative<NotAnEntity>(d->entity)) {
-    return;
-  }
-
-  for (auto eid : d->eids) {
-    d->proxy->color_map.erase(eid);
-  }
-
-  d->view->setCurrentIndex(QModelIndex());
-  d->model->RemoveEntity(d->eids);
-  ColorsUpdated();
-
-  d->dock->EmitRequestAttention();
 }
 
 void HighlightExplorer::ClearAllColors(void) {
@@ -348,58 +272,209 @@ void HighlightExplorer::ClearAllColors(void) {
     return;
   }
 
-  d->eids.clear();
+  d->random_highlight_list.clear();
+
+  std::vector<RawEntityId> entity_id_list;
   for (auto &[eid, cs] : d->proxy->color_map) {
-    d->eids.push_back(eid);
+    entity_id_list.push_back(eid);
   }
 
-  d->model->RemoveEntity(d->eids);
+  d->model->RemoveEntity(entity_id_list);
   d->proxy->color_map.clear();
   ColorsUpdated();
 }
 
 void HighlightExplorer::OnThemeChanged(const ThemeManager &theme_manager) {
-  if (d->color_generator != nullptr) {
-    return;
-  }
-
+  // NOTE: The theme manager will issue updates even if the application
+  // theme is not changed. Skip unneeded updates by checking the
+  // background color
   auto background_color{theme_manager.Theme()->DefaultBackgroundColor()};
-  d->color_generator = std::make_unique<ColorGenerator>(kRandomColorSeed,
-                                                        background_color,
-                                                        kRandomColorSaturation);
-}
 
-void HighlightExplorer::OnToggleHighlightColorAction(const QVariant &data) {
-  if (data.isNull()) {
-    return;
-  }
-
-  if (data.canConvert<VariantEntity>()) {
-    const auto &var_entity = data.value<VariantEntity>();
-    InitializeFromVariantEntity(var_entity);
-
-  } else if (data.canConvert<QModelIndex>()) {
-    const auto &model_index = data.value<QModelIndex>();
-    InitializeFromModelIndex(model_index);
-
-  } else {
-    return;
-  }
-
-  auto present{false};
-  if (d->proxy != nullptr) {
-    for (const auto &entity_id : d->eids) {
-      if (d->proxy->color_map.count(entity_id) > 0) {
-        present = true;
-        break;
-      }
+  if (d->color_generator != nullptr) {
+    const auto &ref_background_color = d->color_generator->ReferenceBackgroundColor();
+    if (background_color == ref_background_color) {
+      return;
     }
   }
 
-  if (present) {
-    RemoveColor();
+  d->color_generator = std::make_unique<ColorGenerator>(kRandomColorSeed,
+                                                        background_color,
+                                                        kRandomColorSaturation);
+
+  auto random_highlight_list = d->random_highlight_list;
+  for (const auto &random_highlight : random_highlight_list) {
+    RemoveEntityHighlight(random_highlight);
+  }
+
+  for (const auto &random_highlight : random_highlight_list) {
+    SetEntityHighlight(random_highlight);
+  }
+}
+
+void HighlightExplorer::OnToggleHighlightColorAction(const QVariant &data) {
+  auto opt_entity_info = QueryEntityInformation(data);
+  if (!opt_entity_info.has_value()) {
+    return;
+  }
+
+  const auto &entity_information = opt_entity_info.value();
+  if (IsEntityHighlighted(entity_information)) {
+    RemoveEntityHighlight(entity_information);
   } else {
-    SetRandomColor();
+    SetEntityHighlight(entity_information);
+  }
+}
+
+std::optional<HighlightExplorer::EntityInformation>
+HighlightExplorer::QueryEntityInformation(const VariantEntity &var_entity) {
+  // It's only reasonable to add highlights on named entities.
+  if (!DefineMacroDirective::from(var_entity) &&
+      !MacroParameter::from(var_entity) &&
+      !NamedDecl::from(var_entity)) {
+    return std::nullopt;
+  }
+
+  EntityInformation entity_info;
+  entity_info.var_entity = var_entity;
+  entity_info.deref_var_entity = var_entity;
+
+  // If the entity is a declaration then go get the canonical declaration, and
+  // collect the set of all redeclaration IDs, so that we can highlight all
+  // variants of this entity.
+  if (std::holds_alternative<Decl>(var_entity)) {
+    auto decl = std::get<Decl>(var_entity).canonical_declaration();
+    entity_info.deref_var_entity = decl;
+
+    for (auto redecl : decl.redeclarations()) {
+      entity_info.id_list.push_back(redecl.id().Pack());
+    }
+  } else {
+    entity_info.id_list.push_back(EntityId(var_entity).Pack());
+  }
+
+  if (entity_info.id_list.empty() ||
+      entity_info.id_list.back() == kInvalidEntityId ||
+      std::holds_alternative<NotAnEntity>(entity_info.deref_var_entity)) {
+    return std::nullopt;
+  }
+
+  return entity_info;
+}
+
+std::optional<HighlightExplorer::EntityInformation>
+HighlightExplorer::QueryEntityInformation(const QModelIndex &index) {
+  return QueryEntityInformation(IModel::EntitySkipThroughTokens(index));
+}
+
+std::optional<HighlightExplorer::EntityInformation>
+HighlightExplorer::QueryEntityInformation(const QVariant &var) {
+  if (var.isNull()) {
+    return std::nullopt;
+
+  } else if (var.canConvert<VariantEntity>()) {
+    const auto &var_entity = var.value<VariantEntity>();
+    return QueryEntityInformation(var_entity);
+
+  } else if (var.canConvert<QModelIndex>()) {
+    const auto &index = var.value<QModelIndex>();
+    return QueryEntityInformation(index);
+
+  } else {
+    return std::nullopt;
+  }
+}
+
+bool
+HighlightExplorer::IsEntityHighlighted(const EntityInformation &entity_info) {
+  if (d->proxy == nullptr) {
+    return false;
+  }
+
+  const auto &color_map = d->proxy->color_map;
+
+  for (const auto &entity_id : entity_info.id_list) {
+    if (color_map.count(entity_id) > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void
+HighlightExplorer::RemoveEntityHighlight(const EntityInformation &entity_info) {
+  if (!d->proxy || !d->model) {
+    return;
+  }
+
+  auto &color_map = d->proxy->color_map;
+  for (const auto &entity_id : entity_info.id_list) {
+    color_map.erase(entity_id);
+  }
+
+  // Make sure to also remove it from the list of random highlights
+  auto random_highlight_list_it = std::find_if(
+    d->random_highlight_list.begin(),
+    d->random_highlight_list.end(),
+
+    [&](const EntityInformation &rand_highlight) -> bool {
+      auto id_list_it = std::find(
+        rand_highlight.id_list.begin(),
+        rand_highlight.id_list.end(),
+        entity_info.id_list.front()
+      );
+
+      return id_list_it != rand_highlight.id_list.end();
+    }
+  );
+
+  if (random_highlight_list_it != d->random_highlight_list.end()) {
+    d->random_highlight_list.erase(random_highlight_list_it);
+  }
+
+  d->view->setCurrentIndex(QModelIndex());
+  d->model->RemoveEntity(entity_info.id_list);
+  ColorsUpdated();
+  d->dock->EmitRequestAttention();
+}
+
+void
+HighlightExplorer::SetEntityHighlight(const EntityInformation &entity_info,
+                                      const std::optional<QColor> &opt_color) {
+  if (!d->dock) {
+    CreateDockWidget();
+  }
+
+  auto made_proxy = false;
+  if (!d->proxy) {
+    made_proxy = true;
+    d->proxy = new HighlightThemeProxy;
+  }
+
+  d->view->setCurrentIndex(QModelIndex());
+  if (!d->proxy->color_map.count(entity_info.id_list[0])) {
+    d->model->AddEntity(entity_info.deref_var_entity);
+  }
+
+  auto color = opt_color.value_or(d->color_generator->Next());
+
+  for (const auto &entity_id : entity_info.id_list) {
+    d->proxy->color_map.erase(entity_id);
+    d->proxy->color_map.try_emplace(
+        entity_id, ITheme::ContrastingColor(color), color);
+  }
+  
+  if (made_proxy) {
+    d->theme_manager.AddProxy(IThemeProxyPtr(d->proxy));
+  } else {
+    ColorsUpdated();
+  }
+
+  d->dock->EmitRequestAttention();
+
+  // Save random color highlights for later
+  if (!opt_color.has_value()) {
+    d->random_highlight_list.push_back(entity_info);
   }
 }
 
