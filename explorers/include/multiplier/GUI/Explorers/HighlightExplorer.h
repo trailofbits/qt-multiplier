@@ -39,6 +39,10 @@ class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void CreateDockWidget(void);
   void ColorsUpdated(void);
 
+  //
+  // Internal API
+  //
+
   struct EntityInformation final {
     VariantEntity var_entity;
     VariantEntity deref_var_entity;
@@ -54,10 +58,15 @@ class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   std::optional<EntityInformation>
   QueryEntityInformation(const QVariant &var);
 
+  void ClearAllHighlights();
   bool IsEntityHighlighted(const EntityInformation &entity_info);
   void RemoveEntityHighlight(const EntityInformation &entity_info);
   void SetEntityHighlight(const EntityInformation &entity_info,
                           const std::optional<QColor> &opt_color = std::nullopt);
+
+  void ScheduleColorUpdate();
+  void EmitColorUpdate();
+
 
  private slots:
   void OnIndexChanged(const ConfigManager &config_manager);

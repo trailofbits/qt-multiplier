@@ -68,6 +68,7 @@ struct HighlightExplorer::PrivateData {
   IWindowManager *manager{nullptr};
   HighlightExplorerWindowWidget *dock{nullptr};
 
+  bool color_update_scheduled{false};
   TriggerHandle toggle_highlight_color_trigger;
   std::unique_ptr<ColorGenerator> color_generator;
   std::vector<EntityInformation> random_highlight_list;
@@ -176,6 +177,7 @@ void HighlightExplorer::ActOnContextMenu(
       }
 
       SetEntityHighlight(entity_information, color);
+      EmitColorUpdate();
     }
   );
 
@@ -191,6 +193,7 @@ void HighlightExplorer::ActOnContextMenu(
       }
 
       SetEntityHighlight(entity_information);
+      EmitColorUpdate();
     }
   );
 
@@ -216,6 +219,7 @@ void HighlightExplorer::ActOnContextMenu(
       this,
       [=, this]() {
         RemoveEntityHighlight(entity_information);
+        EmitColorUpdate();
       }
     );
   }
@@ -225,8 +229,15 @@ void HighlightExplorer::ActOnContextMenu(
 
     auto reset_entity_highlights = new QAction(tr("Reset All"), highlight_menu);
     highlight_menu->addAction(reset_entity_highlights);
-    connect(reset_entity_highlights, &QAction::triggered,
-            this, &HighlightExplorer::ClearAllColors);
+    connect(
+      reset_entity_highlights,
+      &QAction::triggered,
+      this,
+      [=, this]() {
+        ClearAllHighlights();
+        EmitColorUpdate();
+      }
+    );
   }
 }
 
@@ -260,6 +271,21 @@ void HighlightExplorer::ColorsUpdated(void) {
 
 void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
   ClearAllColors();
+  EmitColorUpdate();
+}
+
+void HighlightExplorer::ClearAllHighlights() {
+  d->random_highlight_list.clear();
+  d->color_update_scheduled = false;
+
+  std::vector<RawEntityId> entity_id_list;
+  for (auto &[eid, cs] : d->proxy->color_map) {
+    entity_id_list.push_back(eid);
+  }
+
+  d->model->RemoveEntity(entity_id_list);
+  d->proxy->color_map.clear();
+  ScheduleColorUpdate();
 }
 
 void HighlightExplorer::ClearAllColors(void) {
@@ -272,16 +298,7 @@ void HighlightExplorer::ClearAllColors(void) {
     return;
   }
 
-  d->random_highlight_list.clear();
-
-  std::vector<RawEntityId> entity_id_list;
-  for (auto &[eid, cs] : d->proxy->color_map) {
-    entity_id_list.push_back(eid);
-  }
-
-  d->model->RemoveEntity(entity_id_list);
-  d->proxy->color_map.clear();
-  ColorsUpdated();
+  ClearAllHighlights();
 }
 
 void HighlightExplorer::OnThemeChanged(const ThemeManager &theme_manager) {
@@ -309,6 +326,8 @@ void HighlightExplorer::OnThemeChanged(const ThemeManager &theme_manager) {
   for (const auto &random_highlight : random_highlight_list) {
     SetEntityHighlight(random_highlight);
   }
+
+  EmitColorUpdate();
 }
 
 void HighlightExplorer::OnToggleHighlightColorAction(const QVariant &data) {
@@ -323,6 +342,8 @@ void HighlightExplorer::OnToggleHighlightColorAction(const QVariant &data) {
   } else {
     SetEntityHighlight(entity_information);
   }
+
+  EmitColorUpdate();
 }
 
 std::optional<HighlightExplorer::EntityInformation>
@@ -434,8 +455,7 @@ HighlightExplorer::RemoveEntityHighlight(const EntityInformation &entity_info) {
 
   d->view->setCurrentIndex(QModelIndex());
   d->model->RemoveEntity(entity_info.id_list);
-  ColorsUpdated();
-  d->dock->EmitRequestAttention();
+  ScheduleColorUpdate();
 }
 
 void
@@ -467,15 +487,30 @@ HighlightExplorer::SetEntityHighlight(const EntityInformation &entity_info,
   if (made_proxy) {
     d->theme_manager.AddProxy(IThemeProxyPtr(d->proxy));
   } else {
-    ColorsUpdated();
+    ScheduleColorUpdate();
   }
-
-  d->dock->EmitRequestAttention();
 
   // Save random color highlights for later
   if (!opt_color.has_value()) {
     d->random_highlight_list.push_back(entity_info);
   }
+}
+
+void
+HighlightExplorer::ScheduleColorUpdate() {
+  d->color_update_scheduled = true;
+}
+
+void
+HighlightExplorer::EmitColorUpdate() {
+  if (!d->color_update_scheduled) {
+    return;
+  }
+
+  d->color_update_scheduled = false;
+
+  ColorsUpdated();
+  d->dock->EmitRequestAttention();
 }
 
 }  // namespace mx::gui
