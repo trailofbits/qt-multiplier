@@ -79,8 +79,6 @@ struct HighlightExplorer::PrivateData {
         theme_manager(config_manager.ThemeManager()),
         open_entity_trigger(config_manager.ActionManager().Find(
             "com.trailofbits.action.OpenEntity")) {}
-
-  void ClearAllColors(HighlightExplorer *self);
 };
 
 HighlightExplorer::~HighlightExplorer(void) {}
@@ -304,7 +302,7 @@ void HighlightExplorer::SetColor(const QColor &color) {
 }
 
 void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
-  d->ClearAllColors(this);
+  ClearAllColors();
 }
 
 void HighlightExplorer::SetUserColor(void) {
@@ -340,25 +338,24 @@ void HighlightExplorer::RemoveColor(void) {
   d->dock->EmitRequestAttention();
 }
 
-void HighlightExplorer::PrivateData::ClearAllColors(HighlightExplorer *self) {
-  eids.clear();
-  for (auto &[eid, cs] : proxy->color_map) {
-    eids.push_back(eid);
-  }
-
-  model->RemoveEntity(eids);
-  proxy->color_map.clear();
-  self->ColorsUpdated();
-}
-
 void HighlightExplorer::ClearAllColors(void) {
   auto reply = QMessageBox::question(
       d->view, tr("Reset all highlights?"),
       tr("Are you sure that you want to remove all highlights?"),
       QMessageBox::Yes | QMessageBox::No);
-  if (reply == QMessageBox::Yes) {
-    d->ClearAllColors(this);
+
+  if (reply != QMessageBox::Yes) {
+    return;
   }
+
+  d->eids.clear();
+  for (auto &[eid, cs] : d->proxy->color_map) {
+    d->eids.push_back(eid);
+  }
+
+  d->model->RemoveEntity(d->eids);
+  d->proxy->color_map.clear();
+  ColorsUpdated();
 }
 
 void HighlightExplorer::OnThemeChanged(const ThemeManager &theme_manager) {
