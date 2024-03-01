@@ -256,19 +256,6 @@ HighlightExplorer::ActOnKeyPress(IWindowManager *,
   return std::nullopt;
 }
 
-void HighlightExplorer::ColorsUpdated(void) {
-  if (d->proxy == nullptr) {
-    return;
-  }
-
-  if (d->proxy->color_map.empty()) {
-    d->proxy->UninstallFromOwningManager();
-    d->proxy = nullptr;
-  } else {
-    d->proxy->SendUpdate();
-  }
-}
-
 void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
   ClearAllColors();
   EmitColorUpdate();
@@ -299,6 +286,7 @@ void HighlightExplorer::ClearAllColors(void) {
   }
 
   ClearAllHighlights();
+  EmitColorUpdate();
 }
 
 void HighlightExplorer::OnThemeChanged(const ThemeManager &theme_manager) {
@@ -509,7 +497,15 @@ HighlightExplorer::EmitColorUpdate() {
 
   d->color_update_scheduled = false;
 
-  ColorsUpdated();
+  if (d->proxy != nullptr) {
+    if (d->proxy->color_map.empty()) {
+      d->proxy->UninstallFromOwningManager();
+      d->proxy = nullptr;
+    } else {
+      d->proxy->SendUpdate();
+    }
+  }
+
   d->dock->EmitRequestAttention();
 }
 
