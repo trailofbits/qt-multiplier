@@ -41,6 +41,8 @@ add_library("mx_explorers"
   src/Explorers/HighlightExplorer/HighlightExplorer.cpp
   src/Explorers/HighlightExplorer/HighlightThemeProxy.cpp
   src/Explorers/HighlightExplorer/HighlightThemeProxy.h
+  src/Explorers/HighlightExplorer/ColorGenerator.h
+  src/Explorers/HighlightExplorer/ColorGenerator.cpp
 
   src/Explorers/InformationExplorer/EntityInformationModel.cpp
   src/Explorers/InformationExplorer/EntityInformationModel.h
