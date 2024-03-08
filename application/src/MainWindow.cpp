@@ -5,12 +5,14 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MainWindow.h"
+#include "ConfigEditor.h"
 
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QFileDialog>
 #include <QMenu>
 #include <QMenuBar>
+#include <QScreen>
 
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
@@ -67,6 +69,8 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 
   setWindowIcon(
       d->config_manager.MediaManager().Icon("com.trailofbits.icon.Logo"));
+
+  InitializeConfiguration();
 }
 
 void MainWindow::InitializePlugins(void) {
@@ -168,17 +172,11 @@ void MainWindow::InitializeIndex(QApplication &application) {
   d->config_manager.SetIndex(Index::in_memory_cache(
       Index::from_database(db_path.toStdString())));
 
-  // Set the theme.
-  QString theme_name;
   if (parser.isSet(theme_option)) {
-    theme_name = parser.value(theme_option);
-  } else {
-    theme_name = "com.trailofbits.theme.Dark";
-  }
-
-  auto &theme_manager = d->config_manager.ThemeManager();
-  if (auto theme = theme_manager.Find(parser.value(theme_option))) {
-    theme_manager.SetTheme(std::move(theme));
+    auto &registry = d->config_manager.Registry();
+    registry.Set("com.trailofbits.application",
+                 "theme",
+                 parser.value(theme_option));
   }
 }
 
@@ -240,6 +238,168 @@ void MainWindow::OnRequestKeyPress(
     key_menu.addAction(action);
   }
   key_menu.exec(position);
+}
+
+void MainWindow::InitializeConfiguration() {
+  auto &registry = d->config_manager.Registry();
+  static bool initialized{false};
+
+  registry.DefineModule(
+    // Module name
+    "com.trailofbits.application",
+
+    // Automatically force a sync; if this setup does not work for you, you can
+    // also set `false` here and call `registry.SyncModule(module_name);`
+    true,
+
+    {
+      //
+      // Theme
+      //
+
+      {
+        // Value type.
+        Registry::Type::String,
+
+        // The value name.
+        QString("theme"),
+
+        // Value description.
+        tr("The application theme"),
+
+        // Default value.
+        QVariant(QString("com.trailofbits.theme.Dark")),
+
+        // Optional validator. This can either:
+        //  - Keep `value` as is and validate it by returning true.
+        //  - Change `value` and validate it by returning true.
+        //  - Reject `value` by returning false, forcing the registry
+        //    to apply the default value.
+        [&, this](const Registry &, const QString &, QVariant &value) -> bool {
+          auto theme_name = value.toString();
+
+          auto &theme_manager = d->config_manager.ThemeManager();
+          return theme_manager.Find(theme_name) != nullptr;
+        },
+
+        // Optional value callback. It is best to always have one defined and
+        // only ever apply change deltas rather than force a full
+        // reconfiguration of the application.
+        [&, this](const Registry &, const QString &, const QVariant &value) {
+          const auto &theme_name = value.toString();
+
+          auto &theme_manager = d->config_manager.ThemeManager();
+          if (auto theme = theme_manager.Find(theme_name)) {
+            theme_manager.SetTheme(std::move(theme));
+          }
+        }
+      },
+
+      //
+      // Default window size
+      //
+
+      {
+        Registry::Type::String,
+        QString("window_size"),
+        tr("The application size, at startup"),
+        QVariant(QString("1280x720")),
+
+        [](const Registry &, const QString &, QVariant &value) -> bool {
+          const auto &resolution = value.toString();
+
+          auto resolution_parts = resolution.split("x");
+          if (resolution_parts.size() != 2) {
+            return false;
+          }
+
+          for (const auto &part : resolution_parts) {
+            bool valid_number{false};
+            part.toInt(&valid_number);
+
+            if (!valid_number) {
+              return false;
+            }
+          }
+
+          return true;
+        },
+
+        [&, this](const Registry &, const QString &, const QVariant &value) {
+          // We only want to apply this during startup
+          if (initialized) {
+            return;
+          }
+
+          const auto &resolution = value.toString();
+          auto resolution_parts = resolution.split("x");
+
+          auto width = resolution_parts[0].toInt();
+          auto height = resolution_parts[1].toInt();
+
+          resize(width, height);
+        }
+      },
+
+      //
+      // Window auto-center
+      //
+
+      {
+        Registry::Type::Boolean,
+        QString("center_window"),
+        tr("At startup, automatically center the window on the active screen"),
+        QVariant(true),
+        std::nullopt,
+        [&, this](const Registry &, const QString &, const QVariant &value) {
+          // We only want to apply this during startup
+          if (initialized) {
+            return;
+          }
+
+          auto center_window = value.toBool();
+          if (!center_window) {
+            return;
+          }
+
+          auto screen_rect = QApplication::primaryScreen()->availableGeometry();
+          move(screen_rect.center() - rect().center());
+        }
+      },
+
+      //
+      // Browse mode
+      //
+
+      {
+        Registry::Type::Boolean,
+        QString("browse_mode"),
+        tr("Whether browse mode should be enabled by default or not"),
+        QVariant(true),
+        std::nullopt,
+        [&, this](const Registry &, const QString &, const QVariant &value) {
+          auto &action_manager = d->config_manager.ActionManager();
+          auto action_trigger = action_manager
+                                  .Find("com.trailofbits.action.ToggleBrowseMode");
+
+          action_trigger.Trigger(value);
+        }
+      }
+    }
+  );
+
+  auto config_editor_dock = new QDockWidget(this);
+  config_editor_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+  d->view_menu->addAction(config_editor_dock->toggleViewAction());
+
+  auto config_editor = ConfigEditor::Create(registry, config_editor_dock);
+  config_editor_dock->setWidget(config_editor);
+  config_editor_dock->setWindowTitle(config_editor->windowTitle());
+
+  addDockWidget(Qt::BottomDockWidgetArea, config_editor_dock);
+  config_editor_dock->hide();
+
+  initialized = true;
 }
 
 }  // namespace mx::gui

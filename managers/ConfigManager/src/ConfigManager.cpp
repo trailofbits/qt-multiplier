@@ -4,18 +4,32 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
+#include "ThemedItemDelegate.h"
+
 #include <multiplier/GUI/Managers/ConfigManager.h>
-
-#include <multiplier/Frontend/File.h>
-#include <multiplier/Index.h>
-
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 
-#include "ThemedItemDelegate.h"
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Index.h>
+
+#include <QDir>
+
+#include <cstdint>
+#include <iostream>
 
 namespace mx::gui {
+
+namespace {
+
+std::filesystem::path
+GetConfigurationPath() {
+  static const auto kHomePath{QDir::homePath().toStdString()};
+  return std::filesystem::path(kHomePath) / ".multiplier.ini";
+}
+
+}
 
 class ConfigManagerImpl {
  public:
@@ -24,10 +38,12 @@ class ConfigManagerImpl {
   class ActionManager action_manager;
   class FileLocationCache file_location_cache;
   class Index index;
+  Registry::Ptr registry;
 
   inline ConfigManagerImpl(QApplication &application, QObject *self)
       : theme_manager(application, self),
-        media_manager(theme_manager, self) {}
+        media_manager(theme_manager, self),
+        registry(Registry::Create(GetConfigurationPath())) {}
 };
 
 ConfigManager::~ConfigManager(void) {}
@@ -53,6 +69,11 @@ class MediaManager &ConfigManager::MediaManager(void) const noexcept {
 //! Get access to the current index.
 const class Index &ConfigManager::Index(void) const noexcept {
   return d->index;
+}
+
+//! Get access to the registry
+class Registry &ConfigManager::Registry(void) const noexcept {
+  return *d->registry.get();
 }
 
 //! Change the current index.

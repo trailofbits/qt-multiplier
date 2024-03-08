@@ -38,6 +38,15 @@ add_executable("Multiplier" ${executable_type}
   
   src/WindowManager.h
   src/WindowManager.cpp
+
+  src/ConfigEditor.h
+  src/ConfigEditor.cpp
+
+  src/ConfigModel.h
+  src/ConfigModel.cpp
+
+  src/ConfigEditorDelegate.h
+  src/ConfigEditorDelegate.cpp
 )
 
 target_sources("Multiplier" PRIVATE
@@ -60,6 +69,7 @@ target_link_libraries("Multiplier"
     "mx_simple_text_input_dialog"
     "mx_tab_widget"
     "mx_theme_manager"
+    "mx_tree_widget"
 
     #"mx_codeview"
     #"mx_util_component"

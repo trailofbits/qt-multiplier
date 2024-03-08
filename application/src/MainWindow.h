@@ -32,6 +32,7 @@ class MainWindow Q_DECL_FINAL : public QMainWindow {
   void InitializeMenus(void);
   void InitializeDocks(void);
   void InitializeIndex(QApplication &application);
+  void InitializeConfiguration();
 
  public slots:
   void OnThemeListChanged(const ThemeManager &theme_manager);

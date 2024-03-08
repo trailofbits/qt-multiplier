@@ -211,6 +211,7 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
 
 void CodeExplorer::OnToggleBrowseMode(const QVariant &data) {
   d->browse_mode = data.toBool();
+  d->browse_mode_action->setChecked(d->browse_mode);
 }
 
 void CodeExplorer::ActOnPrimaryClick(IWindowManager *,

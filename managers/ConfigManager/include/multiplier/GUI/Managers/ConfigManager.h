@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <multiplier/GUI/Managers/Registry.h>
+
 #include <memory>
 #include <optional>
 
@@ -48,6 +50,9 @@ class ConfigManager Q_DECL_FINAL : public QObject {
 
   //! Get access to the current index.
   const class Index &Index(void) const noexcept;
+
+  //! Get access to the registry
+  class Registry &Registry(void) const noexcept;
 
   //! Change the current index.
   void SetIndex(const class Index &index) noexcept;

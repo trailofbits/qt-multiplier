@@ -14,6 +14,9 @@ add_library("mx_config_manager"
   src/ThemedItemDelegate.h
   src/ThemedItemModel.cpp
   src/ThemedItemModel.h
+
+  include/multiplier/GUI/Managers/Registry.h
+  src/Registry.cpp
 )
 
 target_link_libraries("mx_config_manager"
