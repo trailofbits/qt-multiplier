@@ -215,9 +215,11 @@ void HistoryWidget::PrivateData::AddToHistory(
           item,
           QString("Entity %1").arg(EntityId(label_entity).Pack()));
 
+      // NOTE(pag): Don't set parent of `HistoryLabelBuilder` to be `widget`
+      //            because then it'll be deleted in a different thread.
       auto labeller = new HistoryLabelBuilder(
           file_cache, std::move(label_entity), history_item.item_id,
-          line, column, widget);
+          line, column, nullptr);
 
       labeller->setAutoDelete(true);
 
