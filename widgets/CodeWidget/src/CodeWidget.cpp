@@ -1948,6 +1948,14 @@ CodeWidget::OpaquePosition CodeWidget::PrivateData::YDimensionToPosition(
 
     pos.scale = y / line_height;
     auto logical = static_cast<int>(std::floor(pos.scale));
+    if (static_cast<unsigned>(logical) >= scene.physical_line_number.size()) {
+      if (scene.physical_line_number.empty()) {
+        return pos;
+      } else {
+        pos.physical = scene.physical_line_number.back();
+        return pos;
+      }
+    }
 
     auto line_nums = scene.physical_line_number.data();
     pos.physical = std::abs(line_nums[logical]);
