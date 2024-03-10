@@ -9,6 +9,8 @@ REDIST_FLAGS="${RELEASE_FLAGS} --disable_new_dtags -no-prefix -Wl,-rpath=\$ORIGI
 FLAGS="${RELEASE_FLAGS}"
 OS_FLAGS=
 CONFIG_EXTRA=-release
+OS_ASAN_FLAGS=
+EXTRA_CMAKE_FLAGS=
 
 export CCC_OVERRIDE_OPTIONS="x-Werror"
 
@@ -32,6 +34,12 @@ main() {
       libinput-dev \
       xserver-xorg-input-libinput \
       python3.11-dev
+
+    OS_ASAN_FLAGS="-fsanitize=address -ffunction-sections -fdata-sections -Wno-unused-command-line-argument"
+  fi
+
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    OS_ASAN_FLAGS="-fsanitize=address -ffunction-sections -fdata-sections -Wl,-dead_strip -Wl,-undefined,dynamic_lookup -Wno-unused-command-line-argument"
   fi
 
   while [[ $# -gt 0 ]]; do
@@ -41,6 +49,12 @@ main() {
     -h | --help)
       Help
       exit 0
+      ;;
+    --asan)
+      BUILD_TYPE=Debug
+      FLAGS="${DEBUG_FLAGS} ${OS_ASAN_FLAGS}"
+      CONFIG_EXTRA=
+      EXTRA_CMAKE_FLAGS="-DCMAKE_EXE_LINKER_FLAGS=\"-fsanitize=address\""
       ;;
     --debug)
       BUILD_TYPE=Debug
@@ -65,7 +79,7 @@ main() {
     shift
   done
 
-  clone_or_update_qtsdk
+  #clone_or_update_qtsdk
   configure_build ${is_redist_build}
   build_project
 
@@ -136,7 +150,10 @@ configure_build() {
       "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" 
       -DCMAKE_C_COMPILER=`which clang` \
       -DCMAKE_CXX_COMPILER=`which clang++` \
-      -S "qt5" -B "qt5-build" -DWARNINGS_ARE_ERRORS=OFF
+      ${EXTRA_CMAKE_FLAGS} \
+      -S "qt5" \
+      -B "qt5-build" \
+      -DWARNINGS_ARE_ERRORS=OFF
 }
 
 clone_or_update_qtsdk() {
