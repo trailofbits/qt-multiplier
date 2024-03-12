@@ -7,6 +7,7 @@
 #
 
 add_subdirectory("CodeWidget")
+add_subdirectory("ConfigEditor")
 add_subdirectory("DockWidget")
 add_subdirectory("FilterSettingsWidget")
 add_subdirectory("HistoryWidget")

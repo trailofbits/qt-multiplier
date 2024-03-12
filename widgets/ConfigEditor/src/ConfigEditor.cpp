@@ -14,6 +14,10 @@
 
 namespace mx::gui {
 
+QWidget *CreateConfigEditor(Registry &registry, QWidget *parent) {
+  return ConfigEditor::Create(registry, parent);
+}
+
 struct ConfigEditor::PrivateData final {
   TreeWidget *tree_view{nullptr};
 };

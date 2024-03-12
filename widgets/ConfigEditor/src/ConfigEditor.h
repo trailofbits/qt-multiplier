@@ -20,7 +20,6 @@ class ConfigEditor Q_DECL_FINAL : public QWidget {
 
  public:
   static ConfigEditor *Create(Registry &registry, QWidget *parent);
-
   virtual ~ConfigEditor() override;
 
   ConfigEditor(ConfigEditor &) = delete;

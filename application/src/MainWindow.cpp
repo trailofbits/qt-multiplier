@@ -5,16 +5,8 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MainWindow.h"
-#include "ConfigEditor.h"
+#include "WindowManager.h"
 
-#include <QCommandLineOption>
-#include <QCommandLineParser>
-#include <QFileDialog>
-#include <QMenu>
-#include <QMenuBar>
-#include <QScreen>
-
-#include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
 #include <multiplier/GUI/Explorers/EntityExplorer.h>
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
@@ -29,10 +21,19 @@
 #include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
 #include <multiplier/GUI/Plugins/StructExplorerPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
+#include <multiplier/GUI/Widgets/ConfigEditor.h>
+
+#include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/Index.h>
+
 #include <vector>
 
-#include "WindowManager.h"
+#include <QCommandLineOption>
+#include <QCommandLineParser>
+#include <QFileDialog>
+#include <QMenu>
+#include <QMenuBar>
+#include <QScreen>
 
 namespace mx::gui {
 
@@ -392,7 +393,7 @@ void MainWindow::InitializeConfiguration() {
   config_editor_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
   d->view_menu->addAction(config_editor_dock->toggleViewAction());
 
-  auto config_editor = ConfigEditor::Create(registry, config_editor_dock);
+  auto config_editor = CreateConfigEditor(registry, config_editor_dock);
   config_editor_dock->setWidget(config_editor);
   config_editor_dock->setWindowTitle(config_editor->windowTitle());
 
