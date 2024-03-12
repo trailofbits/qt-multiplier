@@ -7,11 +7,13 @@
 #pragma once
 
 #include <multiplier/GUI/Managers/Registry.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
 
 #include <QWidget>
 
 namespace mx::gui {
 
-QWidget *CreateConfigEditor(Registry &registry, QWidget *parent);
+QWidget *CreateConfigEditor(const ConfigManager &config_manager,
+                            Registry &registry, QWidget *parent);
 
 }  // namespace mx::gui

@@ -22,6 +22,8 @@ add_library("mx_config_editor"
 target_link_libraries("mx_config_editor"
   PUBLIC
     "mx_tree_widget"
+    "mx_config_manager"
+    "mx_search_widget"
 
   PRIVATE
     "mx_config_manager"

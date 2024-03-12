@@ -79,30 +79,30 @@ void MainWindow::InitializePlugins(void) {
 
   d->plugins.emplace_back(new ProjectExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new EntityExplorer(d->config_manager, wm));
-  
+
   auto info_explorer = new InformationExplorer(d->config_manager, wm);
   info_explorer->EmplacePlugin<BuiltinEntityInformationPlugin>();
   d->plugins.emplace_back(info_explorer);
 
   auto ref_explorer = new ReferenceExplorer(d->config_manager, wm);
-  ref_explorer->EmplacePlugin<CallHierarchyPlugin>(
-      d->config_manager, ref_explorer);
-  ref_explorer->EmplacePlugin<StructExplorerPlugin>(
-      d->config_manager, ref_explorer);
+  ref_explorer->EmplacePlugin<CallHierarchyPlugin>(d->config_manager,
+                                                   ref_explorer);
+  ref_explorer->EmplacePlugin<StructExplorerPlugin>(d->config_manager,
+                                                    ref_explorer);
   d->plugins.emplace_back(ref_explorer);
 
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
 
   for (const auto &plugin : d->plugins) {
-    connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
-            this, &MainWindow::OnRequestPrimaryClick);
+    connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick, this,
+            &MainWindow::OnRequestPrimaryClick);
 
-    connect(plugin.get(), &IMainWindowPlugin::RequestSecondaryClick,
-            this, &MainWindow::OnRequestSecondaryClick);
+    connect(plugin.get(), &IMainWindowPlugin::RequestSecondaryClick, this,
+            &MainWindow::OnRequestSecondaryClick);
 
-    connect(plugin.get(), &IMainWindowPlugin::RequestKeyPress,
-            this, &MainWindow::OnRequestKeyPress);
+    connect(plugin.get(), &IMainWindowPlugin::RequestKeyPress, this,
+            &MainWindow::OnRequestKeyPress);
   }
 }
 
@@ -123,8 +123,8 @@ void MainWindow::InitializeThemes(void) {
 
   // Populate the theme list menu, and keep it up-to-date.
   OnThemeListChanged(theme_manager);
-  connect(&theme_manager, &ThemeManager::ThemeListChanged,
-          this, &MainWindow::OnThemeListChanged);
+  connect(&theme_manager, &ThemeManager::ThemeListChanged, this,
+          &MainWindow::OnThemeListChanged);
 }
 
 //! Keep the theme selection menu up-to-date with the set of registered themes.
@@ -134,17 +134,15 @@ void MainWindow::OnThemeListChanged(const ThemeManager &) {
   auto theme_manager_ptr = &(d->config_manager.ThemeManager());
   for (auto theme : theme_manager_ptr->ThemeList()) {
     auto action = new QAction(theme->Name(), d->view_theme_menu);
-    connect(action, &QAction::triggered,
-            theme_manager_ptr, [=, theme = std::move(theme)] (void) {
+    connect(action, &QAction::triggered, theme_manager_ptr,
+            [=, theme = std::move(theme)](void) {
               theme_manager_ptr->SetTheme(std::move(theme));
             });
     d->view_theme_menu->addAction(action);
   }
 }
 
-void MainWindow::InitializeDocks(void) {
-  
-}
+void MainWindow::InitializeDocks(void) {}
 
 void MainWindow::InitializeIndex(QApplication &application) {
   QCommandLineOption theme_option("theme");
@@ -170,13 +168,12 @@ void MainWindow::InitializeIndex(QApplication &application) {
     db_path = parser.value(db_option);
   }
 
-  d->config_manager.SetIndex(Index::in_memory_cache(
-      Index::from_database(db_path.toStdString())));
+  d->config_manager.SetIndex(
+      Index::in_memory_cache(Index::from_database(db_path.toStdString())));
 
   if (parser.isSet(theme_option)) {
     auto &registry = d->config_manager.Registry();
-    registry.Set("com.trailofbits.application",
-                 "theme",
+    registry.Set("com.trailofbits.application", "theme",
                  parser.value(theme_option));
   }
 }
@@ -201,14 +198,14 @@ void MainWindow::OnRequestPrimaryClick(const QModelIndex &index) {
 }
 
 //! Invoked on an index whose underlying model follows the `IModel` interface.
-void MainWindow::OnRequestKeyPress(
-    const QKeySequence &keys, const QModelIndex &index) {
-  
+void MainWindow::OnRequestKeyPress(const QKeySequence &keys,
+                                   const QModelIndex &index) {
+
   std::vector<NamedAction> actions;
 
   for (const auto &plugin : d->plugins) {
-    auto plugin_actions = plugin->ActOnKeyPressEx(
-        d->window_manager, keys, index);
+    auto plugin_actions =
+        plugin->ActOnKeyPressEx(d->window_manager, keys, index);
     actions.insert(actions.end(),
                    std::make_move_iterator(plugin_actions.begin()),
                    std::make_move_iterator(plugin_actions.end()));
@@ -230,12 +227,11 @@ void MainWindow::OnRequestKeyPress(
 
   for (auto &plugin_action : actions) {
     auto action = new QAction(plugin_action.name, &key_menu);
-    connect(
-        action, &QAction::triggered,
-        [trigger = std::move(plugin_action.action),
-         data = std::move(plugin_action.data)] (void) {
-          trigger.Trigger(data);
-        });
+    connect(action, &QAction::triggered,
+            [trigger = std::move(plugin_action.action),
+             data = std::move(plugin_action.data)](void) {
+              trigger.Trigger(data);
+            });
     key_menu.addAction(action);
   }
   key_menu.exec(position);
@@ -246,20 +242,18 @@ void MainWindow::InitializeConfiguration() {
   static bool initialized{false};
 
   registry.DefineModule(
-    // Module name
-    "com.trailofbits.application",
+      // Module name
+      "com.trailofbits.application",
 
-    // Automatically force a sync; if this setup does not work for you, you can
-    // also set `false` here and call `registry.SyncModule(module_name);`
-    true,
+      // Automatically force a sync; if this setup does not work for you, you can
+      // also set `false` here and call `registry.SyncModule(module_name);`
+      true,
 
-    {
-      //
-      // Theme
-      //
+      {//
+       // Theme
+       //
 
-      {
-        // Value type.
+       {// Value type.
         Registry::Type::String,
 
         // The value name.
@@ -293,18 +287,14 @@ void MainWindow::InitializeConfiguration() {
           if (auto theme = theme_manager.Find(theme_name)) {
             theme_manager.SetTheme(std::move(theme));
           }
-        }
-      },
+        }},
 
-      //
-      // Default window size
-      //
+       //
+       // Default window size
+       //
 
-      {
-        Registry::Type::String,
-        QString("window_size"),
-        tr("The application size, at startup"),
-        QVariant(QString("1280x720")),
+       {Registry::Type::String, QString("window_size"),
+        tr("The application size, at startup"), QVariant(QString("1280x720")),
 
         [](const Registry &, const QString &, QVariant &value) -> bool {
           const auto &resolution = value.toString();
@@ -339,19 +329,15 @@ void MainWindow::InitializeConfiguration() {
           auto height = resolution_parts[1].toInt();
 
           resize(width, height);
-        }
-      },
+        }},
 
-      //
-      // Window auto-center
-      //
+       //
+       // Window auto-center
+       //
 
-      {
-        Registry::Type::Boolean,
-        QString("center_window"),
+       {Registry::Type::Boolean, QString("center_window"),
         tr("At startup, automatically center the window on the active screen"),
-        QVariant(true),
-        std::nullopt,
+        QVariant(true), std::nullopt,
         [&, this](const Registry &, const QString &, const QVariant &value) {
           // We only want to apply this during startup
           if (initialized) {
@@ -365,35 +351,29 @@ void MainWindow::InitializeConfiguration() {
 
           auto screen_rect = QApplication::primaryScreen()->availableGeometry();
           move(screen_rect.center() - rect().center());
-        }
-      },
+        }},
 
-      //
-      // Browse mode
-      //
+       //
+       // Browse mode
+       //
 
-      {
-        Registry::Type::Boolean,
-        QString("browse_mode"),
+       {Registry::Type::Boolean, QString("browse_mode"),
         tr("Whether browse mode should be enabled by default or not"),
-        QVariant(true),
-        std::nullopt,
+        QVariant(true), std::nullopt,
         [&, this](const Registry &, const QString &, const QVariant &value) {
           auto &action_manager = d->config_manager.ActionManager();
-          auto action_trigger = action_manager
-                                  .Find("com.trailofbits.action.ToggleBrowseMode");
+          auto action_trigger =
+              action_manager.Find("com.trailofbits.action.ToggleBrowseMode");
 
           action_trigger.Trigger(value);
-        }
-      }
-    }
-  );
+        }}});
 
   auto config_editor_dock = new QDockWidget(this);
   config_editor_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
   d->view_menu->addAction(config_editor_dock->toggleViewAction());
 
-  auto config_editor = CreateConfigEditor(registry, config_editor_dock);
+  auto config_editor =
+      CreateConfigEditor(d->config_manager, registry, config_editor_dock);
   config_editor_dock->setWidget(config_editor);
   config_editor_dock->setWindowTitle(config_editor->windowTitle());
 

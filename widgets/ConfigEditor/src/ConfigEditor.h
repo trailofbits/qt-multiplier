@@ -7,6 +7,7 @@
 #pragma once
 
 #include <multiplier/GUI/Managers/Registry.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
 
 #include <memory>
 
@@ -19,7 +20,8 @@ class ConfigEditor Q_DECL_FINAL : public QWidget {
   Q_OBJECT
 
  public:
-  static ConfigEditor *Create(Registry &registry, QWidget *parent);
+  static ConfigEditor *Create(const ConfigManager &config_manager,
+                              Registry &registry, QWidget *parent);
   virtual ~ConfigEditor() override;
 
   ConfigEditor(ConfigEditor &) = delete;
@@ -29,12 +31,15 @@ class ConfigEditor Q_DECL_FINAL : public QWidget {
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 
-  ConfigEditor(Registry &registry, QWidget *parent);
+  ConfigEditor(const ConfigManager &config_manager, Registry &registry,
+               QWidget *parent);
 
-  void InitializeWidgets(Registry &registry);
+  void InitializeWidgets(const ConfigManager &config_manager,
+                         Registry &registry);
 
  private slots:
   void OnModelReset();
+  void OnSearchParametersChange();
 };
 
 }  // namespace mx::gui
