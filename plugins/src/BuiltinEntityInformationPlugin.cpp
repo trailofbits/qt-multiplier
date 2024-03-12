@@ -191,6 +191,9 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
       co_yield std::move(item);
 
     } else if (auto md = CXXMethodDecl::from(decl)) {
+
+      item.tokens = md->token();
+
       switch (decl.kind()) {
         case DeclKind::CXX_CONSTRUCTOR:
           item.category = QObject::tr("Constructors");
@@ -201,9 +204,18 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
         case DeclKind::CXX_DEDUCTION_GUIDE:
           item.category = QObject::tr("Deduction Guides");
           break;
-        case DeclKind::CXX_DESTRUCTOR:
+        case DeclKind::CXX_DESTRUCTOR: {
           item.category = QObject::tr("Destructors");
+          auto full_name = md->name();
+
+          tok.related_entity = decl;
+          tok.category = Token::categorize(tok.related_entity);
+          tok.kind = TokenKind::IDENTIFIER;
+          tok.data.insert(tok.data.end(), full_name.begin(), full_name.end());
+          toks.emplace_back(std::move(tok));
+          item.tokens = TokenRange::create(std::move(toks)).front();
           break;
+        }
         default:
           if (md->overloaded_operator() != OverloadedOperatorKind::NONE) {
             item.category = QObject::tr("Overloaded Operators");
@@ -215,7 +227,6 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
           break;
       }
 
-      item.tokens = md->token();
       item.entity = std::move(md.value());
       item.referenced_entity = item.entity;
       FillLocation(file_location_cache, item);

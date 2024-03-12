@@ -977,7 +977,7 @@ TokenRange NameOfEntity(const VariantEntity &ent,
           }
 
           if (!orig_name.empty() && !name_tok) {
-            Q_ASSERT(false);
+            Q_ASSERT(name.starts_with(maybe_name_tok.data()));  // E.g. `~`.
             std::vector<CustomToken> toks;
             UserToken tok;
             tok.related_entity = decl;

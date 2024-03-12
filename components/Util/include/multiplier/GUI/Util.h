@@ -15,6 +15,7 @@
 
 #include <multiplier/AST/Attr.h>
 #include <multiplier/AST/CXXBaseSpecifier.h>
+#include <multiplier/AST/CXXCtorInitializer.h>
 #include <multiplier/AST/Designator.h>
 #include <multiplier/AST/FieldDecl.h>
 #include <multiplier/AST/FunctionDecl.h>
