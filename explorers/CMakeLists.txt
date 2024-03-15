@@ -79,6 +79,7 @@ target_link_libraries("mx_explorers"
     "mx_tab_widget"
     "mx_tree_widget"
     "mx_util_component"
+    "mx_registry"
 
   PUBLIC
     "mx_gap_library"

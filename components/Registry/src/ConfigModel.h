@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <multiplier/GUI/Managers/Registry.h>
+#include <multiplier/GUI/Registry.h>
 
 #include <memory>
 

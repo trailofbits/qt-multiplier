@@ -24,6 +24,7 @@ target_link_libraries("mx_plugins"
     "mx_explorers"
     "mx_generator_widget"
     "mx_util_component"
+    "mx_registry"
 
   PUBLIC
     "mx_gap_library"

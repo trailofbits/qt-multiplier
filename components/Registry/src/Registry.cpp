@@ -4,7 +4,7 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
-#include <multiplier/GUI/Managers/Registry.h>
+#include <multiplier/GUI/Registry.h>
 
 #include <QHash>
 #include <QKeySequence>

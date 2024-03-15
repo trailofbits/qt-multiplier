@@ -7,6 +7,7 @@
 #
 
 add_subdirectory("Util")
+add_subdirectory("Registry")
 
 # add_subdirectory("ActionManager")
 # add_subdirectory("ThemeManager")

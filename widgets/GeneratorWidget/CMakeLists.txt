@@ -44,6 +44,7 @@ target_link_libraries("mx_generator_widget"
     "mx_theme_manager"
     "mx_tree_widget"
     "mx_util_component"
+    "mx_registry"
 
   PUBLIC
     "mx_interfaces"

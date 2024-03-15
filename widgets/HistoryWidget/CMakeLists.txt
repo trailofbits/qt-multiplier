@@ -21,6 +21,7 @@ target_link_libraries("mx_history_widget"
     "mx_cxx_flags"
     "mx_media_manager"
     "mx_util_component"
+    "mx_registry"
 
   PUBLIC
     "mx_qt_library"
