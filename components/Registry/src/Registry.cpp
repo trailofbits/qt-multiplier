@@ -22,26 +22,6 @@ Registry::Ptr Registry::Create(const std::filesystem::path &path) {
 
 Registry::~Registry(void) {}
 
-Registry::KeyMap Registry::GetKeyMap(void) const {
-  KeyMap key_map;
-
-  for (auto it{d->module_map.begin()}; it != d->module_map.end(); ++it) {
-    const auto &module_name = it.key();
-    const auto &key_desc_map = it.value();
-
-    QHash<QString, KeyInformation> local_key_map;
-    for (const auto &key_desc : key_desc_map) {
-      local_key_map.insert(
-          key_desc.key_name,
-          {key_desc.type, key_desc.localized_key_name, key_desc.description});
-    }
-
-    key_map.insert(module_name, std::move(local_key_map));
-  }
-
-  return key_map;
-}
-
 bool Registry::Set(const QString &module_name, const QString &key_name,
                    QVariant value) {
   if (!d->module_map.contains(module_name)) {
@@ -166,6 +146,11 @@ QVariant Registry::Get(const QString &module_name,
 
 Registry::Registry(const std::filesystem::path &path) : d(new PrivateData) {
   d->settings = CreateQSettings(path);
+}
+
+QHash<QString, QHash<QString, Registry::KeyDescriptor>>
+Registry::ModuleMap(void) const {
+  return d->module_map;
 }
 
 std::unique_ptr<QSettings>

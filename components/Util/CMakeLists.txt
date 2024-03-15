@@ -10,6 +10,8 @@ add_library("mx_util_component"
   include/multiplier/GUI/Util.h
   src/Util.h
   src/Util.cpp
+
+  include/multiplier/GUI/Result.h
 )
 
 target_link_libraries("mx_util_component"

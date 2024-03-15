@@ -19,6 +19,9 @@
 
 namespace mx::gui {
 
+struct KeyInformation;
+using KeyMap = QHash<QString, QHash<QString, KeyInformation>>;
+
 class Registry final : public QObject {
   Q_OBJECT
 
@@ -40,10 +43,6 @@ class Registry final : public QObject {
     QString localized_name;
     QString description;
   };
-
-  using KeyMap = QHash<QString, QHash<QString, KeyInformation>>;
-
-  KeyMap GetKeyMap(void) const;
 
   bool Set(const QString &module_name, const QString &key_name, QVariant value);
 
@@ -83,6 +82,7 @@ class Registry final : public QObject {
   std::unique_ptr<PrivateData> d;
 
   Registry(const std::filesystem::path &path);
+  QHash<QString, QHash<QString, KeyDescriptor>> ModuleMap(void) const;
 
   static std::unique_ptr<QSettings>
   CreateQSettings(const std::filesystem::path &path);
@@ -92,6 +92,8 @@ class Registry final : public QObject {
 
  signals:
   void SchemaChanged(void);
+
+  friend KeyMap GetRegistryKeyMap(const Registry &registry);
 };
 
 }  // namespace mx::gui

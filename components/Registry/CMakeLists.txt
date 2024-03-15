@@ -40,6 +40,9 @@ add_library("mx_config_editor"
 
   src/ConfigEditorDelegate.h
   src/ConfigEditorDelegate.cpp
+
+  src/RegistryInternals.h
+  src/RegistryInternals.cpp
 )
 
 target_link_libraries("mx_config_editor"

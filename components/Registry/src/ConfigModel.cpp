@@ -5,6 +5,7 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "ConfigModel.h"
+#include "RegistryInternals.h"
 
 #include <QAbstractItemModelTester>
 
@@ -44,7 +45,7 @@ using NodeMap = std::unordered_map<quintptr, Node>;
 
 NodeMap ImportRegistry(const Registry &registry) {
   NodeMap node_map;
-  auto key_map = registry.GetKeyMap();
+  auto key_map = GetRegistryKeyMap(registry);
 
   quintptr node_id_generator{};
   int module_level_row_generator{};
