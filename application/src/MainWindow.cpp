@@ -22,6 +22,7 @@
 #include <multiplier/GUI/Plugins/StructExplorerPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
 #include <multiplier/GUI/Widgets/ConfigEditor.h>
+#include <multiplier/GUI/Result.h>
 
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/Index.h>
@@ -275,11 +276,15 @@ void MainWindow::InitializeConfiguration() {
         //  - Change `value` and validate it by returning true.
         //  - Reject `value` by returning false, forcing the registry
         //    to apply the default value.
-        [&, this](const Registry &, const QString &, QVariant &value) -> bool {
+        [&, this](const Registry &, const QString &, const QVariant &value) -> Result<std::monostate, QString> {
           auto theme_name = value.toString();
 
           auto &theme_manager = d->config_manager.ThemeManager();
-          return theme_manager.Find(theme_name) != nullptr;
+          if (theme_manager.Find(theme_name) != nullptr) {
+            return std::monostate();
+          } else {
+            return tr("The specified theme could not be found");
+          }
         },
 
         // Optional value callback. It is best to always have one defined and
@@ -306,12 +311,12 @@ void MainWindow::InitializeConfiguration() {
         tr("The application size, at startup"),
         QVariant(QString("1280x720")),
 
-        [](const Registry &, const QString &, QVariant &value) -> bool {
+        [](const Registry &, const QString &, const QVariant &value) -> Result<std::monostate, QString> {
           const auto &resolution = value.toString();
 
           auto resolution_parts = resolution.split("x");
           if (resolution_parts.size() != 2) {
-            return false;
+            return tr("The specified value does not match the <width>x<height> format");
           }
 
           for (const auto &part : resolution_parts) {
@@ -319,11 +324,11 @@ void MainWindow::InitializeConfiguration() {
             part.toInt(&valid_number);
 
             if (!valid_number) {
-              return false;
+              return tr("The specified value does not contain valid integers");
             }
           }
 
-          return true;
+          return std::monostate();
         },
 
         [&, this](const Registry &, const QString &, const QVariant &value) {
@@ -402,6 +407,7 @@ void MainWindow::InitializeConfiguration() {
 
   auto config_editor =
       CreateConfigEditor(d->config_manager, registry, config_editor_dock);
+
   config_editor_dock->setWidget(config_editor);
   config_editor_dock->setWindowTitle(config_editor->windowTitle());
 

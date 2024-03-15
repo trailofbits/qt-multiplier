@@ -5,11 +5,14 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "ConfigEditorDelegate.h"
+#include "ConfigModel.h"
 
 #include <QSpinBox>
 #include <QComboBox>
 #include <QLineEdit>
 #include <QPainter>
+#include <QMessageBox>
+#include <QSortFilterProxyModel>
 
 namespace mx::gui {
 
@@ -89,6 +92,28 @@ void ConfigEditorDelegate::setEditorData(QWidget *editor,
     default: {
       break;
     }
+  }
+}
+
+void ConfigEditorDelegate::setModelData(QWidget *editor,
+                                        QAbstractItemModel *model,
+                                        const QModelIndex &index) const {
+  QStyledItemDelegate::setModelData(editor, model, index);
+
+  auto proxy_model = static_cast<const QSortFilterProxyModel *>(model);
+  auto &config_model = *static_cast<ConfigModel *>(proxy_model->sourceModel());
+
+  if (auto opt_last_error = config_model.LastError();
+      opt_last_error.has_value()) {
+    const auto &last_error = opt_last_error.value();
+
+    QString error_message{last_error.error_message};
+    if (error_message.isEmpty()) {
+      error_message = tr(
+          "The value could not be set but no detailed error message was available");
+    }
+
+    QMessageBox::critical(editor, tr("Error"), error_message);
   }
 }
 

@@ -17,6 +17,7 @@ target_link_libraries("mx_registry"
 
   PUBLIC
     "mx_qt_library"
+    "mx_util_component"
 )
 
 target_include_directories("mx_registry" PRIVATE

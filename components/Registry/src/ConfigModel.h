@@ -18,6 +18,13 @@ class ConfigModel final : public QAbstractItemModel {
   Q_OBJECT
 
  public:
+  struct Error final {
+    QString module_name;
+    QString key_name;
+    QString localized_key_name;
+    QString error_message;
+  };
+
   static ConfigModel *Create(Registry &registry, QObject *parent);
   virtual ~ConfigModel(void) override;
 
@@ -40,6 +47,8 @@ class ConfigModel final : public QAbstractItemModel {
 
   virtual bool setData(const QModelIndex &index, const QVariant &value,
                        int role = Qt::EditRole) override;
+
+  std::optional<Error> LastError(void) const;
 
   ConfigModel(ConfigModel &) = delete;
   ConfigModel &operator=(const ConfigModel &) = delete;

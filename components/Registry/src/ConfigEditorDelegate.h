@@ -24,6 +24,9 @@ class ConfigEditorDelegate : public QStyledItemDelegate {
   virtual void setEditorData(QWidget *editor,
                              const QModelIndex &index) const override;
 
+  virtual void setModelData(QWidget *editor, QAbstractItemModel *model,
+                            const QModelIndex &index) const override;
+
   ConfigEditorDelegate(const ConfigEditorDelegate &) = delete;
   ConfigEditorDelegate &operator=(const ConfigEditorDelegate &) = delete;
 

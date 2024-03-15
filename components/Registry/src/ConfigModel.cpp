@@ -101,6 +101,7 @@ NodeMap ImportRegistry(const Registry &registry) {
 struct ConfigModel::PrivateData final {
   Registry &registry;
   NodeMap node_map;
+  std::optional<Error> opt_last_error;
 
   PrivateData(Registry &registry_) : registry(registry_) {}
 };
@@ -385,8 +386,26 @@ bool ConfigModel::setData(const QModelIndex &index, const QVariant &value,
     }
   }
 
-  return d->registry.Set(model_root_data.name, model_key_data.key_name,
-                         processed_value);
+  auto res = d->registry.Set(model_root_data.name, model_key_data.key_name,
+                             processed_value);
+
+  if (!res.Succeeded()) {
+    // This works exactly like QSqlTableModel; this error can be retrieved
+    // with ConfigModel::LastError()
+    d->opt_last_error =
+        Error{model_root_data.name, model_key_data.key_name,
+              model_key_data.localized_key_name, res.TakeError()};
+
+    return false;
+
+  } else {
+    d->opt_last_error = std::nullopt;
+    return true;
+  }
+}
+
+std::optional<ConfigModel::Error> ConfigModel::LastError(void) const {
+  return d->opt_last_error;
 }
 
 ConfigModel::ConfigModel(Registry &registry, QObject *parent)

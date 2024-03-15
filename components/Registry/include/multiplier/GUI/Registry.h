@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <multiplier/GUI/Result.h>
+
 #include <memory>
 #include <filesystem>
 #include <functional>
@@ -44,13 +46,15 @@ class Registry final : public QObject {
     QString description;
   };
 
-  bool Set(const QString &module_name, const QString &key_name, QVariant value);
+  Result<std::monostate, QString> Set(const QString &module_name,
+                                      const QString &key_name, QVariant value);
 
   QVariant Get(const QString &module_name, const QString &key_name) const;
 
   struct KeyDescriptor final {
-    using ValidatorCallback = std::function<bool(
-        const Registry &registry, const QString &key_name, QVariant &value)>;
+    using ValidatorCallback = std::function<Result<std::monostate, QString>(
+        const Registry &registry, const QString &key_name,
+        const QVariant &value)>;
 
     using ValueCallback =
         std::function<void(const Registry &registry, const QString &key_name,
@@ -66,6 +70,14 @@ class Registry final : public QObject {
     std::optional<ValidatorCallback> opt_validator_callback;
     std::optional<ValueCallback> opt_value_callback;
   };
+
+  struct Error final {
+    QString module;
+    QString key_name;
+    QString localized_key_name;
+  };
+
+  using ErrorList = std::vector<Error>;
 
   using KeyDescriptorList = std::vector<KeyDescriptor>;
 

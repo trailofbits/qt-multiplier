@@ -62,6 +62,7 @@ target_link_libraries("Multiplier"
     "mx_tab_widget"
     "mx_theme_manager"
     "mx_registry"
+    "mx_util_component"
 
     #"mx_codeview"
     #"mx_util_component"

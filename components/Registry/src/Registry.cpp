@@ -22,32 +22,28 @@ Registry::Ptr Registry::Create(const std::filesystem::path &path) {
 
 Registry::~Registry(void) {}
 
-bool Registry::Set(const QString &module_name, const QString &key_name,
-                   QVariant value) {
+Result<std::monostate, QString> Registry::Set(const QString &module_name,
+                                              const QString &key_name,
+                                              QVariant value) {
   if (!d->module_map.contains(module_name)) {
-    qDebug() << "Module" << module_name << "is not defined";
-    return false;
+    return tr("The following module does not exist: ") + module_name;
   }
 
   if (!value.isValid()) {
-    qDebug() << "Invalid" << key_name << "setting passed to Module"
-             << module_name;
-    return false;
+    return tr("The following key could not be set because the value is not valid: ") +
+           module_name + "/" + key_name;
   }
 
   auto &key_map = d->module_map[module_name];
   if (!key_map.contains(key_name)) {
-    qDebug() << "Trying to set an unknown key named" << key_name << "in module"
-             << module_name;
-
-    return false;
+    return tr("The following key does not exist: ") + module_name + "/" +
+           key_name;
   }
 
   const auto &key_descriptor = key_map[key_name];
   if (!ValidateValueType(key_descriptor, value)) {
-    qDebug() << "Invalid" << key_name << "setting type passed to Module"
-             << module_name;
-    return false;
+    return tr("The following key could not be set due to a wrongly typed value: ") +
+           module_name + "/" + key_name;
   }
 
   d->settings->beginGroup(module_name);
@@ -57,30 +53,31 @@ bool Registry::Set(const QString &module_name, const QString &key_name,
     changed = (old_value != value);
   }
 
-  if (changed && key_descriptor.opt_validator_callback.has_value()) {
+  if (!changed) {
+    d->settings->endGroup();
+    return std::monostate();
+  }
+
+  if (key_descriptor.opt_validator_callback.has_value()) {
     const auto &validator_callback =
         key_descriptor.opt_validator_callback.value();
 
-    if (!validator_callback(*this, key_name, value)) {
-      value = key_descriptor.default_value;
-    }
-
-    if (auto old_value = d->settings->value(key_name); old_value.isValid()) {
-      changed = (old_value != value);
+    auto res = validator_callback(*this, key_name, value);
+    if (!res.Succeeded()) {
+      d->settings->endGroup();
+      return res;
     }
   }
 
-  if (changed) {
-    d->settings->setValue(key_name, value);
+  d->settings->setValue(key_name, value);
 
-    if (key_descriptor.opt_value_callback.has_value()) {
-      const auto &value_callback = key_descriptor.opt_value_callback.value();
-      value_callback(*this, key_name, value);
-    }
+  if (key_descriptor.opt_value_callback.has_value()) {
+    const auto &value_callback = key_descriptor.opt_value_callback.value();
+    value_callback(*this, key_name, value);
   }
 
   d->settings->endGroup();
-  return true;
+  return std::monostate();
 }
 
 QVariant Registry::Get(const QString &module_name,
@@ -260,8 +257,15 @@ void Registry::DefineModule(const QString &name, const bool &sync,
         const auto &validator_callback =
             key_desc.opt_validator_callback.value();
 
-        if (!validator_callback(*this, key_desc.key_name, value)) {
+        auto res = validator_callback(*this, key_desc.key_name, value);
+        if (!res.Succeeded()) {
+          auto error_message = res.TakeError();
           value = key_desc.default_value;
+
+          qDebug()
+              << tr("Invalid key value found in the configuration file. The default value has been used. Key:")
+              << name << "/" << key_desc.key_name << " ("
+              << key_desc.localized_key_name << ")";
         }
       }
 
