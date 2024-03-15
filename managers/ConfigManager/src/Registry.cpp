@@ -20,9 +20,9 @@ Registry::Ptr Registry::Create(const std::filesystem::path &path) {
   return Ptr(new Registry(path));
 }
 
-Registry::~Registry() {}
+Registry::~Registry(void) {}
 
-Registry::KeyMap Registry::GetKeyMap() const {
+Registry::KeyMap Registry::GetKeyMap(void) const {
   KeyMap key_map;
 
   for (auto it{d->module_map.begin()}; it != d->module_map.end(); ++it) {
@@ -31,8 +31,9 @@ Registry::KeyMap Registry::GetKeyMap() const {
 
     QHash<QString, KeyInformation> local_key_map;
     for (const auto &key_desc : key_desc_map) {
-      local_key_map.insert(key_desc.name,
-                           {key_desc.type, key_desc.description});
+      local_key_map.insert(
+          key_desc.key_name,
+          {key_desc.type, key_desc.localized_key_name, key_desc.description});
     }
 
     key_map.insert(module_name, std::move(local_key_map));
@@ -247,25 +248,25 @@ void Registry::DefineModule(const QString &name, const bool &sync,
   d->settings->beginGroup(name);
 
   for (const auto &key_desc : key_desc_list) {
-    if (key_map.contains(key_desc.name)) {
-      qDebug() << "KeyDescriptor" << key_desc.name << "in module" << name
+    if (key_map.contains(key_desc.key_name)) {
+      qDebug() << "KeyDescriptor" << key_desc.key_name << "in module" << name
                << "already exists";
       continue;
     }
 
     if (!key_desc.default_value.isValid()) {
-      qDebug() << "KeyDescriptor" << key_desc.name << "in module" << name
+      qDebug() << "KeyDescriptor" << key_desc.key_name << "in module" << name
                << "has no valid default value";
       continue;
     }
 
-    key_map.insert(key_desc.name, key_desc);
+    key_map.insert(key_desc.key_name, key_desc);
 
-    if (!d->settings->contains(key_desc.name)) {
-      d->settings->setValue(key_desc.name, key_desc.default_value);
+    if (!d->settings->contains(key_desc.key_name)) {
+      d->settings->setValue(key_desc.key_name, key_desc.default_value);
 
     } else {
-      auto value = d->settings->value(key_desc.name);
+      auto value = d->settings->value(key_desc.key_name);
       if (!ValidateValueType(key_desc, value)) {
         value = key_desc.default_value;
       }
@@ -274,19 +275,20 @@ void Registry::DefineModule(const QString &name, const bool &sync,
         const auto &validator_callback =
             key_desc.opt_validator_callback.value();
 
-        if (!validator_callback(*this, key_desc.name, value)) {
+        if (!validator_callback(*this, key_desc.key_name, value)) {
           value = key_desc.default_value;
         }
       }
 
-      if (d->settings->value(key_desc.name) != value) {
-        d->settings->setValue(key_desc.name, value);
+      if (d->settings->value(key_desc.key_name) != value) {
+        d->settings->setValue(key_desc.key_name, value);
       }
     }
 
     if (sync && key_desc.opt_value_callback.has_value()) {
       const auto &value_callback = key_desc.opt_value_callback.value();
-      value_callback(*this, key_desc.name, d->settings->value(key_desc.name));
+      value_callback(*this, key_desc.key_name,
+                     d->settings->value(key_desc.key_name));
     }
   }
 
@@ -311,7 +313,8 @@ void Registry::SyncModule(const QString &name) {
     }
 
     const auto &value_callback = key_desc.opt_value_callback.value();
-    value_callback(*this, key_desc.name, d->settings->value(key_desc.name));
+    value_callback(*this, key_desc.key_name,
+                   d->settings->value(key_desc.key_name));
   }
 
   d->settings->endGroup();

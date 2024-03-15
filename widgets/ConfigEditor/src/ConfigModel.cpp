@@ -25,7 +25,8 @@ struct Node final {
   };
 
   struct ModuleKeyData final {
-    QString name;
+    QString key_name;
+    QString localized_key_name;
     QString description;
     Registry::Type type{Registry::Type::String};
     quintptr parent_node_id{};
@@ -76,7 +77,8 @@ NodeMap ImportRegistry(const Registry &registry) {
       key_node.parent_row = module_node.row;
       key_node.row = key_level_row_generator++;
       key_node.data_var = Node::ModuleKeyData{
-          key_name, key_info.description, key_info.type, module_node.node_id};
+          key_name, key_info.localized_name, key_info.description,
+          key_info.type, module_node.node_id};
 
       module_root_data.child_node_id_list.push_back(key_node.node_id);
 
@@ -111,7 +113,7 @@ ConfigModel *ConfigModel::Create(Registry &registry, QObject *parent) {
   return model;
 }
 
-ConfigModel::~ConfigModel() {}
+ConfigModel::~ConfigModel(void) {}
 
 QModelIndex ConfigModel::index(int row, int column,
                                const QModelIndex &parent) const {
@@ -253,7 +255,7 @@ QVariant ConfigModel::data(const QModelIndex &index, int role) const {
   } else if (std::holds_alternative<Node::ModuleKeyData>(node.data_var)) {
     const auto &data = std::get<Node::ModuleKeyData>(node.data_var);
     if (index.column() == 0 && role == Qt::DisplayRole) {
-      return data.name;
+      return data.localized_key_name;
 
     } else if (index.column() != 1 ||
                (role != Qt::DisplayRole && role != Qt::ToolTipRole)) {
@@ -278,7 +280,7 @@ QVariant ConfigModel::data(const QModelIndex &index, int role) const {
         const auto &module_root_data =
             std::get<Node::ModuleRootData>(parent_node.data_var);
 
-        value = d->registry.Get(module_root_data.name, data.name);
+        value = d->registry.Get(module_root_data.name, data.key_name);
         break;
       }
 
@@ -382,7 +384,7 @@ bool ConfigModel::setData(const QModelIndex &index, const QVariant &value,
     }
   }
 
-  return d->registry.Set(model_root_data.name, model_key_data.name,
+  return d->registry.Set(model_root_data.name, model_key_data.key_name,
                          processed_value);
 }
 
@@ -396,7 +398,7 @@ ConfigModel::ConfigModel(Registry &registry, QObject *parent)
   OnSchemaChange();
 }
 
-void ConfigModel::OnSchemaChange() {
+void ConfigModel::OnSchemaChange(void) {
   emit beginResetModel();
   d->node_map = ImportRegistry(d->registry);
   emit endResetModel();

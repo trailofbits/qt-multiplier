@@ -19,7 +19,7 @@ class ConfigModel final : public QAbstractItemModel {
 
  public:
   static ConfigModel *Create(Registry &registry, QObject *parent);
-  virtual ~ConfigModel() override;
+  virtual ~ConfigModel(void) override;
 
   virtual QModelIndex
   index(int row, int column,
@@ -51,7 +51,7 @@ class ConfigModel final : public QAbstractItemModel {
   ConfigModel(Registry &registry, QObject *parent);
 
  private slots:
-  void OnSchemaChange();
+  void OnSchemaChange(void);
 };
 
 }  // namespace mx::gui

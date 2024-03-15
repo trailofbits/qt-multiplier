@@ -26,7 +26,7 @@ class Registry final : public QObject {
   using Ptr = std::unique_ptr<Registry>;
 
   static Ptr Create(const std::filesystem::path &path);
-  virtual ~Registry();
+  virtual ~Registry(void);
 
   enum class Type {
     String,
@@ -37,12 +37,13 @@ class Registry final : public QObject {
 
   struct KeyInformation final {
     Type type{Type::String};
+    QString localized_name;
     QString description;
   };
 
   using KeyMap = QHash<QString, QHash<QString, KeyInformation>>;
 
-  KeyMap GetKeyMap() const;
+  KeyMap GetKeyMap(void) const;
 
   bool Set(const QString &module_name, const QString &key_name, QVariant value);
 
@@ -57,7 +58,9 @@ class Registry final : public QObject {
                            const QVariant &value)>;
 
     Type type{Type::String};
-    QString name;
+    QString key_name;
+
+    QString localized_key_name;
     QString description;
 
     QVariant default_value;
@@ -88,7 +91,7 @@ class Registry final : public QObject {
                                 const QVariant &value);
 
  signals:
-  void SchemaChanged();
+  void SchemaChanged(void);
 };
 
 }  // namespace mx::gui

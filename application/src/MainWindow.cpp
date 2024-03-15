@@ -242,22 +242,27 @@ void MainWindow::InitializeConfiguration() {
   static bool initialized{false};
 
   registry.DefineModule(
-      // Module name
-      "com.trailofbits.application",
+    // Module name
+    "com.trailofbits.application",
 
-      // Automatically force a sync; if this setup does not work for you, you can
-      // also set `false` here and call `registry.SyncModule(module_name);`
-      true,
+    // Automatically force a sync; if this setup does not work for you, you can
+    // also set `false` here and call `registry.SyncModule(module_name);`
+    true,
 
-      {//
-       // Theme
-       //
+    {
+      //
+      // Theme
+      //
 
-       {// Value type.
+      {
+        // Value type.
         Registry::Type::String,
 
-        // The value name.
-        QString("theme"),
+        // The key name.
+        QString("Theme"),
+
+        // The localized key name.
+        tr("Theme"),
 
         // Value description.
         tr("The application theme"),
@@ -287,14 +292,19 @@ void MainWindow::InitializeConfiguration() {
           if (auto theme = theme_manager.Find(theme_name)) {
             theme_manager.SetTheme(std::move(theme));
           }
-        }},
+        }
+      },
 
-       //
-       // Default window size
-       //
+      //
+      // Default window size
+      //
 
-       {Registry::Type::String, QString("window_size"),
-        tr("The application size, at startup"), QVariant(QString("1280x720")),
+      {
+        Registry::Type::String,
+        QString("StartupWindowSize"),
+        tr("Startup Window Size"),
+        tr("The application size, at startup"),
+        QVariant(QString("1280x720")),
 
         [](const Registry &, const QString &, QVariant &value) -> bool {
           const auto &resolution = value.toString();
@@ -329,15 +339,20 @@ void MainWindow::InitializeConfiguration() {
           auto height = resolution_parts[1].toInt();
 
           resize(width, height);
-        }},
+        }
+      },
 
-       //
-       // Window auto-center
-       //
+      //
+      // Window auto-center
+      //
 
-       {Registry::Type::Boolean, QString("center_window"),
+      {
+        Registry::Type::Boolean,
+        QString("StartupCenterWindow"),
+        tr("Startup Center Window"),
         tr("At startup, automatically center the window on the active screen"),
-        QVariant(true), std::nullopt,
+        QVariant(true),
+        std::nullopt,
         [&, this](const Registry &, const QString &, const QVariant &value) {
           // We only want to apply this during startup
           if (initialized) {
@@ -351,22 +366,35 @@ void MainWindow::InitializeConfiguration() {
 
           auto screen_rect = QApplication::primaryScreen()->availableGeometry();
           move(screen_rect.center() - rect().center());
-        }},
+        }
+      },
 
-       //
-       // Browse mode
-       //
+      //
+      // Browse mode
+      //
 
-       {Registry::Type::Boolean, QString("browse_mode"),
-        tr("Whether browse mode should be enabled by default or not"),
-        QVariant(true), std::nullopt,
+      {
+        Registry::Type::Boolean,
+        QString("DefaultBrowseModeState"),
+        tr("Default Browse Mode State"),
+        tr("Whether browse mode should be enabled by default or not on startup"),
+        QVariant(true),
+        std::nullopt,
         [&, this](const Registry &, const QString &, const QVariant &value) {
+          // We only want to apply this during startup
+          if (initialized) {
+            return;
+          }
+
           auto &action_manager = d->config_manager.ActionManager();
           auto action_trigger =
               action_manager.Find("com.trailofbits.action.ToggleBrowseMode");
 
           action_trigger.Trigger(value);
-        }}});
+        }
+      }
+    }
+  );
 
   auto config_editor_dock = new QDockWidget(this);
   config_editor_dock->setAllowedAreas(Qt::AllDockWidgetAreas);

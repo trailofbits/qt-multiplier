@@ -15,7 +15,7 @@ class ConfigEditorDelegate : public QStyledItemDelegate {
 
  public:
   static ConfigEditorDelegate *Create(QWidget *parent);
-  virtual ~ConfigEditorDelegate() override;
+  virtual ~ConfigEditorDelegate(void) override;
 
   virtual QWidget *createEditor(QWidget *parent,
                                 const QStyleOptionViewItem &option,

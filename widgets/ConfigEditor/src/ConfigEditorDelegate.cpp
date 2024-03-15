@@ -19,7 +19,7 @@ ConfigEditorDelegate *ConfigEditorDelegate::Create(QWidget *parent) {
   return new ConfigEditorDelegate(parent);
 }
 
-ConfigEditorDelegate::~ConfigEditorDelegate() {}
+ConfigEditorDelegate::~ConfigEditorDelegate(void) {}
 
 QWidget *ConfigEditorDelegate::createEditor(QWidget *parent,
                                             const QStyleOptionViewItem &option,

@@ -33,7 +33,7 @@ ConfigEditor *ConfigEditor::Create(const ConfigManager &config_manager,
   return new ConfigEditor(config_manager, registry, parent);
 }
 
-ConfigEditor::~ConfigEditor() {}
+ConfigEditor::~ConfigEditor(void) {}
 
 ConfigEditor::ConfigEditor(const ConfigManager &config_manager,
                            Registry &registry, QWidget *parent)
@@ -81,7 +81,7 @@ void ConfigEditor::InitializeWidgets(const ConfigManager &config_manager,
   OnModelReset();
 }
 
-void ConfigEditor::OnModelReset() {
+void ConfigEditor::OnModelReset(void) {
   d->tree_view->expandAll();
   d->tree_view->resizeColumnToContents(0);
 }

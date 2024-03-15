@@ -22,7 +22,7 @@ class ConfigEditor Q_DECL_FINAL : public QWidget {
  public:
   static ConfigEditor *Create(const ConfigManager &config_manager,
                               Registry &registry, QWidget *parent);
-  virtual ~ConfigEditor() override;
+  virtual ~ConfigEditor(void) override;
 
   ConfigEditor(ConfigEditor &) = delete;
   ConfigEditor &operator=(const ConfigEditor &) = delete;
@@ -38,8 +38,8 @@ class ConfigEditor Q_DECL_FINAL : public QWidget {
                          Registry &registry);
 
  private slots:
-  void OnModelReset();
-  void OnSearchParametersChange();
+  void OnModelReset(void);
+  void OnSearchParametersChange(void);
 };
 
 }  // namespace mx::gui
