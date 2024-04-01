@@ -12,8 +12,9 @@
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Widgets/TabWidget.h>
 
-#include <unordered_map>
-#include <filesystem>
+#include <DockManager.h>
+#include <DockAreaWidget.h>
+#include <DockWidget.h>
 
 #include <QDesktopServices>
 #include <QDockWidget>
@@ -28,6 +29,9 @@
 #include <QUrl>
 #include <QClipboard>
 #include <QAction>
+
+#include <unordered_map>
+#include <filesystem>
 
 namespace mx::gui {
 namespace {
@@ -46,16 +50,15 @@ static  Qt::DockWidgetArea ConvertLocation(IWindowManager::DockLocation loc) {
 
 struct WindowManager::PrivateData {
   MainWindow * const window;
-  TabWidget * const tab_widget;
   QToolBar * toolbar{nullptr};
+  ads::CDockManager * central_widget{nullptr};
 
   std::unordered_map<QDockWidget *, DockConfig> dock_configs;
 
   QMap<QString, QMenu *> app_menus;
 
   inline PrivateData(MainWindow *parent)
-      : window(parent),
-        tab_widget(new TabWidget(parent)) {}
+      : window(parent) {}
 };
 
 WindowManager::~WindowManager(void) {}
@@ -64,32 +67,19 @@ WindowManager::WindowManager(MainWindow *window)
     : IWindowManager(window),
       d(new PrivateData(window)) {
 
+  // The `CDockManager` will automatically set itself as the
+  // central widget in our `QMainWindow`-based class
+  d->central_widget = new ads::CDockManager(window);
+  d->central_widget->setConfigFlag(ads::CDockManager::EqualSplitOnInsertion, true);
+  d->central_widget->setConfigFlag(ads::CDockManager::MiddleMouseButtonClosesTab, true);
+  d->central_widget->setConfigFlag(ads::CDockManager::DisableTabTextEliding, true);
+
   window->setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
   window->setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
   window->setTabPosition(Qt::RightDockWidgetArea, QTabWidget::East);
   window->setTabPosition(Qt::TopDockWidgetArea, QTabWidget::North);
   window->setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
   window->setDocumentMode(false);
-
-  connect(d->tab_widget->tabBar(), &QTabBar::tabCloseRequested,
-          this, &WindowManager::OnTabBarClose);
-
-  connect(d->tab_widget->tabBar(), &QTabBar::tabBarClicked,
-          this, &WindowManager::OnTabBarClicked);
-
-  connect(d->tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked, this,
-          [=](int tab_index) {
-            if ((QApplication::mouseButtons() & Qt::LeftButton) == 0) {
-              return;
-            }
-
-            this->OnRenameTabBar(tab_index);
-          });
-
-  d->tab_widget->setTabsClosable(true);
-  d->tab_widget->setDocumentMode(true);
-  d->tab_widget->setTabBarAutoHide(false);
-  window->setCentralWidget(d->tab_widget);
 
 #ifdef MXQT_EVAL_COPY
   auto eval = new QDockWidget(window);
@@ -109,110 +99,25 @@ WindowManager::WindowManager(MainWindow *window)
 #endif
 }
 
-void WindowManager::OnTabBarClose(int i) {
-  auto widget = d->tab_widget->widget(i);
-  d->tab_widget->RemoveTab(i);
-  widget->close();
-}
-
-void WindowManager::OnTabBarClicked(int i) {
-  if ((QApplication::mouseButtons() & Qt::MiddleButton) != 0) {
-    OnTabBarClose(i);
-
-  } else if ((QApplication::mouseButtons() & Qt::RightButton) != 0) {
-    OnTabBarContextMenu(i);
-  }
-}
-
-void WindowManager::OnRenameTabBar(int i) {
-  auto current_tab_name = d->tab_widget->tabText(i);
-
-  SimpleTextInputDialog dialog(tr("Insert the new tab name"), current_tab_name,
-                               d->tab_widget);
-  dialog.setWindowTitle(tr("Rename Tab"));
-  if (dialog.exec() != QDialog::Accepted) {
-    return;
-  }
-
-  const auto &opt_tab_name = dialog.TextInput();
-
-  QString new_tab_name;
-  if (opt_tab_name.has_value()) {
-    new_tab_name = opt_tab_name.value();
-  } else {
-    new_tab_name = tr("Reference Browser #") + QString::number(i);
-  }
-
-  d->tab_widget->setTabText(i, new_tab_name);
-}
-
-void WindowManager::OnTabBarContextMenu(int i) {
-  auto full_path = d->tab_widget->tabToolTip(i);
-  auto file_name = QString::fromStdString(
-                       std::filesystem::path(full_path.toStdString())
-                       .filename()
-                       .generic_string());
-
-  // We can't use `this` as a parent, so make sure we release the menu
-  // by using a unique_ptr
-  auto menu = std::make_unique<QMenu>(tr("Context Menu"));
-
-  // Rename and close actions
-  auto action = new QAction(tr("Close"), menu.get());
-  menu->addAction(action);
-  connect(action, &QAction::triggered,
-          [=](void) {
-            this->OnTabBarClose(i);
-          });
-
-  action = new QAction(tr("Rename"), menu.get());
-  menu->addAction(action);
-  connect(action, &QAction::triggered,
-          [=](void) {
-            this->OnRenameTabBar(i);
-          });
-
-  // Copy menu
-  auto copy_menu = new QMenu(tr("Copy..."), menu.get());
-  menu->addMenu(copy_menu);
-
-  action = new QAction(tr("Full path"), menu.get());
-  copy_menu->addAction(action);
-  connect(action, &QAction::triggered,
-          [=](void) {
-            qApp->clipboard()->setText(full_path);
-          });
-
-  action = new QAction(tr("File name"), menu.get());
-  copy_menu->addAction(action);
-  connect(action, &QAction::triggered,
-          [=](void) {
-            qApp->clipboard()->setText(file_name);
-          });
-
-  menu->exec(QCursor::pos());
-}
-
 void WindowManager::AddCentralWidget(IWindowWidget *widget,
                                      const CentralConfig &config) {
-  d->tab_widget->InsertTab(0, widget, config.keep_title_up_to_date);
 
-  if (!config.tooltip.isEmpty()) {
-    d->tab_widget->setTabToolTip(0, config.tooltip);
+	auto dock_widget = new ads::CDockWidget(widget->windowTitle());
+  dock_widget->setFeature(ads::CDockWidget::DockWidgetDeleteOnClose, true);
+	dock_widget->setWidget(widget);
+
+  ads::CDockAreaWidget *existing_dock_area_widget{nullptr};
+  for (auto *widget : d->window->findChildren<QWidget *>(Qt::FindChildrenRecursively)) {
+    auto dock_area_widget = dynamic_cast<ads::CDockAreaWidget *>(widget);
+    if (dock_area_widget != nullptr) {
+      existing_dock_area_widget = dock_area_widget;
+      break;
+    }
   }
 
-  connect(widget, &IWindowWidget::Shown,
-          d->tab_widget, [=, this] (void) {
-                            d->tab_widget->setCurrentWidget(widget);
-                          });
-
-  connect(widget, &IWindowWidget::Closed,
-          d->tab_widget, [=, this] (void) {
-                            auto index = d->tab_widget->indexOf(widget);
-                            if (index != -1) {
-                              d->tab_widget->RemoveTab(index);
-                            }
-                          });
+  d->central_widget->addDockWidget(ads::CenterDockWidgetArea,
+                                   dock_widget,
+                                   existing_dock_area_widget);
 
   // If the widget requested a click, then do it.
   connect(widget, &IWindowWidget::RequestPrimaryClick,

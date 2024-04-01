@@ -55,12 +55,6 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
  private:
   void CreateToolBarIfMissing(void);
   void RemoveDockWidget(QDockWidget *dock_widget);
-
- private slots:
-  void OnTabBarClose(int i);
-  void OnTabBarClicked(int i);
-  void OnRenameTabBar(int i);
-  void OnTabBarContextMenu(int i);
 };
 
 }  // namespace mx::gui

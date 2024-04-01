@@ -35,3 +35,13 @@ Tagged releases can be found at the following link: [qt-multiplier releases](htt
 
 1. Generate a new database using `mx-index` from the `multiplier` repository: `mx-index --target compile_commands.json --db database.mx`
 2. Open the `Multiplier.app` application and select the database file
+
+## Open source licenses
+
+| Library name               | License      | Homepage                                                       |
+|----------------------------|--------------|----------------------------------------------------------------|
+| Qt 6                       | LGPL         | https://github.com/qt/qt5                                      |
+| Phantom Style              | LGPL         | https://github.com/randrew/phantomstyle                        |
+| Qt-Advanced-Docking-System | LGPL         | https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System |
+| doctest                    | MIT          | https://github.com/doctest/doctest                             |
+| xxHash                     | BSD 2-Clause | https://github.com/Cyan4973/xxHash                             |
