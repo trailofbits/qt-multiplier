@@ -102,11 +102,14 @@ WindowManager::WindowManager(MainWindow *window)
 void WindowManager::AddCentralWidget(IWindowWidget *widget,
                                      const CentralConfig &config) {
 
+  // Do not configure the dock widget with DockWidgetDeleteOnClose=true, because
+  // the code explorer is not using WA_DeleteOnClose=true
 	auto dock_widget = new ads::CDockWidget(widget->windowTitle());
-  dock_widget->setFeature(ads::CDockWidget::DockWidgetDeleteOnClose, true);
+  dock_widget->setToggleViewActionMode(ads::CDockWidget::ActionModeShow);
 	dock_widget->setWidget(widget);
 
   ads::CDockAreaWidget *existing_dock_area_widget{nullptr};
+
   for (auto *widget : d->window->findChildren<QWidget *>(Qt::FindChildrenRecursively)) {
     auto dock_area_widget = dynamic_cast<ads::CDockAreaWidget *>(widget);
     if (dock_area_widget != nullptr) {
@@ -118,6 +121,10 @@ void WindowManager::AddCentralWidget(IWindowWidget *widget,
   d->central_widget->addDockWidget(ads::CenterDockWidgetArea,
                                    dock_widget,
                                    existing_dock_area_widget);
+
+  connect(widget, &IWindowWidget::RequestAttention, this, [=, this]() {
+    dock_widget->toggleViewAction()->trigger();
+  });
 
   // If the widget requested a click, then do it.
   connect(widget, &IWindowWidget::RequestPrimaryClick,
