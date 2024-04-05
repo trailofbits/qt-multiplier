@@ -731,14 +731,23 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
   RawEntityId def_id = kInvalidEntityId;
   std::optional<Macro> macro;
   auto sub = node.macro();
+  auto force_expand = false;
   if (std::holds_alternative<MacroSubstitution>(sub)) {
-    macro = std::get<MacroSubstitution>(sub);
+    auto &sub_node = std::get<MacroSubstitution>(sub);
+    macro = sub_node;
 
     // Global expansion of a macro is based on the definition ID.
     if (auto exp = MacroExpansion::from(macro.value())) {
       if (auto def = exp->definition()) {
         def_id = def->id().Pack();
       }
+    
+    } else if (sub_node.last_fully_substituted_token().kind() ==
+               TokenKind::HEADER_NAME) {
+      force_expand = true;
+
+    } else if (macro->kind() == MacroKind::CONCATENATE) {
+      force_expand = true;
     }
   } else {
     macro = std::get<MacroVAOpt>(sub);
@@ -747,8 +756,8 @@ void CodeWidget::PrivateData::ImportSubstitutionNode(
   const RawEntityId macro_id = macro->id().Pack();
 
   // Keep track of which macros were expanded.
-  auto expanded = macros_to_expand.contains(macro_id) ||
-                  macro->kind() == MacroKind::CONCATENATE;
+  auto expanded = force_expand || macros_to_expand.contains(macro_id);
+
   if (def_id != kInvalidEntityId) {
     expanded = expanded || macros_to_expand.contains(def_id);
     b.scene.expanded_macros.emplace(def_id, expanded);
