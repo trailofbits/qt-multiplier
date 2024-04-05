@@ -299,6 +299,7 @@ TokenRange Tokens(const VariantEntity &ent) {
       [](const Macro &entity) { return entity.use_tokens(); },
       [](const Designator &entity) { return entity.tokens(); },
       [](const CXXBaseSpecifier &entity) { return entity.tokens(); },
+      [](const CXXCtorInitializer &entity) { return entity.tokens(); },
       [](const TemplateArgument &) { return TokenRange(); },
       [](const TemplateParameterList &entity) { return entity.tokens(); },
 
@@ -939,6 +940,7 @@ std::optional<File> FileOfEntity(const VariantEntity &ent) {
       [](const Macro &entity) { return File::containing(entity); },
       [](const Designator &entity) { return File::containing(entity); },
       [](const CXXBaseSpecifier &entity) { return File::containing(entity); },
+      [](const CXXCtorInitializer &entity) { return File::containing(entity); },
       [](const TemplateArgument &entity) { return File::containing(entity); },
       [](const TemplateParameterList &entity) {
         return File::containing(entity);
