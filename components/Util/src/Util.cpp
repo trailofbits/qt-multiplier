@@ -77,10 +77,10 @@ void GenerateCopySubMenu(QMenu *menu, const QModelIndex &index) {
   auto copyable_role_map = qvariant_cast<CopyableRoleMap>(copyable_role_map_var);
 
   std::vector<QAction *> action_list;
-  for (auto [key, value] : copyable_role_map.asKeyValueRange()) {
+  for (auto it = copyable_role_map.begin(); it != copyable_role_map.end(); ++it) {
     // Make a copy for the lambda
-    auto role_name = key;
-    auto role_id = value;
+    auto role_name = it.key();
+    auto role_id = it.value();
 
     auto action = new QAction(role_name);
     action->setData(kGeneratedCopyMenuSignature);
