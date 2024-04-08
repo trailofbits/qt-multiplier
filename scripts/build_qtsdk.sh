@@ -147,7 +147,7 @@ configure_build() {
   CXXFLAGS="${FLAGS} ${OS_CXXFLAGS}" \
   CCFLAGS="${FLAGS} ${OS_CCFLAGS}" \
   cmake \
-      "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" 
+      "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" \
       -DCMAKE_C_COMPILER=`which clang` \
       -DCMAKE_CXX_COMPILER=`which clang++` \
       ${EXTRA_CMAKE_FLAGS} \
@@ -169,7 +169,7 @@ clone_or_update_qtsdk() {
 
   # As we are now tracking a different tree, clean it up again
   ( cd "qt5" && git reset --hard && git clean -ffdx )
-  ( cd "qt5" && perl init-repository -f --module-subset=qtbase,qt5compat,-qtwebengine ) || panic "Failed to initialize the git submodules"
+  ( cd "qt5" && perl init-repository -f --module-subset=qtbase,qt5compat,qtsvg,-qtwebengine ) || panic "Failed to initialize the git submodules"
 }
 
 panic() {
