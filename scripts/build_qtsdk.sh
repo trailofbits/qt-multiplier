@@ -5,7 +5,7 @@ QTSDK_VERSION="v6.5.2"
 BUILD_TYPE=Release
 RELEASE_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -gline-tables-only"
 DEBUG_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -O0 -g3"
-REDIST_FLAGS="${RELEASE_FLAGS} --disable_new_dtags -no-prefix -Wl,-rpath=\$ORIGIN/../lib"
+REDIST_FLAGS="${RELEASE_FLAGS}"
 FLAGS="${RELEASE_FLAGS}"
 OS_FLAGS=
 CONFIG_EXTRA=-release
@@ -35,6 +35,7 @@ main() {
       xserver-xorg-input-libinput \
       python3.11-dev
 
+    REDIST_FLAGS="${REDIST_FLAGS} --disable_new_dtags -no-prefix -Wl,-rpath=\$ORIGIN/../lib"
     OS_ASAN_FLAGS="-fsanitize=address -ffunction-sections -fdata-sections -Wno-unused-command-line-argument"
   fi
 
@@ -79,7 +80,7 @@ main() {
     shift
   done
 
-  #clone_or_update_qtsdk
+  clone_or_update_qtsdk
   configure_build ${is_redist_build}
   build_project
 
