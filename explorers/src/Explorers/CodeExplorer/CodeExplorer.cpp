@@ -386,7 +386,7 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
 
   code_widget->ChangeScene(tt, d->scene_options);
 
-  connect(code_widget, &IWindowWidget::Closed,
+  connect(code_widget, &QObject::destroyed,
           this, [id = id, this] (void) {
                   d->history->CommitCurrentItemToHistory();
                   d->opened_windows.erase(id);

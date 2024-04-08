@@ -70,6 +70,7 @@ WindowManager::WindowManager(MainWindow *window)
   // The `CDockManager` will automatically set itself as the
   // central widget in our `QMainWindow`-based class
   d->central_widget = new ads::CDockManager(window);
+  d->central_widget->setStyleSheet("");
   d->central_widget->setConfigFlag(ads::CDockManager::EqualSplitOnInsertion, true);
   d->central_widget->setConfigFlag(ads::CDockManager::MiddleMouseButtonClosesTab, true);
   d->central_widget->setConfigFlag(ads::CDockManager::DisableTabTextEliding, true);
@@ -102,9 +103,8 @@ WindowManager::WindowManager(MainWindow *window)
 void WindowManager::AddCentralWidget(IWindowWidget *widget,
                                      const CentralConfig &config) {
 
-  // Do not configure the dock widget with DockWidgetDeleteOnClose=true, because
-  // the code explorer is not using WA_DeleteOnClose=true
 	auto dock_widget = new ads::CDockWidget(widget->windowTitle());
+  dock_widget->setFeature(ads::CDockWidget::DockWidgetDeleteOnClose, true);
   dock_widget->setToggleViewActionMode(ads::CDockWidget::ActionModeShow);
 	dock_widget->setWidget(widget);
 
