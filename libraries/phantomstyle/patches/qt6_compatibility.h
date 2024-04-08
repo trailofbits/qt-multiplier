@@ -6,6 +6,18 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
+// Use this with:
+
+/*
+  set_source_files_properties(
+    "path/to/phantom/phantomstyle.cpp"
+
+    PROPERTIES
+      COMPILE_OPTIONS
+        "-include;qt6_compatibility.h"
+  )
+*/
+
 // Include the headers we don't want to risk to break with our defines.
 // The include guards will prevent them from being included again
 // when building the .cpp files from the library.

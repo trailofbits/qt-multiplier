@@ -117,6 +117,14 @@ target_include_directories("mx_qt-ads" SYSTEM INTERFACE
   "${library_root}/src"
 )
 
+find_package(Git REQUIRED)
+
+execute_process(
+  COMMAND "${GIT_EXECUTABLE}" reset --hard
+  COMMAND "${GIT_EXECUTABLE}" apply "${CMAKE_CURRENT_SOURCE_DIR}/patches/qt-advanced-docking-system_css_patch.patch"
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
 # When building on Linux, this library requires access to the private
 # headers of the Gui module.
 #
@@ -163,5 +171,10 @@ if(MXQT_ENABLE_INSTALL)
   install(
     TARGETS "mx_qt-ads"
     DESTINATION "${install_destination}"
+  )
+
+  install(
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/patches/qt-advanced-docking-system_css_patch.patch"
+    DESTINATION "${install_destination}/usr/share/multiplier/patches/qt-advanced-docking-system"
   )
 endif()

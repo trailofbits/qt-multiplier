@@ -43,10 +43,10 @@ const char *kMultiplierLicense =
 
 const char *kThirdPartyLibsLicense =
   "Qt 6 (LGPL)\n"
-  "Phantom Style (LGPL),\n"
-  "Qt-Advanced-Docking-System (LGPL)\n"
-  "doctest (MIT)\n"
-  "xxHash (BSD 2-Clause)";
+  "Phantom Style 309c97a (LGPL)\n"
+  "Qt-Advanced-Docking-System 4.2.1 (LGPL)\n"
+  "doctest 2.4.11 (MIT)\n"
+  "xxHash 0.8.2 (BSD 2-Clause)";
 
 }
 

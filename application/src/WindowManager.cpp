@@ -70,7 +70,13 @@ WindowManager::WindowManager(MainWindow *window)
   // The `CDockManager` will automatically set itself as the
   // central widget in our `QMainWindow`-based class
   d->central_widget = new ads::CDockManager(window);
+
+  // Use the built-in stylesheet on Linux, but disable it on
+  // macOS since we are using PhantomStyle
+#ifndef __linux__
   d->central_widget->setStyleSheet("");
+#endif
+
   d->central_widget->setConfigFlag(ads::CDockManager::EqualSplitOnInsertion, true);
   d->central_widget->setConfigFlag(ads::CDockManager::MiddleMouseButtonClosesTab, true);
   d->central_widget->setConfigFlag(ads::CDockManager::DisableTabTextEliding, true);
