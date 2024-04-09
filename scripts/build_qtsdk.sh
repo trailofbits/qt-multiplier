@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 QTSDK_REPOSITORY="https://code.qt.io/qt/qt5.git"
-QTSDK_VERSION="v6.5.2"
+QTSDK_VERSION="v6.7.0"
 BUILD_TYPE=Release
 RELEASE_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -gline-tables-only"
 DEBUG_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -O0 -g3"
-REDIST_FLAGS="${RELEASE_FLAGS} --disable_new_dtags -no-prefix -Wl,-rpath=\$ORIGIN/../lib"
+REDIST_FLAGS="${RELEASE_FLAGS}"
 FLAGS="${RELEASE_FLAGS}"
 OS_FLAGS=
 CONFIG_EXTRA=-release
@@ -35,6 +35,7 @@ main() {
       xserver-xorg-input-libinput \
       python3.11-dev
 
+    REDIST_FLAGS="${REDIST_FLAGS} --disable_new_dtags -no-prefix -Wl,-rpath=\$ORIGIN/../lib"
     OS_ASAN_FLAGS="-fsanitize=address -ffunction-sections -fdata-sections -Wno-unused-command-line-argument"
   fi
 
@@ -79,18 +80,18 @@ main() {
     shift
   done
 
-  #clone_or_update_qtsdk
+  clone_or_update_qtsdk
   configure_build ${is_redist_build}
   build_project
 
   if [[ $is_redist_build != 0 ]] ; then
     install_project
 
-    echo "Append the following path to the CMAKE_PREFIX_PATH: $(realpath qt5-install/usr/local/Qt-6.5.2)"
+    echo "Append the following path to the CMAKE_PREFIX_PATH: $(pwd)/qt5-install/usr/local/Qt-6.5.2)"
     echo "If you already have a path, use ; as separator"
 
   else
-    echo "Append the following path to the CMAKE_PREFIX_PATH: $(realpath qt5-build/qtbase/lib/cmake)"
+    echo "Append the following path to the CMAKE_PREFIX_PATH: $(pwd)/qt5-build/qtbase/lib/cmake)"
     echo "If you already have a path, use ; as separator"
   fi
 
@@ -147,7 +148,7 @@ configure_build() {
   CXXFLAGS="${FLAGS} ${OS_CXXFLAGS}" \
   CCFLAGS="${FLAGS} ${OS_CCFLAGS}" \
   cmake \
-      "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" 
+      "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" \
       -DCMAKE_C_COMPILER=`which clang` \
       -DCMAKE_CXX_COMPILER=`which clang++` \
       ${EXTRA_CMAKE_FLAGS} \
@@ -169,7 +170,7 @@ clone_or_update_qtsdk() {
 
   # As we are now tracking a different tree, clean it up again
   ( cd "qt5" && git reset --hard && git clean -ffdx )
-  ( cd "qt5" && perl init-repository -f --module-subset=qtbase,qt5compat,-qtwebengine ) || panic "Failed to initialize the git submodules"
+  ( cd "qt5" && perl init-repository -f --module-subset=qtbase,qt5compat,qtsvg,-qtwebengine ) || panic "Failed to initialize the git submodules"
 }
 
 panic() {

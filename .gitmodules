@@ -11,3 +11,6 @@
 [submodule "libraries/xxhash/src"]
 	path = libraries/xxhash/src
 	url = https://github.com/Cyan4973/xxHash
+[submodule "libraries/qt-advanced-docking-system/src"]
+	path = libraries/qt-advanced-docking-system/src
+	url = https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System

@@ -1076,7 +1076,8 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
   auto y = point.y();
 
   auto line_index = static_cast<unsigned>(std::floor(y / line_height));
-  if ((line_index + 1u) >= scene.logical_line_index.size()) {
+  if (line_index == std::numeric_limits<unsigned>::max() ||
+     (line_index + 1u) >= scene.logical_line_index.size()) {
     return CursorPositionFixed(point);
   }
 

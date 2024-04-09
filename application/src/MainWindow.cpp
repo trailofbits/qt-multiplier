@@ -5,12 +5,7 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include "MainWindow.h"
-
-#include <QCommandLineOption>
-#include <QCommandLineParser>
-#include <QFileDialog>
-#include <QMenu>
-#include <QMenuBar>
+#include "WindowManager.h"
 
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
@@ -28,11 +23,32 @@
 #include <multiplier/GUI/Plugins/StructExplorerPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
 #include <multiplier/Index.h>
+
+#include <QCommandLineOption>
+#include <QCommandLineParser>
+#include <QFileDialog>
+#include <QMenu>
+#include <QMenuBar>
+#include <QMessageBox>
+
 #include <vector>
 
-#include "WindowManager.h"
-
 namespace mx::gui {
+
+namespace {
+
+const char *kMultiplierLicense =
+  "Copyright 2018-2024, Trail of Bits, Inc., all rights reserved.\n\n"
+  "This software is proprietary and confidential.";
+
+const char *kThirdPartyLibsLicense =
+  "Qt 6 (LGPL)\n"
+  "Phantom Style 309c97a (LGPL)\n"
+  "Qt-Advanced-Docking-System 4.2.1 (LGPL)\n"
+  "doctest 2.4.11 (MIT)\n"
+  "xxHash 0.8.2 (BSD 2-Clause)";
+
+}
 
 struct MainWindow::PrivateData {
   ConfigManager config_manager;
@@ -107,6 +123,21 @@ void MainWindow::InitializeMenus(void) {
   d->view_menu->addMenu(d->view_theme_menu);
 
   menuBar()->addMenu(d->view_menu);
+
+  auto help_menu = new QMenu(tr("Help"));
+  menuBar()->addMenu(help_menu);
+
+  auto about_action = new QAction(tr("About"));
+  help_menu->addAction(about_action);
+  connect(about_action, &QAction::triggered, this, [this]() {
+    QMessageBox::information(this, "Multiplier", kMultiplierLicense);
+  });
+
+  auto third_party_libs = new QAction(tr("Third-party libraries"));
+  help_menu->addAction(third_party_libs);
+  connect(third_party_libs, &QAction::triggered, this, [this]() {
+    QMessageBox::information(this, tr("Third-party libraries"), kThirdPartyLibsLicense);
+  });
 }
 
 void MainWindow::InitializeThemes(void) {

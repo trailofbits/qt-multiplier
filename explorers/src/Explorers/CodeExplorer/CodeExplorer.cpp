@@ -4,15 +4,11 @@
 // This source code is licensed in accordance with the terms specified in
 // the LICENSE file found in the root directory of this source tree.
 
+#include "CodePreviewWidget.h"
+#include "ExpandedMacrosModel.h"
+#include "MacroExplorer.h"
+
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
-
-#include <QAction>
-#include <QApplication>
-#include <QClipboard>
-#include <QKeySequence>
-#include <QMainWindow>
-#include <QMenu>
-
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
@@ -21,15 +17,20 @@
 #include <multiplier/GUI/Widgets/CodeWidget.h>
 #include <multiplier/GUI/Widgets/HistoryWidget.h>
 #include <multiplier/GUI/Util.h>
+
 #include <multiplier/Frontend/MacroConcatenate.h>
 #include <multiplier/Frontend/MacroExpansion.h>
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/Index.h>
-#include <unordered_map>
 
-#include "CodePreviewWidget.h"
-#include "ExpandedMacrosModel.h"
-#include "MacroExplorer.h"
+#include <QAction>
+#include <QApplication>
+#include <QClipboard>
+#include <QKeySequence>
+#include <QMainWindow>
+#include <QMenu>
+
+#include <unordered_map>
 
 namespace mx::gui {
 namespace {
@@ -338,7 +339,7 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
   // need to show it and go to the relevant entity.
   auto &entity_widget = d->opened_windows[id];
   if (entity_widget.second) {
-    entity_widget.second->show();
+    entity_widget.second->EmitRequestAttention();
     entity_widget.second->OnGoToEntity(entity, true  /* take focus */);
     return;
   }
@@ -385,7 +386,7 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
 
   code_widget->ChangeScene(tt, d->scene_options);
 
-  connect(code_widget, &IWindowWidget::Closed,
+  connect(code_widget, &QObject::destroyed,
           this, [id = id, this] (void) {
                   d->history->CommitCurrentItemToHistory();
                   d->opened_windows.erase(id);

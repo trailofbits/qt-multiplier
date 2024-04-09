@@ -1,0 +1,43 @@
+diff --git a/src/stylesheets/default.css b/src/stylesheets/default.css
+index 19c5ab1..69969f9 100644
+--- a/src/stylesheets/default.css
++++ b/src/stylesheets/default.css
+@@ -69,13 +69,12 @@ ads--CDockWidgetTab {
+ }
+ 
+ ads--CDockWidgetTab[activeTab="true"] {
+-	background: qlineargradient(spread : pad, x1 : 0, y1 : 0, x2 : 0, y2 : 0.5, stop : 0
+-		palette(window), stop:1 palette(light));
+-	/*background: palette(highlight);*/
++	/*background: palette(window);*/
++	background: palette(highlight);
+ }
+ 
+ ads--CDockWidgetTab QLabel {
+-	color: palette(dark);
++	color: palette(text);
+ }
+ 
+ ads--CDockWidgetTab[activeTab="true"] QLabel {
+diff --git a/src/stylesheets/default_linux.css b/src/stylesheets/default_linux.css
+index d9bc03d..2e2feac 100644
+--- a/src/stylesheets/default_linux.css
++++ b/src/stylesheets/default_linux.css
+@@ -72,14 +72,13 @@ ads--CDockWidgetTab {
+ 
+ 
+ ads--CDockWidgetTab[activeTab="true"] {
+-	background: qlineargradient(spread : pad, x1 : 0, y1 : 0, x2 : 0, y2 : 0.5, stop : 0
+-		palette(window), stop:1 palette(light));
+-	/*background: palette(highlight);*/
++	/*background: palette(window);*/
++	background: palette(highlight);
+ }
+ 
+ 
+ ads--CDockWidgetTab QLabel {
+-	color: palette(dark);
++	color: palette(text);
+ }
+ 
+ 

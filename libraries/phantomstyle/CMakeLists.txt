@@ -82,4 +82,9 @@ if(MXQT_ENABLE_INSTALL)
     TARGETS "mx_phantomstyle_library"
     DESTINATION "${install_destination}"
   )
+
+  install(
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/patches/qt6_compatibility.h"
+    DESTINATION "${install_destination}/usr/share/multiplier/patches/phantomstyle"
+  )
 endif()

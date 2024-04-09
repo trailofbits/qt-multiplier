@@ -8,6 +8,7 @@
 
 set(qt_component_list
   "Core"
+  "Gui"
   "Widgets"
   "Concurrent"
   "Core5Compat"
