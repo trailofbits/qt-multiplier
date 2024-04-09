@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 QTSDK_REPOSITORY="https://code.qt.io/qt/qt5.git"
-QTSDK_VERSION="v6.5.2"
+QTSDK_VERSION="v6.7.0"
 BUILD_TYPE=Release
 RELEASE_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -gline-tables-only"
 DEBUG_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -O0 -g3"
@@ -87,11 +87,11 @@ main() {
   if [[ $is_redist_build != 0 ]] ; then
     install_project
 
-    echo "Append the following path to the CMAKE_PREFIX_PATH: $(realpath qt5-install/usr/local/Qt-6.5.2)"
+    echo "Append the following path to the CMAKE_PREFIX_PATH: $(pwd)/qt5-install/usr/local/Qt-6.5.2)"
     echo "If you already have a path, use ; as separator"
 
   else
-    echo "Append the following path to the CMAKE_PREFIX_PATH: $(realpath qt5-build/qtbase/lib/cmake)"
+    echo "Append the following path to the CMAKE_PREFIX_PATH: $(pwd)/qt5-build/qtbase/lib/cmake)"
     echo "If you already have a path, use ; as separator"
   fi
 
