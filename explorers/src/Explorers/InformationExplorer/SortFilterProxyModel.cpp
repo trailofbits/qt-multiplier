@@ -19,8 +19,13 @@ QMap<QString, int> GetCategorySortingOrderMap() {
   static const char *kCategoryList[] {
     "Definitions",
     "Declarations",
+    "Specializations",
     "Parentage",
     "Size",
+    "Bases",
+    "Derived By",
+    "Overriddes",
+    "Overridden By",
     "Constructors",
     "Destructors",
     "Conversion Operators",

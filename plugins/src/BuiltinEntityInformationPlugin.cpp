@@ -9,11 +9,11 @@
 #include <multiplier/AST/CallExpr.h>
 #include <multiplier/AST/CastExpr.h>
 #include <multiplier/AST/CXXMethodDecl.h>
+#include <multiplier/AST/CXXRecordDecl.h>
 #include <multiplier/AST/DeclKind.h>
 #include <multiplier/AST/EnumDecl.h>
 #include <multiplier/AST/EnumConstantDecl.h>
 #include <multiplier/AST/FieldDecl.h>
-#include <multiplier/AST/RecordDecl.h>
 #include <multiplier/AST/TypeTraitExpr.h>
 #include <multiplier/AST/UnaryExprOrTypeTraitExpr.h>
 #include <multiplier/AST/VarDecl.h>
@@ -237,6 +237,30 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
     }
 
     // TODO(pag): Friend classes, functions
+  }
+
+  if (auto cls = CXXRecordDecl::from(entity)) {
+    for (auto base_cls : cls->base_classes()) {
+      item.category = QObject::tr("Bases");
+      item.entity = std::move(base_cls);
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
+      FillLocation(file_location_cache, item);
+      item.tokens = NameOfEntity(item.entity, true  /* qualify */,
+                                 false  /* don't scan redecls */);
+      co_yield std::move(item);
+    }
+
+    for (auto derived_cls : cls->derived_classes()) {
+      item.category = QObject::tr("Derived By");
+      item.entity = std::move(derived_cls);
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
+      FillLocation(file_location_cache, item);
+      item.tokens = NameOfEntity(item.entity, true  /* qualify */,
+                                 false  /* don't scan redecls */);
+      co_yield std::move(item);
+    }
   }
 }
 
@@ -715,6 +739,31 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
   }
+
+  // Find the overrides.
+  if (auto method = CXXMethodDecl::from(entity)) {
+    for (auto override : method->overridden_methods()) {
+      item.category = QObject::tr("Overrides");
+      item.entity = std::move(override);
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
+      FillLocation(file_location_cache, item);
+      item.tokens = NameOfEntity(item.entity, true  /* qualify */,
+                                 false  /* don't scan redecls */);
+      co_yield std::move(item);
+    }
+
+    for (auto override : method->overridden_by_methods()) {
+      item.category = QObject::tr("Overridden By");
+      item.entity = std::move(override);
+      item.referenced_entity = item.entity;
+      item.tokens = TokenRange();
+      FillLocation(file_location_cache, item);
+      item.tokens = NameOfEntity(item.entity, true  /* qualify */,
+                                 false  /* don't scan redecls */);
+      co_yield std::move(item);
+    }
+  }
 }
 
 // Generate information about variables.
@@ -847,6 +896,18 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
         break;
       }
     }
+  }
+
+  // Specializations of this from the perspective of templates.
+  for (Decl spec : entity.specializations()) {
+    item.category = QObject::tr("Specializations");
+    item.entity = std::move(spec);
+    item.referenced_entity = item.entity;
+    item.tokens = TokenRange();
+    FillLocation(file_location_cache, item);
+    item.tokens = NameOfEntity(item.entity, true  /* qualify */,
+                               false  /* don't scan redecls */);
+    co_yield std::move(item);
   }
 
   if (entity.parent_declaration()) {
