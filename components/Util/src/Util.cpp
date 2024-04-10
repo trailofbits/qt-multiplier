@@ -740,6 +740,7 @@ static bool IsFirst(TokenKind tk) {
     case TokenKind::L_PARENTHESIS:
     case TokenKind::L_SQUARE:
     case TokenKind::L_BRACE:
+    case TokenKind::L_ANGLE:
     case TokenKind::R_BRACE:
     case TokenKind::SEMI:
     case TokenKind::COMMA:
@@ -813,9 +814,18 @@ static bool AddTrailingWhitespaceAsFirst(TokenKind tk) {
 
 static bool SuppressLeadingWhitespace(TokenKind tk) {
   switch (tk) {
+    case TokenKind::PERIOD:
+    case TokenKind::PERIOD_STAR:
+    case TokenKind::ARROW:
+    case TokenKind::ARROW_STAR:
     case TokenKind::COMMA:
-    case TokenKind::R_PARENTHESIS:
+    case TokenKind::COLON:
+    case TokenKind::L_SQUARE:
     case TokenKind::R_SQUARE:
+    case TokenKind::L_PARENTHESIS:
+    case TokenKind::R_PARENTHESIS:
+    case TokenKind::L_ANGLE:
+    case TokenKind::R_ANGLE:
       return true;
     default:
       return false;

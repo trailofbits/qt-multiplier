@@ -640,7 +640,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
 
     switch (brk.value()) {
       case BuiltinReferenceKind::CALLS:
-        item.category = QObject::tr("Callers");
+        item.category = QObject::tr("Called By");
         break;
       case BuiltinReferenceKind::TAKES_ADDRESS:
         item.category = QObject::tr("Address Ofs");
@@ -724,8 +724,9 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<ValueDecl>::Items(
 
   IInfoGenerator::Item item;
 
+  auto type = entity.type();
   item.category = QObject::tr("Type");
-  item.tokens = InjectWhitespace(entity.type().tokens());
+  item.tokens = InjectWhitespace(type.tokens());
   FillLocation(file_location_cache, item);
   co_yield std::move(item);
 
