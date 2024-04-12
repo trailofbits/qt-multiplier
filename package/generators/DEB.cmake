@@ -25,6 +25,8 @@ set(multiplier_data_file_list
   "lib/libRemarks.${dyn_lib_ext}.17"
 
   # Multiplier files
+  "include/multiplier"
+  "lib/cmake/multiplier"
   "lib/libmultiplier.${dyn_lib_ext}"
   "lib/python3.11"
   "bin/mx-count-sourceir"
@@ -58,8 +60,9 @@ set(multiplier_data_file_list
   "bin/mx-regex-query"
   "bin/mx-taint-entity"
 
-  # 3rd parties
+  # gap (transitive, header-only dependency)
   "include/gap"
+  "lib/cmake/gap"
 )
 
 foreach(multiplier_data_file ${multiplier_data_file_list})
