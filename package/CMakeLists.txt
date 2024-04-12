@@ -11,7 +11,8 @@ project("qt-multiplier")
 
 include("${CMAKE_SOURCE_DIR}/../cmake/version.cmake")
 
-set(QT_MULTIPLIER_DATA_PATH "" CACHE PATH "This is where both multiplier and qt-multiplier have been installed")
+set(QT_MULTIPLIER_DATA_PATH "" CACHE PATH "This is where qt-multiplier has been installed")
+set(MULTIPLIER_DATA_PATH "" CACHE PATH "This is where multiplier has been installed")
 set(QT_REDIST_PATH "" CACHE PATH "Path to the Qt SDK redist folder")
 
 set(CPACK_PACKAGE_VERSION "${QTMULTIPLIER_VERSION}" CACHE STRING "Package version")
@@ -22,13 +23,15 @@ else()
   set(QT_MULTIPLIER_PACKAGE_RELEASE "1.macos")
 endif()
 
-if(NOT EXISTS "${QT_MULTIPLIER_DATA_PATH}/bin/mx-index" OR
-   NOT EXISTS "${QT_MULTIPLIER_DATA_PATH}/bin/multiplier")
-
+if(NOT EXISTS "${QT_MULTIPLIER_DATA_PATH}/bin/multiplier")
   message(FATAL_ERROR "Invalid QT_MULTIPLIER_DATA_PATH path.")
 endif()
 
-if(NOT EXISTS "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/bin/qmake")
+if(NOT EXISTS "${MULTIPLIER_DATA_PATH}/bin/mx-index")
+  message(FATAL_ERROR "Invalid MULTIPLIER_DATA_PATH path.")
+endif()
+
+if(NOT EXISTS "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/bin/qmake")
   message(FATAL_ERROR "Invalid QT_REDIST_PATH path.")
 endif()
 
@@ -51,6 +54,8 @@ endif()
 
 set(CPACK_PACKAGE_RELOCATABLE ON)
 set(CPACK_SET_DESTDIR ON)
+
+include("generators/common.cmake")
 
 set(generator_include "${CMAKE_CURRENT_SOURCE_DIR}/generators/${CPACK_GENERATOR}.cmake")
 if(NOT EXISTS "${generator_include}")

@@ -4,30 +4,37 @@
 
 ### Building the project
 
-Build the Qt SDK. This will create a folder named `qt5-install` which from now on will be referred to as `qt_redist_path` 
+Build the Qt SDK. This will create a folder named `qt5-install` which from now on will be referred to as `qt_redist_path`.
 
 ```bash
 ./qt-multiplier/scripts/build_qtsdk.sh --redist
 ```
 
-Build Multiplier and install it in a folder which from now on will be referred to as `install_path`.
+Build multiplier and install it in a folder which from now on will be referred to as `multiplier_install_path`.
+Build qt-multiplier and install it in a folder which from now on will be referred to as `qt_multiplier_install_path`.
 
-Build and install qt-multiplier:
- * Pass the Multiplier install path with `-DCMAKE_INSTALL_PREFIX=install_path`
- * Pass the Qt SDK redist path with `-DQT_REDIST_PATH=qt_redist_path`
+Configure the packaging project passing the following arguments:
+ * -DMULTIPLIER_DATA_PATH=multiplier_install_path
+ * -DQT_MULTIPLIER_DATA_PATH=qt_multiplier_install_path
+ * -DQT_REDIST_PATH=qt_redist_path
+ * -DQTMULTIPLIER_VERSION=1.1.2 (try to follow what's in `<qt-multiplier-root>/cmake/version.cmake`)
 
 ### Creating the DEB package
 
 ```bash
 cmake \
-  -S "./qt-multiplier/package" \
-  -B "package-build" \
-  -DQT_MULTIPLIER_DATA_PATH=install_path \
-  -DQT_REDIST_PATH=qt_redist_path \
-  -DCPACK_GENERATOR=DEB
+  -DCPACK_GENERATOR=DEB \
+  -DCMAKE_BUILD_TYPE=Release \
+  -G Ninja \
+  -S qt-multiplier/package \
+  -B build/package \
+  -DQT_MULTIPLIER_DATA_PATH="$(realpath install/qt-multiplier)" \
+  -DQT_REDIST_PATH="$(realpath qt-multiplier/scripts/qt5-install)" \
+  -DQTMULTIPLIER_VERSION=1.1.2 \
+  -DMULTIPLIER_DATA_PATH="$(realpath install)"
 
 cmake \
-  --build package_build \
+  --build build/package \
   --target package
 ```
 
