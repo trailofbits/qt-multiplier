@@ -28,7 +28,7 @@ if(NOT EXISTS "${QT_MULTIPLIER_DATA_PATH}/bin/mx-index" OR
   message(FATAL_ERROR "Invalid QT_MULTIPLIER_DATA_PATH path.")
 endif()
 
-if(NOT EXISTS "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/bin/qmake")
+if(NOT EXISTS "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/bin/qmake")
   message(FATAL_ERROR "Invalid QT_REDIST_PATH path.")
 endif()
 

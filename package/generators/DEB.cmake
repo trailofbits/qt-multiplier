@@ -40,8 +40,8 @@ set(qt_library_list
 foreach(qt_library ${qt_library_list})
   install(
     FILES
-      "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/lib/${qt_library}"
-      "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/lib/${qt_library}.5.2"
+      "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}"
+      "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}.7.0"
 
     DESTINATION
       "/opt/multiplier/lib"
@@ -50,7 +50,7 @@ endforeach()
 
 install(
   DIRECTORY
-    "${QT_REDIST_PATH}/usr/local/Qt-6.5.2/plugins"
+    "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/plugins"
 
   DESTINATION
     "/opt/multiplier"
