@@ -87,7 +87,7 @@ main() {
   if [[ $is_redist_build != 0 ]] ; then
     install_project
 
-    echo "Append the following path to the CMAKE_PREFIX_PATH: $(pwd)/qt5-install/usr/local/Qt-6.5.2)"
+    echo "Append the following path to the CMAKE_PREFIX_PATH: $(pwd)/qt5-install/usr/local/Qt-6.7.0)"
     echo "If you already have a path, use ; as separator"
 
   else
