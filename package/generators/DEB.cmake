@@ -101,22 +101,30 @@ endforeach()
 #
 
 set(qt_library_list
-  "libQt6Widgets.so.6"
-  "libQt6Gui.so.6"
-  "libQt6Concurrent.so.6"
-  "libQt6Core5Compat.so.6"
-  "libQt6Test.so.6"
-  "libQt6Core.so.6"
-  "libQt6DBus.so.6"
-  "libQt6OpenGL.so.6"
-  "libQt6XcbQpa.so.6"
+  "libQt6Widgets.so"
+  "libQt6Gui.so"
+  "libQt6Concurrent.so"
+  "libQt6Core5Compat.so"
+  "libQt6Test.so"
+  "libQt6Core.so"
+  "libQt6DBus.so"
+  "libQt6OpenGL.so"
+  "libQt6XcbQpa.so"
+  "libQt6PrintSupport.so"
+  "libQt6Xml.so"
+  "libQt6SvgWidgets.so"
+  "libQt6Svg.so"
+  "libQt6OpenGLWidgets.so"
+  "libQt6Network.so"
+  "libQt6Sql.so"
 )
 
 foreach(qt_library ${qt_library_list})
   install(
     FILES
       "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}"
-      "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}.7.0"
+      "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}.6"
+      "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}.6.7.0"
 
     DESTINATION
       "/opt/multiplier/lib"
