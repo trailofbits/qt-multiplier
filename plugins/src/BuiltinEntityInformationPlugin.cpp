@@ -470,7 +470,7 @@ EntityInfoGenerator<DefineMacroDirective>::Items(
   co_yield std::move(item);
 
   // Find the macro parameters.
-  for (const MacroOrToken &mt : entity.parameters()) {
+  for (const PreprocessedEntity &mt : entity.parameters()) {
     if (!std::holds_alternative<Macro>(mt)) {
       continue;
     }

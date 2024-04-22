@@ -181,8 +181,8 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity) {
     // expansion, and we don't want the expansion to put us into the body of
     // a define, but to the use of the top-level macro expansion.
     auto macro = std::get<Macro>(entity).root();
-
-    for (Token tok : macro.generate_expansion_tokens()) {
+    auto tokens = macro.generate_expansion_tokens();
+    for (Token tok : tokens) {
       if (Token ptok = tok.parsed_token()) {
         auto res = NamedDeclContaining(ptok);
         if (!std::holds_alternative<NotAnEntity>(res)) {
@@ -903,7 +903,11 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
       [](const Stmt &entity) { return NamedDeclContaining(entity); },
       [](const Token &entity) { return NamedDeclContaining(entity); },
       [](const Macro &entity) -> VariantEntity {
-        for (Token tok : entity.root().generate_use_tokens()) {
+        auto root = entity.root();
+        // NOTE(pag): `root` has to be a separate variable otherwise there are
+        //            lifetime issues with the generators.
+        auto tokens = root.generate_use_tokens();
+        for (Token tok : tokens) {
           if (auto cont = NamedDeclContaining(tok);
               !std::holds_alternative<NotAnEntity>(cont)) {
             return cont;
@@ -915,7 +919,8 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
         return NamedDeclContainingOperation(op);
       },
       [](const auto &entity) -> VariantEntity {
-        for (Token tok : entity.tokens()) {
+        auto tokens = entity.tokens();
+        for (Token tok : tokens) {
           if (auto cont = NamedDeclContaining(tok);
               !std::holds_alternative<NotAnEntity>(cont)) {
             return cont;
@@ -970,6 +975,22 @@ TokenRange NameOfEntity(const VariantEntity &ent,
       [qualified, scan_redecls](const Decl &decl) -> TokenRange {
         Token name_tok;
 
+        switch (decl.kind()) {
+          case mx::DeclKind::FRIEND:
+          case mx::DeclKind::FRIEND_TEMPLATE:
+          case mx::DeclKind::LINKAGE_SPEC:
+            if (qualified) {
+              if (auto pd = decl.parent_declaration()) {
+                return NameOfEntity(pd.value(), true, scan_redecls);
+              }
+            }
+            [[fallthrough]];
+          case mx::DeclKind::ACCESS_SPEC:
+            return name_tok;
+          default:
+            break;
+        }
+
         if (auto named = NamedDecl::from(decl)) {
           std::string_view orig_name = named->name();
           std::string_view name = orig_name;
@@ -978,7 +999,8 @@ TokenRange NameOfEntity(const VariantEntity &ent,
             name_tok = std::move(maybe_name_tok);
           
           } else if (scan_redecls) {
-            for (NamedDecl redecl : named->redeclarations()) {
+            auto redecls = named->redeclarations();
+            for (NamedDecl redecl : redecls) {
               name = redecl.name();
               maybe_name_tok = redecl.token();
               if (!name.empty() && name == maybe_name_tok.data()) {
@@ -989,7 +1011,6 @@ TokenRange NameOfEntity(const VariantEntity &ent,
           }
 
           if (!orig_name.empty() && !name_tok) {
-            Q_ASSERT(name.starts_with(maybe_name_tok.data()));  // E.g. `~`.
             std::vector<CustomToken> toks;
             UserToken tok;
             tok.related_entity = decl;
@@ -1374,7 +1395,8 @@ QString EntityBreadCrumbs(const VariantEntity &ent, bool run_length_encode) {
     std::optional<Macro> m;
     m.emplace(std::get<Macro>(ent));
     for (; m; m = m->parent()) {
-      for (Token tok : m->generate_expansion_tokens()) {
+      auto tokens = m->generate_expansion_tokens();
+      for (Token tok : tokens) {
         if (Token ptok = tok.parsed_token()) {
           return TokenBreadCrumbs(ptok, run_length_encode);
         }
