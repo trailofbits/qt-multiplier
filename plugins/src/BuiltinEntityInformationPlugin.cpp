@@ -277,7 +277,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
   for (IncludeLikeMacroDirective inc : IncludeLikeMacroDirective::in(entity)) {
     if (std::optional<File> file = inc.included_file()) {
       item.category = QObject::tr("Includes");
-      item.tokens = inc.use_tokens().strip_whitespace();
+      item.tokens = inc.expansion_tokens().strip_whitespace();
       item.entity = std::move(inc);
       item.referenced_entity = NotAnEntity{};
       FillLocation(file_location_cache, item);
