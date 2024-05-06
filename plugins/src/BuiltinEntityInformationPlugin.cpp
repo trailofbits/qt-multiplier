@@ -110,7 +110,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
 
   uint64_t max_offset = 0u;
   uint64_t all_offset = 0u;
-  for (const mx::Decl &decl : entity.declarations_in_context()) {
+  for (const mx::Decl &decl : entity.contained_declarations()) {
     if (auto fd = mx::FieldDecl::from(decl)) {
       if (auto offset = fd->offset_in_bits()) {
         all_offset |= offset.value();
@@ -131,7 +131,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
   IInfoGenerator::Item item;
 
   // Find the local variables.
-  for (const mx::Decl &decl : entity.declarations_in_context()) {
+  for (const mx::Decl &decl : entity.contained_declarations()) {
 
     // Var decls.
     if (auto vd = VarDecl::from(decl)) {
@@ -420,7 +420,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
       // Descend into records.
       if (auto rd = RecordDecl::from(decl)) {
         if (rd->is_definition()) {
-          for (auto nested_decl : rd->declarations_in_context()) {
+          for (auto nested_decl : rd->contained_declarations()) {
             switch (Token::categorize(nested_decl)) {
               case TokenCategory::ENUM:
               case TokenCategory::CLASS_METHOD:
@@ -594,6 +594,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
     } else if (auto uett = UnaryExprOrTypeTraitExpr::from(context)) {
       switch (uett->keyword_kind()) {
         case UnaryExprOrTypeTrait::SIZE_OF:
+        case UnaryExprOrTypeTrait::DATA_SIZE_OF:
           item.category = QObject::tr("Size Ofs");
           break;
         case UnaryExprOrTypeTrait::ALIGN_OF:
@@ -608,6 +609,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
           break;
         case UnaryExprOrTypeTrait::VEC_STEP:
         case UnaryExprOrTypeTrait::OPEN_MP_REQUIRED_SIMD_ALIGN:
+        case UnaryExprOrTypeTrait::VECTOR_ELEMENTS:
           item.category = QObject::tr("Vector Type Traits");
           break;
       }
@@ -714,7 +716,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
   }
 
   // Find the local variables.
-  for (const mx::Decl &decl : entity.declarations_in_context()) {
+  for (const mx::Decl &decl : entity.contained_declarations()) {
     std::optional<VarDecl> vd = mx::VarDecl::from(decl);
     if (!vd) {
       continue;

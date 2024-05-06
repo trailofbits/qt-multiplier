@@ -1021,7 +1021,7 @@ TokenRange NameOfEntity(const VariantEntity &ent,
           }
         }
 
-        if (!name_tok) {
+        if (name_tok.data().empty()) {
           std::vector<CustomToken> toks;
           UserToken tok;
           tok.related_entity = decl;

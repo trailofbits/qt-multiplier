@@ -10,7 +10,7 @@
 
 #include <QString>
 
-#include <gap/core/generator.hpp>
+#include <gap/coro/generator.hpp>
 #include <memory>
 
 #include "IGeneratedItem.h"
