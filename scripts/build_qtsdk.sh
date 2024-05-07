@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 QTSDK_REPOSITORY="https://code.qt.io/qt/qt5.git"
-QTSDK_VERSION="v6.5.2"
+QTSDK_VERSION="v6.5.3"
 BUILD_TYPE=Release
 RELEASE_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -gline-tables-only"
 DEBUG_FLAGS="-fno-omit-frame-pointer -fno-optimize-sibling-calls -O0 -g3"
