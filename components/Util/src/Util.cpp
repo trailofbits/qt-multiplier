@@ -973,123 +973,23 @@ TokenRange NameOfEntity(const VariantEntity &ent,
 
   const auto VariantEntityVisitor = Overload{
       [qualified, scan_redecls](const Decl &decl) -> TokenRange {
-        Token name_tok;
-
-        switch (decl.kind()) {
-          case mx::DeclKind::FRIEND:
-          case mx::DeclKind::FRIEND_TEMPLATE:
-          case mx::DeclKind::LINKAGE_SPEC:
-            if (qualified) {
-              if (auto pd = decl.parent_declaration()) {
-                return NameOfEntity(pd.value(), true, scan_redecls);
-              }
-            }
-            [[fallthrough]];
-          case mx::DeclKind::ACCESS_SPEC:
-            return name_tok;
-          default:
-            break;
-        }
-
         if (auto named = NamedDecl::from(decl)) {
-          std::string_view orig_name = named->name();
-          std::string_view name = orig_name;
-          auto maybe_name_tok = named->token();
-          if (!name.empty() && name == maybe_name_tok.data()) {
-            name_tok = std::move(maybe_name_tok);
-          
-          } else if (scan_redecls) {
-            auto redecls = named->redeclarations();
-            for (NamedDecl redecl : redecls) {
-              name = redecl.name();
-              maybe_name_tok = redecl.token();
-              if (!name.empty() && name == maybe_name_tok.data()) {
-                name_tok = std::move(maybe_name_tok);
-                break;
-              }
-            }
-          }
-
-          if (!orig_name.empty() && !name_tok) {
-            std::vector<CustomToken> toks;
-            UserToken tok;
-            tok.related_entity = decl;
-            tok.category = Token::categorize(tok.related_entity);
-            tok.kind = TokenKind::IDENTIFIER;
-            tok.data.insert(tok.data.end(), orig_name.begin(), orig_name.end());
-            name_tok = TokenRange::create(std::move(toks)).front();
+          if (qualified) {
+            mx::QualifiedNameRenderOptions opts;
+            opts.find_name_in_redeclaration = scan_redecls;
+            return named->qualified_name(opts);
+          } else {
+            UserToken tk;
+            tk.data = named->name();
+            tk.category = Token::categorize(decl);
+            tk.kind = TokenKind::IDENTIFIER;
+            tk.related_entity = decl;
+            std::vector<CustomToken> tokens;
+            tokens.emplace_back(std::move(tk));
+            return TokenRange::create(std::move(tokens));
           }
         }
-
-        if (name_tok.data().empty()) {
-          std::vector<CustomToken> toks;
-          UserToken tok;
-          tok.related_entity = decl;
-          tok.category = Token::categorize(tok.related_entity);
-          tok.kind = TokenKind::IDENTIFIER;
-
-          switch (tok.category) {
-            case TokenCategory::ENUM:
-              tok.data = QObject::tr("(anonymous enum)").toStdString();
-              break;
-
-            case TokenCategory::CLASS:
-              tok.data = QObject::tr("(anonymous class)").toStdString();
-              break;
-
-            case TokenCategory::STRUCT:
-              tok.data = QObject::tr("(anonymous struct)").toStdString();
-              break;
-
-            case TokenCategory::UNION:
-              tok.data = QObject::tr("(anonymous union)").toStdString();
-              break;
-
-            case TokenCategory::INSTANCE_MEMBER:
-              tok.data = QObject::tr("(anonymous field)").toStdString();
-              break;
-
-            case TokenCategory::PARAMETER_VARIABLE:
-              tok.data = QObject::tr("(anonymous parameter)").toStdString();
-              break;
-
-            case TokenCategory::NAMESPACE:
-              tok.data = QObject::tr("(anonymous namespace)").toStdString();
-              break;
-
-            default:
-              tok.data = QObject::tr("(anonymous)").toStdString();
-              break;
-          }
-
-          toks.emplace_back(std::move(tok));
-          name_tok = TokenRange::create(std::move(toks)).front();
-        }
-
-        auto pd = decl.parent_declaration();
-        if (!pd || !qualified) {
-          return TokenRange(name_tok);
-        }
-
-        std::vector<CustomToken> toks;
-
-        for (Token tok : NameOfEntity(pd.value(), qualified, scan_redecls)) {
-          toks.emplace_back(std::move(tok));
-        }
-
-        if (toks.empty()) {
-          return TokenRange(name_tok);
-        }
-
-        UserToken tok;
-        tok.category = TokenCategory::PUNCTUATION;
-        tok.kind = TokenKind::COLON_COLON;
-        tok.data = "::";
-        toks.emplace_back(std::move(tok));
-
-        toks.emplace_back(std::move(name_tok));
-
-        return TokenRange::create(std::move(toks));
+        return TokenRange();
       },
 
       [](const Stmt &stmt) -> TokenRange {

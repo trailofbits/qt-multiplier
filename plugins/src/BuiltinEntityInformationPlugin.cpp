@@ -550,7 +550,12 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
   }
 
   for (Reference ref : Reference::to(entity)) {
-    if (!ref.builtin_reference_kind()) {
+    auto brk = ref.builtin_reference_kind();
+    if (!brk) {
+      continue;
+    }
+
+    if (brk.value() == BuiltinReferenceKind::CONTAINS) {
       continue;
     }
 
@@ -671,6 +676,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
       case BuiltinReferenceKind::TAKES_ADDRESS:
         item.category = QObject::tr("Address Ofs");
         break;
+      case BuiltinReferenceKind::CONTAINS:
+        continue;
       default:
         item.category = QObject::tr("Users");
         break;
@@ -815,6 +822,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<ValueDecl>::Items(
       case BuiltinReferenceKind::TAKES_ADDRESS:
         item.category = QObject::tr("Address Taken By");
         break;
+      case BuiltinReferenceKind::CONTAINS:
+        continue;
       case BuiltinReferenceKind::USES_VALUE:
       default:
         item.category = QObject::tr("Used By");

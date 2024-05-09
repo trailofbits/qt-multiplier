@@ -188,6 +188,10 @@ gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Children(
     auto user = NamedEntityContaining(use);
 
     if (auto bk = ref.builtin_reference_kind()) {
+      if (bk.value() == BuiltinReferenceKind::CONTAINS) {
+        continue;
+      }
+
       if (bk.value() == BuiltinReferenceKind::USES_TYPE) {
         user = use;
       }
