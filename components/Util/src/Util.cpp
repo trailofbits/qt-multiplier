@@ -673,6 +673,21 @@ static bool IsKeyword(TokenKind tk) {
 
 static bool AddLeadingWhitespace(TokenKind tk) {
   switch (tk) {
+    case TokenKind::WHITESPACE:
+    case TokenKind::ARROW:
+    case TokenKind::MINUS_MINUS:
+    case TokenKind::PLUS_PLUS:
+    case TokenKind::COLON:
+    case TokenKind::SEMI:
+    case TokenKind::COMMA:
+    case TokenKind::L_ANGLE:
+    case TokenKind::R_ANGLE:
+    case TokenKind::L_PARENTHESIS:
+    case TokenKind::R_PARENTHESIS:
+    case TokenKind::L_SQUARE:
+    case TokenKind::R_SQUARE:
+      return false;
+
 //    case TokenKind::NUMERIC_CONSTANT:
 //    case TokenKind::CHARACTER_CONSTANT:
 //    case TokenKind::WIDE_CHARACTER_CONSTANT:
@@ -692,11 +707,8 @@ static bool AddLeadingWhitespace(TokenKind tk) {
     case TokenKind::STAR:
     case TokenKind::STAR_EQUAL:
     case TokenKind::PLUS:
-//    case TokenKind::PLUS_PLUS:
     case TokenKind::PLUS_EQUAL:
     case TokenKind::MINUS:
-//    case TokenKind::ARROW:
-//    case TokenKind::MINUS_MINUS:
     case TokenKind::MINUS_EQUAL:
     case TokenKind::TILDE:
     case TokenKind::EXCLAIM:
@@ -705,8 +717,8 @@ static bool AddLeadingWhitespace(TokenKind tk) {
     case TokenKind::SLASH_EQUAL:
     case TokenKind::PERCENT:
     case TokenKind::PERCENT_EQUAL:
-    case TokenKind::LESS:  // TODO(pag): Templates.
-    case TokenKind::LESS_LESS:  // TODO(pag): Templates.
+    case TokenKind::LESS:
+    case TokenKind::LESS_LESS:
     case TokenKind::LESS_EQUAL:
     case TokenKind::LESS_LESS_EQUAL:
     case TokenKind::SPACESHIP:
@@ -720,11 +732,8 @@ static bool AddLeadingWhitespace(TokenKind tk) {
     case TokenKind::PIPE_PIPE:
     case TokenKind::PIPE_EQUAL:
     case TokenKind::QUESTION:
-//    case TokenKind::COLON:
-//    case TokenKind::SEMI:
     case TokenKind::EQUAL:
     case TokenKind::EQUAL_EQUAL:
-//    case TokenKind::COMMA:
     case TokenKind::LESS_LESS_LESS:
     case TokenKind::GREATER_GREATER_GREATER:
     case TokenKind::L_BRACE:
@@ -752,6 +761,11 @@ static bool IsFirst(TokenKind tk) {
 
 static bool AddTrailingWhitespace(TokenKind tk) {
   switch (tk) {
+    case TokenKind::WHITESPACE:
+    case TokenKind::L_ANGLE:
+    case TokenKind::R_ANGLE:
+      return false;
+
     case TokenKind::AMP:
     case TokenKind::AMP_AMP:
     case TokenKind::AMP_EQUAL:
@@ -763,16 +777,16 @@ static bool AddTrailingWhitespace(TokenKind tk) {
     case TokenKind::MINUS:
 //    case TokenKind::ARROW:
 //    case TokenKind::MINUS_MINUS:
-    case TokenKind::MINUS_EQUAL:
 //    case TokenKind::TILDE:
 //    case TokenKind::EXCLAIM:
+    case TokenKind::MINUS_EQUAL:
     case TokenKind::EXCLAIM_EQUAL:
     case TokenKind::SLASH:
     case TokenKind::SLASH_EQUAL:
     case TokenKind::PERCENT:
     case TokenKind::PERCENT_EQUAL:
-    case TokenKind::LESS:  // TODO(pag): Templates.
-    case TokenKind::LESS_LESS:  // TODO(pag): Templates.
+    case TokenKind::LESS:
+    case TokenKind::LESS_LESS:
     case TokenKind::LESS_EQUAL:
     case TokenKind::LESS_LESS_EQUAL:
     case TokenKind::SPACESHIP:
@@ -802,10 +816,13 @@ static bool AddTrailingWhitespace(TokenKind tk) {
 
 static bool AddTrailingWhitespaceAsFirst(TokenKind tk) {
   switch (tk) {
+    case TokenKind::WHITESPACE:
     case TokenKind::STAR:
     case TokenKind::AMP:
     case TokenKind::PLUS:
     case TokenKind::MINUS:
+    case TokenKind::L_ANGLE:
+    case TokenKind::R_ANGLE:
       return false;
     default:
       return AddTrailingWhitespace(tk);
@@ -814,6 +831,7 @@ static bool AddTrailingWhitespaceAsFirst(TokenKind tk) {
 
 static bool SuppressLeadingWhitespace(TokenKind tk) {
   switch (tk) {
+    case TokenKind::WHITESPACE:
     case TokenKind::PERIOD:
     case TokenKind::PERIOD_STAR:
     case TokenKind::ARROW:
@@ -832,14 +850,36 @@ static bool SuppressLeadingWhitespace(TokenKind tk) {
   }
 }
 
-static bool ForceLeadingWhitespace(bool prev_is_first, TokenKind prev, TokenKind curr) {
+static bool ForceLeadingWhitespace(bool prev_is_first, TokenKind prev,
+                                   TokenKind curr) {
+  switch (prev) {
+    case TokenKind::WHITESPACE:
+    case TokenKind::L_SQUARE:
+    case TokenKind::L_PARENTHESIS:
+    case TokenKind::L_ANGLE:
+    case TokenKind::PERIOD:
+    case TokenKind::PERIOD_STAR:
+    case TokenKind::ARROW:
+    case TokenKind::ARROW_STAR:
+      return false;
+    default:
+      if (curr == TokenKind::WHITESPACE) {
+        return false;
+      }
+      break;
+  }
+
   auto prev_is_ident_kw = prev == TokenKind::IDENTIFIER || IsKeyword(prev);
   auto curr_is_ident_kw = curr == TokenKind::IDENTIFIER || IsKeyword(curr);
   if (prev_is_ident_kw && curr_is_ident_kw) {
     return true;
   }
-  (void) prev_is_first;
-  return prev == TokenKind::COMMA || prev == TokenKind::SEMI;
+
+  if (prev == TokenKind::COMMA || prev == TokenKind::SEMI) {
+    return true;
+  }
+
+  return AddLeadingWhitespace(curr);
 }
 
 }  // namespace
@@ -856,17 +896,16 @@ TokenRange InjectWhitespace(const TokenRange &toks) {
   for (Token tok : toks) {
     TokenKind tk = tok.kind();
 
-    if (!add_leading_ws) {
-      add_leading_ws = ForceLeadingWhitespace(is_first, last_tk, tk);
-    }
-
-    if (add_leading_ws || (!is_first && AddLeadingWhitespace(tk))) {
-      if (!SuppressLeadingWhitespace(tk)) {
-        UserToken st;
-        st.kind = TokenKind::WHITESPACE;
-        st.category = TokenCategory::WHITESPACE;
-        st.data = " ";
-        tokens.emplace_back(std::move(st));
+    if (last_tk != TokenKind::WHITESPACE) {
+      if (add_leading_ws ||
+          ForceLeadingWhitespace(is_first, last_tk, tk)) {
+        if (!SuppressLeadingWhitespace(tk)) {
+          UserToken st;
+          st.kind = TokenKind::WHITESPACE;
+          st.category = TokenCategory::WHITESPACE;
+          st.data = " ";
+          tokens.emplace_back(std::move(st));
+        }
       }
     }
 
@@ -974,20 +1013,10 @@ TokenRange NameOfEntity(const VariantEntity &ent,
   const auto VariantEntityVisitor = Overload{
       [qualified, scan_redecls](const Decl &decl) -> TokenRange {
         if (auto named = NamedDecl::from(decl)) {
-          if (qualified) {
-            mx::QualifiedNameRenderOptions opts;
-            opts.find_name_in_redeclaration = scan_redecls;
-            return named->qualified_name(opts);
-          } else {
-            UserToken tk;
-            tk.data = named->name();
-            tk.category = Token::categorize(decl);
-            tk.kind = TokenKind::IDENTIFIER;
-            tk.related_entity = decl;
-            std::vector<CustomToken> tokens;
-            tokens.emplace_back(std::move(tk));
-            return TokenRange::create(std::move(tokens));
-          }
+          mx::QualifiedNameRenderOptions opts;
+          opts.fully_qualified = qualified;
+          opts.find_name_in_redeclaration = scan_redecls;
+          return named->qualified_name(opts);
         }
         return TokenRange();
       },

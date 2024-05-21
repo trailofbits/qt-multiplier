@@ -6,6 +6,7 @@
 
 #include <multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h>
 
+#include <multiplier/AST/BindingDecl.h>
 #include <multiplier/AST/CallExpr.h>
 #include <multiplier/AST/CastExpr.h>
 #include <multiplier/AST/CXXMethodDecl.h>
@@ -14,6 +15,7 @@
 #include <multiplier/AST/EnumDecl.h>
 #include <multiplier/AST/EnumConstantDecl.h>
 #include <multiplier/AST/FieldDecl.h>
+#include <multiplier/AST/TemplateDecl.h>
 #include <multiplier/AST/TypeTraitExpr.h>
 #include <multiplier/AST/UnaryExprOrTypeTraitExpr.h>
 #include <multiplier/AST/VarDecl.h>
@@ -663,36 +665,6 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
 
   IInfoGenerator::Item item;
 
-  for (Reference ref : Reference::to(entity)) {
-    auto brk = ref.builtin_reference_kind();
-    if (!brk) {
-      continue;
-    }
-
-    switch (brk.value()) {
-      case BuiltinReferenceKind::CALLS:
-        item.category = QObject::tr("Called By");
-        break;
-      case BuiltinReferenceKind::TAKES_ADDRESS:
-        item.category = QObject::tr("Address Ofs");
-        break;
-      case BuiltinReferenceKind::CONTAINS:
-        continue;
-      default:
-        item.category = QObject::tr("Users");
-        break;
-    }
-
-    item.entity = ref.context();
-    if (std::holds_alternative<NotAnEntity>(item.entity)) {
-      item.entity = ref.as_variant();
-    }
-
-    item.tokens = InjectWhitespace(Tokens(item.entity));
-    FillLocation(file_location_cache, item);
-    co_yield std::move(item);
-  }
-
   // Find the callees. Slightly annoying as we kind of have to invent a join.
   //
   // TODO(pag): Make `::in(entity)` work for all entities, not just files
@@ -724,26 +696,31 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
 
   // Find the local variables.
   for (const mx::Decl &decl : entity.contained_declarations()) {
-    std::optional<VarDecl> vd = mx::VarDecl::from(decl);
-    if (!vd) {
+
+    if (auto vd = mx::VarDecl::from(decl)) {
+
+      if (vd->kind() == DeclKind::PARM_VAR) {
+        item.category = QObject::tr("Parameters");
+      } else {
+        if (vd->tsc_spec() != ThreadStorageClassSpecifier::UNSPECIFIED) {
+          item.category = QObject::tr("Thread Local Variables");
+
+        } else if (vd->storage_duration() == StorageDuration::STATIC) {
+          item.category = QObject::tr("Static Local Variables");
+
+        } else {
+          item.category = QObject::tr("Local Variables");
+        }
+      }
+    } else if (decl.kind() == DeclKind::BINDING) {
+      item.category = QObject::tr("Local Variables");
+
+    } else {
       continue;
     }
 
-    if (vd->kind() == DeclKind::PARM_VAR) {
-      item.category = QObject::tr("Parameters");
-    } else {
-      if (vd->tsc_spec() != ThreadStorageClassSpecifier::UNSPECIFIED) {
-        item.category = QObject::tr("Thread Local Variables");
-
-      } else if (vd->storage_duration() == StorageDuration::STATIC) {
-        item.category = QObject::tr("Static Local Variables");
-
-      } else {
-        item.category = QObject::tr("Local Variables");
-      }
-    }
     item.tokens = NameOfEntity(decl, false  /* don't fully qualify name */);
-    item.entity = std::move(vd.value());
+    item.entity = decl;
     item.referenced_entity = item.entity;
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
@@ -922,7 +899,20 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
   }
 
   if (entity.parent_declaration()) {
-    for (std::optional<Decl> pd = entity; pd; pd = pd->parent_declaration()) {
+    std::optional<Decl> next_pd;
+    for (std::optional<Decl> pd = entity; pd; pd = std::move(next_pd)) {
+      next_pd = pd->parent_declaration();
+      
+      // Templates and their patterns have the same name, so skip over the
+      // patterns.
+      if (auto tpl = TemplateDecl::from(next_pd)) {
+        if (auto pattern = tpl->templated_declaration()) {
+          if (pattern.value() == pd.value()) {
+            continue;
+          }
+        }
+      }
+
       item.category = QObject::tr("Parentage");
       item.entity = pd.value();
       item.referenced_entity = item.entity;
