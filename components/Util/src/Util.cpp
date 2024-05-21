@@ -181,8 +181,8 @@ VariantEntity NamedEntityContaining(const VariantEntity &entity) {
     // expansion, and we don't want the expansion to put us into the body of
     // a define, but to the use of the top-level macro expansion.
     auto macro = std::get<Macro>(entity).root();
-
-    for (Token tok : macro.generate_expansion_tokens()) {
+    auto tokens = macro.generate_expansion_tokens();
+    for (Token tok : tokens) {
       if (Token ptok = tok.parsed_token()) {
         auto res = NamedDeclContaining(ptok);
         if (!std::holds_alternative<NotAnEntity>(res)) {
@@ -673,6 +673,21 @@ static bool IsKeyword(TokenKind tk) {
 
 static bool AddLeadingWhitespace(TokenKind tk) {
   switch (tk) {
+    case TokenKind::WHITESPACE:
+    case TokenKind::ARROW:
+    case TokenKind::MINUS_MINUS:
+    case TokenKind::PLUS_PLUS:
+    case TokenKind::COLON:
+    case TokenKind::SEMI:
+    case TokenKind::COMMA:
+    case TokenKind::L_ANGLE:
+    case TokenKind::R_ANGLE:
+    case TokenKind::L_PARENTHESIS:
+    case TokenKind::R_PARENTHESIS:
+    case TokenKind::L_SQUARE:
+    case TokenKind::R_SQUARE:
+      return false;
+
 //    case TokenKind::NUMERIC_CONSTANT:
 //    case TokenKind::CHARACTER_CONSTANT:
 //    case TokenKind::WIDE_CHARACTER_CONSTANT:
@@ -692,11 +707,8 @@ static bool AddLeadingWhitespace(TokenKind tk) {
     case TokenKind::STAR:
     case TokenKind::STAR_EQUAL:
     case TokenKind::PLUS:
-//    case TokenKind::PLUS_PLUS:
     case TokenKind::PLUS_EQUAL:
     case TokenKind::MINUS:
-//    case TokenKind::ARROW:
-//    case TokenKind::MINUS_MINUS:
     case TokenKind::MINUS_EQUAL:
     case TokenKind::TILDE:
     case TokenKind::EXCLAIM:
@@ -705,8 +717,8 @@ static bool AddLeadingWhitespace(TokenKind tk) {
     case TokenKind::SLASH_EQUAL:
     case TokenKind::PERCENT:
     case TokenKind::PERCENT_EQUAL:
-    case TokenKind::LESS:  // TODO(pag): Templates.
-    case TokenKind::LESS_LESS:  // TODO(pag): Templates.
+    case TokenKind::LESS:
+    case TokenKind::LESS_LESS:
     case TokenKind::LESS_EQUAL:
     case TokenKind::LESS_LESS_EQUAL:
     case TokenKind::SPACESHIP:
@@ -720,11 +732,8 @@ static bool AddLeadingWhitespace(TokenKind tk) {
     case TokenKind::PIPE_PIPE:
     case TokenKind::PIPE_EQUAL:
     case TokenKind::QUESTION:
-//    case TokenKind::COLON:
-//    case TokenKind::SEMI:
     case TokenKind::EQUAL:
     case TokenKind::EQUAL_EQUAL:
-//    case TokenKind::COMMA:
     case TokenKind::LESS_LESS_LESS:
     case TokenKind::GREATER_GREATER_GREATER:
     case TokenKind::L_BRACE:
@@ -752,6 +761,11 @@ static bool IsFirst(TokenKind tk) {
 
 static bool AddTrailingWhitespace(TokenKind tk) {
   switch (tk) {
+    case TokenKind::WHITESPACE:
+    case TokenKind::L_ANGLE:
+    case TokenKind::R_ANGLE:
+      return false;
+
     case TokenKind::AMP:
     case TokenKind::AMP_AMP:
     case TokenKind::AMP_EQUAL:
@@ -763,16 +777,16 @@ static bool AddTrailingWhitespace(TokenKind tk) {
     case TokenKind::MINUS:
 //    case TokenKind::ARROW:
 //    case TokenKind::MINUS_MINUS:
-    case TokenKind::MINUS_EQUAL:
 //    case TokenKind::TILDE:
 //    case TokenKind::EXCLAIM:
+    case TokenKind::MINUS_EQUAL:
     case TokenKind::EXCLAIM_EQUAL:
     case TokenKind::SLASH:
     case TokenKind::SLASH_EQUAL:
     case TokenKind::PERCENT:
     case TokenKind::PERCENT_EQUAL:
-    case TokenKind::LESS:  // TODO(pag): Templates.
-    case TokenKind::LESS_LESS:  // TODO(pag): Templates.
+    case TokenKind::LESS:
+    case TokenKind::LESS_LESS:
     case TokenKind::LESS_EQUAL:
     case TokenKind::LESS_LESS_EQUAL:
     case TokenKind::SPACESHIP:
@@ -802,10 +816,13 @@ static bool AddTrailingWhitespace(TokenKind tk) {
 
 static bool AddTrailingWhitespaceAsFirst(TokenKind tk) {
   switch (tk) {
+    case TokenKind::WHITESPACE:
     case TokenKind::STAR:
     case TokenKind::AMP:
     case TokenKind::PLUS:
     case TokenKind::MINUS:
+    case TokenKind::L_ANGLE:
+    case TokenKind::R_ANGLE:
       return false;
     default:
       return AddTrailingWhitespace(tk);
@@ -814,6 +831,7 @@ static bool AddTrailingWhitespaceAsFirst(TokenKind tk) {
 
 static bool SuppressLeadingWhitespace(TokenKind tk) {
   switch (tk) {
+    case TokenKind::WHITESPACE:
     case TokenKind::PERIOD:
     case TokenKind::PERIOD_STAR:
     case TokenKind::ARROW:
@@ -832,14 +850,36 @@ static bool SuppressLeadingWhitespace(TokenKind tk) {
   }
 }
 
-static bool ForceLeadingWhitespace(bool prev_is_first, TokenKind prev, TokenKind curr) {
+static bool ForceLeadingWhitespace(bool prev_is_first, TokenKind prev,
+                                   TokenKind curr) {
+  switch (prev) {
+    case TokenKind::WHITESPACE:
+    case TokenKind::L_SQUARE:
+    case TokenKind::L_PARENTHESIS:
+    case TokenKind::L_ANGLE:
+    case TokenKind::PERIOD:
+    case TokenKind::PERIOD_STAR:
+    case TokenKind::ARROW:
+    case TokenKind::ARROW_STAR:
+      return false;
+    default:
+      if (curr == TokenKind::WHITESPACE) {
+        return false;
+      }
+      break;
+  }
+
   auto prev_is_ident_kw = prev == TokenKind::IDENTIFIER || IsKeyword(prev);
   auto curr_is_ident_kw = curr == TokenKind::IDENTIFIER || IsKeyword(curr);
   if (prev_is_ident_kw && curr_is_ident_kw) {
     return true;
   }
-  (void) prev_is_first;
-  return prev == TokenKind::COMMA || prev == TokenKind::SEMI;
+
+  if (prev == TokenKind::COMMA || prev == TokenKind::SEMI) {
+    return true;
+  }
+
+  return AddLeadingWhitespace(curr);
 }
 
 }  // namespace
@@ -856,17 +896,16 @@ TokenRange InjectWhitespace(const TokenRange &toks) {
   for (Token tok : toks) {
     TokenKind tk = tok.kind();
 
-    if (!add_leading_ws) {
-      add_leading_ws = ForceLeadingWhitespace(is_first, last_tk, tk);
-    }
-
-    if (add_leading_ws || (!is_first && AddLeadingWhitespace(tk))) {
-      if (!SuppressLeadingWhitespace(tk)) {
-        UserToken st;
-        st.kind = TokenKind::WHITESPACE;
-        st.category = TokenCategory::WHITESPACE;
-        st.data = " ";
-        tokens.emplace_back(std::move(st));
+    if (last_tk != TokenKind::WHITESPACE) {
+      if (add_leading_ws ||
+          ForceLeadingWhitespace(is_first, last_tk, tk)) {
+        if (!SuppressLeadingWhitespace(tk)) {
+          UserToken st;
+          st.kind = TokenKind::WHITESPACE;
+          st.category = TokenCategory::WHITESPACE;
+          st.data = " ";
+          tokens.emplace_back(std::move(st));
+        }
       }
     }
 
@@ -903,7 +942,11 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
       [](const Stmt &entity) { return NamedDeclContaining(entity); },
       [](const Token &entity) { return NamedDeclContaining(entity); },
       [](const Macro &entity) -> VariantEntity {
-        for (Token tok : entity.root().generate_use_tokens()) {
+        auto root = entity.root();
+        // NOTE(pag): `root` has to be a separate variable otherwise there are
+        //            lifetime issues with the generators.
+        auto tokens = root.generate_use_tokens();
+        for (Token tok : tokens) {
           if (auto cont = NamedDeclContaining(tok);
               !std::holds_alternative<NotAnEntity>(cont)) {
             return cont;
@@ -915,7 +958,8 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
         return NamedDeclContainingOperation(op);
       },
       [](const auto &entity) -> VariantEntity {
-        for (Token tok : entity.tokens()) {
+        auto tokens = entity.tokens();
+        for (Token tok : tokens) {
           if (auto cont = NamedDeclContaining(tok);
               !std::holds_alternative<NotAnEntity>(cont)) {
             return cont;
@@ -968,107 +1012,13 @@ TokenRange NameOfEntity(const VariantEntity &ent,
 
   const auto VariantEntityVisitor = Overload{
       [qualified, scan_redecls](const Decl &decl) -> TokenRange {
-        Token name_tok;
-
         if (auto named = NamedDecl::from(decl)) {
-          std::string_view orig_name = named->name();
-          std::string_view name = orig_name;
-          auto maybe_name_tok = named->token();
-          if (!name.empty() && name == maybe_name_tok.data()) {
-            name_tok = std::move(maybe_name_tok);
-          
-          } else if (scan_redecls) {
-            for (NamedDecl redecl : named->redeclarations()) {
-              name = redecl.name();
-              maybe_name_tok = redecl.token();
-              if (!name.empty() && name == maybe_name_tok.data()) {
-                name_tok = std::move(maybe_name_tok);
-                break;
-              }
-            }
-          }
-
-          if (!orig_name.empty() && !name_tok) {
-            Q_ASSERT(name.starts_with(maybe_name_tok.data()));  // E.g. `~`.
-            std::vector<CustomToken> toks;
-            UserToken tok;
-            tok.related_entity = decl;
-            tok.category = Token::categorize(tok.related_entity);
-            tok.kind = TokenKind::IDENTIFIER;
-            tok.data.insert(tok.data.end(), orig_name.begin(), orig_name.end());
-            name_tok = TokenRange::create(std::move(toks)).front();
-          }
+          mx::QualifiedNameRenderOptions opts;
+          opts.fully_qualified = qualified;
+          opts.find_name_in_redeclaration = scan_redecls;
+          return named->qualified_name(opts);
         }
-
-        if (!name_tok) {
-          std::vector<CustomToken> toks;
-          UserToken tok;
-          tok.related_entity = decl;
-          tok.category = Token::categorize(tok.related_entity);
-          tok.kind = TokenKind::IDENTIFIER;
-
-          switch (tok.category) {
-            case TokenCategory::ENUM:
-              tok.data = QObject::tr("(anonymous enum)").toStdString();
-              break;
-
-            case TokenCategory::CLASS:
-              tok.data = QObject::tr("(anonymous class)").toStdString();
-              break;
-
-            case TokenCategory::STRUCT:
-              tok.data = QObject::tr("(anonymous struct)").toStdString();
-              break;
-
-            case TokenCategory::UNION:
-              tok.data = QObject::tr("(anonymous union)").toStdString();
-              break;
-
-            case TokenCategory::INSTANCE_MEMBER:
-              tok.data = QObject::tr("(anonymous field)").toStdString();
-              break;
-
-            case TokenCategory::PARAMETER_VARIABLE:
-              tok.data = QObject::tr("(anonymous parameter)").toStdString();
-              break;
-
-            case TokenCategory::NAMESPACE:
-              tok.data = QObject::tr("(anonymous namespace)").toStdString();
-              break;
-
-            default:
-              tok.data = QObject::tr("(anonymous)").toStdString();
-              break;
-          }
-
-          toks.emplace_back(std::move(tok));
-          name_tok = TokenRange::create(std::move(toks)).front();
-        }
-
-        auto pd = decl.parent_declaration();
-        if (!pd || !qualified) {
-          return TokenRange(name_tok);
-        }
-
-        std::vector<CustomToken> toks;
-
-        for (Token tok : NameOfEntity(pd.value(), qualified, scan_redecls)) {
-          toks.emplace_back(std::move(tok));
-        }
-
-        if (toks.empty()) {
-          return TokenRange(name_tok);
-        }
-
-        UserToken tok;
-        tok.category = TokenCategory::PUNCTUATION;
-        tok.kind = TokenKind::COLON_COLON;
-        tok.data = "::";
-        toks.emplace_back(std::move(tok));
-
-        toks.emplace_back(std::move(name_tok));
-
-        return TokenRange::create(std::move(toks));
+        return TokenRange();
       },
 
       [](const Stmt &stmt) -> TokenRange {
@@ -1374,7 +1324,8 @@ QString EntityBreadCrumbs(const VariantEntity &ent, bool run_length_encode) {
     std::optional<Macro> m;
     m.emplace(std::get<Macro>(ent));
     for (; m; m = m->parent()) {
-      for (Token tok : m->generate_expansion_tokens()) {
+      auto tokens = m->generate_expansion_tokens();
+      for (Token tok : tokens) {
         if (Token ptok = tok.parsed_token()) {
           return TokenBreadCrumbs(ptok, run_length_encode);
         }

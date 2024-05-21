@@ -6,6 +6,7 @@
 
 #include <multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h>
 
+#include <multiplier/AST/BindingDecl.h>
 #include <multiplier/AST/CallExpr.h>
 #include <multiplier/AST/CastExpr.h>
 #include <multiplier/AST/CXXMethodDecl.h>
@@ -14,6 +15,7 @@
 #include <multiplier/AST/EnumDecl.h>
 #include <multiplier/AST/EnumConstantDecl.h>
 #include <multiplier/AST/FieldDecl.h>
+#include <multiplier/AST/TemplateDecl.h>
 #include <multiplier/AST/TypeTraitExpr.h>
 #include <multiplier/AST/UnaryExprOrTypeTraitExpr.h>
 #include <multiplier/AST/VarDecl.h>
@@ -110,7 +112,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
 
   uint64_t max_offset = 0u;
   uint64_t all_offset = 0u;
-  for (const mx::Decl &decl : entity.declarations_in_context()) {
+  for (const mx::Decl &decl : entity.contained_declarations()) {
     if (auto fd = mx::FieldDecl::from(decl)) {
       if (auto offset = fd->offset_in_bits()) {
         all_offset |= offset.value();
@@ -131,7 +133,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<RecordDecl>::Items(
   IInfoGenerator::Item item;
 
   // Find the local variables.
-  for (const mx::Decl &decl : entity.declarations_in_context()) {
+  for (const mx::Decl &decl : entity.contained_declarations()) {
 
     // Var decls.
     if (auto vd = VarDecl::from(decl)) {
@@ -277,7 +279,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
   for (IncludeLikeMacroDirective inc : IncludeLikeMacroDirective::in(entity)) {
     if (std::optional<File> file = inc.included_file()) {
       item.category = QObject::tr("Includes");
-      item.tokens = inc.use_tokens().strip_whitespace();
+      item.tokens = inc.expansion_tokens().strip_whitespace();
       item.entity = std::move(inc);
       item.referenced_entity = NotAnEntity{};
       FillLocation(file_location_cache, item);
@@ -420,7 +422,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<File>::Items(
       // Descend into records.
       if (auto rd = RecordDecl::from(decl)) {
         if (rd->is_definition()) {
-          for (auto nested_decl : rd->declarations_in_context()) {
+          for (auto nested_decl : rd->contained_declarations()) {
             switch (Token::categorize(nested_decl)) {
               case TokenCategory::ENUM:
               case TokenCategory::CLASS_METHOD:
@@ -470,7 +472,7 @@ EntityInfoGenerator<DefineMacroDirective>::Items(
   co_yield std::move(item);
 
   // Find the macro parameters.
-  for (const MacroOrToken &mt : entity.parameters()) {
+  for (const PreprocessedEntity &mt : entity.parameters()) {
     if (!std::holds_alternative<Macro>(mt)) {
       continue;
     }
@@ -550,7 +552,12 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
   }
 
   for (Reference ref : Reference::to(entity)) {
-    if (!ref.builtin_reference_kind()) {
+    auto brk = ref.builtin_reference_kind();
+    if (!brk) {
+      continue;
+    }
+
+    if (brk.value() == BuiltinReferenceKind::CONTAINS) {
       continue;
     }
 
@@ -594,6 +601,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
     } else if (auto uett = UnaryExprOrTypeTraitExpr::from(context)) {
       switch (uett->keyword_kind()) {
         case UnaryExprOrTypeTrait::SIZE_OF:
+        case UnaryExprOrTypeTrait::DATA_SIZE_OF:
           item.category = QObject::tr("Size Ofs");
           break;
         case UnaryExprOrTypeTrait::ALIGN_OF:
@@ -608,6 +616,7 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<TypeDecl>::Items(
           break;
         case UnaryExprOrTypeTrait::VEC_STEP:
         case UnaryExprOrTypeTrait::OPEN_MP_REQUIRED_SIMD_ALIGN:
+        case UnaryExprOrTypeTrait::VECTOR_ELEMENTS:
           item.category = QObject::tr("Vector Type Traits");
           break;
       }
@@ -656,34 +665,6 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
 
   IInfoGenerator::Item item;
 
-  for (Reference ref : Reference::to(entity)) {
-    auto brk = ref.builtin_reference_kind();
-    if (!brk) {
-      continue;
-    }
-
-    switch (brk.value()) {
-      case BuiltinReferenceKind::CALLS:
-        item.category = QObject::tr("Called By");
-        break;
-      case BuiltinReferenceKind::TAKES_ADDRESS:
-        item.category = QObject::tr("Address Ofs");
-        break;
-      default:
-        item.category = QObject::tr("Users");
-        break;
-    }
-
-    item.entity = ref.context();
-    if (std::holds_alternative<NotAnEntity>(item.entity)) {
-      item.entity = ref.as_variant();
-    }
-
-    item.tokens = InjectWhitespace(Tokens(item.entity));
-    FillLocation(file_location_cache, item);
-    co_yield std::move(item);
-  }
-
   // Find the callees. Slightly annoying as we kind of have to invent a join.
   //
   // TODO(pag): Make `::in(entity)` work for all entities, not just files
@@ -714,27 +695,32 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<FunctionDecl>::Items(
   }
 
   // Find the local variables.
-  for (const mx::Decl &decl : entity.declarations_in_context()) {
-    std::optional<VarDecl> vd = mx::VarDecl::from(decl);
-    if (!vd) {
+  for (const mx::Decl &decl : entity.contained_declarations()) {
+
+    if (auto vd = mx::VarDecl::from(decl)) {
+
+      if (vd->kind() == DeclKind::PARM_VAR) {
+        item.category = QObject::tr("Parameters");
+      } else {
+        if (vd->tsc_spec() != ThreadStorageClassSpecifier::UNSPECIFIED) {
+          item.category = QObject::tr("Thread Local Variables");
+
+        } else if (vd->storage_duration() == StorageDuration::STATIC) {
+          item.category = QObject::tr("Static Local Variables");
+
+        } else {
+          item.category = QObject::tr("Local Variables");
+        }
+      }
+    } else if (decl.kind() == DeclKind::BINDING) {
+      item.category = QObject::tr("Local Variables");
+
+    } else {
       continue;
     }
 
-    if (vd->kind() == DeclKind::PARM_VAR) {
-      item.category = QObject::tr("Parameters");
-    } else {
-      if (vd->tsc_spec() != ThreadStorageClassSpecifier::UNSPECIFIED) {
-        item.category = QObject::tr("Thread Local Variables");
-
-      } else if (vd->storage_duration() == StorageDuration::STATIC) {
-        item.category = QObject::tr("Static Local Variables");
-
-      } else {
-        item.category = QObject::tr("Local Variables");
-      }
-    }
     item.tokens = NameOfEntity(decl, false  /* don't fully qualify name */);
-    item.entity = std::move(vd.value());
+    item.entity = decl;
     item.referenced_entity = item.entity;
     FillLocation(file_location_cache, item);
     co_yield std::move(item);
@@ -813,6 +799,8 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<ValueDecl>::Items(
       case BuiltinReferenceKind::TAKES_ADDRESS:
         item.category = QObject::tr("Address Taken By");
         break;
+      case BuiltinReferenceKind::CONTAINS:
+        continue;
       case BuiltinReferenceKind::USES_VALUE:
       default:
         item.category = QObject::tr("Used By");
@@ -911,7 +899,20 @@ gap::generator<IInfoGenerator::Item> EntityInfoGenerator<NamedDecl>::Items(
   }
 
   if (entity.parent_declaration()) {
-    for (std::optional<Decl> pd = entity; pd; pd = pd->parent_declaration()) {
+    std::optional<Decl> next_pd;
+    for (std::optional<Decl> pd = entity; pd; pd = std::move(next_pd)) {
+      next_pd = pd->parent_declaration();
+      
+      // Templates and their patterns have the same name, so skip over the
+      // patterns.
+      if (auto tpl = TemplateDecl::from(next_pd)) {
+        if (auto pattern = tpl->templated_declaration()) {
+          if (pattern.value() == pd.value()) {
+            continue;
+          }
+        }
+      }
+
       item.category = QObject::tr("Parentage");
       item.entity = pd.value();
       item.referenced_entity = item.entity;

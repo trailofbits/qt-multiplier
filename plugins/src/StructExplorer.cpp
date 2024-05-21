@@ -5,7 +5,8 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include <multiplier/AST/ConstantArrayType.h>
-#include <multiplier/AST/RecordDecl.h>
+#include <multiplier/AST/CXXBaseSpecifier.h>
+#include <multiplier/AST/CXXRecordDecl.h>
 #include <multiplier/AST/RecordType.h>
 #include <multiplier/AST/TypedefNameDecl.h>
 #include <multiplier/Frontend/Token.h>
@@ -215,6 +216,17 @@ StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
   if (!rd.is_definition()) {
     rd = rd.canonical_declaration();
   }
+
+  // if (auto cls = CXXRecordDecl::from(rd)) {
+  //   if (auto bases = cls->bases()) {
+  //     for (const auto &base : *bases) {
+  //       if (auto base_type = RecordType::from(base.type())) {
+
+  //       }
+  //     }
+  //   }
+  // }
+
   for (const auto &field : rd.fields()) {
     co_yield CreateGeneratedItem(
         field, NameOfEntity(field, /*qualified=*/false),
