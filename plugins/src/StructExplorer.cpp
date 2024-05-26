@@ -207,6 +207,66 @@ CreateGeneratedItem(const VariantEntity &entity, TokenRange name,
       cumulative_offset_tokens, size_tokens, cumulative_offset_bits);
 }
 
+struct SizeOffsetAndBase {
+  uint64_t size;
+  uint64_t offset;
+  CXXBaseSpecifier spec;
+  CXXRecordDecl record;
+
+  SizeOffsetAndBase(void) = delete;
+
+  inline SizeOffsetAndBase(uint64_t size_, uint64_t offset_,
+                           CXXBaseSpecifier spec_,
+                           CXXRecordDecl record_)
+      : size(size_),
+        offset(offset_),
+        spec(std::move(spec_)),
+        record(std::move(record_)) {}
+};
+
+static std::vector<SizeOffsetAndBase> GetBases(RecordDecl &rd) {
+
+  std::vector<SizeOffsetAndBase> bases;
+  auto cls = CXXRecordDecl::from(rd);
+  if (!cls) {
+    return bases;
+  }
+
+  auto base_specifiers = cls->bases();
+  if (!base_specifiers) {
+    return bases;
+  }
+  for (auto &base : *base_specifiers) {
+    auto base_size = base.base_type().size_in_bits();
+    if (!base_size) {
+      continue;
+    }
+
+    auto base_cls = base.base_class();
+    if (!base_cls) {
+      continue;
+    }
+
+    auto base_cls_offset = base.offset_in_bits();
+    if (!base_cls_offset) {
+      continue;
+    }
+
+    bases.emplace_back(base_size.value(),
+                       base_cls_offset.value(),
+                       std::move(base),
+                       std::move(base_cls.value()));
+  }
+
+  // Sort the base classes by offset.
+  std::sort(bases.begin(), bases.end(),
+            [] (const SizeOffsetAndBase &a, const SizeOffsetAndBase &b) {
+              return a.offset < b.offset;
+            });
+
+  return bases;
+}
+
 gap::generator<IGeneratedItemPtr>
 StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
   auto rd = root_entity;
@@ -217,15 +277,13 @@ StructExplorerGenerator::Roots(ITreeGeneratorPtr self) {
     rd = rd.canonical_declaration();
   }
 
-  // if (auto cls = CXXRecordDecl::from(rd)) {
-  //   if (auto bases = cls->bases()) {
-  //     for (const auto &base : *bases) {
-  //       if (auto base_type = RecordType::from(base.type())) {
-
-  //       }
-  //     }
-  //   }
-  // }
+  for (const auto &offset_base : GetBases(rd)) {
+    co_yield CreateGeneratedItem(
+        offset_base.spec,
+        TokenRange(),
+        NameOfEntity(offset_base.record, /*qualified=*/true),
+        offset_base.offset, offset_base.offset, offset_base.size);
+  }
 
   for (const auto &field : rd.fields()) {
     co_yield CreateGeneratedItem(
@@ -254,10 +312,25 @@ StructExplorerGenerator::Children(ITreeGeneratorPtr self,
         rd = RecordDecl::from(rt->declaration());
       }
     }
+  } else if (auto spec = CXXBaseSpecifier::from(entity)) {
+    rd = spec->base_class();
   }
 
   if (!rd) {
     co_return;
+  }
+
+  for (const auto &offset_base : GetBases(rd.value())) {
+    std::optional<uint64_t> new_offset;
+    if (item->CumulativeOffsetInBits()) {
+      new_offset = offset_base.offset +
+                   item->CumulativeOffsetInBits().value();
+    }
+    co_yield CreateGeneratedItem(
+        offset_base.spec,
+        TokenRange(),
+        NameOfEntity(offset_base.record, /*qualified=*/true),
+        offset_base.offset, new_offset, offset_base.size);
   }
 
   for (const auto &rd_field : rd->fields()) {
@@ -299,6 +372,9 @@ static std::optional<RecordDecl> GetRecordDecl(VariantEntity entity) {
     if (auto pd = fd->parent_declaration()) {
       return RecordDecl::from(pd.value());
     }
+  }
+  if (auto spec = CXXBaseSpecifier::from(entity)) {
+    return spec->base_class();
   }
   return RecordDecl::from(entity);
 }
