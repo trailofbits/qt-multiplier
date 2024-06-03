@@ -28,7 +28,7 @@ set(multiplier_data_file_list
   "include/multiplier"
   "lib/cmake/multiplier"
   "lib/libmultiplier.${dyn_lib_ext}"
-  "lib/python3.10"
+  "lib/python3.11"
   "bin/mx-count-sourceir"
   "bin/mx-dump-files"
   "bin/mx-find-calls-in-macro-expansions"
