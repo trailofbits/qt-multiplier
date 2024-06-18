@@ -9,10 +9,12 @@
 add_library("mx_plugins"
   include/multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h
   include/multiplier/GUI/Plugins/CallHierarchyPlugin.h
+  include/multiplier/GUI/Plugins/ClassHierarchyPlugin.h
   include/multiplier/GUI/Plugins/StructExplorerPlugin.h
 
   src/BuiltinEntityInformationPlugin.cpp
   src/CallHierarchyPlugin.cpp
+  src/ClassHierarchyPlugin.cpp
   src/StructExplorer.cpp
 )
 

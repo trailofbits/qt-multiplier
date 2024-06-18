@@ -20,6 +20,7 @@
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Plugins/BuiltinEntityInformationPlugin.h>
 #include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
+#include <multiplier/GUI/Plugins/ClassHierarchyPlugin.h>
 #include <multiplier/GUI/Plugins/StructExplorerPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
 #include <multiplier/Index.h>
@@ -97,6 +98,8 @@ void MainWindow::InitializePlugins(void) {
 
   auto ref_explorer = new ReferenceExplorer(d->config_manager, wm);
   ref_explorer->EmplacePlugin<CallHierarchyPlugin>(
+      d->config_manager, ref_explorer);
+  ref_explorer->EmplacePlugin<ClassHierarchyPlugin>(
       d->config_manager, ref_explorer);
   ref_explorer->EmplacePlugin<StructExplorerPlugin>(
       d->config_manager, ref_explorer);
