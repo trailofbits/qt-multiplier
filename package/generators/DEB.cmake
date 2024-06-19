@@ -20,9 +20,9 @@ set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
 set(multiplier_data_file_list
   # LLVM libraries
   "lib/libLTO.${dyn_lib_ext}"
-  "lib/libLTO.${dyn_lib_ext}.17"
+  "lib/libLTO.${dyn_lib_ext}.18.1"
   "lib/libRemarks.${dyn_lib_ext}"
-  "lib/libRemarks.${dyn_lib_ext}.17"
+  "lib/libRemarks.${dyn_lib_ext}.18.1"
 
   # Multiplier files
   "include/multiplier"
@@ -67,6 +67,10 @@ set(multiplier_data_file_list
 
 foreach(multiplier_data_file ${multiplier_data_file_list})
   get_filename_component(destination_path "${multiplier_data_file}" DIRECTORY)
+  if(NOT EXISTS "${MULTIPLIER_DATA_PATH}/${multiplier_data_file}")
+    message(WARNING "${multiplier_data_file} does not exist!")
+    continue()
+  endif()
 
   if(IS_DIRECTORY "${MULTIPLIER_DATA_PATH}/${multiplier_data_file}")
     install(
