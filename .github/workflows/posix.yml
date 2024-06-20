@@ -134,8 +134,8 @@ jobs:
             -DMXQT_MULTIPLIER_VERSION=${{ inputs.multiplier_release }} \
             -Dmultiplier_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier" \
             -Dgap_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/gap" \
-            -DQt6_DIR=${{ github.workspace }}/usr/local/Qt-6.7.0/lib/cmake/Qt6 \
-            -DQt6Gui_DIR=${{ github.workspace }}/usr/local/Qt-6.7.0/lib/cmake/Qt6Gui \
+            -DQt6_DIR=${{ github.workspace }}/qt5-install/usr/local/Qt-6.7.0/lib/cmake/Qt6 \
+            -DQt6Gui_DIR=${{ github.workspace }}/qt5-install/usr/local/Qt-6.7.0/lib/cmake/Qt6Gui \
             -S . \
             -B build_qtmultiplier
 
