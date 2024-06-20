@@ -165,6 +165,7 @@ jobs:
             -B package-build \
             -DQT_MULTIPLIER_DATA_PATH="${QT_MULTIPLIER_INSTALL_DIRECTORY}/usr/local" \
             -DMULTIPLIER_DATA_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DQT_REDIST_PATH=${{ github.workspace }}/qt5-install \
             -DCPACK_GENERATOR=DEB
 
           cmake \
