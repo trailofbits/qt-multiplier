@@ -52,6 +52,7 @@ jobs:
           git submodule update --init --recursive libraries/doctest/src
           git submodule update --init --recursive libraries/phantomstyle/src
           git submodule update --init --recursive libraries/xxhash/src
+          git submodule update --init --recursive libraries/qt-advanced-docking-system/src
           git submodule update --init libraries/vendored/multiplier
 
       - name: Set the CCACHE_DIR environment variable
