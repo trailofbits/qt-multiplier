@@ -52,6 +52,7 @@ jobs:
           git submodule update --init --recursive libraries/doctest/src
           git submodule update --init --recursive libraries/phantomstyle/src
           git submodule update --init --recursive libraries/xxhash/src
+          git submodule update --init --recursive libraries/qt-advanced-docking-system/src
           git submodule update --init libraries/vendored/multiplier
 
       - name: Set the CCACHE_DIR environment variable
@@ -122,6 +123,8 @@ jobs:
 
       - name: Build qt-multiplier
         run: |
+          bash ./scripts/build_qtsdk.sh --redist
+
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -132,6 +135,8 @@ jobs:
             -DMXQT_MULTIPLIER_VERSION=${{ inputs.multiplier_release }} \
             -Dmultiplier_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier" \
             -Dgap_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/gap" \
+            -DQt6_DIR=${{ github.workspace }}/qt5-install/usr/local/Qt-6.7.0/lib/cmake/Qt6 \
+            -DQt6Gui_DIR=${{ github.workspace }}/qt5-install/usr/local/Qt-6.7.0/lib/cmake/Qt6Gui \
             -S . \
             -B build_qtmultiplier
 
@@ -158,8 +163,9 @@ jobs:
           cmake \
             -S package \
             -B package-build \
-            -DQT_MULTIPLIER_DATA_PATH="${QT_MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DQT_MULTIPLIER_DATA_PATH="${QT_MULTIPLIER_INSTALL_DIRECTORY}/usr/local" \
             -DMULTIPLIER_DATA_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
+            -DQT_REDIST_PATH=${{ github.workspace }}/qt5-install \
             -DCPACK_GENERATOR=DEB
 
           cmake \
