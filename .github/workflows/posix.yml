@@ -99,7 +99,7 @@ jobs:
 
       - name: Download multiplier
         env:
-          GITHUB_TOKEN: ${{ secrets.MULTIPLIER_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
@@ -179,7 +179,7 @@ jobs:
           echo "NAME=${package_name}" >> $GITHUB_OUTPUT
 
       - name: Upload the DEB package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.deb_package.outputs.NAME }}
           path: ${{ steps.deb_package.outputs.PATH }}
