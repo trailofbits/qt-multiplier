@@ -99,7 +99,7 @@ jobs:
 
       - name: Download multiplier
         env:
-          GITHUB_TOKEN: ${{ secrets.MULTIPLIER_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
