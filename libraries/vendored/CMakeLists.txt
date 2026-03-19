@@ -14,11 +14,15 @@ if(MXQT_ENABLE_INSTALL AND MXQT_GENERATE_LIBRARY_MANIFEST)
   find_package(Git REQUIRED)
 
   foreach(library ${library_list})
-    execute_process(
-      COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
-      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${library}"
-      OUTPUT_VARIABLE "library_version"
-    )
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${library}/.git")
+      set(library_version "installed-externally\n")
+    else()
+      execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${library}"
+        OUTPUT_VARIABLE "library_version"
+      )
+    endif()
 
     set(library_manifest
       "${library_manifest}${library}: ${library_version}\n"

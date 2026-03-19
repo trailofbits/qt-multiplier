@@ -30,8 +30,6 @@
 #include <multiplier/Frontend/DefineMacroDirective.h>
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Frontend/IncludeLikeMacroDirective.h>
-#include <multiplier/IR/Operation.h>
-
 #include <QColor>
 #include <QModelIndex>
 #include <QString>

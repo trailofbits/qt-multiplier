@@ -60,7 +60,7 @@ class EntityInformationWidget Q_DECL_FINAL : public IWindowWidget {
  private slots:
   void OnAllDataFound(void);
   void OnCancelRunningRequest(void);
-  void OnChangeSync(int state);
+  void OnChangeSync(Qt::CheckState state);
   void OnSearchParametersChange(void);
   void ExpandAllBelow(const QModelIndex &parent);
   void OnItemActivated(const QModelIndex &current_index);

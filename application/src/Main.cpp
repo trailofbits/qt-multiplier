@@ -11,6 +11,7 @@
 
 #include <QApplication>
 #include <QProxyStyle>
+#include <QTimer>
 
 #include <phantom/phantomstyle.h>
 
@@ -36,6 +37,12 @@ int main(int argc, char *argv[]) {
 
   mx::gui::MainWindow main_window(application);
   main_window.show();
+
+  // Defer index initialization until the event loop is running,
+  // so that the file dialog can display properly on macOS.
+  QTimer::singleShot(0, [&]() {
+    main_window.InitializeIndex(application);
+  });
 
   return application.exec();
 }

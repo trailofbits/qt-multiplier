@@ -269,7 +269,7 @@ EntityInformationWidget::EntityInformationWidget(
     connect(d->history, &HistoryWidget::GoToHistoricalItem,
             this, &EntityInformationWidget::HistoricalEntitySelected);
 
-    connect(sync, &QCheckBox::stateChanged,
+    connect(sync, &QCheckBox::checkStateChanged,
             this, &EntityInformationWidget::OnChangeSync);
 
     connect(&media_manager, &MediaManager::IconsChanged,
@@ -595,7 +595,7 @@ void EntityInformationWidget::OnCancelRunningRequest(void) {
   d->version_number->fetch_add(1u);
 }
 
-void EntityInformationWidget::OnChangeSync(int state) {
+void EntityInformationWidget::OnChangeSync(Qt::CheckState state) {
   d->sync = Qt::Checked == state;
 }
 

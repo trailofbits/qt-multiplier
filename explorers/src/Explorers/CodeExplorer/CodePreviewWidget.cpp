@@ -135,7 +135,7 @@ CodePreviewWidget::CodePreviewWidget(
     connect(d->history, &HistoryWidget::GoToHistoricalItem,
             this, &CodePreviewWidget::HistoricalEntitySelected);
 
-    connect(sync, &QCheckBox::stateChanged,
+    connect(sync, &QCheckBox::checkStateChanged,
             this, &CodePreviewWidget::OnChangeSync);
 
     connect(&media_manager, &MediaManager::IconsChanged,
@@ -242,7 +242,7 @@ void CodePreviewWidget::DisplayEntity(
   emit RequestAttention();
 }
 
-void CodePreviewWidget::OnChangeSync(int state) {
+void CodePreviewWidget::OnChangeSync(Qt::CheckState state) {
   d->sync = Qt::Checked == state;
 }
 

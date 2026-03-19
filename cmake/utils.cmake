@@ -30,13 +30,19 @@ function(enable_appbundle_postbuild_steps target_name)
     return()
   endif()
 
+  # Look for macdeployqt in the vendored Qt install, then system paths
   find_program(macdeployqt_path
-    NAME
-      "macdeployqt"
-
+    NAMES "macdeployqt"
     HINTS
+      "${QT6_INSTALL_PREFIX}/bin"
+      "${Qt6_DIR}/../../../bin"
       "/usr/local/bin"
+    NO_DEFAULT_PATH
   )
+
+  if(NOT macdeployqt_path)
+    find_program(macdeployqt_path NAMES "macdeployqt")
+  endif()
 
   if(MACDEPLOYQT_EXECUTABLE)
     set(macdeployqt_path "${MACDEPLOYQT_EXECUTABLE}")
@@ -45,6 +51,8 @@ function(enable_appbundle_postbuild_steps target_name)
   if(NOT macdeployqt_path)
     message(FATAL_ERROR "qt-multiplier: Failed to locate the macdeployqt executable")
   endif()
+
+  message(STATUS "qt-multiplier: Using macdeployqt: ${macdeployqt_path}")
 
   get_target_property(binary_dir "${target_name}" BINARY_DIR)
   if(NOT binary_dir)
@@ -63,10 +71,6 @@ function(enable_appbundle_postbuild_steps target_name)
       "${target_name}"
 
     POST_BUILD
-
-    # Required to get macdeployqt from homebrew to work correctly
-    COMMAND
-      "${CMAKE_COMMAND}" -E create_symlink "/usr/local/opt/qt/lib" "${CMAKE_CURRENT_BINARY_DIR}/lib"
 
     COMMAND
       "${macdeployqt_path}" "${binary_path}" -no-strip -always-overwrite

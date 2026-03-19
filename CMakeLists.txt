@@ -16,6 +16,7 @@ include("cmake/version.cmake")
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
 include("cmake/build_flags.cmake")
+include("cmake/qt_vendor.cmake")
 
 if(MXQT_ENABLE_INSTALL AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -28,6 +29,19 @@ endif()
 if(MXQT_ENABLE_TESTS)
   include("CTest")
   enable_testing()
+endif()
+
+# Set up Qt (system or vendor build)
+mxqt_setup_qt()
+
+# If Qt vendor build is not yet complete, only the qt6_external target
+# is available. The user must build it, re-run cmake, then build again.
+if(NOT MXQT_USE_SYSTEM_QT AND NOT MXQT_QT_AVAILABLE)
+  message(STATUS "")
+  message(STATUS "Qt is not yet available. Only the qt6_external target is defined.")
+  message(STATUS "Run: cmake --build ${CMAKE_BINARY_DIR} --target qt6_external")
+  message(STATUS "Then re-run cmake to configure the full project.")
+  return()
 endif()
 
 add_subdirectory("libraries")

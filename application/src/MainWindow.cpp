@@ -31,6 +31,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QTimer>
 
 #include <vector>
 
@@ -78,9 +79,9 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 
   InitializeMenus();
   InitializeThemes();
-  InitializeIndex(application);
+  // InitializeIndex is called after the event loop starts (from main)
+  // so that file dialogs work properly on macOS.
   InitializeDocks();
-  InitializePlugins();
 
   setWindowIcon(
       d->config_manager.MediaManager().Icon("com.trailofbits.icon.Logo"));
@@ -193,14 +194,31 @@ void MainWindow::InitializeIndex(QApplication &application) {
   // Set the database.
   QString db_path;
   if (!parser.isSet(db_option)) {
-    db_path = QFileDialog::getOpenFileName(
-        nullptr, QObject::tr("Select a Multiplier database"), QDir::homePath());
+    QFileDialog dialog(this, tr("Select a Multiplier database"),
+                       QDir::homePath());
+    dialog.setNameFilter(tr("Multiplier databases (*.db);;All files (*)"));
+    dialog.setFileMode(QFileDialog::ExistingFile);
+    dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog.setWindowModality(Qt::ApplicationModal);
+
+    if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+      db_path = dialog.selectedFiles().first();
+    }
+
+    if (db_path.isEmpty()) {
+      QMessageBox::warning(this, tr("No database selected"),
+                           tr("No database was selected. Exiting."));
+      QTimer::singleShot(0, &application, &QApplication::quit);
+      return;
+    }
   } else {
     db_path = parser.value(db_option);
   }
 
   d->config_manager.SetIndex(Index::in_memory_cache(
       Index::from_database(db_path.toStdString())));
+
+  InitializePlugins();
 
   // Set the theme.
   QString theme_name;

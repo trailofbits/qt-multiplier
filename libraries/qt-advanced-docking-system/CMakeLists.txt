@@ -164,9 +164,15 @@ if(MXQT_ENABLE_INSTALL)
     set(install_destination ".")
   endif()
 
-  set_target_properties("mx_qt-ads" PROPERTIES
-    INSTALL_RPATH "$ORIGIN/../lib"
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_target_properties("mx_qt-ads" PROPERTIES
+      INSTALL_RPATH "$ORIGIN/../lib"
+    )
+  else()
+    set_target_properties("mx_qt-ads" PROPERTIES
+      INSTALL_RPATH "@loader_path"
+    )
+  endif()
 
   install(
     TARGETS "mx_qt-ads"

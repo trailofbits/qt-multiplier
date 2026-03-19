@@ -111,9 +111,19 @@ if(MXQT_ENABLE_INSTALL)
     set(install_destination ".")
   endif()
 
-  set_target_properties("Multiplier" PROPERTIES
-    INSTALL_RPATH "$ORIGIN/../lib"
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_target_properties("Multiplier" PROPERTIES
+      INSTALL_RPATH "$ORIGIN/../lib"
+    )
+  else()
+    # macOS: executable is at Multiplier.app/Contents/MacOS/Multiplier
+    # - mx_*.dylib are at the install prefix root (../../.. from executable)
+    # - libmultiplier.dylib is in <prefix>/lib/ (../../../lib from executable)
+    # - Qt frameworks are in the vendored Qt install
+    set_target_properties("Multiplier" PROPERTIES
+      INSTALL_RPATH "@executable_path/../../../;@executable_path/../../../lib"
+    )
+  endif()
 
   install(
     TARGETS "Multiplier"

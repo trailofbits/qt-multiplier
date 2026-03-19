@@ -22,7 +22,6 @@
 #include <multiplier/Frontend.h>
 #include <multiplier/Index.h>
 #include <multiplier/Iterator.h>
-#include <multiplier/IR/Block.h>
 
 namespace mx::gui {
 
@@ -922,19 +921,6 @@ TokenRange InjectWhitespace(const TokenRange &toks) {
   return TokenRange::create(std::move(tokens));
 }
 
-static VariantEntity NamedDeclContainingOperation(const ir::Operation &op) {
-  if (auto decl = Decl::from(op)) {
-    return NamedDeclContaining(decl.value());
-  } else if (auto stmt = Stmt::from(op)) {
-    return NamedDeclContaining(stmt.value());
-  } else if (auto block = ir::Block::containing(op)) {
-    return NamedDeclContainingOperation(
-        ir::Operation::containing(block.value()));
-  } else {
-    return NotAnEntity{};
-  }
-}
-
 //! Return the named declaration containing `thing`, or `NotAnEntity`.
 VariantEntity NamedDeclContaining(const VariantEntity &ent) {
   const auto VariantEntityVisitor = Overload{
@@ -953,9 +939,6 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
           }
         }
         return NotAnEntity{};
-      },
-      [](const ir::Operation &op) {
-        return NamedDeclContainingOperation(op);
       },
       [](const auto &entity) -> VariantEntity {
         auto tokens = entity.tokens();

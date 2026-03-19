@@ -115,7 +115,7 @@ void FilterSettingsWidget::InitializeWidgets(void) {
     auto checkbox = new QCheckBox(column_name);
     checkbox->setChecked(true);
 
-    connect(checkbox, &QCheckBox::stateChanged, this,
+    connect(checkbox, &QCheckBox::checkStateChanged, this,
             &FilterSettingsWidget::OnCheckboxStateChange);
 
     d->checkbox_list.push_back(checkbox);
@@ -126,7 +126,7 @@ void FilterSettingsWidget::InitializeWidgets(void) {
   EmitColumnFilterStateListChanged();
 }
 
-void FilterSettingsWidget::OnCheckboxStateChange(int) {
+void FilterSettingsWidget::OnCheckboxStateChange(Qt::CheckState) {
   EmitColumnFilterStateListChanged();
 }
 
