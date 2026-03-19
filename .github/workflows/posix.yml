@@ -23,10 +23,6 @@ on:
         required: true
         type: string
 
-      python_version:
-        required: true
-        type: string
-
       llvm_version:
         required: true
         type: string
@@ -40,70 +36,64 @@ jobs:
 
     steps:
       - name: Clone the source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: false
 
-      - name: Initialize the submodules
+      - name: Initialize submodules
         run: |
-          eval $(ssh-agent -s)
-          ssh-add - <<< '${{ secrets.MX_MULTIPLIER_DEPLOY_KEY }}'
-
           git submodule update --init --recursive libraries/doctest/src
           git submodule update --init --recursive libraries/phantomstyle/src
           git submodule update --init --recursive libraries/xxhash/src
           git submodule update --init --recursive libraries/qt-advanced-docking-system/src
-          git submodule update --init libraries/vendored/multiplier
 
-      - name: Set the CCACHE_DIR environment variable
+      - name: Set up ccache
         run: |
           echo "CCACHE_DIR=${{ github.workspace }}/ccache" >> $GITHUB_ENV
 
-      - name: Update the ccache cache
-        uses: actions/cache@v3
+      - name: Restore ccache
+        uses: actions/cache@v4
         with:
-          path: ${{ env.CCACHE_DIR }}
+          path: ${{ github.workspace }}/ccache
           key: ccache_${{ env.CACHE_KEY }}-${{ github.sha }}
           restore-keys: ccache_${{ env.CACHE_KEY }}
 
-      - name: Create the ccache folder
-        run: |
-          mkdir -p \
-            "${CCACHE_DIR}"
-
-      - name: Install Python
-        uses: trail-of-forks/setup-python@main
-        with:
-          python-version: "${{ inputs.python_version }}-dev"
-
       - name: Install Clang and LLVM
-        uses: trail-of-forks/install-llvm-action@master
-        with:
-          version: "${{ inputs.llvm_version }}.0"
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-${{ inputs.llvm_version }} main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            clang-${{ inputs.llvm_version }} \
+            lld-${{ inputs.llvm_version }}
+
+          echo "CC=clang-${{ inputs.llvm_version }}" >> $GITHUB_ENV
+          echo "CXX=clang++-${{ inputs.llvm_version }}" >> $GITHUB_ENV
 
       - name: Install system dependencies
         run: |
-          sudo apt update
-
-          sudo apt install -y \
+          sudo apt-get install -y \
             ccache \
             cmake \
-            flex \
-            bison \
+            ninja-build \
             qt6-base-dev \
             libqt6core5compat6-dev \
             libgl1-mesa-dev \
-            libglvnd-dev \
-            cbindgen \
-            gh
+            libglvnd-dev
 
-      - name: Download multiplier
+      - name: Download multiplier release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           folder_name="multiplier-${{ inputs.multiplier_release }}"
           archive_name="${folder_name}.tar.xz"
-          gh release download ${{ inputs.multiplier_release }} --repo trailofbits/multiplier
+
+          gh release download "${{ inputs.multiplier_release }}" \
+            --repo trailofbits/multiplier
 
           mkdir "${folder_name}"
           tar -xf "${archive_name}" --directory "${folder_name}"
@@ -111,75 +101,33 @@ jobs:
 
           echo "MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/${folder_name}" >> $GITHUB_ENV
 
-      - name: Setup the build folders for the vendored libraries
+      - name: Configure qt-multiplier
         run: |
-          mkdir qt_multiplier_install
-          echo "QT_MULTIPLIER_INSTALL_DIRECTORY=$(pwd)/qt_multiplier_install" >> $GITHUB_ENV
-
-      - name: Determine job count
-        id: job_count
-        run: |
-          echo "VALUE=$(nproc)" >> $GITHUB_OUTPUT
-
-      - name: Build qt-multiplier
-        run: |
-          bash ./scripts/build_qtsdk.sh --redist
-
           cmake \
+            -G Ninja \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
-            -DCMAKE_C_COMPILER="${{ env.LLVM_PATH }}/bin/clang" \
-            -DCMAKE_CXX_COMPILER="${{ env.LLVM_PATH }}/bin/clang++" \
+            -DCMAKE_C_COMPILER="${CC}" \
+            -DCMAKE_CXX_COMPILER="${CXX}" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/qt-multiplier-install" \
             -DMXQT_ENABLE_TESTS=true \
             -DMXQT_MULTIPLIER_VERSION=${{ inputs.multiplier_release }} \
             -Dmultiplier_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier" \
             -Dgap_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/gap" \
-            -DQt6_DIR=${{ github.workspace }}/qt5-install/usr/local/Qt-6.7.0/lib/cmake/Qt6 \
-            -DQt6Gui_DIR=${{ github.workspace }}/qt5-install/usr/local/Qt-6.7.0/lib/cmake/Qt6Gui \
             -S . \
-            -B build_qtmultiplier
+            -B build
 
-          cmake \
-            --build build_qtmultiplier \
-            -j ${{ steps.job_count.outputs.VALUE }}
-
-          export DESTDIR="${QT_MULTIPLIER_INSTALL_DIRECTORY}"
-
-          cmake \
-            --build build_qtmultiplier \
-            --target install
-
-      - name: Run the qt-multiplier tests
-        if: false
+      - name: Build qt-multiplier
         run: |
-          cmake \
-            --build build_qtmultiplier \
-            --target test
+          cmake --build build -j $(nproc)
 
-      - name: Create the DEB package
-        id: deb_package
+      - name: Install qt-multiplier
         run: |
-          cmake \
-            -S package \
-            -B package-build \
-            -DQT_MULTIPLIER_DATA_PATH="${QT_MULTIPLIER_INSTALL_DIRECTORY}/usr/local" \
-            -DMULTIPLIER_DATA_PATH="${MULTIPLIER_INSTALL_DIRECTORY}" \
-            -DQT_REDIST_PATH=${{ github.workspace }}/qt5-install \
-            -DCPACK_GENERATOR=DEB
+          cmake --install build
 
-          cmake \
-            --build package-build \
-            --target package
-
-          rel_package_path="$(ls package-build/*.deb)"
-          package_name="$(basename ${rel_package_path})"
-
-          echo "PATH=${rel_package_path}" >> $GITHUB_OUTPUT
-          echo "NAME=${package_name}" >> $GITHUB_OUTPUT
-
-      - name: Upload the DEB package
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.deb_package.outputs.NAME }}
-          path: ${{ steps.deb_package.outputs.PATH }}
+          name: qt-multiplier-${{ inputs.platform }}-${{ inputs.build_type }}
+          path: ${{ github.workspace }}/qt-multiplier-install
