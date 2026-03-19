@@ -12,21 +12,22 @@
 
 namespace mx::gui {
 
-//! A theme proxy that overrides the font size. Install this via
-//! ThemeManager::AddProxy() and then call SetPointSize() to change
-//! the code font size at runtime.
+//! A theme proxy that adjusts the code font size by a delta relative to
+//! the underlying theme's font size. Install via ThemeManager::AddProxy().
 class FontSizeProxy final : public IThemeProxy {
   Q_OBJECT
 
-  int point_size;
+  int delta{0};
 
  public:
-  explicit FontSizeProxy(int initial_size = 14);
+  FontSizeProxy(void) = default;
 
   QFont Font(const ITheme &theme, QFont theme_font) const override;
 
-  int PointSize(void) const;
-  void SetPointSize(int size);
+  int Delta(void) const;
+  void Increment(void);
+  void Decrement(void);
+  void Reset(void);
 };
 
 }  // namespace mx::gui

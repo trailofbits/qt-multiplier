@@ -138,7 +138,7 @@ void MainWindow::InitializeMenus(void) {
   d->view_menu->addAction(increase_font);
   connect(increase_font, &QAction::triggered, this, [this]() {
     if (d->font_size_proxy) {
-      d->font_size_proxy->SetPointSize(d->font_size_proxy->PointSize() + 1);
+      d->font_size_proxy->Increment();
     }
   });
 
@@ -147,7 +147,7 @@ void MainWindow::InitializeMenus(void) {
   d->view_menu->addAction(decrease_font);
   connect(decrease_font, &QAction::triggered, this, [this]() {
     if (d->font_size_proxy) {
-      d->font_size_proxy->SetPointSize(d->font_size_proxy->PointSize() - 1);
+      d->font_size_proxy->Decrement();
     }
   });
 
@@ -156,7 +156,7 @@ void MainWindow::InitializeMenus(void) {
   d->view_menu->addAction(reset_font);
   connect(reset_font, &QAction::triggered, this, [this]() {
     if (d->font_size_proxy) {
-      d->font_size_proxy->SetPointSize(11);
+      d->font_size_proxy->Reset();
     }
   });
 
@@ -187,7 +187,7 @@ void MainWindow::InitializeThemes(void) {
 
   // Install a font size proxy so the user can adjust code font size
   // via View > Increase/Decrease Font Size (Ctrl+/Ctrl-).
-  auto font_proxy = std::make_unique<FontSizeProxy>(11);
+  auto font_proxy = std::make_unique<FontSizeProxy>();
   d->font_size_proxy = font_proxy.get();
   theme_manager.AddProxy(std::move(font_proxy));
 

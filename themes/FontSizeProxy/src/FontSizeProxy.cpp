@@ -12,22 +12,29 @@
 
 namespace mx::gui {
 
-FontSizeProxy::FontSizeProxy(int initial_size)
-    : point_size(initial_size) {}
-
 QFont FontSizeProxy::Font(const ITheme &, QFont theme_font) const {
-  theme_font.setPointSize(point_size);
+  int size = std::clamp(theme_font.pointSize() + delta, 6, 48);
+  theme_font.setPointSize(size);
   return theme_font;
 }
 
-int FontSizeProxy::PointSize(void) const {
-  return point_size;
+int FontSizeProxy::Delta(void) const {
+  return delta;
 }
 
-void FontSizeProxy::SetPointSize(int size) {
-  size = std::clamp(size, 6, 48);
-  if (size != point_size) {
-    point_size = size;
+void FontSizeProxy::Increment(void) {
+  ++delta;
+  EmitThemeProxyChanged();
+}
+
+void FontSizeProxy::Decrement(void) {
+  --delta;
+  EmitThemeProxyChanged();
+}
+
+void FontSizeProxy::Reset(void) {
+  if (delta != 0) {
+    delta = 0;
     EmitThemeProxyChanged();
   }
 }
