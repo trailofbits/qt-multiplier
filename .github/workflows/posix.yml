@@ -177,12 +177,8 @@ jobs:
 
           # qt.conf tells Qt where to find plugins relative to the binary.
           # Works for both /usr/local (DEB) and custom extract locations (tar.xz).
-          cat > "${INSTALL_DIR}/bin/qt.conf" <<'QTCONF'
-[Paths]
-Prefix = ..
-Plugins = plugins
-Libraries = lib
-QTCONF
+          printf '[Paths]\nPrefix = ..\nPlugins = plugins\nLibraries = lib\n' \
+            > "${INSTALL_DIR}/bin/qt.conf"
 
       - name: Build DEB package
         id: deb_package
@@ -230,28 +226,33 @@ QTCONF
         run: |
           release_tag="$(git rev-parse --short=7 HEAD)"
 
+          deb_name="${{ steps.deb_package.outputs.NAME }}"
+          tar_name="${{ steps.archive.outputs.NAME }}"
+          mx_rel="${{ inputs.multiplier_release }}"
+          mx_url="https://github.com/trailofbits/multiplier/releases/tag/${mx_rel}"
+
+          notes="Built against [multiplier ${mx_rel}](${mx_url})"
+          notes="${notes}
+
+          ## Install
+
+          **Ubuntu 24.04 (DEB):**
+          \`\`\`bash
+          sudo apt install ./${deb_name}
+          sudo ldconfig
+          \`\`\`
+
+          **Portable (any Linux):**
+          \`\`\`bash
+          tar -xf ${tar_name}
+          export PATH=\"\$(pwd)/multiplier/bin:\$PATH\"
+          export LD_LIBRARY_PATH=\"\$(pwd)/multiplier/lib:\$LD_LIBRARY_PATH\"
+          \`\`\`"
+
           gh release create "${release_tag}" \
             "${{ steps.deb_package.outputs.PATH }}" \
             "${{ steps.archive.outputs.PATH }}" \
             --repo "${{ github.repository }}" \
             --title "qt-multiplier ${release_tag}" \
-            --notes "$(cat <<NOTES
-Built against [multiplier ${{ inputs.multiplier_release }}](https://github.com/trailofbits/multiplier/releases/tag/${{ inputs.multiplier_release }})
-
-## Install
-
-**Ubuntu 24.04 (DEB):**
-\`\`\`bash
-sudo apt install ./${{ steps.deb_package.outputs.NAME }}
-sudo ldconfig
-\`\`\`
-
-**Portable (any Linux):**
-\`\`\`bash
-tar -xf ${{ steps.archive.outputs.NAME }}
-export PATH="\\\$(pwd)/multiplier/bin:\\\$PATH"
-export LD_LIBRARY_PATH="\\\$(pwd)/multiplier/lib:\\\$LD_LIBRARY_PATH"
-\`\`\`
-NOTES
-)" \
+            --notes "${notes}" \
             --latest
