@@ -7,10 +7,10 @@
 */
 
 #include <multiplier/GUI/Widgets/FilterSettingsWidget.h>
+#include <multiplier/GUI/QtCompat.h>
 
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QCheckBox>
 
 #include <algorithm>
 
@@ -115,8 +115,8 @@ void FilterSettingsWidget::InitializeWidgets(void) {
     auto checkbox = new QCheckBox(column_name);
     checkbox->setChecked(true);
 
-    connect(checkbox, &QCheckBox::checkStateChanged, this,
-            &FilterSettingsWidget::OnCheckboxStateChange);
+    connect(checkbox, &QCheckBox::MXQT_CHECK_STATE_CHANGED, this,
+            &FilterSettingsWidget::EmitColumnFilterStateListChanged);
 
     d->checkbox_list.push_back(checkbox);
     d->layout->addWidget(checkbox);
@@ -126,9 +126,6 @@ void FilterSettingsWidget::InitializeWidgets(void) {
   EmitColumnFilterStateListChanged();
 }
 
-void FilterSettingsWidget::OnCheckboxStateChange(Qt::CheckState) {
-  EmitColumnFilterStateListChanged();
-}
 
 void FilterSettingsWidget::Activate(void) {
   ResetCheckboxes();

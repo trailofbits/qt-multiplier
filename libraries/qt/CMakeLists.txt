@@ -34,6 +34,10 @@ endif()
 
 add_library("mx_qt_library" INTERFACE)
 
+target_include_directories("mx_qt_library" SYSTEM INTERFACE
+  "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
 foreach(qt_component ${qt_component_list})
   target_link_libraries("mx_qt_library" INTERFACE
     "Qt6::${qt_component}"

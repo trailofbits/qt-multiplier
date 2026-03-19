@@ -8,6 +8,7 @@
 
 #include "SearchFilterModelProxy.h"
 
+#include <QtGlobal>
 #include <algorithm>
 #include <vector>
 
@@ -31,8 +32,12 @@ void SearchFilterModelProxy::OnColumnFilterStateListChange(
   // dealing with a QAbstractItemModel that models a tree, so just
   // take and save whatever we were given
   d->column_filter_state_list = column_filter_state_list;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
   beginFilterChange();
   endFilterChange();
+#else
+  invalidateFilter();
+#endif
 }
 
 void SearchFilterModelProxy::setSourceModel(QAbstractItemModel *source_model) {

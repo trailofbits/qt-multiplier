@@ -66,8 +66,6 @@ class FilterSettingsWidget final : public QWidget {
   //! Use to (re)generate the filter checkboxes in the layout
   void OnModelReset(void);
 
-  //! Emitted when any of the settings have changed.
-  void OnCheckboxStateChange(Qt::CheckState);
 };
 
 }  // namespace mx::gui

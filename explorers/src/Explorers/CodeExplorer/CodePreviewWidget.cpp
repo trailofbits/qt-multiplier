@@ -8,7 +8,7 @@
 
 #include "CodePreviewWidget.h"
 
-#include <QCheckBox>
+#include <multiplier/GUI/QtCompat.h>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
@@ -135,8 +135,10 @@ CodePreviewWidget::CodePreviewWidget(
     connect(d->history, &HistoryWidget::GoToHistoricalItem,
             this, &CodePreviewWidget::HistoricalEntitySelected);
 
-    connect(sync, &QCheckBox::checkStateChanged,
-            this, &CodePreviewWidget::OnChangeSync);
+    connect(sync, &QCheckBox::MXQT_CHECK_STATE_CHANGED,
+            this, [this](MxQtCheckState state) {
+              d->sync = Qt::Checked == static_cast<int>(state);
+            });
 
     connect(&media_manager, &MediaManager::IconsChanged,
             this, &CodePreviewWidget::OnIconsChanged);
@@ -240,10 +242,6 @@ void CodePreviewWidget::DisplayEntity(
   // Signal the window manager that the contents of this widget have been
   // changed
   emit RequestAttention();
-}
-
-void CodePreviewWidget::OnChangeSync(Qt::CheckState state) {
-  d->sync = Qt::Checked == state;
 }
 
 // Invoked when the set of macros to be expanded changes.

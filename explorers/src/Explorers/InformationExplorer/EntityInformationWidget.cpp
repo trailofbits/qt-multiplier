@@ -8,7 +8,7 @@
 
 #include "EntityInformationWidget.h"
 
-#include <QCheckBox>
+#include <multiplier/GUI/QtCompat.h>
 #include <QElapsedTimer>
 #include <QHeaderView>
 #include <QLabel>
@@ -269,8 +269,10 @@ EntityInformationWidget::EntityInformationWidget(
     connect(d->history, &HistoryWidget::GoToHistoricalItem,
             this, &EntityInformationWidget::HistoricalEntitySelected);
 
-    connect(sync, &QCheckBox::checkStateChanged,
-            this, &EntityInformationWidget::OnChangeSync);
+    connect(sync, &QCheckBox::MXQT_CHECK_STATE_CHANGED,
+            this, [this](MxQtCheckState state) {
+              d->sync = Qt::Checked == static_cast<int>(state);
+            });
 
     connect(&media_manager, &MediaManager::IconsChanged,
             this, &EntityInformationWidget::OnIconsChanged);
@@ -593,10 +595,6 @@ void EntityInformationWidget::OnAllDataFound(void) {
 void EntityInformationWidget::OnCancelRunningRequest(void) {
   d->status->setVisible(false);
   d->version_number->fetch_add(1u);
-}
-
-void EntityInformationWidget::OnChangeSync(Qt::CheckState state) {
-  d->sync = Qt::Checked == state;
 }
 
 void EntityInformationWidget::OnItemActivated(

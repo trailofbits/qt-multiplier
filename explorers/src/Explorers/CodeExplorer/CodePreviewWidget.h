@@ -44,7 +44,6 @@ class CodePreviewWidget Q_DECL_FINAL : public IWindowWidget {
                      bool is_explicit_request, bool add_to_history);
 
  private slots:
-  void OnChangeSync(Qt::CheckState state);
   void OnIconsChanged(const MediaManager &media_manager);
   void OnPopOutPressed(void);
  
