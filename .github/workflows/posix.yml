@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Clone the source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: false
@@ -54,7 +54,7 @@ jobs:
           echo "CCACHE_DIR=${{ github.workspace }}/ccache" >> $GITHUB_ENV
 
       - name: Restore ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ccache_${{ env.CACHE_KEY }}-${{ github.sha }}
