@@ -12,11 +12,15 @@ set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
 
-# Minimal runtime dependencies — Qt and multiplier libs are bundled.
-# We only need the low-level system libraries that can't be bundled.
-set(CPACK_DEBIAN_PACKAGE_DEPENDS
-    "libc6 (>= 2.35), libglx0, libxcb1, libxcb-xinput0, libx11-xcb1, libxkbcommon0, libxkbcommon-x11-0"
-)
+# Auto-detect runtime dependencies by scanning ELF headers of all
+# bundled binaries and shared libraries. dpkg-shlibdeps maps each
+# needed .so to the correct Debian package automatically.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+
+# The bundled libraries (Qt, ICU, multiplier) live in /usr/local/lib
+# inside the package. Tell dpkg-shlibdeps to look there so it doesn't
+# flag them as unresolved, while still detecting true system deps.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS "${BUNDLE_DIR}/lib")
 
 # =============================================================================
 # Install the entire bundle into /usr/local

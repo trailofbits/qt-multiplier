@@ -86,7 +86,8 @@ jobs:
             libqt6core5compat6-dev \
             libgl1-mesa-dev \
             libglvnd-dev \
-            libxkbcommon-dev
+            libxkbcommon-dev \
+            dpkg-dev
 
       - name: Download multiplier release
         env:
