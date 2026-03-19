@@ -175,11 +175,13 @@ jobs:
             fi
           done
 
-          # qt.conf tells the binary where to find plugins
+          # qt.conf tells Qt where to find plugins relative to the binary.
+          # Works for both /usr/local (DEB) and custom extract locations (tar.xz).
           cat > "${INSTALL_DIR}/bin/qt.conf" <<'QTCONF'
 [Paths]
-Plugins = ../plugins
-Libraries = ../lib
+Prefix = ..
+Plugins = plugins
+Libraries = lib
 QTCONF
 
       - name: Build DEB package
@@ -199,11 +201,27 @@ QTCONF
           echo "PATH=${deb_path}" >> $GITHUB_OUTPUT
           echo "NAME=${deb_name}" >> $GITHUB_OUTPUT
 
+      - name: Create portable archive
+        id: archive
+        run: |
+          archive_name="qt-multiplier-${{ inputs.multiplier_release }}-${{ inputs.platform }}.tar.xz"
+          tar -cJf "${archive_name}" \
+            --transform 's/^qt-multiplier-install/multiplier/' \
+            -C "${{ github.workspace }}" qt-multiplier-install
+          echo "PATH=${archive_name}" >> $GITHUB_OUTPUT
+          echo "NAME=${archive_name}" >> $GITHUB_OUTPUT
+
       - name: Upload DEB package
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.deb_package.outputs.NAME }}
           path: ${{ steps.deb_package.outputs.PATH }}
+
+      - name: Upload portable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.NAME }}
+          path: ${{ steps.archive.outputs.PATH }}
 
       - name: Create GitHub release
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -214,7 +232,26 @@ QTCONF
 
           gh release create "${release_tag}" \
             "${{ steps.deb_package.outputs.PATH }}" \
+            "${{ steps.archive.outputs.PATH }}" \
             --repo "${{ github.repository }}" \
             --title "qt-multiplier ${release_tag}" \
-            --notes "Built against [multiplier ${{ inputs.multiplier_release }}](https://github.com/trailofbits/multiplier/releases/tag/${{ inputs.multiplier_release }})" \
+            --notes "$(cat <<NOTES
+Built against [multiplier ${{ inputs.multiplier_release }}](https://github.com/trailofbits/multiplier/releases/tag/${{ inputs.multiplier_release }})
+
+## Install
+
+**Ubuntu 24.04 (DEB):**
+\`\`\`bash
+sudo apt install ./${{ steps.deb_package.outputs.NAME }}
+sudo ldconfig
+\`\`\`
+
+**Portable (any Linux):**
+\`\`\`bash
+tar -xf ${{ steps.archive.outputs.NAME }}
+export PATH="\\\$(pwd)/multiplier/bin:\\\$PATH"
+export LD_LIBRARY_PATH="\\\$(pwd)/multiplier/lib:\\\$LD_LIBRARY_PATH"
+\`\`\`
+NOTES
+)" \
             --latest

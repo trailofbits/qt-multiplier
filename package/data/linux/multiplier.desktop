@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Multiplier
 Comment=Code browser and analysis tool
-Exec=/opt/multiplier/bin/multiplier
+Exec=multiplier
 Icon=multiplier
 Terminal=false
 Type=Application

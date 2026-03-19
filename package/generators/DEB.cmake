@@ -19,13 +19,13 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS
 )
 
 # =============================================================================
-# Install the entire bundle into /opt/multiplier
+# Install the entire bundle into /usr/local
 # =============================================================================
 
-# Binaries
+# Binaries — goes to /usr/local/bin (already on PATH)
 install(
   DIRECTORY "${BUNDLE_DIR}/bin/"
-  DESTINATION "/opt/multiplier/bin"
+  DESTINATION "/usr/local/bin"
   USE_SOURCE_PERMISSIONS
   PATTERN "qt.conf" EXCLUDE
 )
@@ -33,30 +33,38 @@ install(
 # qt.conf must be next to the executable
 install(
   FILES "${BUNDLE_DIR}/bin/qt.conf"
-  DESTINATION "/opt/multiplier/bin"
+  DESTINATION "/usr/local/bin"
 )
 
-# Shared libraries (Qt, multiplier, ICU, etc.)
+# Shared libraries — goes to /usr/local/lib (standard linker search path)
 install(
   DIRECTORY "${BUNDLE_DIR}/lib/"
-  DESTINATION "/opt/multiplier/lib"
+  DESTINATION "/usr/local/lib"
   USE_SOURCE_PERMISSIONS
 )
 
-# Qt plugins (platforms, imageformats, etc.)
+# Qt plugins
 if(EXISTS "${BUNDLE_DIR}/plugins")
   install(
     DIRECTORY "${BUNDLE_DIR}/plugins/"
-    DESTINATION "/opt/multiplier/plugins"
+    DESTINATION "/usr/local/plugins"
     USE_SOURCE_PERMISSIONS
   )
 endif()
 
-# Icons and other shared resources
+# Headers (for development against multiplier)
+if(EXISTS "${BUNDLE_DIR}/include")
+  install(
+    DIRECTORY "${BUNDLE_DIR}/include/"
+    DESTINATION "/usr/local/include"
+  )
+endif()
+
+# Shared resources (icons, license, etc.)
 if(EXISTS "${BUNDLE_DIR}/share")
   install(
     DIRECTORY "${BUNDLE_DIR}/share/"
-    DESTINATION "/opt/multiplier/share"
+    DESTINATION "/usr/local/share"
   )
 endif()
 
@@ -64,17 +72,11 @@ endif()
 # System integration
 # =============================================================================
 
-# Symlink in /usr/local/bin so `multiplier` is on PATH
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E create_symlink
-    "/opt/multiplier/bin/multiplier"
-    "${CMAKE_CURRENT_BINARY_DIR}/multiplier"
-)
-
-install(
-  FILES "${CMAKE_CURRENT_BINARY_DIR}/multiplier"
-  DESTINATION "/usr/local/bin"
-)
+# ldconfig: ensure /usr/local/lib is picked up by the dynamic linker
+install(CODE "
+  file(WRITE \"\$ENV{DESTDIR}/etc/ld.so.conf.d/multiplier.conf\"
+       \"/usr/local/lib\\n\")
+")
 
 # .desktop file for application menus
 install(
@@ -82,19 +84,11 @@ install(
   DESTINATION "/usr/share/applications"
 )
 
-# Application icon in the XDG icon hierarchy so desktop environments find it
+# Application icon in the XDG icon hierarchy
 if(EXISTS "${BUNDLE_DIR}/share/icons/logo.png")
-  # Install at multiple sizes for best compatibility.
-  # The PNG is high-res so the 256x256 hicolor slot works well.
   install(
     FILES "${BUNDLE_DIR}/share/icons/logo.png"
     DESTINATION "/usr/share/icons/hicolor/256x256/apps"
     RENAME "multiplier.png"
-  )
-
-  # Also keep a copy in the bundle for the .desktop Icon= path
-  install(
-    FILES "${BUNDLE_DIR}/share/icons/logo.png"
-    DESTINATION "/opt/multiplier/share/icons"
   )
 endif()
