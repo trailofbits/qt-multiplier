@@ -126,8 +126,73 @@ jobs:
         run: |
           cmake --install build
 
-      - name: Upload build artifacts
+      - name: Bundle multiplier libraries
+        run: |
+          install_dir="${{ github.workspace }}/qt-multiplier-install"
+
+          # Copy multiplier shared libraries and binaries
+          cp -a "${MULTIPLIER_INSTALL_DIRECTORY}"/lib/libmultiplier.so* "${install_dir}/lib/"
+
+          # Copy multiplier tools
+          cp "${MULTIPLIER_INSTALL_DIRECTORY}"/bin/mx-* "${install_dir}/bin/"
+
+          # Copy LLVM runtime libraries shipped with multiplier
+          for lib in libLTO libRemarks; do
+            cp -a "${MULTIPLIER_INSTALL_DIRECTORY}"/lib/${lib}.so* "${install_dir}/lib/" 2>/dev/null || true
+          done
+
+      - name: Bundle Qt libraries
+        run: |
+          install_dir="${{ github.workspace }}/qt-multiplier-install"
+          qt_lib_dir="/usr/lib/x86_64-linux-gnu"
+
+          # Core Qt libraries needed at runtime
+          qt_libs=(
+            libQt6Core
+            libQt6Gui
+            libQt6Widgets
+            libQt6Concurrent
+            libQt6Core5Compat
+            libQt6DBus
+            libQt6OpenGL
+            libQt6OpenGLWidgets
+            libQt6Network
+            libQt6XcbQpa
+            libQt6Test
+          )
+
+          for lib in "${qt_libs[@]}"; do
+            # Copy the .so symlink and all versioned variants
+            cp -a "${qt_lib_dir}/${lib}".so* "${install_dir}/lib/" 2>/dev/null || true
+          done
+
+          # Copy the ICU libraries that Qt depends on
+          cp -a "${qt_lib_dir}"/libicu*.so* "${install_dir}/lib/" 2>/dev/null || true
+
+          # Copy Qt plugins (platform, imageformats, etc.)
+          qt_plugin_dir="/usr/lib/x86_64-linux-gnu/qt6/plugins"
+          mkdir -p "${install_dir}/plugins"
+          for plugin_type in platforms imageformats platforminputcontexts xcbglintegrations; do
+            if [ -d "${qt_plugin_dir}/${plugin_type}" ]; then
+              cp -a "${qt_plugin_dir}/${plugin_type}" "${install_dir}/plugins/"
+            fi
+          done
+
+          # Create qt.conf so the binary finds plugins relative to itself
+          cat > "${install_dir}/bin/qt.conf" <<'QTCONF'
+[Paths]
+Plugins = ../plugins
+QTCONF
+
+      - name: Create release archive
+        id: archive
+        run: |
+          archive_name="qt-multiplier-${{ inputs.multiplier_release }}-${{ inputs.platform }}.tar.xz"
+          tar -cJf "${archive_name}" -C "${{ github.workspace }}" qt-multiplier-install
+          echo "NAME=${archive_name}" >> $GITHUB_OUTPUT
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: qt-multiplier-${{ inputs.platform }}-${{ inputs.build_type }}
-          path: ${{ github.workspace }}/qt-multiplier-install
+          name: ${{ steps.archive.outputs.NAME }}
+          path: ${{ steps.archive.outputs.NAME }}
