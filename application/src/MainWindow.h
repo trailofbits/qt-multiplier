@@ -34,8 +34,6 @@ class MainWindow Q_DECL_FINAL : public QMainWindow {
   void InitializeIndex(QApplication &application);
 
  public slots:
-  void OnThemeListChanged(const ThemeManager &theme_manager);
-
   //! Invoked on an index whose underlying model follows the `IModel` interface.
   void OnRequestSecondaryClick(const QModelIndex &index);
 

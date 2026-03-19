@@ -6,7 +6,13 @@
   the LICENSE file found in the root directory of this source tree.
 */
 
+#include "FontSizeProxy.h"
 #include "ProxyTheme.h"
+
+#include <QAction>
+#include <QActionGroup>
+#include <QKeySequence>
+#include <QMenu>
 
 namespace mx::gui {
 
@@ -21,6 +27,9 @@ class ThemeManagerImpl final {
   std::unique_ptr<ProxyTheme> proxy_theme;
 
   ITheme *current_theme{nullptr};
+
+  // Lazily created when the user first changes font size.
+  FontSizeProxy *font_size_proxy{nullptr};
 };
 
 ThemeManager::~ThemeManager(void) {}
@@ -108,7 +117,7 @@ void ThemeManager::SetTheme(IThemePtr theme) {
     if (!dynamic_cast<ProxyTheme *>(d->current_theme)) {
       d->current_theme = raw_theme_ptr;
     }
-    
+
     d->current_theme->Apply(d->application);
     emit ThemeChanged(*this);
     break;
@@ -141,6 +150,70 @@ std::vector<IThemePtr> ThemeManager::ThemeList(void) const {
     themes.emplace_back(IThemePtr(d, owned_theme.get()));
   }
   return themes;
+}
+
+// Lazily create and install the font size proxy.
+static FontSizeProxy *EnsureFontSizeProxy(ThemeManager *self,
+                                          ThemeManagerImpl *d) {
+  if (!d->font_size_proxy) {
+    auto proxy = std::make_unique<FontSizeProxy>();
+    d->font_size_proxy = proxy.get();
+    self->AddProxy(std::move(proxy));
+  }
+  return d->font_size_proxy;
+}
+
+void ThemeManager::PopulateViewMenu(QMenu *menu) {
+  // --- Theme selection submenu ---
+  auto theme_menu = new QMenu(tr("Themes"), menu);
+  menu->addMenu(theme_menu);
+
+  auto populate_theme_menu = [this, theme_menu] (const ThemeManager &) {
+    theme_menu->clear();
+    auto theme_group = new QActionGroup(theme_menu);
+    theme_group->setExclusive(true);
+
+    auto current = Theme();
+    for (auto &theme : ThemeList()) {
+      auto action = new QAction(theme->Name(), theme_group);
+      action->setCheckable(true);
+      action->setChecked(theme.get() == current.get());
+
+      connect(action, &QAction::triggered, this,
+              [this, theme = std::move(theme)] () {
+                SetTheme(theme);
+              });
+
+      theme_menu->addAction(action);
+    }
+  };
+
+  populate_theme_menu(*this);
+  connect(this, &ThemeManager::ThemeListChanged, this, populate_theme_menu);
+
+  // --- Font size controls ---
+  menu->addSeparator();
+
+  auto increase_font = new QAction(tr("Increase Font Size"), menu);
+  increase_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus));
+  menu->addAction(increase_font);
+  connect(increase_font, &QAction::triggered, this, [this]() {
+    EnsureFontSizeProxy(this, d.get())->Increment();
+  });
+
+  auto decrease_font = new QAction(tr("Decrease Font Size"), menu);
+  decrease_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus));
+  menu->addAction(decrease_font);
+  connect(decrease_font, &QAction::triggered, this, [this]() {
+    EnsureFontSizeProxy(this, d.get())->Decrement();
+  });
+
+  auto reset_font = new QAction(tr("Reset Font Size"), menu);
+  reset_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+  menu->addAction(reset_font);
+  connect(reset_font, &QAction::triggered, this, [this]() {
+    EnsureFontSizeProxy(this, d.get())->Reset();
+  });
 }
 
 }  // namespace mx::gui

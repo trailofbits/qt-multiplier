@@ -12,6 +12,9 @@ add_library("mx_theme_manager"
 
   src/ProxyTheme.cpp
   src/ProxyTheme.h
+
+  src/FontSizeProxy.cpp
+  src/FontSizeProxy.h
 )
 
 target_link_libraries("mx_theme_manager"

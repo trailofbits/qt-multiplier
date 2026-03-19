@@ -20,6 +20,9 @@ on:
     branches:
       - 'main'
 
+permissions:
+  contents: write
+
 concurrency:
   group: main-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
@@ -34,9 +37,7 @@ jobs:
     secrets: inherit
 
     with:
-      platform: ubuntu-22.04
+      platform: ubuntu-24.04
       build_type: ${{ matrix.build_type }}
-      # git rev-parse --short=7
-      multiplier_release: 44e350e
-      python_version: 3.11
-      llvm_version: 17
+      multiplier_release: d5fd686
+      llvm_version: 18

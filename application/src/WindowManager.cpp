@@ -353,4 +353,12 @@ QMainWindow *WindowManager::Window(void) const noexcept {
   return d->window;
 }
 
+void WindowManager::RefreshDockStylesheet(void) {
+  if (d->central_widget) {
+    // Re-apply the same stylesheet to force Qt to re-resolve palette()
+    // references against the newly active palette.
+    d->central_widget->setStyleSheet(d->central_widget->styleSheet());
+  }
+}
+
 }  // namespace mx::gui

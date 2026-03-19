@@ -30,8 +30,6 @@
 #include <multiplier/Frontend/DefineMacroDirective.h>
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Frontend/IncludeLikeMacroDirective.h>
-#include <multiplier/IR/Operation.h>
-
 #include <QColor>
 #include <QModelIndex>
 #include <QString>
@@ -48,6 +46,15 @@ class Index;
 class Token;
 class TokenRange;
 namespace gui {
+
+//! How file paths should be displayed in explorer views.
+enum class FilePathDisplayMode {
+  FileNameOnly,  //!< Just "foo.cpp:42:10" (default)
+  AbsolutePath,  //!< Full "/home/user/src/foo.cpp:42:10"
+};
+
+//! Shorten a "path:line:col" location string to just "filename:line:col".
+QString ShortenLocation(const QString &location);
 
 VariantEntity NamedEntityContaining(const VariantEntity &entity);
 

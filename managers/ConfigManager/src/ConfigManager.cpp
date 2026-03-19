@@ -7,6 +7,8 @@
 #include <multiplier/GUI/Managers/ConfigManager.h>
 
 #include <multiplier/Frontend/File.h>
+
+#include <QMenu>
 #include <multiplier/Index.h>
 
 #include <multiplier/GUI/Managers/ActionManager.h>
@@ -95,6 +97,10 @@ void ConfigManager::InstallItemDelegate(
   set_delegate(d->theme_manager);
   connect(&(d->theme_manager), &ThemeManager::ThemeChanged,
           view, std::move(set_delegate));
+}
+
+void ConfigManager::PopulateViewMenu(QMenu *menu) {
+  d->theme_manager.PopulateViewMenu(menu);
 }
 
 }  // namespace mx::gui

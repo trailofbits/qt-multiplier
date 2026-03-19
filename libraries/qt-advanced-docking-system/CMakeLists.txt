@@ -132,29 +132,34 @@ execute_process(
 # with the following path: `qpa/qplatformnativeinterface.h`
 #
 # The path on disk is the following:
-# <qt-install-prefix>/usr/local/Qt-6.5.2/include/QtGui/6.5.2/QtGui/qpa/qplatformnativeinterface.h
+# We need Qt Gui private headers for qpa/qplatformnativeinterface.h.
+# Use the Qt6GuiPrivate target if available (system Qt with private-dev
+# package installed), otherwise fall back to manual path discovery.
 if (UNIX AND NOT APPLE)
-  if(NOT Qt6Gui_DIR)
-    message(FATAL_ERROR "mx_qt-ads: The `Qt6Gui_DIR` variable is not defined")
+  if(TARGET Qt6::GuiPrivate)
+    target_link_libraries("mx_qt-ads" PRIVATE Qt6::GuiPrivate)
+  else()
+    # Manual fallback: find the private headers directory.
+    # System Qt (Ubuntu): /usr/include/<arch>/qt6/QtGui/<version>/QtGui/
+    # Vendored Qt: <prefix>/include/QtGui/<version>/QtGui/
+    set(_qtgui_private_found FALSE)
+
+    get_target_property(_qt6gui_include_dirs Qt6::Gui INTERFACE_INCLUDE_DIRECTORIES)
+    foreach(_inc_dir ${_qt6gui_include_dirs})
+      set(_candidate "${_inc_dir}/${Qt6_VERSION}/QtGui")
+      if(EXISTS "${_candidate}/qpa/qplatformnativeinterface.h")
+        target_include_directories("mx_qt-ads" PRIVATE "${_candidate}")
+        set(_qtgui_private_found TRUE)
+        break()
+      endif()
+    endforeach()
+
+    if(NOT _qtgui_private_found)
+      message(FATAL_ERROR
+          "mx_qt-ads: Failed to locate the private Qt Gui module headers. "
+          "Install qt6-base-private-dev or set Qt6Gui_DIR.")
+    endif()
   endif()
-
-  get_filename_component(qtsdk_base_path "${Qt6Gui_DIR}" DIRECTORY)
-  get_filename_component(qtsdk_base_path "${qtsdk_base_path}" DIRECTORY)
-  get_filename_component(qtsdk_base_path "${qtsdk_base_path}" DIRECTORY)
-
-  get_filename_component(qtsdk_version "${qtsdk_base_path}" NAME)
-  string(REPLACE "-" ";" qtsdk_version "${qtsdk_version}")
-  list(GET qtsdk_version 1 qtsdk_version)
-
-  set(qtgui_private_include_dir "${qtsdk_base_path}/include/QtGui/${qtsdk_version}/QtGui")
-
-  if(NOT EXISTS "${qtgui_private_include_dir}/qpa/qplatformnativeinterface.h")
-    message(FATAL_ERROR "mx_qt-ads: Failed to locate the private Qt Gui module headers")
-  endif()
-
-  target_include_directories("mx_qt-ads" PRIVATE
-    "${qtgui_private_include_dir}"
-  )
 endif()
 
 if(MXQT_ENABLE_INSTALL)
@@ -164,9 +169,15 @@ if(MXQT_ENABLE_INSTALL)
     set(install_destination ".")
   endif()
 
-  set_target_properties("mx_qt-ads" PROPERTIES
-    INSTALL_RPATH "$ORIGIN/../lib"
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_target_properties("mx_qt-ads" PROPERTIES
+      INSTALL_RPATH "$ORIGIN/../lib"
+    )
+  else()
+    set_target_properties("mx_qt-ads" PROPERTIES
+      INSTALL_RPATH "@loader_path"
+    )
+  endif()
 
   install(
     TARGETS "mx_qt-ads"

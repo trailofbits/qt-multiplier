@@ -1,6 +1,9 @@
 [Desktop Entry]
 Name=Multiplier
-Exec=/opt/multiplier/bin/multiplier
-Icon=/opt/multiplier/share/icons/logo.png
+Comment=Code browser and analysis tool
+Exec=multiplier
+Icon=multiplier
 Terminal=false
 Type=Application
+Categories=Development;IDE;
+Keywords=code;analysis;browser;multiplier;

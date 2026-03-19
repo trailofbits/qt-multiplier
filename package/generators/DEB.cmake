@@ -8,198 +8,106 @@
 
 set(CPACK_STRIP_FILES ON)
 set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
-set(CPACK_DEBIAN_PACKAGE_PRIORITY "extra")
-set(CPACK_DEBIAN_PACKAGE_SECTION "default")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>=2.35), libglx0 (>=1.4.0), libxcb1 (>=1.14), libxcb-xinput0 (>=1.14), libinput-bin (>=1.20.0), libx11-xcb1 (>=1.7.5), libxcb-util1 (>=0.4.0), libxcb-composite0 (>= 1.14), libxcb-cursor0 (>= 0.1.1), libxcb-dpms0 (>= 1.14), libxcb-ewmh2 (>= 0.4.1), libxcb-imdkit1 (>= 1.0.3), libxcb-record0 (>= 1.14), libxcb-screensaver0 (>= 1.14), libxcb-xf86dri0 (>= 1.14), libxcb-xinerama0 (>= 1.14), libxcb-xrm0 (>= 1.0), libxcb-xtest0 (>= 1.14), libxcb-xvmc0 (>= 1.14), python3.11 (>=3.11)")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
 
-#
-# Multiplier files
-#
+# Auto-detect runtime dependencies by scanning ELF headers of all
+# bundled binaries and shared libraries. dpkg-shlibdeps maps each
+# needed .so to the correct Debian package automatically.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 
-set(multiplier_data_file_list
-  # LLVM libraries
-  "lib/libLTO.${dyn_lib_ext}"
-  "lib/libLTO.${dyn_lib_ext}.18.1"
-  "lib/libRemarks.${dyn_lib_ext}"
-  "lib/libRemarks.${dyn_lib_ext}.18.1"
+# The bundled libraries (Qt, ICU, multiplier) live in /usr/local/lib
+# inside the package. Tell dpkg-shlibdeps to look there so it doesn't
+# flag them as unresolved, while still detecting true system deps.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS "${BUNDLE_DIR}/lib")
 
-  # Multiplier files
-  "include/multiplier"
-  "lib/cmake/multiplier"
-  "lib/libmultiplier.${dyn_lib_ext}"
-  "lib/python3.11"
-  "bin/mx-count-sourceir"
-  "bin/mx-dump-files"
-  "bin/mx-find-calls-in-macro-expansions"
-  "bin/mx-find-divergent-candidates"
-  "bin/mx-find-flexible-user-copies"
-  "bin/mx-find-linked-structures"
-  "bin/mx-find-sketchy-casts"
-  "bin/mx-find-sketchy-strchr"
-  "bin/mx-find-symbol"
-  "bin/mx-harness"
-  "bin/mx-highlight-entity"
-  "bin/mx-index"
-  "bin/mx-list-files"
-  "bin/mx-list-fragments"
-  "bin/mx-list-functions"
-  "bin/mx-list-macros"
-  "bin/mx-list-redeclarations"
-  "bin/mx-list-structures"
-  "bin/mx-list-variables"
-  "bin/mx-print-call-graph"
-  "bin/mx-print-file"
-  "bin/mx-print-fragment"
-  "bin/mx-print-include-graph"
-  "bin/mx-print-reference-hierarchy"
-  "bin/mx-print-reference-graph"
-  "bin/mx-print-token-graph"
-  "bin/mx-print-token-tree"
-  "bin/mx-print-type-token-graph"
-  "bin/mx-regex-query"
-  "bin/mx-taint-entity"
+# =============================================================================
+# Install the entire bundle into /usr/local
+# =============================================================================
 
-  # gap (transitive, header-only dependency)
-  "include/gap"
-  "lib/cmake/gap"
-)
-
-foreach(multiplier_data_file ${multiplier_data_file_list})
-  get_filename_component(destination_path "${multiplier_data_file}" DIRECTORY)
-  if(NOT EXISTS "${MULTIPLIER_DATA_PATH}/${multiplier_data_file}")
-    message(WARNING "${multiplier_data_file} does not exist!")
-    continue()
-  endif()
-
-  if(IS_DIRECTORY "${MULTIPLIER_DATA_PATH}/${multiplier_data_file}")
-    install(
-      DIRECTORY
-        "${MULTIPLIER_DATA_PATH}/${multiplier_data_file}"
-
-      DESTINATION
-        "/opt/multiplier/${destination_path}"
-
-      USE_SOURCE_PERMISSIONS
-    )
-
-  else()
-    if("${destination_path}" MATCHES "bin|lib")
-      set(permissions "${standard_executable_permissions}")
-    else()
-      set(permissions "${standard_resource_permissions}")
-    endif()
-
-    install(
-      FILES
-        "${MULTIPLIER_DATA_PATH}/${multiplier_data_file}"
-
-      DESTINATION
-        "/opt/multiplier/${destination_path}"
-
-      PERMISSIONS
-        ${permissions}
-    )
-  endif()
-endforeach()
-
-#
-# Qt SDK files
-#
-
-set(qt_library_list
-  "libQt6Widgets.so"
-  "libQt6Gui.so"
-  "libQt6Concurrent.so"
-  "libQt6Core5Compat.so"
-  "libQt6Test.so"
-  "libQt6Core.so"
-  "libQt6DBus.so"
-  "libQt6OpenGL.so"
-  "libQt6XcbQpa.so"
-  "libQt6PrintSupport.so"
-  "libQt6Xml.so"
-  "libQt6SvgWidgets.so"
-  "libQt6Svg.so"
-  "libQt6OpenGLWidgets.so"
-  "libQt6Network.so"
-  "libQt6Sql.so"
-)
-
-foreach(qt_library ${qt_library_list})
-  install(
-    FILES
-      "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}"
-      "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}.6"
-      "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/lib/${qt_library}.6.7.0"
-
-    DESTINATION
-      "/opt/multiplier/lib"
-  )
-endforeach()
-
+# Binaries — goes to /usr/local/bin (already on PATH)
 install(
-  DIRECTORY
-    "${QT_REDIST_PATH}/usr/local/Qt-6.7.0/plugins"
+  DIRECTORY "${BUNDLE_DIR}/bin/"
+  DESTINATION "/usr/local/bin"
+  USE_SOURCE_PERMISSIONS
+  PATTERN "qt.conf" EXCLUDE
+)
 
-  DESTINATION
-    "/opt/multiplier"
+# qt.conf must be next to the executable
+install(
+  FILES "${BUNDLE_DIR}/bin/qt.conf"
+  DESTINATION "/usr/local/bin"
+)
 
+# Shared libraries — goes to /usr/local/lib (standard linker search path)
+install(
+  DIRECTORY "${BUNDLE_DIR}/lib/"
+  DESTINATION "/usr/local/lib"
   USE_SOURCE_PERMISSIONS
 )
 
-#
-# qt-multiplier files
-#
+# Qt plugins
+if(EXISTS "${BUNDLE_DIR}/plugins")
+  install(
+    DIRECTORY "${BUNDLE_DIR}/plugins/"
+    DESTINATION "/usr/local/plugins"
+    USE_SOURCE_PERMISSIONS
+  )
+endif()
 
+# Headers (for development against multiplier)
+if(EXISTS "${BUNDLE_DIR}/include")
+  install(
+    DIRECTORY "${BUNDLE_DIR}/include/"
+    DESTINATION "/usr/local/include"
+  )
+endif()
+
+# Shared resources (icons, license, etc.)
+if(EXISTS "${BUNDLE_DIR}/share")
+  install(
+    DIRECTORY "${BUNDLE_DIR}/share/"
+    DESTINATION "/usr/local/share"
+  )
+endif()
+
+# =============================================================================
+# System integration
+# =============================================================================
+
+# ldconfig: ensure /usr/local/lib is picked up by the dynamic linker
+install(CODE "
+  file(WRITE \"\$ENV{DESTDIR}/etc/ld.so.conf.d/multiplier.conf\"
+       \"/usr/local/lib\\n\")
+")
+
+# .desktop file for application menus
 install(
-  FILES
-    "${QT_MULTIPLIER_DATA_PATH}/lib/libmx_qt-ads.so"
-    "${QT_MULTIPLIER_DATA_PATH}/lib/libmx_phantomstyle_library.so"
-    "${QT_MULTIPLIER_DATA_PATH}/share/multiplier/LICENSE.txt"
-    "${QT_MULTIPLIER_DATA_PATH}/share/multiplier/library_manifest.txt"
-
-  DESTINATION
-    "/opt/multiplier/lib"
+  FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/linux/multiplier.desktop"
+  DESTINATION "/usr/share/applications"
 )
 
-install(
-  FILES
-    "${QT_MULTIPLIER_DATA_PATH}/bin/multiplier"
+# Application icons in the XDG icon hierarchy at multiple sizes.
+# The CI generates these from the source logo.png via ImageMagick.
+foreach(icon_size 16 24 32 48 64 128 256)
+  set(icon_file "${BUNDLE_DIR}/share/icons/multiplier-${icon_size}.png")
+  if(EXISTS "${icon_file}")
+    install(
+      FILES "${icon_file}"
+      DESTINATION "/usr/share/icons/hicolor/${icon_size}x${icon_size}/apps"
+      RENAME "multiplier.png"
+    )
+  endif()
+endforeach()
 
-  DESTINATION
-    "/opt/multiplier/bin"
-
-  PERMISSIONS
-    ${standard_executable_permissions}
-)
-
-# `multiplier` symlink in /usr/local/bin
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E create_symlink "/opt/multiplier/bin/multiplier" "${CMAKE_CURRENT_BINARY_DIR}/multiplier"
-)
-
-install(
-  FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/multiplier"
-
-  DESTINATION
-    "/usr/local/bin"
-)
-
-# The qt-multiplier .desktop file to make it appear in menus
-install(
-  FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/data/linux/multiplier.desktop"
-
-  DESTINATION
-    "/usr/share/applications"
-)
-
-install(
-  FILES
-    "${QT_MULTIPLIER_DATA_PATH}/share/icons/logo.png"
-
-  DESTINATION
-    "/opt/multiplier/share/icons"
-)
+# Fallback: if sized icons weren't generated, install the original
+if(NOT EXISTS "${BUNDLE_DIR}/share/icons/multiplier-256.png")
+  if(EXISTS "${BUNDLE_DIR}/share/icons/logo.png")
+    install(
+      FILES "${BUNDLE_DIR}/share/icons/logo.png"
+      DESTINATION "/usr/share/icons/hicolor/256x256/apps"
+      RENAME "multiplier.png"
+    )
+  endif()
+endif()

@@ -31,6 +31,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QTimer>
 
 #include <vector>
 
@@ -59,7 +60,6 @@ struct MainWindow::PrivateData {
 
   QMenu *view_menu{nullptr};
   QMenu *view_explorers_menu{nullptr};
-  QMenu *view_theme_menu{nullptr};
 
   WindowManager *const window_manager;
 
@@ -78,9 +78,9 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 
   InitializeMenus();
   InitializeThemes();
-  InitializeIndex(application);
+  // InitializeIndex is called after the event loop starts (from main)
+  // so that file dialogs work properly on macOS.
   InitializeDocks();
-  InitializePlugins();
 
   setWindowIcon(
       d->config_manager.MediaManager().Icon("com.trailofbits.icon.Logo"));
@@ -122,8 +122,9 @@ void MainWindow::InitializePlugins(void) {
 
 void MainWindow::InitializeMenus(void) {
   d->view_menu = d->window_manager->Menu(tr("View"));
-  d->view_theme_menu = new QMenu(tr("Themes"), this);
-  d->view_menu->addMenu(d->view_theme_menu);
+
+  // Let each manager add its items to the View menu.
+  d->config_manager.PopulateViewMenu(d->view_menu);
 
   menuBar()->addMenu(d->view_menu);
 
@@ -150,25 +151,12 @@ void MainWindow::InitializeThemes(void) {
   theme_manager.Register(CreateDarkTheme(media_manager));
   theme_manager.Register(CreateLightTheme(media_manager));
 
-  // Populate the theme list menu, and keep it up-to-date.
-  OnThemeListChanged(theme_manager);
-  connect(&theme_manager, &ThemeManager::ThemeListChanged,
-          this, &MainWindow::OnThemeListChanged);
-}
-
-//! Keep the theme selection menu up-to-date with the set of registered themes.
-void MainWindow::OnThemeListChanged(const ThemeManager &) {
-  d->view_theme_menu->clear();
-
-  auto theme_manager_ptr = &(d->config_manager.ThemeManager());
-  for (auto theme : theme_manager_ptr->ThemeList()) {
-    auto action = new QAction(theme->Name(), d->view_theme_menu);
-    connect(action, &QAction::triggered,
-            theme_manager_ptr, [=, theme = std::move(theme)] (void) {
-              theme_manager_ptr->SetTheme(std::move(theme));
-            });
-    d->view_theme_menu->addAction(action);
-  }
+  // When the theme changes, force the docking system to re-resolve its
+  // palette-based stylesheet so tab bars, scrollbars, etc. update.
+  connect(&theme_manager, &ThemeManager::ThemeChanged,
+          this, [this](const ThemeManager &) {
+            d->window_manager->RefreshDockStylesheet();
+          });
 }
 
 void MainWindow::InitializeDocks(void) {
@@ -193,14 +181,31 @@ void MainWindow::InitializeIndex(QApplication &application) {
   // Set the database.
   QString db_path;
   if (!parser.isSet(db_option)) {
-    db_path = QFileDialog::getOpenFileName(
-        nullptr, QObject::tr("Select a Multiplier database"), QDir::homePath());
+    QFileDialog dialog(this, tr("Select a Multiplier database"),
+                       QDir::homePath());
+    dialog.setNameFilter(tr("Multiplier databases (*.db);;All files (*)"));
+    dialog.setFileMode(QFileDialog::ExistingFile);
+    dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog.setWindowModality(Qt::ApplicationModal);
+
+    if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+      db_path = dialog.selectedFiles().first();
+    }
+
+    if (db_path.isEmpty()) {
+      QMessageBox::warning(this, tr("No database selected"),
+                           tr("No database was selected. Exiting."));
+      QTimer::singleShot(0, &application, &QApplication::quit);
+      return;
+    }
   } else {
     db_path = parser.value(db_option);
   }
 
   d->config_manager.SetIndex(Index::in_memory_cache(
       Index::from_database(db_path.toStdString())));
+
+  InitializePlugins();
 
   // Set the theme.
   QString theme_name;

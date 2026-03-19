@@ -14,6 +14,8 @@
 #include <multiplier/GUI/Interfaces/IThemeProxy.h>
 #include <vector>
 
+class QMenu;
+
 namespace mx::gui {
 
 class ThemeManagerImpl;
@@ -49,6 +51,10 @@ class ThemeManager Q_DECL_FINAL : public QObject {
 
   // Return the list of registered theme IDs.
   std::vector<IThemePtr> ThemeList(void) const;
+
+  //! Add theme-related items (theme selection, font size controls) to a
+  //! View menu. The ThemeManager owns the actions and keeps them up-to-date.
+  void PopulateViewMenu(QMenu *menu);
 
  signals:
   //! Emitted when the theme has changed. Sends out the new theme.

@@ -10,6 +10,8 @@
 
 #include <multiplier/GUI/Managers/MediaManager.h>
 
+#include <QApplication>
+
 namespace mx::gui {
 
 IBuiltinTheme::~IBuiltinTheme(void) {}
@@ -21,8 +23,10 @@ IBuiltinTheme::IBuiltinTheme(const MediaManager &media, QString name_, QString i
       name(std::move(name_)),
       palette(std::move(palette_)),
       data(data_) {
-  font.setPointSize(14);
-  font.setStyleHint(QFont::TypeWriter);        
+  font.setPointSize(QApplication::font().pointSize() + 2);
+  font.setStyleHint(QFont::TypeWriter);
+  font.setHintingPreference(QFont::PreferFullHinting);
+  font.setStyleStrategy(QFont::PreferAntialias);
 }
 
 QString IBuiltinTheme::Name(void) const {

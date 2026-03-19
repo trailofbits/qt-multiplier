@@ -194,6 +194,23 @@ void TreeGeneratorWidget::InitializeWidgets(
   QHeaderView *header = d->tree_view->header();
   header->setStretchLastSection(true);
 
+  // Add a context menu to the header for toggling file path display.
+  header->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(header, &QHeaderView::customContextMenuRequested,
+          this, [this](const QPoint &pos) {
+    QMenu menu;
+    auto *action = menu.addAction(tr("Show Full File Paths"));
+    action->setCheckable(true);
+    action->setChecked(
+        d->model->GetFilePathDisplayMode() == FilePathDisplayMode::AbsolutePath);
+    connect(action, &QAction::toggled, this, [this](bool checked) {
+      d->model->SetFilePathDisplayMode(
+          checked ? FilePathDisplayMode::AbsolutePath
+                  : FilePathDisplayMode::FileNameOnly);
+    });
+    menu.exec(d->tree_view->header()->mapToGlobal(pos));
+  });
+
   // Don't let double click expand things in three; we capture double click so
   // that we can make it open up the use in the code.
   d->tree_view->setExpandsOnDoubleClick(false);
