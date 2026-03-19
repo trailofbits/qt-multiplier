@@ -7,4 +7,3 @@
 #
 
 add_subdirectory("Builtin")
-add_subdirectory("FontSizeProxy")

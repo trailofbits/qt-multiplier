@@ -49,7 +49,6 @@ target_link_libraries("Multiplier"
   PRIVATE
     "mx_action_manager"
     "mx_builtin_theme"
-    "mx_font_size_proxy"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_explorers"

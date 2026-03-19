@@ -14,6 +14,8 @@
 #include <QObject>
 #include <QString>
 
+class QMenu;
+
 namespace mx {
 class FileLocationCache;
 class Index;
@@ -75,6 +77,9 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   //!            future.
   void InstallItemDelegate(QAbstractItemView *view,
                            const ItemDelegateConfig &config={}) const;
+
+  //! Let each manager populate a View menu with its relevant actions.
+  void PopulateViewMenu(QMenu *menu);
 
  signals:
   void IndexChanged(const ConfigManager &config_manager);
