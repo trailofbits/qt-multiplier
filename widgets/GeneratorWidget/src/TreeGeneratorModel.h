@@ -10,6 +10,7 @@
 
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/ITreeGenerator.h>
+#include <multiplier/GUI/Util.h>
 
 #include <QVector>
 
@@ -46,6 +47,12 @@ class TreeGeneratorModel Q_DECL_FINAL : public IModel {
 
   //! Install a new generator to back the data of this model.
   void InstallGenerator(ITreeGeneratorPtr generator_);
+
+  //! Set how file path columns are displayed.
+  void SetFilePathDisplayMode(FilePathDisplayMode mode);
+
+  //! Get the current file path display mode.
+  FilePathDisplayMode GetFilePathDisplayMode(void) const;
 
   //! Expand starting at the model index, going up to `depth` levels deep.
   void Expand(const QModelIndex &, unsigned depth);

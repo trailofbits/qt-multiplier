@@ -23,6 +23,7 @@
 #include <multiplier/GUI/Plugins/ClassHierarchyPlugin.h>
 #include <multiplier/GUI/Plugins/StructExplorerPlugin.h>
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
+#include <multiplier/GUI/Themes/FontSizeProxy.h>
 #include <multiplier/Index.h>
 
 #include <QCommandLineOption>
@@ -61,6 +62,10 @@ struct MainWindow::PrivateData {
   QMenu *view_menu{nullptr};
   QMenu *view_explorers_menu{nullptr};
   QMenu *view_theme_menu{nullptr};
+
+  // Font size proxy — owned by ThemeManager after AddProxy, but we keep
+  // a raw pointer so the menu actions can adjust the size.
+  FontSizeProxy *font_size_proxy{nullptr};
 
   WindowManager *const window_manager;
 
@@ -126,6 +131,35 @@ void MainWindow::InitializeMenus(void) {
   d->view_theme_menu = new QMenu(tr("Themes"), this);
   d->view_menu->addMenu(d->view_theme_menu);
 
+  d->view_menu->addSeparator();
+
+  auto increase_font = new QAction(tr("Increase Font Size"), this);
+  increase_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus));
+  d->view_menu->addAction(increase_font);
+  connect(increase_font, &QAction::triggered, this, [this]() {
+    if (d->font_size_proxy) {
+      d->font_size_proxy->SetPointSize(d->font_size_proxy->PointSize() + 1);
+    }
+  });
+
+  auto decrease_font = new QAction(tr("Decrease Font Size"), this);
+  decrease_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus));
+  d->view_menu->addAction(decrease_font);
+  connect(decrease_font, &QAction::triggered, this, [this]() {
+    if (d->font_size_proxy) {
+      d->font_size_proxy->SetPointSize(d->font_size_proxy->PointSize() - 1);
+    }
+  });
+
+  auto reset_font = new QAction(tr("Reset Font Size"), this);
+  reset_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+  d->view_menu->addAction(reset_font);
+  connect(reset_font, &QAction::triggered, this, [this]() {
+    if (d->font_size_proxy) {
+      d->font_size_proxy->SetPointSize(11);
+    }
+  });
+
   menuBar()->addMenu(d->view_menu);
 
   auto help_menu = new QMenu(tr("Help"));
@@ -150,6 +184,19 @@ void MainWindow::InitializeThemes(void) {
 
   theme_manager.Register(CreateDarkTheme(media_manager));
   theme_manager.Register(CreateLightTheme(media_manager));
+
+  // Install a font size proxy so the user can adjust code font size
+  // via View > Increase/Decrease Font Size (Ctrl+/Ctrl-).
+  auto font_proxy = std::make_unique<FontSizeProxy>(11);
+  d->font_size_proxy = font_proxy.get();
+  theme_manager.AddProxy(std::move(font_proxy));
+
+  // When the theme changes, force the docking system to re-resolve its
+  // palette-based stylesheet so tab bars, scrollbars, etc. update.
+  connect(&theme_manager, &ThemeManager::ThemeChanged,
+          this, [this](const ThemeManager &) {
+            d->window_manager->RefreshDockStylesheet();
+          });
 
   // Populate the theme list menu, and keep it up-to-date.
   OnThemeListChanged(theme_manager);

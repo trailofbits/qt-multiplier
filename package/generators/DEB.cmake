@@ -88,11 +88,26 @@ install(
   DESTINATION "/usr/share/applications"
 )
 
-# Application icon in the XDG icon hierarchy
-if(EXISTS "${BUNDLE_DIR}/share/icons/logo.png")
-  install(
-    FILES "${BUNDLE_DIR}/share/icons/logo.png"
-    DESTINATION "/usr/share/icons/hicolor/256x256/apps"
-    RENAME "multiplier.png"
-  )
+# Application icons in the XDG icon hierarchy at multiple sizes.
+# The CI generates these from the source logo.png via ImageMagick.
+foreach(icon_size 16 24 32 48 64 128 256)
+  set(icon_file "${BUNDLE_DIR}/share/icons/multiplier-${icon_size}.png")
+  if(EXISTS "${icon_file}")
+    install(
+      FILES "${icon_file}"
+      DESTINATION "/usr/share/icons/hicolor/${icon_size}x${icon_size}/apps"
+      RENAME "multiplier.png"
+    )
+  endif()
+endforeach()
+
+# Fallback: if sized icons weren't generated, install the original
+if(NOT EXISTS "${BUNDLE_DIR}/share/icons/multiplier-256.png")
+  if(EXISTS "${BUNDLE_DIR}/share/icons/logo.png")
+    install(
+      FILES "${BUNDLE_DIR}/share/icons/logo.png"
+      DESTINATION "/usr/share/icons/hicolor/256x256/apps"
+      RENAME "multiplier.png"
+    )
+  endif()
 endif()

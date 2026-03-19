@@ -1083,6 +1083,16 @@ static std::filesystem::path FilePath(const File &file) {
 
 }  // namespace
 
+QString ShortenLocation(const QString &location) {
+  // Input format: "/some/long/path/file.cpp:42:10"
+  // Output format: "file.cpp:42:10"
+  auto last_sep = location.lastIndexOf('/', location.indexOf(':'));
+  if (last_sep >= 0) {
+    return location.mid(last_sep + 1);
+  }
+  return location;
+}
+
 QString LocationOfEntity(const FileLocationCache &file_location_cache,
                          const VariantEntity &entity) {
 

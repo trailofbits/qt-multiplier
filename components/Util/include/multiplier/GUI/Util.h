@@ -47,6 +47,15 @@ class Token;
 class TokenRange;
 namespace gui {
 
+//! How file paths should be displayed in explorer views.
+enum class FilePathDisplayMode {
+  FileNameOnly,  //!< Just "foo.cpp:42:10" (default)
+  AbsolutePath,  //!< Full "/home/user/src/foo.cpp:42:10"
+};
+
+//! Shorten a "path:line:col" location string to just "filename:line:col".
+QString ShortenLocation(const QString &location);
+
 VariantEntity NamedEntityContaining(const VariantEntity &entity);
 
 template <typename T>

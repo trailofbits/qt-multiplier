@@ -105,6 +105,12 @@ struct TreeGeneratorModel::PrivateData final {
   //! Thread pool for all expansion runnables.
   QThreadPool thread_pool;
 
+  //! How file path columns are displayed.
+  FilePathDisplayMode file_path_mode{FilePathDisplayMode::FileNameOnly};
+
+  //! Cached set of column indices whose title contains "File".
+  std::vector<int> file_path_columns;
+
   inline PrivateData(const QString &model_id_)
       : model_id(model_id_) {}
 };
@@ -116,6 +122,21 @@ TreeGeneratorModel::TreeGeneratorModel(const QString &model_id, QObject *parent)
 
   connect(&d->import_timer, &QTimer::timeout, this,
           &TreeGeneratorModel::ProcessData);
+}
+
+void TreeGeneratorModel::SetFilePathDisplayMode(FilePathDisplayMode mode) {
+  if (d->file_path_mode != mode) {
+    d->file_path_mode = mode;
+    if (!d->file_path_columns.empty()) {
+      emit dataChanged(index(0, 0, {}),
+                       index(rowCount({}) - 1, columnCount({}) - 1, {}),
+                       {Qt::DisplayRole, Qt::ToolTipRole});
+    }
+  }
+}
+
+FilePathDisplayMode TreeGeneratorModel::GetFilePathDisplayMode(void) const {
+  return d->file_path_mode;
 }
 
 TreeGeneratorModel::~TreeGeneratorModel(void) {
@@ -219,6 +240,18 @@ void TreeGeneratorModel::InstallGenerator(ITreeGeneratorPtr generator_) {
   d->root.self_or_duplicate = nullptr;
   d->generator = std::move(generator_);
   d->num_columns = d->generator ? d->generator->NumColumns() : 0u;
+
+  // Cache which columns contain file paths based on column title.
+  d->file_path_columns.clear();
+  if (d->generator) {
+    for (int i = 0; i < d->num_columns; ++i) {
+      auto title = d->generator->ColumnTitle(i);
+      if (title.contains(QStringLiteral("File"), Qt::CaseInsensitive)) {
+        d->file_path_columns.push_back(i);
+      }
+    }
+  }
+
   d->entity_to_node.clear();
   d->entity_to_node.emplace(kInvalidEntityId, &(d->root));
   d->nodes.swap(old_nodes);
@@ -328,6 +361,14 @@ QVariant TreeGeneratorModel::data(const QModelIndex &index, int role) const {
 
     if (role == Qt::DisplayRole) {
       if (auto as_str = TryConvertToString(data)) {
+        // Shorten file path columns when in FileNameOnly mode.
+        if (d->file_path_mode == FilePathDisplayMode::FileNameOnly) {
+          for (int fc : d->file_path_columns) {
+            if (column == fc) {
+              return ShortenLocation(as_str.value());
+            }
+          }
+        }
         return as_str.value();
       }
 

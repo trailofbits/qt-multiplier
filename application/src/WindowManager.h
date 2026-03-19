@@ -52,6 +52,10 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
 
   QMenu *Menu(const QString &menu_name) Q_DECL_FINAL;
 
+  //! Force the docking system to re-resolve its palette-based stylesheet.
+  //! Call this after the application palette changes (e.g. theme switch).
+  void RefreshDockStylesheet(void);
+
  private:
   void CreateToolBarIfMissing(void);
   void RemoveDockWidget(QDockWidget *dock_widget);

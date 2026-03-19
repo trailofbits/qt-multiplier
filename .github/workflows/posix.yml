@@ -87,7 +87,8 @@ jobs:
             libgl1-mesa-dev \
             libglvnd-dev \
             libxkbcommon-dev \
-            dpkg-dev
+            dpkg-dev \
+            imagemagick
 
       - name: Download multiplier release
         env:
@@ -129,6 +130,16 @@ jobs:
       - name: Install qt-multiplier
         run: |
           cmake --install build
+
+      - name: Generate icon sizes
+        run: |
+          logo="${INSTALL_DIR}/share/icons/logo.png"
+          if [ -f "${logo}" ]; then
+            for size in 16 24 32 48 64 128 256; do
+              convert "${logo}" -resize "${size}x${size}" -filter Lanczos \
+                "${INSTALL_DIR}/share/icons/multiplier-${size}.png"
+            done
+          fi
 
       - name: Bundle multiplier
         run: |
