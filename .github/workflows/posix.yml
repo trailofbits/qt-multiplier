@@ -33,6 +33,7 @@ jobs:
 
     env:
       CACHE_KEY: platform-${{ inputs.platform }}_type-${{ inputs.build_type }}-${{ inputs.multiplier_release }}
+      INSTALL_DIR: ${{ github.workspace }}/qt-multiplier-install
 
     steps:
       - name: Clone the source code
@@ -110,7 +111,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
             -DCMAKE_C_COMPILER="${CC}" \
             -DCMAKE_CXX_COMPILER="${CXX}" \
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/qt-multiplier-install" \
+            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
             -DMXQT_ENABLE_TESTS=true \
             -DMXQT_MULTIPLIER_VERSION=${{ inputs.multiplier_release }} \
             -Dmultiplier_DIR="${MULTIPLIER_INSTALL_DIRECTORY}/lib/cmake/multiplier" \
@@ -126,27 +127,24 @@ jobs:
         run: |
           cmake --install build
 
-      - name: Bundle multiplier libraries
+      - name: Bundle multiplier
         run: |
-          install_dir="${{ github.workspace }}/qt-multiplier-install"
+          # Copy the entire multiplier release into the bundle.
+          # This includes: binaries (mx-*), shared libraries, Python
+          # bindings, CMake config files, headers, and gap.
+          cp -a "${MULTIPLIER_INSTALL_DIRECTORY}"/bin/* "${INSTALL_DIR}/bin/"
+          cp -a "${MULTIPLIER_INSTALL_DIRECTORY}"/lib/* "${INSTALL_DIR}/lib/"
 
-          # Copy multiplier shared libraries and binaries
-          cp -a "${MULTIPLIER_INSTALL_DIRECTORY}"/lib/libmultiplier.so* "${install_dir}/lib/"
-
-          # Copy multiplier tools
-          cp "${MULTIPLIER_INSTALL_DIRECTORY}"/bin/mx-* "${install_dir}/bin/"
-
-          # Copy LLVM runtime libraries shipped with multiplier
-          for lib in libLTO libRemarks; do
-            cp -a "${MULTIPLIER_INSTALL_DIRECTORY}"/lib/${lib}.so* "${install_dir}/lib/" 2>/dev/null || true
-          done
+          # Preserve include and cmake directories for development use
+          if [ -d "${MULTIPLIER_INSTALL_DIRECTORY}/include" ]; then
+            cp -a "${MULTIPLIER_INSTALL_DIRECTORY}/include" "${INSTALL_DIR}/"
+          fi
 
       - name: Bundle Qt libraries
         run: |
-          install_dir="${{ github.workspace }}/qt-multiplier-install"
           qt_lib_dir="/usr/lib/x86_64-linux-gnu"
 
-          # Core Qt libraries needed at runtime
+          # Core Qt shared libraries needed at runtime
           qt_libs=(
             libQt6Core
             libQt6Gui
@@ -162,37 +160,61 @@ jobs:
           )
 
           for lib in "${qt_libs[@]}"; do
-            # Copy the .so symlink and all versioned variants
-            cp -a "${qt_lib_dir}/${lib}".so* "${install_dir}/lib/" 2>/dev/null || true
+            cp -a "${qt_lib_dir}/${lib}".so* "${INSTALL_DIR}/lib/" 2>/dev/null || true
           done
 
-          # Copy the ICU libraries that Qt depends on
-          cp -a "${qt_lib_dir}"/libicu*.so* "${install_dir}/lib/" 2>/dev/null || true
+          # ICU libraries (Qt runtime dependency)
+          cp -a "${qt_lib_dir}"/libicu*.so* "${INSTALL_DIR}/lib/" 2>/dev/null || true
 
-          # Copy Qt plugins (platform, imageformats, etc.)
+          # Qt platform and image format plugins
           qt_plugin_dir="/usr/lib/x86_64-linux-gnu/qt6/plugins"
-          mkdir -p "${install_dir}/plugins"
+          mkdir -p "${INSTALL_DIR}/plugins"
           for plugin_type in platforms imageformats platforminputcontexts xcbglintegrations; do
             if [ -d "${qt_plugin_dir}/${plugin_type}" ]; then
-              cp -a "${qt_plugin_dir}/${plugin_type}" "${install_dir}/plugins/"
+              cp -a "${qt_plugin_dir}/${plugin_type}" "${INSTALL_DIR}/plugins/"
             fi
           done
 
-          # Create qt.conf so the binary finds plugins relative to itself
-          cat > "${install_dir}/bin/qt.conf" <<'QTCONF'
+          # qt.conf tells the binary where to find plugins
+          cat > "${INSTALL_DIR}/bin/qt.conf" <<'QTCONF'
 [Paths]
 Plugins = ../plugins
+Libraries = ../lib
 QTCONF
 
-      - name: Create release archive
-        id: archive
+      - name: Build DEB package
+        id: deb_package
         run: |
-          archive_name="qt-multiplier-${{ inputs.multiplier_release }}-${{ inputs.platform }}.tar.xz"
-          tar -cJf "${archive_name}" -C "${{ github.workspace }}" qt-multiplier-install
-          echo "NAME=${archive_name}" >> $GITHUB_OUTPUT
+          cmake \
+            -S package \
+            -B package-build \
+            -DBUNDLE_DIR="${INSTALL_DIR}" \
+            -DCPACK_GENERATOR=DEB
 
-      - name: Upload build artifact
+          cmake --build package-build --target package
+
+          deb_path="$(ls package-build/*.deb)"
+          deb_name="$(basename "${deb_path}")"
+
+          echo "PATH=${deb_path}" >> $GITHUB_OUTPUT
+          echo "NAME=${deb_name}" >> $GITHUB_OUTPUT
+
+      - name: Upload DEB package
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.archive.outputs.NAME }}
-          path: ${{ steps.archive.outputs.NAME }}
+          name: ${{ steps.deb_package.outputs.NAME }}
+          path: ${{ steps.deb_package.outputs.PATH }}
+
+      - name: Create GitHub release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_tag="$(git rev-parse --short=7 HEAD)"
+
+          gh release create "${release_tag}" \
+            "${{ steps.deb_package.outputs.PATH }}" \
+            --repo "${{ github.repository }}" \
+            --title "qt-multiplier ${release_tag}" \
+            --notes "Built against [multiplier ${{ inputs.multiplier_release }}](https://github.com/trailofbits/multiplier/releases/tag/${{ inputs.multiplier_release }})" \
+            --latest
