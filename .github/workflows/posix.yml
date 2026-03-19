@@ -82,9 +82,11 @@ jobs:
             cmake \
             ninja-build \
             qt6-base-dev \
+            qt6-base-private-dev \
             libqt6core5compat6-dev \
             libgl1-mesa-dev \
-            libglvnd-dev
+            libglvnd-dev \
+            libxkbcommon-dev
 
       - name: Download multiplier release
         env:
