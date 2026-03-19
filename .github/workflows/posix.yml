@@ -211,13 +211,13 @@ jobs:
           echo "NAME=${archive_name}" >> $GITHUB_OUTPUT
 
       - name: Upload DEB package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.deb_package.outputs.NAME }}
           path: ${{ steps.deb_package.outputs.PATH }}
 
       - name: Upload portable archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.archive.outputs.NAME }}
           path: ${{ steps.archive.outputs.PATH }}
