@@ -8,6 +8,7 @@
 
 add_library("mx_explorers"
   include/multiplier/GUI/Explorers/CodeExplorer.h
+  include/multiplier/GUI/Explorers/CodeSearchExplorer.h
   include/multiplier/GUI/Explorers/EntityExplorer.h
   include/multiplier/GUI/Explorers/HighlightExplorer.h
   include/multiplier/GUI/Explorers/InformationExplorer.h
@@ -31,6 +32,12 @@ add_library("mx_explorers"
   src/Explorers/CodeExplorer/ExpandedMacrosModel.h
   src/Explorers/CodeExplorer/MacroExplorer.cpp
   src/Explorers/CodeExplorer/MacroExplorer.h
+
+  src/Explorers/CodeSearchExplorer/CodeSearchExplorer.cpp
+  src/Explorers/CodeSearchExplorer/CodeSearchResultsModel.cpp
+  src/Explorers/CodeSearchExplorer/CodeSearchResultsModel.h
+  src/Explorers/CodeSearchExplorer/CodeSearchRunnable.cpp
+  src/Explorers/CodeSearchExplorer/CodeSearchRunnable.h
 
   src/Explorers/EntityExplorer/CategoryComboBox.cpp
   src/Explorers/EntityExplorer/CategoryComboBox.h

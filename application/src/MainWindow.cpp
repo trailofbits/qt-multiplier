@@ -9,6 +9,7 @@
 
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
+#include <multiplier/GUI/Explorers/CodeSearchExplorer.h>
 #include <multiplier/GUI/Explorers/EntityExplorer.h>
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
 #include <multiplier/GUI/Explorers/InformationExplorer.h>
@@ -107,6 +108,7 @@ void MainWindow::InitializePlugins(void) {
 
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new CodeSearchExplorer(d->config_manager, wm));
 
   for (const auto &plugin : d->plugins) {
     connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
