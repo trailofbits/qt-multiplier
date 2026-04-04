@@ -9,6 +9,7 @@
 #include <QAction>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMainWindow>
 #include <QMenu>
 #include <QPainter>
 #include <QSortFilterProxyModel>
@@ -19,11 +20,12 @@
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
-#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Interfaces/ITheme.h>
+#include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Widgets/LineEditWidget.h>
+#include <multiplier/GUI/Widgets/TabWidget.h>
 #include <multiplier/Index.h>
 #include <multiplier/Re2.h>
 
@@ -41,7 +43,6 @@ static const QString kModelId =
 
 // Delegate that creates and owns a ThemedItemDelegate internally, and draws
 // a subtle column tint over odd columns after the themed delegate has painted.
-// This avoids using InstallItemDelegate which would delete us on theme change.
 class ColumnTintDelegate Q_DECL_FINAL : public QAbstractItemDelegate {
   QAbstractItemDelegate *inner{nullptr};
   IThemePtr theme;
@@ -49,8 +50,6 @@ class ColumnTintDelegate Q_DECL_FINAL : public QAbstractItemDelegate {
   void RebuildInner(IThemePtr new_theme) {
     delete inner;
     theme = std::move(new_theme);
-    // Create a new ThemedItemDelegate. We replicate what InstallItemDelegate
-    // does, but own the delegate ourselves.
     inner = new ThemedItemDelegate(theme, std::nullopt, 4u, this);
   }
 
@@ -70,7 +69,6 @@ class ColumnTintDelegate Q_DECL_FINAL : public QAbstractItemDelegate {
       inner->paint(painter, option, index);
     }
 
-    // Draw column tint overlay on odd columns.
     if (index.column() % 2 == 1) {
       painter->save();
       painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
@@ -92,6 +90,17 @@ class ColumnTintDelegate Q_DECL_FINAL : public QAbstractItemDelegate {
   }
 };
 
+// Per-tab state: model, proxy, table, version, result count.
+struct SearchTab {
+  CodeSearchResultsModel *model;
+  QSortFilterProxyModel *sort_proxy;
+  QTableView *table;
+  QLabel *status_label;
+  QWidget *container;  // The widget added to the TabWidget.
+  AtomicU64Ptr search_version;
+  int result_count{0};
+};
+
 }  // namespace
 
 struct CodeSearchExplorer::PrivateData {
@@ -100,27 +109,35 @@ struct CodeSearchExplorer::PrivateData {
   const ConfigManager &config_manager;
   IWindowManager * const manager;
 
+  // The dock holds a TabWidget with per-search tabs.
   IWindowWidget *dock{nullptr};
-  LineEditWidget *search_input{nullptr};
-  QLabel *status_label{nullptr};
-  QTableView *results_table{nullptr};
-  CodeSearchResultsModel *model{nullptr};
-  QSortFilterProxyModel *sort_proxy{nullptr};
+  TabWidget *tab_widget{nullptr};
 
-  AtomicU64Ptr search_version;
-  int result_count{0};
+  // The search input lives in the main toolbar.
+  LineEditWidget *search_input{nullptr};
 
   const TriggerHandle open_entity_trigger;
   const TriggerHandle preview_entity_trigger;
 
+  // Track per-tab state so we can route signals correctly.
+  // Key: the container widget pointer.
+  std::unordered_map<QWidget *, SearchTab> tabs;
+
   inline PrivateData(ConfigManager &config_manager_, IWindowManager *manager_)
       : config_manager(config_manager_),
         manager(manager_),
-        search_version(std::make_shared<AtomicU64>(0u)),
         open_entity_trigger(config_manager.ActionManager().Find(
             "com.trailofbits.action.OpenEntity")),
         preview_entity_trigger(config_manager.ActionManager().Find(
             "com.trailofbits.action.OpenEntityPreview")) {}
+
+  SearchTab *CurrentTab(void) {
+    if (!tab_widget) return nullptr;
+    auto *w = tab_widget->currentWidget();
+    if (!w) return nullptr;
+    auto it = tabs.find(w);
+    return it != tabs.end() ? &it->second : nullptr;
+  }
 };
 
 CodeSearchExplorer::~CodeSearchExplorer(void) {}
@@ -146,22 +163,14 @@ CodeSearchExplorer::CodeSearchExplorer(ConfigManager &config_manager,
           this, &CodeSearchExplorer::OnIndexChanged);
 
   OnIndexChanged(d->config_manager);
-  CreateDockWidget(parent);
-}
 
-void CodeSearchExplorer::CreateDockWidget(IWindowManager *manager) {
-  auto &theme_manager = d->config_manager.ThemeManager();
-
-  d->dock = new IWindowWidget;
-  d->dock->setWindowTitle(tr("Code Search"));
-
-  auto layout = new QVBoxLayout;
-  layout->setContentsMargins(0, 0, 0, 0);
-
-  // Search input.
-  d->search_input = new LineEditWidget(d->dock);
+  // Add search input to the main toolbar.
+  auto &theme_manager = config_manager.ThemeManager();
+  d->search_input = new LineEditWidget(parent->Window());
   d->search_input->setClearButtonEnabled(true);
-  d->search_input->setPlaceholderText(tr("Regex pattern (Enter to search)"));
+  d->search_input->setPlaceholderText(tr("Regex Search (Enter)"));
+  d->search_input->setMinimumWidth(300);
+  d->search_input->setMaximumWidth(500);
 
   d->search_input->setFont(theme_manager.Theme()->Font());
   connect(&theme_manager, &ThemeManager::ThemeChanged,
@@ -172,81 +181,29 @@ void CodeSearchExplorer::CreateDockWidget(IWindowManager *manager) {
   connect(d->search_input, &QLineEdit::returnPressed,
           this, &CodeSearchExplorer::OnSearchTriggered);
 
-  layout->addWidget(d->search_input);
+  parent->AddToolBarWidget(d->search_input);
 
-  // Status label.
-  d->status_label = new QLabel(d->dock);
-  d->status_label->setContentsMargins(4, 2, 4, 2);
-  layout->addWidget(d->status_label);
+  // Dock is created lazily on first search.
+}
 
-  // Results table.
-  d->model = new CodeSearchResultsModel(d->dock);
-  d->sort_proxy = new QSortFilterProxyModel(d->dock);
-  d->sort_proxy->setSourceModel(d->model);
-
-  d->results_table = new QTableView(d->dock);
-  d->results_table->setModel(d->sort_proxy);
-  d->results_table->setSortingEnabled(true);
-  d->results_table->setSelectionBehavior(
-      QAbstractItemView::SelectionBehavior::SelectRows);
-  d->results_table->setSelectionMode(
-      QAbstractItemView::SelectionMode::SingleSelection);
-  d->results_table->setEditTriggers(
-      QAbstractItemView::EditTrigger::NoEditTriggers);
-  d->results_table->setWordWrap(false);
-  d->results_table->setTextElideMode(Qt::ElideRight);
-  d->results_table->verticalHeader()->hide();
-  d->results_table->horizontalHeader()->setDefaultAlignment(
-      Qt::AlignLeft | Qt::AlignVCenter);
-  d->results_table->horizontalHeader()->setSectionsMovable(true);
-  d->results_table->horizontalHeader()->setSectionResizeMode(
-      QHeaderView::Interactive);
-  d->results_table->horizontalHeader()->setStretchLastSection(true);
-  d->results_table->setVerticalScrollMode(
-      QAbstractItemView::ScrollMode::ScrollPerPixel);
-  d->results_table->setHorizontalScrollMode(
-      QAbstractItemView::ScrollMode::ScrollPerPixel);
-
-  // Right-click on header: toggle "Show Full File Paths".
-  d->results_table->horizontalHeader()->setContextMenuPolicy(
-      Qt::CustomContextMenu);
-  connect(d->results_table->horizontalHeader(),
-          &QHeaderView::customContextMenuRequested,
-          this, [this] (const QPoint &pos) {
-    QMenu menu;
-    auto *action = menu.addAction(tr("Show Full File Paths"));
-    action->setCheckable(true);
-    action->setChecked(d->model->GetShowFullPaths());
-    connect(action, &QAction::toggled, this, [this] (bool checked) {
-      d->model->SetShowFullPaths(checked);
-    });
-    menu.exec(d->results_table->horizontalHeader()->mapToGlobal(pos));
-  });
-
-  // Create our own themed delegate with column tinting, instead of using
-  // InstallItemDelegate (which would fight us on theme changes).
-  auto *tint = new ColumnTintDelegate(theme_manager.Theme(), d->results_table);
-  d->results_table->setItemDelegate(tint);
-  d->results_table->setFont(theme_manager.Theme()->Font());
-
-  connect(&theme_manager, &ThemeManager::ThemeChanged,
-          d->results_table, [tint, table = d->results_table] (const ThemeManager &tm) {
-            tint->OnThemeChanged(tm);
-            table->setFont(tm.Theme()->Font());
-            table->viewport()->update();
-          });
-
-  layout->addWidget(d->results_table, 1);
-
+void CodeSearchExplorer::CreateDockWidget(IWindowManager *manager) {
+  d->dock = new IWindowWidget;
+  d->dock->setWindowTitle(tr("Code Search"));
   d->dock->setContentsMargins(0, 0, 0, 0);
+
+  d->tab_widget = new TabWidget(d->dock);
+  d->tab_widget->setDocumentMode(true);
+  d->tab_widget->setTabsClosable(true);
+
+  connect(d->tab_widget->tabBar(), &QTabBar::tabCloseRequested,
+          this, &CodeSearchExplorer::OnTabClose);
+
+  auto layout = new QVBoxLayout(d->dock);
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->addWidget(d->tab_widget, 1);
+  layout->addStretch();
   d->dock->setLayout(layout);
 
-  // Connect table selection changes to trigger the global code preview.
-  connect(d->results_table->selectionModel(),
-          &QItemSelectionModel::currentChanged,
-          this, &CodeSearchExplorer::OnCurrentChanged);
-
-  // Register dock at the bottom, tabified with other bottom docks.
   IWindowManager::DockConfig config;
   config.id = "com.trailofbits.dock.CodeSearchExplorer";
   config.location = IWindowManager::DockLocation::Bottom;
@@ -255,78 +212,181 @@ void CodeSearchExplorer::CreateDockWidget(IWindowManager *manager) {
   manager->AddDockWidget(d->dock, config);
 }
 
+QTableView *CodeSearchExplorer::CreateResultsTable(QWidget *parent) {
+  auto &theme_manager = d->config_manager.ThemeManager();
+
+  auto *table = new QTableView(parent);
+  table->setSortingEnabled(true);
+  table->setSelectionBehavior(
+      QAbstractItemView::SelectionBehavior::SelectRows);
+  table->setSelectionMode(
+      QAbstractItemView::SelectionMode::SingleSelection);
+  table->setEditTriggers(
+      QAbstractItemView::EditTrigger::NoEditTriggers);
+  table->setWordWrap(false);
+  table->setTextElideMode(Qt::ElideRight);
+  table->verticalHeader()->hide();
+  table->horizontalHeader()->setDefaultAlignment(
+      Qt::AlignLeft | Qt::AlignVCenter);
+  table->horizontalHeader()->setSectionsMovable(true);
+  table->horizontalHeader()->setSectionResizeMode(
+      QHeaderView::Interactive);
+  table->horizontalHeader()->setStretchLastSection(true);
+  table->setVerticalScrollMode(
+      QAbstractItemView::ScrollMode::ScrollPerPixel);
+  table->setHorizontalScrollMode(
+      QAbstractItemView::ScrollMode::ScrollPerPixel);
+
+  // Right-click on header: toggle "Show Full File Paths".
+  table->horizontalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(table->horizontalHeader(),
+          &QHeaderView::customContextMenuRequested,
+          this, [this, table] (const QPoint &pos) {
+    // Find the tab for this table.
+    for (auto &[w, tab] : d->tabs) {
+      if (tab.table == table) {
+        QMenu menu;
+        auto *action = menu.addAction(tr("Show Full File Paths"));
+        action->setCheckable(true);
+        action->setChecked(tab.model->GetShowFullPaths());
+        connect(action, &QAction::toggled, this,
+                [model = tab.model] (bool checked) {
+          model->SetShowFullPaths(checked);
+        });
+        menu.exec(table->horizontalHeader()->mapToGlobal(pos));
+        break;
+      }
+    }
+  });
+
+  // Themed delegate with column tinting.
+  auto *tint = new ColumnTintDelegate(theme_manager.Theme(), table);
+  table->setItemDelegate(tint);
+  table->setFont(theme_manager.Theme()->Font());
+
+  connect(&theme_manager, &ThemeManager::ThemeChanged,
+          table, [tint, table] (const ThemeManager &tm) {
+            tint->OnThemeChanged(tm);
+            table->setFont(tm.Theme()->Font());
+            table->viewport()->update();
+          });
+
+  return table;
+}
+
 void CodeSearchExplorer::OnSearchTriggered(void) {
-  if (!d->model) {
-    return;
-  }
-
-  // Cancel any in-progress search.
-  d->search_version->fetch_add(1u);
-  d->model->Clear();
-  d->result_count = 0;
-
   QString pattern = d->search_input->text().trimmed();
   if (pattern.isEmpty()) {
-    d->status_label->clear();
     return;
   }
 
   RegexQuery query(pattern.toStdString());
   if (!query.is_valid()) {
-    d->status_label->setText(
-        tr("Invalid regex: %1").arg(pattern));
+    // TODO(pag): Show a proper error dialog or status bar message.
     return;
   }
 
-  d->status_label->setText(tr("Searching..."));
+  if (!d->dock) {
+    CreateDockWidget(d->manager);
+  }
 
+  // Create a new tab for this search.
+  auto *container = new QWidget(d->tab_widget);
+  auto *layout = new QVBoxLayout(container);
+  layout->setContentsMargins(0, 0, 0, 0);
+
+  auto *status_label = new QLabel(container);
+  status_label->setContentsMargins(4, 2, 4, 2);
+  status_label->setText(tr("Searching..."));
+  layout->addWidget(status_label);
+
+  auto *model = new CodeSearchResultsModel(container);
+  auto *sort_proxy = new QSortFilterProxyModel(container);
+  sort_proxy->setSourceModel(model);
+
+  auto *table = CreateResultsTable(container);
+  table->setModel(sort_proxy);
+  layout->addWidget(table, 1);
+
+  container->setLayout(layout);
+  container->setWindowTitle(pattern);
+
+  SearchTab tab;
+  tab.model = model;
+  tab.sort_proxy = sort_proxy;
+  tab.table = table;
+  tab.status_label = status_label;
+  tab.container = container;
+  tab.search_version = std::make_shared<AtomicU64>(0u);
+
+  d->tabs.emplace(container, tab);
+
+  // Connect selection changes.
+  connect(table->selectionModel(),
+          &QItemSelectionModel::currentChanged,
+          this, [this, container] (const QModelIndex &current, const QModelIndex &) {
+            OnCurrentChanged(current, container);
+          });
+
+  // Insert tab at front and show.
+  d->tab_widget->InsertTab(0, container);
+  d->dock->show();
+  d->dock->EmitRequestAttention();
+
+  // Start the search.
   auto *runnable = new CodeSearchRunnable(
       std::move(query), d->index,
       d->config_manager.FileLocationCache(),
-      d->search_version);
+      tab.search_version);
 
   connect(runnable, &CodeSearchRunnable::NewResults,
-          this, [this] (uint64_t version,
-                        QVector<CodeSearchResultRow> rows) {
-            if (version != d->search_version->load()) {
-              return;
-            }
-            d->result_count = d->model->AppendRows(std::move(rows));
-            d->status_label->setText(tr("%1 results").arg(d->result_count));
+          this, [this, container, version = tab.search_version]
+                (uint64_t v, QVector<CodeSearchResultRow> rows) {
+            auto it = d->tabs.find(container);
+            if (it == d->tabs.end()) return;
+            auto &t = it->second;
+            if (v != t.search_version->load()) return;
+            t.result_count = t.model->AppendRows(std::move(rows));
+            t.status_label->setText(tr("%1 results").arg(t.result_count));
           });
 
   connect(runnable, &CodeSearchRunnable::Finished,
-          this, &CodeSearchExplorer::OnSearchFinished);
+          this, [this, container] () {
+            auto it = d->tabs.find(container);
+            if (it == d->tabs.end()) return;
+            auto &t = it->second;
+            if (t.result_count == 0 &&
+                t.status_label->text() == tr("Searching...")) {
+              t.status_label->setText(tr("No results found"));
+            }
+          });
 
   QThreadPool::globalInstance()->start(runnable);
 }
 
 void CodeSearchExplorer::OnSearchFinished(void) {
-  if (d->result_count == 0 &&
-      d->status_label->text() == tr("Searching...")) {
-    d->status_label->setText(tr("No results found"));
-  }
+  // Handled inline in the lambda above.
 }
 
 void CodeSearchExplorer::OnCurrentChanged(const QModelIndex &current,
-                                          const QModelIndex &) {
-  if (!current.isValid()) {
-    return;
-  }
+                                          QWidget *container) {
+  if (!current.isValid()) return;
 
-  // Map through sort proxy to get the source index.
-  QModelIndex source_index = d->sort_proxy->mapToSource(current);
-  const auto *row = d->model->Row(source_index.row());
-  if (!row) {
-    return;
-  }
+  auto it = d->tabs.find(container);
+  if (it == d->tabs.end()) return;
+  auto &tab = it->second;
+
+  QModelIndex source_index = tab.sort_proxy->mapToSource(current);
+  const auto *row = tab.model->Row(source_index.row());
+  if (!row) return;
+
+  int col = source_index.column();
+  int loc_col = tab.model->LocationColumn();
 
   // Determine which token to navigate to based on the clicked column.
-  // If a capture group column is clicked, navigate to that capture's token.
   std::optional<Token> nav_token;
-  int col = source_index.column();
   int capture_index = col - CodeSearchResultsModel::FirstCaptureColumn;
-  if (capture_index >= 0 &&
+  if (capture_index >= 0 && col != loc_col &&
       capture_index < row->capture_tokens.size() &&
       row->capture_tokens[capture_index]) {
     nav_token = row->capture_tokens[capture_index];
@@ -345,9 +405,27 @@ void CodeSearchExplorer::OnCurrentChanged(const QModelIndex &current,
     return;
   }
 
-  // Trigger the global code preview (same one used by reference explorer).
-  d->preview_entity_trigger.Trigger(
-      QVariant::fromValue<VariantEntity>(std::move(entity)));
+  // Clicking the File column opens in the main code explorer;
+  // other columns show in the preview pane.
+  if (col == loc_col) {
+    d->open_entity_trigger.Trigger(
+        QVariant::fromValue<VariantEntity>(std::move(entity)));
+  } else {
+    d->preview_entity_trigger.Trigger(
+        QVariant::fromValue<VariantEntity>(std::move(entity)));
+  }
+}
+
+void CodeSearchExplorer::OnTabClose(int index) {
+  auto *widget = d->tab_widget->widget(index);
+  d->tab_widget->RemoveTab(index);
+  d->tabs.erase(widget);
+  widget->close();
+  widget->deleteLater();
+
+  if (!d->tab_widget->count()) {
+    d->dock->hide();
+  }
 }
 
 void CodeSearchExplorer::ActOnPrimaryClick(
@@ -367,8 +445,7 @@ void CodeSearchExplorer::ActOnContextMenu(
 }
 
 void CodeSearchExplorer::OnOpenCodeSearch(const QVariant &) {
-  if (d->dock) {
-    d->dock->EmitRequestAttention();
+  if (d->search_input) {
     d->search_input->setFocus();
   }
 }
@@ -376,13 +453,6 @@ void CodeSearchExplorer::OnOpenCodeSearch(const QVariant &) {
 void CodeSearchExplorer::OnIndexChanged(
     const ConfigManager &config_manager) {
   d->index = config_manager.Index();
-  if (d->model) {
-    d->model->Clear();
-    d->result_count = 0;
-  }
-  if (d->status_label) {
-    d->status_label->clear();
-  }
 }
 
 }  // namespace mx::gui

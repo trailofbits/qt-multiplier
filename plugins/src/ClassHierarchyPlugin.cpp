@@ -114,7 +114,7 @@ int ClassHierarchyGenerator::SortColumn(void) const {
 QString ClassHierarchyGenerator::ColumnTitle(int col) const {
   switch (col) {
     case 0: return QObject::tr("Class");
-    case 1: return QObject::tr("File Name");
+    case 1: return QObject::tr("File");
     default: return QString();
   }
 }

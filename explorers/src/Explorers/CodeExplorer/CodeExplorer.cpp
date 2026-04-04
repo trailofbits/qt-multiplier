@@ -202,7 +202,7 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
       media_manager.Pixmap("com.trailofbits.icon.BrowseMode"),
       tr("Browse Mode"), d->browse_mode_trigger);
 
-  d->browse_mode_action->setChecked(true);
+  d->browse_mode_action->setChecked(false);
 
   // When the user navigates the history, make sure that we change what the
   // view shows.

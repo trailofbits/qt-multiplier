@@ -165,6 +165,7 @@ void ReferenceExplorer::CreateDockWidget(void) {
   IWindowManager::DockConfig config;
   config.id = "com.trailofbits.dock.ReferenceExplorer";
   config.location = IWindowManager::DockLocation::Bottom;
+  config.tabify = true;
   config.app_menu_location = {tr("View"), tr("Explorers")};
   d->manager->AddDockWidget(d->dock, config);
 }
@@ -260,7 +261,15 @@ void ReferenceExplorer::OnSelectionChange(const QModelIndex &index) {
     return;
   }
 
-  d->preview_entity_trigger.Trigger(QVariant::fromValue(entity));
+  // Clicking on a File column opens in the main code explorer;
+  // other columns show in the preview pane.
+  auto header = index.model()->headerData(
+      index.column(), Qt::Horizontal, Qt::DisplayRole).toString();
+  if (header.contains(QStringLiteral("File"), Qt::CaseInsensitive)) {
+    d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
+  } else {
+    d->preview_entity_trigger.Trigger(QVariant::fromValue(entity));
+  }
 }
 
 }  // namespace mx::gui

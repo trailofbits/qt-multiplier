@@ -10,6 +10,8 @@
 
 #include <memory>
 
+class QTableView;
+
 namespace mx::gui {
 
 class ConfigManager;
@@ -35,12 +37,14 @@ class CodeSearchExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
  private:
   void CreateDockWidget(IWindowManager *manager);
+  QTableView *CreateResultsTable(QWidget *parent);
 
  private slots:
   void OnSearchTriggered(void);
   void OnOpenCodeSearch(const QVariant &data);
   void OnIndexChanged(const ConfigManager &config_manager);
-  void OnCurrentChanged(const QModelIndex &current, const QModelIndex &);
+  void OnCurrentChanged(const QModelIndex &current, QWidget *container);
+  void OnTabClose(int index);
   void OnSearchFinished(void);
 };
 
