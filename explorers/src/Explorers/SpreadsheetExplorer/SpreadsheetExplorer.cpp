@@ -7,7 +7,6 @@
 #include <multiplier/GUI/Explorers/SpreadsheetExplorer.h>
 
 #include <QAction>
-#include <iostream>
 #include <QMenu>
 #include <QToolBar>
 #include <QToolButton>
@@ -130,9 +129,6 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
       media_manager.Icon("com.trailofbits.icon.NewSheet"),
       new_sheet_named_action);
 
-  connect(&config_manager, &ConfigManager::IndexChanged,
-          this, &SpreadsheetExplorer::OnIndexChanged);
-
   // Create the dock eagerly (hidden) so it appears in View > Explorers.
   CreateDockWidget(parent);
 
@@ -146,6 +142,10 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
   if (file_menu) {
     file_menu->addAction(new_sheet_action);
   }
+
+  // Load persisted sheets from the project database.
+  // The DB is already open because InitializePlugins runs after SetIndex.
+  OnIndexChanged(config_manager);
 }
 
 void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
@@ -423,8 +423,6 @@ void SpreadsheetExplorer::ActOnContextMenu(
 
 void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {
   auto sheets = cm.LoadAllSheets();
-  std::cerr << "SpreadsheetExplorer::OnIndexChanged: loaded "
-            << sheets.size() << " sheets" << std::endl;
   if (sheets.isEmpty()) {
     return;
   }
