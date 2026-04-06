@@ -67,7 +67,7 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
   new_sheet_named_action.name = tr("New Sheet");
   new_sheet_named_action.action = new_sheet_trigger;
   parent->AddToolBarButton(
-      media_manager.Icon("com.trailofbits.icon.PopOut"),
+      media_manager.Icon("com.trailofbits.icon.NewSheet"),
       new_sheet_named_action);
 
   connect(&config_manager, &ConfigManager::IndexChanged,

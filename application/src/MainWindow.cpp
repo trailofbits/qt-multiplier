@@ -125,8 +125,8 @@ void MainWindow::InitializePlugins(void) {
 
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
-  d->plugins.emplace_back(new CodeSearchExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new SpreadsheetExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new CodeSearchExplorer(d->config_manager, wm));
 
 #ifdef MX_ENABLE_PYTHON
   d->plugins.emplace_back(new PythonConsoleExplorer(d->config_manager, wm));
