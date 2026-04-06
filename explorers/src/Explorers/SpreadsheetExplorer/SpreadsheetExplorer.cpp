@@ -18,6 +18,7 @@
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
+#include <multiplier/GUI/Interfaces/ITheme.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
@@ -206,6 +207,20 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
 
   auto *view = new SpreadsheetView(container);
   view->setModel(model);
+
+  // Apply theme colors to headers and grid.
+  auto &theme_manager = d->config_manager.ThemeManager();
+  auto apply_theme = [view] (const ThemeManager &tm) {
+    auto theme = tm.Theme();
+    view->ApplyThemeColors(
+        theme->GutterBackgroundColor(),
+        theme->GutterForegroundColor(),
+        theme->GutterBackgroundColor().darker(120));
+    view->setFont(theme->Font());
+  };
+  apply_theme(theme_manager);
+  connect(&theme_manager, &ThemeManager::ThemeChanged, view, apply_theme);
+
   layout->addWidget(view, 1);
 
   // Bottom toolbar for row/column operations.

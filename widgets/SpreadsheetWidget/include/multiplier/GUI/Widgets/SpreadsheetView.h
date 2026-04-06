@@ -27,6 +27,10 @@ class SpreadsheetView Q_DECL_FINAL : public QTableView {
   explicit SpreadsheetView(QWidget *parent = nullptr);
   virtual ~SpreadsheetView(void);
 
+  // Update header/grid colors from theme.
+  void ApplyThemeColors(const QColor &gutter_bg, const QColor &gutter_fg,
+                        const QColor &grid_color);
+
   // Clipboard operations.
   void copy_selection(void);
   void paste_at_selection(void);

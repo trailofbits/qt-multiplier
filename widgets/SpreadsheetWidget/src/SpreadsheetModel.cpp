@@ -58,6 +58,10 @@ QVariant SpreadsheetModel::data(const QModelIndex &index, int role) const {
       return cell;
 
     case Qt::DisplayRole: {
+      // Bool cells: empty text — the checkbox widget is the visual.
+      if (cell.userType() == QMetaType::Bool) {
+        return {};
+      }
       return display_text_for(cell);
     }
 

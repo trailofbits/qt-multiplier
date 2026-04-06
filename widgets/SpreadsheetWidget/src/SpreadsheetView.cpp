@@ -45,6 +45,10 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
   setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
 
+  // Visual structure.
+  setShowGrid(true);
+  setAlternatingRowColors(true);
+
   // Word wrap on for multiline cells.
   setWordWrap(true);
   setTextElideMode(Qt::ElideNone);
@@ -144,6 +148,29 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
 }
 
 SpreadsheetView::~SpreadsheetView(void) {}
+
+void SpreadsheetView::ApplyThemeColors(const QColor &gutter_bg,
+                                       const QColor &gutter_fg,
+                                       const QColor &grid_color) {
+  auto header_style = QStringLiteral(
+      "QHeaderView::section {"
+      "  background-color: %1;"
+      "  color: %2;"
+      "  border: 1px solid %3;"
+      "  padding: 2px 4px;"
+      "}")
+      .arg(gutter_bg.name(), gutter_fg.name(), grid_color.name());
+
+  horizontalHeader()->setStyleSheet(header_style);
+  verticalHeader()->setStyleSheet(header_style);
+
+  setGridStyle(Qt::SolidLine);
+
+  // Set grid color via stylesheet on the table itself.
+  setStyleSheet(QStringLiteral(
+      "QTableView { gridline-color: %1; }")
+      .arg(grid_color.name()));
+}
 
 void SpreadsheetView::copy_selection(void) {
   auto indexes = selectionModel()->selectedIndexes();
