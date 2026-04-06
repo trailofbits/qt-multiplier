@@ -145,6 +145,9 @@ void MainWindow::InitializePlugins(void) {
 }
 
 void MainWindow::InitializeMenus(void) {
+  // Create File menu first so it appears before View and Help.
+  d->window_manager->Menu(tr("File"));
+
   d->view_menu = d->window_manager->Menu(tr("View"));
 
   // Let each manager add its items to the View menu.
