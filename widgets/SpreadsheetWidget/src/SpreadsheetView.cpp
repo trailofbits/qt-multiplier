@@ -13,6 +13,7 @@
 #include <QDataStream>
 #include <QHeaderView>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QMenu>
 #include <QMimeData>
 
@@ -30,11 +31,13 @@ namespace mx::gui {
 SpreadsheetView::SpreadsheetView(QWidget *parent)
     : QTableView(parent) {
 
-  // Clicking column headers selects the column (not sort).
-  // Sorting is available via the column header context menu.
+  // Column header clicks select the column. Sorting via context menu only.
   setSortingEnabled(false);
-  horizontalHeader()->setSectionsClickable(true);
+  horizontalHeader()->setSectionsClickable(false);
   horizontalHeader()->setSortIndicatorShown(true);
+
+  // Manually select column on header press via event filter.
+  horizontalHeader()->viewport()->installEventFilter(this);
 
   // Movable headers.
   horizontalHeader()->setSectionsMovable(true);
@@ -160,6 +163,28 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
 }
 
 SpreadsheetView::~SpreadsheetView(void) {}
+
+bool SpreadsheetView::eventFilter(QObject *object, QEvent *event) {
+  // Handle column selection on header click.
+  if (object == horizontalHeader()->viewport() &&
+      event->type() == QEvent::MouseButtonPress) {
+    auto *me = static_cast<QMouseEvent *>(event);
+    int col = horizontalHeader()->logicalIndexAt(me->pos());
+    if (col >= 0) {
+      if (me->modifiers() & Qt::ShiftModifier) {
+        selectionModel()->select(
+            model()->index(0, col),
+            QItemSelectionModel::Select | QItemSelectionModel::Columns);
+      } else {
+        selectionModel()->select(
+            model()->index(0, col),
+            QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Columns);
+      }
+      return true;  // Consume the event so it doesn't trigger sorting.
+    }
+  }
+  return QTableView::eventFilter(object, event);
+}
 
 void SpreadsheetView::ApplyThemeColors(const QColor &gutter_bg,
                                        const QColor &gutter_fg,

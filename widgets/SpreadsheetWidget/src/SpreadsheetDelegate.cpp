@@ -186,7 +186,36 @@ void SpreadsheetDelegate::paint(QPainter *painter,
     return;
   }
 
-  // Bool and QString: fall through to the default delegate.
+  // Bool cells: draw a centered checkbox.
+  if (raw.userType() == QMetaType::Bool) {
+    QStyleOptionViewItem opt = option;
+    initStyleOption(&opt, index);
+
+    auto *style = opt.widget ? opt.widget->style() : QApplication::style();
+    style->drawPrimitive(QStyle::PE_PanelItemViewItem, &opt, painter,
+                         opt.widget);
+
+    QStyleOptionButton check_opt;
+    check_opt.state = QStyle::State_Enabled;
+    if (raw.toBool()) {
+      check_opt.state |= QStyle::State_On;
+    } else {
+      check_opt.state |= QStyle::State_Off;
+    }
+
+    // Center the checkbox in the cell.
+    QRect check_rect = style->subElementRect(
+        QStyle::SE_CheckBoxIndicator, &check_opt, opt.widget);
+    int x = opt.rect.x() + (opt.rect.width() - check_rect.width()) / 2;
+    int y = opt.rect.y() + (opt.rect.height() - check_rect.height()) / 2;
+    check_opt.rect = QRect(QPoint(x, y), check_rect.size());
+
+    style->drawPrimitive(QStyle::PE_IndicatorCheckBox, &check_opt,
+                         painter, opt.widget);
+    return;
+  }
+
+  // QString: fall through to the default delegate.
   QStyledItemDelegate::paint(painter, option, index);
 }
 
