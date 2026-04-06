@@ -12,6 +12,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QFontMetricsF>
+#include <QMimeData>
 #include <QHBoxLayout>
 #include <QImage>
 #include <QKeySequence>
@@ -43,6 +44,7 @@
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Util.h>
+#include <multiplier/Index.h>
 #include <multiplier/GUI/Widgets/SearchWidget.h>
 #include <multiplier/Types.h>
 
@@ -652,6 +654,13 @@ struct CodeWidget::PrivateData {
 
   template <typename CB>
   void TriggerScrollbarUpdate(CB cb);
+
+  // Build a TokenRange from the current selection, chopping partial tokens
+  // at the edges into UserTokens.
+  TokenRange BuildSelectionTokenRange(void) const;
+
+  // Copy the selection to the clipboard with both plain text and token data.
+  void CopySelectionToClipboard(void) const;
 };
 
 // Apply some change to the `scroll_x` and `scroll_y`, and trigger the
@@ -1794,7 +1803,7 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       // Support Ctrl-C.
       if (ks == kCopyKeqSequence && d->selection_start_cursor &&
           !d->token_model.selection.isEmpty()) {
-        qApp->clipboard()->setText(d->token_model.selection);
+        d->CopySelectionToClipboard();
 
       } else if (ks == kFindKeqSequence) {
         d->search_widget->show();
@@ -3235,6 +3244,92 @@ void CodeWidget::OnShowSearchResult(size_t result_index) {
 }
 
 //! Called when we want to act on the context menu.
+TokenRange CodeWidget::PrivateData::BuildSelectionTokenRange(void) const {
+  if (selection_start_offset < 0 || selection_end_offset < 0 ||
+      selection_start_offset >= selection_end_offset) {
+    return {};
+  }
+
+  int sel_start = selection_start_offset;
+  int sel_end = selection_end_offset;
+
+  std::vector<CustomToken> result;
+
+  auto num_entities = scene.entities.size();
+  for (size_t eo = 0u; eo < num_entities; ++eo) {
+    int entity_start = scene.begin_of_entity_in_document[eo];
+    const Entity &entity = scene.entities[eo];
+    const Data &data = scene.data[
+        entity.data_index_and_config >> kFormatShift];
+    int entity_end = entity_start + static_cast<int>(data.text.size());
+
+    // Skip entities entirely before the selection.
+    if (entity_end <= sel_start) continue;
+    // Stop at entities entirely after the selection.
+    if (entity_start >= sel_end) break;
+
+    // Compute overlap.
+    int overlap_start = std::max(entity_start, sel_start);
+    int overlap_end = std::min(entity_end, sel_end);
+
+    bool fully_covered = (overlap_start == entity_start &&
+                          overlap_end == entity_end);
+
+    if (fully_covered && entity.token_index < scene.tokens.size()) {
+      // Use the actual token.
+      result.emplace_back(scene.tokens[entity.token_index]);
+    } else {
+      // Partial token — create a UserToken with the substring.
+      QString sub = data.text.mid(overlap_start - entity_start,
+                                  overlap_end - overlap_start);
+      UserToken ut;
+      ut.data = sub.toStdString();
+
+      // Inherit kind/category from the real token if available.
+      if (entity.token_index < scene.tokens.size()) {
+        const Token &tok = scene.tokens[entity.token_index];
+        ut.kind = tok.kind();
+        ut.category = tok.category();
+        ut.related_entity = tok.related_entity();
+      }
+
+      result.emplace_back(std::move(ut));
+    }
+  }
+
+  if (result.empty()) {
+    return {};
+  }
+
+  return TokenRange::create(std::move(result));
+}
+
+void CodeWidget::PrivateData::CopySelectionToClipboard(void) const {
+  auto *mime = new QMimeData;
+  mime->setText(token_model.selection);
+
+  // Also put a TokenRange on the clipboard for rich paste into spreadsheets.
+  TokenRange tokens = BuildSelectionTokenRange();
+  if (!tokens.empty()) {
+    // Serialize the token range as a QByteArray via QDataStream.
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    // Write count, then each token's entity ID.
+    auto count = static_cast<quint32>(tokens.size());
+    stream << count;
+    for (Token tok : tokens) {
+      stream << static_cast<quint64>(tok.id().Pack());
+      // Write the display text as fallback.
+      auto tok_data = tok.data();
+      stream << QString::fromUtf8(tok_data.data(),
+                                  static_cast<qsizetype>(tok_data.size()));
+    }
+    mime->setData(QStringLiteral("application/x-qtmultiplier-tokens"), data);
+  }
+
+  qApp->clipboard()->setMimeData(mime);
+}
+
 void CodeWidget::ActOnContextMenu(IWindowManager *, QMenu *menu,
                                   const QModelIndex &) {
   if (!d->token_model.selection.isEmpty()) {
@@ -3242,7 +3337,7 @@ void CodeWidget::ActOnContextMenu(IWindowManager *, QMenu *menu,
     menu->addAction(copy_selection);
     connect(copy_selection, &QAction::triggered,
             this, [this] (void) {
-                    qApp->clipboard()->setText(d->token_model.selection);
+                    d->CopySelectionToClipboard();
                   });
   }
 }

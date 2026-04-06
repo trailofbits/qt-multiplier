@@ -9,10 +9,13 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QDataStream>
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMimeData>
+
+#include <multiplier/Index.h>
 
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
@@ -113,17 +116,56 @@ void SpreadsheetView::copy_selection(void) {
 
 void SpreadsheetView::paste_at_selection(void) {
   auto *clip = QApplication::clipboard();
-  if (!clip) {
-    return;
-  }
-
-  QString text = clip->text();
-  if (text.isEmpty()) {
+  if (!clip || !clip->mimeData()) {
     return;
   }
 
   QModelIndex current = currentIndex();
   if (!current.isValid() || !model()) {
+    return;
+  }
+
+  const QMimeData *mime = clip->mimeData();
+
+  // Check for token range data from the code explorer.
+  if (mime->hasFormat(
+          QStringLiteral("application/x-qtmultiplier-tokens"))) {
+    auto data = mime->data(
+        QStringLiteral("application/x-qtmultiplier-tokens"));
+    QDataStream stream(&data, QIODevice::ReadOnly);
+
+    quint32 count = 0;
+    stream >> count;
+
+    // Collect tokens into one cell as a TokenRange.
+    std::vector<CustomToken> tokens;
+    for (quint32 i = 0; i < count; ++i) {
+      quint64 entity_id = 0;
+      QString display_text;
+      stream >> entity_id >> display_text;
+
+      // Try to reconstruct the real token from entity ID. Since we
+      // don't have an Index here, create a UserToken with the text.
+      UserToken ut;
+      ut.data = display_text.toStdString();
+      ut.kind = TokenKind::UNKNOWN;
+      ut.category = TokenCategory::UNKNOWN;
+      tokens.emplace_back(std::move(ut));
+    }
+
+    if (!tokens.empty()) {
+      auto range = TokenRange::create(std::move(tokens));
+      if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
+        sm->set_cell_value(current.row(), current.column(),
+                           QVariant::fromValue(range));
+      }
+      return;
+    }
+  }
+
+  // Fall back to plain text paste.
+  QString text = mime->text();
+  if (text.isEmpty()) {
     return;
   }
 
