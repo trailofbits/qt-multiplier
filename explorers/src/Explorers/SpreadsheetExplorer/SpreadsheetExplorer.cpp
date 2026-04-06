@@ -211,8 +211,13 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
 
   // Install themed delegate for syntax-highlighted token rendering.
   auto &theme_manager = d->config_manager.ThemeManager();
-  auto *delegate = new SpreadsheetDelegate(theme_manager.Theme(), view);
+  auto *delegate = new SpreadsheetDelegate(
+      theme_manager.Theme(), d->config_manager.TabWidth(), view);
   view->setItemDelegate(delegate);
+
+  // Update tab width when it changes.
+  connect(&d->config_manager, &ConfigManager::TabWidthChanged,
+          view, [delegate] (unsigned tw) { delegate->SetTabWidth(tw); });
 
   // Apply theme colors to headers, grid, delegate, and font.
   auto apply_theme = [view, delegate] (const ThemeManager &tm) {

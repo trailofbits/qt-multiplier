@@ -25,14 +25,20 @@ Q_DECLARE_METATYPE(mx::TokenRange)
 
 namespace mx::gui {
 
-SpreadsheetDelegate::SpreadsheetDelegate(IThemePtr theme_, QObject *parent)
+SpreadsheetDelegate::SpreadsheetDelegate(IThemePtr theme_, unsigned tab_width_,
+                                         QObject *parent)
     : QStyledItemDelegate(parent),
-      theme(std::move(theme_)) {}
+      theme(std::move(theme_)),
+      tab_width(tab_width_) {}
 
 SpreadsheetDelegate::~SpreadsheetDelegate(void) {}
 
 void SpreadsheetDelegate::SetTheme(IThemePtr new_theme) {
   theme = std::move(new_theme);
+}
+
+void SpreadsheetDelegate::SetTabWidth(unsigned tw) {
+  tab_width = tw;
 }
 
 void SpreadsheetDelegate::paint(QPainter *painter,
@@ -58,12 +64,15 @@ void SpreadsheetDelegate::paint(QPainter *painter,
     auto range = raw.value<TokenRange>();
     QFont font = theme->Font();
     QFontMetricsF fm(font);
-    QPointF pos = opt.rect.topLeft();
-    pos.setY(pos.y() + fm.ascent());
 
     bool selected = (opt.state & QStyle::State_Selected);
 
+    // Clip to cell rect to prevent painting over adjacent cells.
     painter->save();
+    painter->setClipRect(opt.rect);
+
+    QPointF pos(opt.rect.left() + 2, opt.rect.top() + fm.ascent());
+
     for (Token tok : range) {
       auto cs = theme->TokenColorAndStyle(tok);
 
@@ -80,19 +89,32 @@ void SpreadsheetDelegate::paint(QPainter *painter,
       font.setUnderline(cs.underline);
       painter->setFont(font);
       painter->setPen(cs.foreground_color);
+      fm = QFontMetricsF(font);
 
       auto tok_data = tok.data();
       QString text = QString::fromUtf8(
           tok_data.data(), static_cast<qsizetype>(tok_data.size()));
 
-      // Handle newlines by advancing Y and resetting X.
-      for (const auto &line : text.split(QLatin1Char('\n'))) {
-        if (&line != &text.split(QLatin1Char('\n')).first()) {
-          pos.setX(opt.rect.left());
-          pos.setY(pos.y() + fm.height());
+      if (tok.kind() == TokenKind::WHITESPACE) {
+        // Process whitespace for layout without drawing.
+        for (auto ch : text) {
+          if (ch == QLatin1Char('\n')) {
+            pos.setX(opt.rect.left() + 2);
+            pos.setY(pos.y() + fm.height());
+          } else if (ch == QLatin1Char('\t')) {
+            pos.setX(pos.x() + fm.horizontalAdvance(QLatin1Char(' ')) *
+                     static_cast<qreal>(tab_width));
+          } else if (ch == QLatin1Char(' ')) {
+            pos.setX(pos.x() + fm.horizontalAdvance(ch));
+          }
         }
-        painter->drawText(pos, line);
-        pos.setX(pos.x() + fm.horizontalAdvance(line));
+      } else {
+        // Draw the whole token string at once for proper kerning.
+        QRectF text_rect(pos.x(), pos.y() - fm.ascent(),
+                         opt.rect.right() - pos.x(), fm.height());
+        painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                          text);
+        pos.setX(pos.x() + fm.horizontalAdvance(text));
       }
     }
     painter->restore();

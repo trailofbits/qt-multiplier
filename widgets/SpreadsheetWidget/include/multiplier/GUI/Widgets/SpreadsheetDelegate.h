@@ -22,13 +22,15 @@ class SpreadsheetDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   Q_OBJECT
 
   IThemePtr theme;
+  unsigned tab_width{4};
 
  public:
-  explicit SpreadsheetDelegate(IThemePtr theme_,
+  explicit SpreadsheetDelegate(IThemePtr theme_, unsigned tab_width_ = 4,
                                QObject *parent = nullptr);
   virtual ~SpreadsheetDelegate(void);
 
   void SetTheme(IThemePtr new_theme);
+  void SetTabWidth(unsigned tw);
 
   void paint(QPainter *painter, const QStyleOptionViewItem &option,
              const QModelIndex &index) const Q_DECL_FINAL;
