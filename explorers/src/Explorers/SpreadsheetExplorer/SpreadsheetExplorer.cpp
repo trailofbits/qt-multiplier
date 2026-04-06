@@ -7,6 +7,7 @@
 #include <multiplier/GUI/Explorers/SpreadsheetExplorer.h>
 
 #include <QAction>
+#include <iostream>
 #include <QMenu>
 #include <QToolBar>
 #include <QToolButton>
@@ -422,6 +423,8 @@ void SpreadsheetExplorer::ActOnContextMenu(
 
 void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {
   auto sheets = cm.LoadAllSheets();
+  std::cerr << "SpreadsheetExplorer::OnIndexChanged: loaded "
+            << sheets.size() << " sheets" << std::endl;
   if (sheets.isEmpty()) {
     return;
   }
