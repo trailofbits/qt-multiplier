@@ -149,6 +149,18 @@ void SpreadsheetView::keyPressEvent(QKeyEvent *event) {
     delete_selection();
     return;
   }
+  if (event->matches(QKeySequence::Undo)) {
+    if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
+      sm->undoStack()->undo();
+    }
+    return;
+  }
+  if (event->matches(QKeySequence::Redo)) {
+    if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
+      sm->undoStack()->redo();
+    }
+    return;
+  }
   // Ctrl+Shift+C -> copy as markdown.
   if (event->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier) &&
       event->key() == Qt::Key_C) {
@@ -161,6 +173,19 @@ void SpreadsheetView::keyPressEvent(QKeyEvent *event) {
 
 void SpreadsheetView::OnContextMenu(const QPoint &pos) {
   QMenu menu(this);
+
+  // Undo/redo.
+  if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
+    auto *undo = sm->undoStack()->createUndoAction(&menu, tr("Undo"));
+    undo->setShortcut(QKeySequence::Undo);
+    menu.addAction(undo);
+
+    auto *redo = sm->undoStack()->createRedoAction(&menu, tr("Redo"));
+    redo->setShortcut(QKeySequence::Redo);
+    menu.addAction(redo);
+
+    menu.addSeparator();
+  }
 
   // Clipboard section.
   menu.addAction(tr("Copy"), QKeySequence::Copy,

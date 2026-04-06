@@ -1,12 +1,13 @@
 # Spreadsheet Feature — Progress Tracker
 
 ## Phase 1: Minimal model + view + dock integration
-- [ ] Create widgets/SpreadsheetWidget/ (SpreadsheetModel, SpreadsheetDelegate, SpreadsheetView)
-- [ ] Create SpreadsheetExplorer as IMainWindowPlugin
-- [ ] Register in MainWindow::InitializePlugins
-- [ ] Add to CMake build
-- [ ] Build and verify rendering with mixed cell types
-- [ ] Hard-code test data to verify
+- [x] Create widgets/SpreadsheetWidget/ (SpreadsheetModel, SpreadsheetDelegate, SpreadsheetView)
+- [x] Create SpreadsheetExplorer as IMainWindowPlugin
+- [x] Register in MainWindow::InitializePlugins
+- [x] Add to CMake build (Qt6::Sql added to components)
+- [x] Build compiles cleanly
+- [ ] Verify rendering with mixed cell types at runtime
+- [ ] Hard-code test data to verify token rendering
 
 ## Phase 2: Mutations + undo/redo
 - [ ] QUndoStack integration
@@ -41,6 +42,7 @@
 - [ ] "Open in Spreadsheet" action on code search results
 - [ ] Blank sheet creation from menu
 - [ ] Dock integration via IWindowManager
+- [ ] New toolbar icon for creating a sheet (register with MediaManager, add via AddToolBarButton)
 
 ## Phase 7: Formula system
 - [ ] FormulaCell struct and Q_DECLARE_METATYPE
@@ -49,6 +51,7 @@
 - [ ] Stale indicator rendering
 - [ ] Recompute actions in context menu
 - [ ] Error display
+- [ ] Python formula editor with auto-complete popup (reuse PythonCompletionModel from PythonConsoleWidget)
 
 ## Cycle Log
 

@@ -7,13 +7,17 @@
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
 #include <QFont>
+#include <QUndoStack>
 
 #include <multiplier/Frontend/Token.h>
+
+#include "SpreadsheetCommands.h"
 
 namespace mx::gui {
 
 SpreadsheetModel::SpreadsheetModel(QObject *parent)
-    : QAbstractTableModel(parent) {}
+    : QAbstractTableModel(parent),
+      m_undo_stack(new QUndoStack(this)) {}
 
 SpreadsheetModel::~SpreadsheetModel(void) {}
 
@@ -98,10 +102,12 @@ bool SpreadsheetModel::setData(const QModelIndex &index, const QVariant &value,
   }
 
   if (role == Qt::CheckStateRole) {
-    QVariant &cell = m_rows[row][col];
+    const QVariant &cell = m_rows[row][col];
     if (cell.userType() == QMetaType::Bool) {
-      cell = (value.toInt() == Qt::Checked);
-      emit dataChanged(index, index, {role, Qt::DisplayRole});
+      QVariant old_val = cell;
+      QVariant new_val = QVariant(value.toInt() == Qt::Checked);
+      m_undo_stack->push(
+          new SetCellValueCommand(this, row, col, old_val, new_val));
       return true;
     }
     return false;
@@ -111,20 +117,23 @@ bool SpreadsheetModel::setData(const QModelIndex &index, const QVariant &value,
     return false;
   }
 
+  QVariant old_val = m_rows[row][col];
   QString text = value.toString();
 
+  QVariant new_val;
   // Detect formula mode: text starting with '='.
   if (text.startsWith(QLatin1Char('='))) {
     FormulaCell fc;
     fc.formula = text;
     fc.cached_result = QVariant();
     fc.is_stale = true;
-    m_rows[row][col] = QVariant::fromValue(fc);
+    new_val = QVariant::fromValue(fc);
   } else {
-    m_rows[row][col] = QVariant(text);
+    new_val = QVariant(text);
   }
 
-  emit dataChanged(index, index, {Qt::DisplayRole, Qt::EditRole});
+  m_undo_stack->push(
+      new SetCellValueCommand(this, row, col, old_val, new_val));
   return true;
 }
 
@@ -186,13 +195,7 @@ bool SpreadsheetModel::insertRows(int row, int count,
   }
 
   row = qBound(0, row, static_cast<int>(m_rows.size()));
-  int cols = static_cast<int>(m_columns.size());
-
-  beginInsertRows(parent, row, row + count - 1);
-  for (int i = 0; i < count; ++i) {
-    m_rows.insert(row, QVector<QVariant>(cols));
-  }
-  endInsertRows();
+  m_undo_stack->push(new InsertRowsCommand(this, row, count));
   return true;
 }
 
@@ -203,9 +206,14 @@ bool SpreadsheetModel::removeRows(int row, int count,
     return false;
   }
 
-  beginRemoveRows(parent, row, row + count - 1);
-  m_rows.remove(row, count);
-  endRemoveRows();
+  // Save the row data before removing so undo can restore it.
+  QVector<QVector<QVariant>> saved_data;
+  saved_data.reserve(count);
+  for (int i = 0; i < count; ++i) {
+    saved_data.append(m_rows[row + i]);
+  }
+  m_undo_stack->push(
+      new RemoveRowsCommand(this, row, count, std::move(saved_data)));
   return true;
 }
 
@@ -216,20 +224,7 @@ bool SpreadsheetModel::insertColumns(int column, int count,
   }
 
   column = qBound(0, column, static_cast<int>(m_columns.size()));
-
-  beginInsertColumns(parent, column, column + count - 1);
-  for (int i = 0; i < count; ++i) {
-    ColumnDefinition def;
-    def.name = QString("Column %1").arg(m_columns.size() + 1);
-    def.logical_index = static_cast<int>(m_columns.size());
-    m_columns.insert(column + i, def);
-  }
-  for (auto &row : m_rows) {
-    for (int i = 0; i < count; ++i) {
-      row.insert(column, QVariant());
-    }
-  }
-  endInsertColumns();
+  m_undo_stack->push(new InsertColumnsCommand(this, column, count));
   return true;
 }
 
@@ -240,12 +235,16 @@ bool SpreadsheetModel::removeColumns(int column, int count,
     return false;
   }
 
-  beginRemoveColumns(parent, column, column + count - 1);
-  m_columns.remove(column, count);
-  for (auto &row : m_rows) {
-    row.remove(column, count);
+  // Save column definitions and per-row cell data for undo.
+  QVector<ColumnDefinition> saved_columns = m_columns.mid(column, count);
+  QVector<QVector<QVariant>> saved_data;
+  saved_data.reserve(m_rows.size());
+  for (const auto &row : m_rows) {
+    saved_data.append(row.mid(column, count));
   }
-  endRemoveColumns();
+  m_undo_stack->push(new RemoveColumnsCommand(this, column, count,
+                                              std::move(saved_columns),
+                                              std::move(saved_data)));
   return true;
 }
 
@@ -255,8 +254,104 @@ void SpreadsheetModel::move_row(int from, int to) {
     return;
   }
 
-  // QAbstractItemModel move semantics: destination is the row *before* which
-  // the moved row will be placed.
+  m_undo_stack->push(new MoveRowCommand(this, from, to));
+}
+
+void SpreadsheetModel::move_column(int from, int to) {
+  if (from < 0 || from >= m_columns.size() || to < 0 ||
+      to >= m_columns.size() || from == to) {
+    return;
+  }
+
+  m_undo_stack->push(new MoveColumnCommand(this, from, to));
+}
+
+// ---------------------------------------------------------------------------
+// Internal methods (called by undo commands, not public API)
+// ---------------------------------------------------------------------------
+
+void SpreadsheetModel::set_cell_value_internal(int row, int col,
+                                               const QVariant &value) {
+  if (row < 0 || row >= m_rows.size() || col < 0 || col >= m_columns.size()) {
+    return;
+  }
+  m_rows[row][col] = value;
+  QModelIndex idx = index(row, col);
+  emit dataChanged(idx, idx,
+                   {Qt::DisplayRole, Qt::EditRole, Qt::CheckStateRole});
+}
+
+void SpreadsheetModel::insert_rows_internal(int row, int count) {
+  int cols = static_cast<int>(m_columns.size());
+  beginInsertRows(QModelIndex(), row, row + count - 1);
+  for (int i = 0; i < count; ++i) {
+    m_rows.insert(row, QVector<QVariant>(cols));
+  }
+  endInsertRows();
+}
+
+void SpreadsheetModel::remove_rows_internal(int row, int count) {
+  beginRemoveRows(QModelIndex(), row, row + count - 1);
+  m_rows.remove(row, count);
+  endRemoveRows();
+}
+
+void SpreadsheetModel::insert_columns_internal(int col, int count) {
+  beginInsertColumns(QModelIndex(), col, col + count - 1);
+  for (int i = 0; i < count; ++i) {
+    ColumnDefinition def;
+    def.name = QString("Column %1").arg(m_columns.size() + 1);
+    def.logical_index = static_cast<int>(m_columns.size());
+    m_columns.insert(col + i, def);
+  }
+  for (auto &row : m_rows) {
+    for (int i = 0; i < count; ++i) {
+      row.insert(col, QVariant());
+    }
+  }
+  endInsertColumns();
+}
+
+void SpreadsheetModel::remove_columns_internal(int col, int count) {
+  beginRemoveColumns(QModelIndex(), col, col + count - 1);
+  m_columns.remove(col, count);
+  for (auto &row : m_rows) {
+    row.remove(col, count);
+  }
+  endRemoveColumns();
+}
+
+void SpreadsheetModel::restore_columns_internal(
+    int col, const QVector<ColumnDefinition> &columns,
+    const QVector<QVector<QVariant>> &data) {
+  // Overwrite column definitions that were just inserted with the saved ones.
+  for (int i = 0; i < columns.size(); ++i) {
+    m_columns[col + i] = columns[i];
+  }
+  // Restore per-row cell data.
+  for (int r = 0; r < data.size() && r < m_rows.size(); ++r) {
+    for (int c = 0; c < data[r].size(); ++c) {
+      m_rows[r][col + c] = data[r][c];
+    }
+  }
+  // Notify views that header and cell data changed.
+  if (!columns.isEmpty()) {
+    emit headerDataChanged(Qt::Horizontal, col,
+                           col + static_cast<int>(columns.size()) - 1);
+  }
+  if (!m_rows.isEmpty() && !columns.isEmpty()) {
+    emit dataChanged(index(0, col),
+                     index(static_cast<int>(m_rows.size()) - 1,
+                           col + static_cast<int>(columns.size()) - 1));
+  }
+}
+
+void SpreadsheetModel::move_row_internal(int from, int to) {
+  if (from < 0 || from >= m_rows.size() || to < 0 || to >= m_rows.size() ||
+      from == to) {
+    return;
+  }
+
   int dest = (to > from) ? to + 1 : to;
   if (!beginMoveRows(QModelIndex(), from, from, QModelIndex(), dest)) {
     return;
@@ -267,7 +362,7 @@ void SpreadsheetModel::move_row(int from, int to) {
   endMoveRows();
 }
 
-void SpreadsheetModel::move_column(int from, int to) {
+void SpreadsheetModel::move_column_internal(int from, int to) {
   if (from < 0 || from >= m_columns.size() || to < 0 ||
       to >= m_columns.size() || from == to) {
     return;
@@ -286,6 +381,20 @@ void SpreadsheetModel::move_column(int from, int to) {
     row.insert(to, cell);
   }
   endMoveColumns();
+}
+
+QUndoStack *SpreadsheetModel::undoStack(void) const {
+  return m_undo_stack;
+}
+
+void SpreadsheetModel::set_cell_value(int row, int col,
+                                      const QVariant &value) {
+  if (row < 0 || row >= m_rows.size() || col < 0 || col >= m_columns.size()) {
+    return;
+  }
+  QVariant old_val = m_rows[row][col];
+  m_undo_stack->push(
+      new SetCellValueCommand(this, row, col, old_val, value));
 }
 
 void SpreadsheetModel::populate_from_results(

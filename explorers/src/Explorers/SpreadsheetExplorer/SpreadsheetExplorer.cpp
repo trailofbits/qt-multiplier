@@ -75,6 +75,14 @@ void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
     }
   });
 
+  // Double-click on empty tab bar area creates a new sheet.
+  connect(d->tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
+          this, [this] (int index) {
+    if (index == -1) {
+      OnNewBlankSheet({});
+    }
+  });
+
   auto layout = new QVBoxLayout(d->dock);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->tab_widget, 1);
@@ -98,17 +106,27 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
 
   auto *model = new SpreadsheetModel;
 
-  // Create a blank sheet with 10 rows and 3 columns.
+  // Create a blank sheet with some columns and empty rows.
   QVector<ColumnDefinition> cols;
-  cols.push_back({tr("A"), 0});
-  cols.push_back({tr("B"), 1});
-  cols.push_back({tr("C"), 2});
+  cols.push_back({tr("Name"), 0});
+  cols.push_back({tr("Value"), 1});
+  cols.push_back({tr("Active"), 2});
 
   QVector<QVector<QVariant>> rows;
-  rows.resize(10);
+  rows.resize(8);
   for (auto &row : rows) {
     row.resize(3);
   }
+
+  // Populate a few rows with test data.
+  rows[0][0] = QStringLiteral("Hello");
+  rows[0][1] = QStringLiteral("World");
+  rows[0][2] = true;
+  rows[1][0] = QStringLiteral("Foo");
+  rows[1][1] = QStringLiteral("Bar");
+  rows[1][2] = false;
+  rows[2][0] = QStringLiteral("Editable cell");
+  rows[2][2] = true;
 
   model->populate_from_results(cols, rows);
 

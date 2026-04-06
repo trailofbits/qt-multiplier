@@ -10,6 +10,8 @@ add_library("mx_spreadsheet_widget"
   include/multiplier/GUI/Widgets/SpreadsheetModel.h
   include/multiplier/GUI/Widgets/SpreadsheetView.h
   include/multiplier/GUI/Widgets/SpreadsheetDelegate.h
+  src/SpreadsheetCommands.h
+  src/SpreadsheetCommands.cpp
   src/SpreadsheetModel.cpp
   src/SpreadsheetView.cpp
   src/SpreadsheetDelegate.cpp
