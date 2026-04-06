@@ -13,10 +13,9 @@
 namespace mx::gui {
 
 // Item delegate for the spreadsheet view. Renders Token / TokenRange cells
-// using theme colours (plain text for Phase 1; proper ThemedItemDelegate
-// wrapping will be added in Phase 4). FormulaCell values display their
-// cached result. Bool cells are rendered as check-boxes via the default
-// delegate. Other types fall through to QStyledItemDelegate::paint.
+// using theme colours. FormulaCell values display their cached result.
+// Bool cells are rendered as check-boxes via the default delegate.
+// QString cells use a QPlainTextEdit editor supporting multiline (Shift+Enter).
 class SpreadsheetDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   Q_OBJECT
 
@@ -29,6 +28,18 @@ class SpreadsheetDelegate Q_DECL_FINAL : public QStyledItemDelegate {
 
   QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
                         const QModelIndex &index) const Q_DECL_FINAL;
+
+  void setEditorData(QWidget *editor,
+                     const QModelIndex &index) const Q_DECL_FINAL;
+
+  void setModelData(QWidget *editor, QAbstractItemModel *model,
+                    const QModelIndex &index) const Q_DECL_FINAL;
+
+  void updateEditorGeometry(QWidget *editor,
+                            const QStyleOptionViewItem &option,
+                            const QModelIndex &index) const Q_DECL_FINAL;
+
+  bool eventFilter(QObject *object, QEvent *event) Q_DECL_FINAL;
 };
 
 }  // namespace mx::gui

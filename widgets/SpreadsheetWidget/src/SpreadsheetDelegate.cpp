@@ -7,7 +7,9 @@
 #include <multiplier/GUI/Widgets/SpreadsheetDelegate.h>
 
 #include <QApplication>
+#include <QKeyEvent>
 #include <QPainter>
+#include <QPlainTextEdit>
 #include <QStyle>
 #include <QStyleOptionViewItem>
 
@@ -79,7 +81,7 @@ void SpreadsheetDelegate::paint(QPainter *painter,
 }
 
 QWidget *SpreadsheetDelegate::createEditor(
-    QWidget *parent, const QStyleOptionViewItem &option,
+    QWidget *parent, const QStyleOptionViewItem &,
     const QModelIndex &index) const {
 
   QVariant raw = index.data(SpreadsheetRoles::RawValueRole);
@@ -92,7 +94,62 @@ QWidget *SpreadsheetDelegate::createEditor(
     return nullptr;
   }
 
-  return QStyledItemDelegate::createEditor(parent, option, index);
+  // Use QPlainTextEdit so Shift+Enter inserts newlines.
+  auto *editor = new QPlainTextEdit(parent);
+  editor->setTabChangesFocus(true);
+  editor->setLineWrapMode(QPlainTextEdit::NoWrap);
+  return editor;
+}
+
+void SpreadsheetDelegate::setEditorData(QWidget *editor,
+                                        const QModelIndex &index) const {
+  if (auto *te = qobject_cast<QPlainTextEdit *>(editor)) {
+    te->setPlainText(index.data(Qt::EditRole).toString());
+    te->selectAll();
+  } else {
+    QStyledItemDelegate::setEditorData(editor, index);
+  }
+}
+
+void SpreadsheetDelegate::setModelData(QWidget *editor,
+                                       QAbstractItemModel *model,
+                                       const QModelIndex &index) const {
+  if (auto *te = qobject_cast<QPlainTextEdit *>(editor)) {
+    model->setData(index, te->toPlainText(), Qt::EditRole);
+  } else {
+    QStyledItemDelegate::setModelData(editor, model, index);
+  }
+}
+
+void SpreadsheetDelegate::updateEditorGeometry(
+    QWidget *editor, const QStyleOptionViewItem &option,
+    const QModelIndex &) const {
+  // Give the editor at least the cell rect, but expand vertically
+  // to show a few lines.
+  QRect rect = option.rect;
+  rect.setHeight(std::max(rect.height(), 80));
+  editor->setGeometry(rect);
+}
+
+bool SpreadsheetDelegate::eventFilter(QObject *object, QEvent *event) {
+  if (event->type() == QEvent::KeyPress) {
+    auto *ke = static_cast<QKeyEvent *>(event);
+    if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter) {
+      if (ke->modifiers() & Qt::ShiftModifier) {
+        // Shift+Enter: let the editor handle it (inserts newline).
+        return false;
+      }
+      // Plain Enter: commit and close.
+      emit commitData(qobject_cast<QWidget *>(object));
+      emit closeEditor(qobject_cast<QWidget *>(object));
+      return true;
+    }
+    if (ke->key() == Qt::Key_Escape) {
+      emit closeEditor(qobject_cast<QWidget *>(object));
+      return true;
+    }
+  }
+  return QStyledItemDelegate::eventFilter(object, event);
 }
 
 }  // namespace mx::gui

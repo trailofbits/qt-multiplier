@@ -42,9 +42,10 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
   setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
 
-  // Word wrap off for performance.
-  setWordWrap(false);
-  setTextElideMode(Qt::ElideRight);
+  // Word wrap on for multiline cells.
+  setWordWrap(true);
+  setTextElideMode(Qt::ElideNone);
+  verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
 
   // Context menu on cells.
   setContextMenuPolicy(Qt::CustomContextMenu);

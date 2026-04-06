@@ -64,7 +64,7 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
   CreateDockWidget(parent);
 
   // Add "New Spreadsheet" to the File menu.
-  auto *new_sheet_action = new QAction(tr("New Spreadsheet"), this);
+  auto *new_sheet_action = new QAction(tr("New Sheet"), this);
   new_sheet_action->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
   connect(new_sheet_action, &QAction::triggered,
           this, [this] () { OnNewBlankSheet({}); });
@@ -77,7 +77,7 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
 
 void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
   d->dock = new IWindowWidget;
-  d->dock->setWindowTitle(tr("Spreadsheets"));
+  d->dock->setWindowTitle(tr("Sheets"));
   d->dock->setContentsMargins(0, 0, 0, 0);
 
   d->tab_widget = new TabWidget(d->dock);
@@ -159,7 +159,7 @@ void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
   d->dock->setLayout(layout);
 
   IWindowManager::DockConfig config;
-  config.id = "com.trailofbits.dock.Spreadsheets";
+  config.id = "com.trailofbits.dock.Sheets";
   config.location = IWindowManager::DockLocation::Bottom;
   config.tabify = true;
   config.app_menu_location = {tr("View"), tr("Explorers")};

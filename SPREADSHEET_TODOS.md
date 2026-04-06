@@ -9,6 +9,12 @@
 - [ ] Verify rendering with mixed cell types at runtime
 - [ ] Hard-code test data to verify token rendering
 
+## Phase 1.5: Row/column background colors
+- [ ] Per-row and per-column background color support in SpreadsheetModel
+- [ ] Right-click row/column header to set background color (QColorDialog)
+- [ ] BackgroundRole in model returns the row/column color
+- [ ] Persistence of row/column colors in SQLite
+
 ## Phase 2: Mutations + undo/redo
 - [x] QUndoStack integration
 - [x] SetCellValueCommand, InsertRowsCommand, RemoveRowsCommand, etc.
@@ -54,6 +60,7 @@
 - [ ] Python formula editor with auto-complete popup (reuse PythonCompletionModel from PythonConsoleWidget)
 
 ## Future: Global undo support
+- [ ] Global undo/redo toolbar buttons (route to the active widget's QUndoStack)
 - [ ] Make macro (un)expansion undoable (QUndoCommand wrapping ExpandedMacrosModel changes)
 - [ ] Make highlight color set/remove undoable (QUndoCommand wrapping HighlightThemeProxy changes)
 - [ ] Consider a global QUndoStack for the application (vs per-widget stacks)
