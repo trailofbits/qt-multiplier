@@ -8,6 +8,8 @@
 
 #include <QAction>
 #include <QMenu>
+#include <QToolBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
@@ -174,9 +176,9 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
 
   // Create a blank sheet with some columns and empty rows.
   QVector<ColumnDefinition> cols;
-  cols.push_back({tr("Name"), 0});
-  cols.push_back({tr("Value"), 1});
-  cols.push_back({tr("Active"), 2});
+  cols.push_back({tr("A"), 0});
+  cols.push_back({tr("B"), 1});
+  cols.push_back({tr("C"), 2});
 
   QVector<QVector<QVariant>> rows;
   rows.resize(8);
@@ -184,24 +186,101 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
     row.resize(3);
   }
 
-  // Populate a few rows with test data.
-  rows[0][0] = QStringLiteral("Hello");
-  rows[0][1] = QStringLiteral("World");
-  rows[0][2] = true;
-  rows[1][0] = QStringLiteral("Foo");
-  rows[1][1] = QStringLiteral("Bar");
-  rows[1][2] = false;
-  rows[2][0] = QStringLiteral("Editable cell");
-  rows[2][2] = true;
-
   model->populate_from_results(cols, rows);
 
-  auto *view = new SpreadsheetView(d->tab_widget);
-  view->setModel(model);
-  ++(d->sheet_counter);
-  view->setWindowTitle(tr("Sheet %1").arg(d->sheet_counter));
+  // Container widget: toolbar at bottom + view.
+  auto *container = new QWidget(d->tab_widget);
+  auto *layout = new QVBoxLayout(container);
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(0);
 
-  d->tab_widget->InsertTab(0, view);
+  auto *view = new SpreadsheetView(container);
+  view->setModel(model);
+  layout->addWidget(view, 1);
+
+  // Bottom toolbar for row/column operations.
+  auto *toolbar = new QToolBar(container);
+  toolbar->setIconSize(QSize(16, 16));
+
+  auto *add_row = toolbar->addAction(tr("+ Row"));
+  connect(add_row, &QAction::triggered, view, [model, view] () {
+    auto sel = view->selectionModel()->currentIndex();
+    int row = sel.isValid() ? sel.row() + 1
+                            : model->rowCount();
+    model->insertRow(row);
+  });
+
+  auto *add_col = toolbar->addAction(tr("+ Col"));
+  connect(add_col, &QAction::triggered, view, [model, view] () {
+    auto sel = view->selectionModel()->currentIndex();
+    int col = sel.isValid() ? sel.column() + 1
+                            : model->columnCount();
+    model->insertColumn(col);
+  });
+
+  toolbar->addSeparator();
+
+  auto *del_row = toolbar->addAction(tr("Del Row"));
+  connect(del_row, &QAction::triggered, view, [model, view] () {
+    auto sel = view->selectionModel()->currentIndex();
+    if (sel.isValid()) {
+      model->removeRow(sel.row());
+    }
+  });
+
+  auto *del_col = toolbar->addAction(tr("Del Col"));
+  connect(del_col, &QAction::triggered, view, [model, view] () {
+    auto sel = view->selectionModel()->currentIndex();
+    if (sel.isValid()) {
+      model->removeColumn(sel.column());
+    }
+  });
+
+  toolbar->addSeparator();
+
+  auto *move_row_up = toolbar->addAction(QStringLiteral("\u2191 Row"));
+  connect(move_row_up, &QAction::triggered, view, [model, view] () {
+    auto sel = view->selectionModel()->currentIndex();
+    if (sel.isValid() && sel.row() > 0) {
+      model->move_row(sel.row(), sel.row() - 1);
+      view->selectRow(sel.row() - 1);
+    }
+  });
+
+  auto *move_row_down = toolbar->addAction(QStringLiteral("\u2193 Row"));
+  connect(move_row_down, &QAction::triggered, view, [model, view] () {
+    auto sel = view->selectionModel()->currentIndex();
+    if (sel.isValid() && sel.row() < model->rowCount() - 1) {
+      model->move_row(sel.row(), sel.row() + 1);
+      view->selectRow(sel.row() + 1);
+    }
+  });
+
+  auto *move_col_left = toolbar->addAction(QStringLiteral("\u2190 Col"));
+  connect(move_col_left, &QAction::triggered, view, [model, view] () {
+    auto sel = view->selectionModel()->currentIndex();
+    if (sel.isValid() && sel.column() > 0) {
+      model->move_column(sel.column(), sel.column() - 1);
+      view->selectColumn(sel.column() - 1);
+    }
+  });
+
+  auto *move_col_right = toolbar->addAction(QStringLiteral("\u2192 Col"));
+  connect(move_col_right, &QAction::triggered, view, [model, view] () {
+    auto sel = view->selectionModel()->currentIndex();
+    if (sel.isValid() && sel.column() < model->columnCount() - 1) {
+      model->move_column(sel.column(), sel.column() + 1);
+      view->selectColumn(sel.column() + 1);
+    }
+  });
+
+  layout->addWidget(toolbar);
+  container->setLayout(layout);
+
+  ++(d->sheet_counter);
+  container->setWindowTitle(tr("Sheet %1").arg(d->sheet_counter));
+
+  d->tab_widget->InsertTab(0, container);
   d->dock->show();
   d->dock->EmitRequestAttention();
 }

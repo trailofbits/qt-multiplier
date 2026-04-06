@@ -87,6 +87,19 @@ QVariant SpreadsheetModel::data(const QModelIndex &index, int role) const {
       return {};
     }
 
+    case Qt::BackgroundRole: {
+      // Row color takes priority, then column color.
+      auto row_it = m_row_colors.find(row);
+      if (row_it != m_row_colors.end()) {
+        return row_it.value();
+      }
+      auto col_it = m_col_colors.find(col);
+      if (col_it != m_col_colors.end()) {
+        return col_it.value();
+      }
+      return {};
+    }
+
     default:
       break;
   }
@@ -459,6 +472,52 @@ QString SpreadsheetModel::display_text_for(const QVariant &value) {
   }
 
   return value.toString();
+}
+
+void SpreadsheetModel::SetRowColor(int row, const QColor &color) {
+  m_row_colors[row] = color;
+  if (m_columns.size() > 0) {
+    emit dataChanged(index(row, 0),
+                     index(row, static_cast<int>(m_columns.size()) - 1),
+                     {Qt::BackgroundRole});
+  }
+}
+
+void SpreadsheetModel::ClearRowColor(int row) {
+  m_row_colors.remove(row);
+  if (m_columns.size() > 0) {
+    emit dataChanged(index(row, 0),
+                     index(row, static_cast<int>(m_columns.size()) - 1),
+                     {Qt::BackgroundRole});
+  }
+}
+
+void SpreadsheetModel::SetColumnColor(int col, const QColor &color) {
+  m_col_colors[col] = color;
+  if (m_rows.size() > 0) {
+    emit dataChanged(index(0, col),
+                     index(static_cast<int>(m_rows.size()) - 1, col),
+                     {Qt::BackgroundRole});
+  }
+}
+
+void SpreadsheetModel::ClearColumnColor(int col) {
+  m_col_colors.remove(col);
+  if (m_rows.size() > 0) {
+    emit dataChanged(index(0, col),
+                     index(static_cast<int>(m_rows.size()) - 1, col),
+                     {Qt::BackgroundRole});
+  }
+}
+
+QColor SpreadsheetModel::RowColor(int row) const {
+  auto it = m_row_colors.find(row);
+  return (it != m_row_colors.end()) ? it.value() : QColor();
+}
+
+QColor SpreadsheetModel::ColumnColor(int col) const {
+  auto it = m_col_colors.find(col);
+  return (it != m_col_colors.end()) ? it.value() : QColor();
 }
 
 }  // namespace mx::gui

@@ -9,6 +9,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QColorDialog>
 #include <QDataStream>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -47,6 +48,43 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
   setTextElideMode(Qt::ElideNone);
   verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
 
+  // Context menu on row headers for insert/delete/move/color.
+  verticalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(verticalHeader(), &QWidget::customContextMenuRequested,
+          this, [this] (const QPoint &pos) {
+    int row = verticalHeader()->logicalIndexAt(pos);
+    if (row < 0) return;
+
+    QMenu menu(this);
+    menu.addAction(tr("Insert Row Above"), this, [this, row] () {
+      model()->insertRow(row);
+    });
+    menu.addAction(tr("Insert Row Below"), this, [this, row] () {
+      model()->insertRow(row + 1);
+    });
+    menu.addAction(tr("Remove Row"), this, [this, row] () {
+      model()->removeRow(row);
+    });
+    menu.addSeparator();
+    menu.addAction(tr("Set Row Color..."), this, [this, row] () {
+      auto *sm = qobject_cast<SpreadsheetModel *>(model());
+      if (!sm) return;
+      QColor initial = sm->RowColor(row);
+      QColor color = QColorDialog::getColor(
+          initial.isValid() ? initial : Qt::white, this,
+          tr("Row Color"));
+      if (color.isValid()) {
+        sm->SetRowColor(row, color);
+      }
+    });
+    menu.addAction(tr("Clear Row Color"), this, [this, row] () {
+      if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
+        sm->ClearRowColor(row);
+      }
+    });
+    menu.exec(verticalHeader()->mapToGlobal(pos));
+  });
+
   // Context menu on cells.
   setContextMenuPolicy(Qt::CustomContextMenu);
   connect(this, &QWidget::customContextMenuRequested,
@@ -81,6 +119,23 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
     });
     menu.addAction(tr("Remove Column"), this, [this, col] () {
       model()->removeColumn(col);
+    });
+    menu.addSeparator();
+    menu.addAction(tr("Set Column Color..."), this, [this, col] () {
+      auto *sm = qobject_cast<SpreadsheetModel *>(model());
+      if (!sm) return;
+      QColor initial = sm->ColumnColor(col);
+      QColor color = QColorDialog::getColor(
+          initial.isValid() ? initial : Qt::white, this,
+          tr("Column Color"));
+      if (color.isValid()) {
+        sm->SetColumnColor(col, color);
+      }
+    });
+    menu.addAction(tr("Clear Column Color"), this, [this, col] () {
+      if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
+        sm->ClearColumnColor(col);
+      }
     });
     menu.exec(horizontalHeader()->mapToGlobal(pos));
   });

@@ -9,6 +9,8 @@
 #pragma once
 
 #include <QAbstractTableModel>
+#include <QColor>
+#include <QHash>
 #include <QMetaType>
 #include <QString>
 #include <QUndoStack>
@@ -124,10 +126,20 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
   void move_row_internal(int from, int to);
   void move_column_internal(int from, int to);
 
+  // Row/column background colors.
+  void SetRowColor(int row, const QColor &color);
+  void ClearRowColor(int row);
+  void SetColumnColor(int col, const QColor &color);
+  void ClearColumnColor(int col);
+  QColor RowColor(int row) const;
+  QColor ColumnColor(int col) const;
+
  private:
   QVector<ColumnDefinition> m_columns;
   QVector<QVector<QVariant>> m_rows;
   QUndoStack *m_undo_stack;
+  QHash<int, QColor> m_row_colors;
+  QHash<int, QColor> m_col_colors;
 };
 
 }  // namespace mx::gui
