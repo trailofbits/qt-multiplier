@@ -3355,6 +3355,7 @@ void CodeWidget::ActOnContextMenu(IWindowManager *, QMenu *menu,
     menu->addAction(copy_selection);
     connect(copy_selection, &QAction::triggered,
             this, [this] (void) {
+                    std::cerr << "CONTEXT_COPY: triggered" << std::endl;
                     d->CopySelectionToClipboard();
                   });
   }
