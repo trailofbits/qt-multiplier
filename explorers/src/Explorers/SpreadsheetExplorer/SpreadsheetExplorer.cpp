@@ -32,6 +32,13 @@
 
 namespace mx::gui {
 
+struct SheetTab {
+  SpreadsheetModel *model{nullptr};
+  SpreadsheetView *view{nullptr};
+  QWidget *container{nullptr};
+  int sheet_id{-1};
+};
+
 struct SpreadsheetExplorer::PrivateData {
   ConfigManager &config_manager;
   IWindowManager * const manager;
@@ -40,12 +47,63 @@ struct SpreadsheetExplorer::PrivateData {
   TabWidget *tab_widget{nullptr};
   int sheet_counter{0};
 
+  // Track per-tab state.
+  std::unordered_map<QWidget *, SheetTab> tabs;
+
   inline PrivateData(ConfigManager &config_manager_, IWindowManager *manager_)
       : config_manager(config_manager_),
         manager(manager_) {}
+
+  void SaveAllSheets(void) const;
 };
 
-SpreadsheetExplorer::~SpreadsheetExplorer(void) {}
+void SpreadsheetExplorer::PrivateData::SaveAllSheets(void) const {
+  for (const auto &[widget, tab] : tabs) {
+    ConfigManager::SheetData data;
+    data.sheet_id = tab.sheet_id;
+    data.name = tab.container->windowTitle();
+
+    auto *model = tab.model;
+    int num_cols = model->columnCount();
+    int num_rows = model->rowCount();
+
+    // Columns.
+    for (int c = 0; c < num_cols; ++c) {
+      QString col_name = model->headerData(c, Qt::Horizontal).toString();
+      QColor col_color = model->ColumnColor(c);
+      data.columns.push_back({col_name, col_color});
+    }
+
+    // Cells.
+    data.cells.resize(num_rows);
+    for (int r = 0; r < num_rows; ++r) {
+      data.cells[r].resize(num_cols);
+      for (int c = 0; c < num_cols; ++c) {
+        QVariant cell = model->data(model->index(r, c),
+                                    SpreadsheetRoles::RawValueRole);
+        if (cell.isValid()) {
+          data.cells[r][c] = SpreadsheetModel::value_to_json(cell);
+        }
+      }
+    }
+
+    // Row colors.
+    for (int r = 0; r < num_rows; ++r) {
+      QColor rc = model->RowColor(r);
+      if (rc.isValid()) {
+        data.row_colors[r] = rc;
+      }
+    }
+
+    int new_id = config_manager.SaveSheet(data);
+    // Update the stored sheet_id for future saves.
+    const_cast<SheetTab &>(tab).sheet_id = new_id;
+  }
+}
+
+SpreadsheetExplorer::~SpreadsheetExplorer(void) {
+  d->SaveAllSheets();
+}
 
 SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
                                          IWindowManager *parent)
@@ -101,6 +159,14 @@ void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
   connect(d->tab_widget->tabBar(), &QTabBar::tabCloseRequested,
           this, [this] (int i) {
     auto *widget = d->tab_widget->widget(i);
+    // Delete from DB if it was saved.
+    auto it = d->tabs.find(widget);
+    if (it != d->tabs.end()) {
+      if (it->second.sheet_id >= 0) {
+        d->config_manager.DeleteSheet(it->second.sheet_id);
+      }
+      d->tabs.erase(it);
+    }
     d->tab_widget->RemoveTab(i);
     widget->deleteLater();
     if (!d->tab_widget->count()) {
@@ -326,6 +392,14 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
   ++(d->sheet_counter);
   container->setWindowTitle(tr("Sheet %1").arg(d->sheet_counter));
 
+  // Track the tab.
+  SheetTab tab;
+  tab.model = model;
+  tab.view = view;
+  tab.container = container;
+  tab.sheet_id = -1;
+  d->tabs.emplace(container, tab);
+
   d->tab_widget->InsertTab(0, container);
   d->dock->show();
   d->dock->EmitRequestAttention();
@@ -346,8 +420,111 @@ void SpreadsheetExplorer::ActOnContextMenu(
   // No global context menu actions.
 }
 
-void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &) {
-  // TODO: Phase 5 — load persisted sheets from the database.
+void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {
+  auto sheets = cm.LoadAllSheets();
+  if (sheets.isEmpty()) {
+    return;
+  }
+
+  if (!d->dock) {
+    CreateDockWidget(d->manager);
+  }
+
+  for (const auto &sheet : sheets) {
+    auto *model = new SpreadsheetModel;
+
+    // Build columns.
+    QVector<ColumnDefinition> cols;
+    for (int c = 0; c < sheet.columns.size(); ++c) {
+      cols.push_back({sheet.columns[c].first, c});
+    }
+
+    // Build rows from JSON cells.
+    int num_rows = static_cast<int>(sheet.cells.size());
+    int num_cols = static_cast<int>(cols.size());
+    QVector<QVector<QVariant>> rows(num_rows);
+    for (int r = 0; r < num_rows; ++r) {
+      rows[r].resize(num_cols);
+      for (int c = 0; c < num_cols && c < sheet.cells[r].size(); ++c) {
+        if (!sheet.cells[r][c].isEmpty()) {
+          rows[r][c] = SpreadsheetModel::value_from_json(sheet.cells[r][c]);
+        }
+      }
+    }
+
+    model->populate_from_results(cols, rows);
+
+    // Restore column colors.
+    for (int c = 0; c < sheet.columns.size(); ++c) {
+      if (sheet.columns[c].second.isValid()) {
+        model->SetColumnColor(c, sheet.columns[c].second);
+      }
+    }
+
+    // Restore row colors.
+    for (auto it = sheet.row_colors.constBegin();
+         it != sheet.row_colors.constEnd(); ++it) {
+      model->SetRowColor(it.key(), it.value());
+    }
+
+    // Create the view container (same as OnNewBlankSheet).
+    auto *container = new QWidget(d->tab_widget);
+    auto *layout = new QVBoxLayout(container);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    auto *view = new SpreadsheetView(container);
+    view->setModel(model);
+
+    auto &theme_manager = d->config_manager.ThemeManager();
+    auto *delegate = new SpreadsheetDelegate(
+        theme_manager.Theme(), d->config_manager.TabWidth(), view);
+    view->setItemDelegate(delegate);
+
+    auto apply_theme = [view, delegate] (const ThemeManager &tm) {
+      auto theme = tm.Theme();
+      view->ApplyThemeColors(
+          theme->GutterBackgroundColor(),
+          theme->GutterForegroundColor(),
+          theme->GutterBackgroundColor().darker(120));
+      view->setFont(theme->Font());
+      delegate->SetTheme(theme);
+    };
+    apply_theme(theme_manager);
+    connect(&theme_manager, &ThemeManager::ThemeChanged, view, apply_theme);
+
+    connect(&d->config_manager, &ConfigManager::TabWidthChanged,
+            view, [delegate] (unsigned tw) { delegate->SetTabWidth(tw); });
+
+    layout->addWidget(view, 1);
+
+    // Bottom toolbar (same as OnNewBlankSheet — TODO: extract to helper).
+    auto *toolbar = new QToolBar(container);
+    toolbar->setIconSize(QSize(16, 16));
+    toolbar->addAction(tr("+ Row"), view, [model, view] () {
+      auto sel = view->selectionModel()->currentIndex();
+      model->insertRow(sel.isValid() ? sel.row() + 1 : model->rowCount());
+    });
+    toolbar->addAction(tr("+ Col"), view, [model, view] () {
+      auto sel = view->selectionModel()->currentIndex();
+      model->insertColumn(sel.isValid() ? sel.column() + 1 : model->columnCount());
+    });
+    layout->addWidget(toolbar);
+
+    container->setLayout(layout);
+    container->setWindowTitle(sheet.name);
+
+    SheetTab tab;
+    tab.model = model;
+    tab.view = view;
+    tab.container = container;
+    tab.sheet_id = sheet.sheet_id;
+    d->tabs.emplace(container, tab);
+
+    d->tab_widget->AddTab(container);
+  }
+
+  d->dock->show();
 }
 
 }  // namespace mx::gui

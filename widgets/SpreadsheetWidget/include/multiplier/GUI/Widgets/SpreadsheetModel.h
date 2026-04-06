@@ -109,6 +109,10 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
   // Return a human-readable string for a cell value.
   static QString display_text_for(const QVariant &value);
 
+  // Serialize/deserialize a cell value to/from a JSON string.
+  static QString value_to_json(const QVariant &value);
+  static QVariant value_from_json(const QString &json);
+
   // Set a single cell value (creates an undo command).
   void set_cell_value(int row, int col, const QVariant &value);
 

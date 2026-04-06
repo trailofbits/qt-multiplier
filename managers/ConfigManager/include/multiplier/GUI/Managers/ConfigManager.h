@@ -13,6 +13,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QObject>
+#include <QPair>
 #include <QSet>
 #include <QString>
 
@@ -127,6 +128,18 @@ class ConfigManager Q_DECL_FINAL : public QObject {
       std::unordered_map<mx::RawEntityId, std::pair<QColor, QColor>>;
   void SaveHighlightColors(const HighlightColorMap &colors) const;
   HighlightColorMap LoadHighlightColors(void) const;
+
+  //! Save/load spreadsheet sheets (per-project).
+  struct SheetData {
+    int sheet_id{-1};
+    QString name;
+    QVector<QPair<QString, QColor>> columns;  // (name, color)
+    QVector<QVector<QString>> cells;          // cells[row][col] = JSON value
+    QHash<int, QColor> row_colors;
+  };
+  int SaveSheet(const SheetData &sheet) const;
+  QVector<SheetData> LoadAllSheets(void) const;
+  void DeleteSheet(int sheet_id) const;
 
   //! Save/load navigation history (per-project).
   struct NavigationEntry {

@@ -68,6 +68,33 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "CREATE TABLE IF NOT EXISTS gui_highlight_colors ("
       "  entity_id INTEGER PRIMARY KEY, fg TEXT, bg TEXT)"));
 
+  // Spreadsheet persistence tables.
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_sheets ("
+      "  sheet_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  name TEXT NOT NULL,"
+      "  column_order TEXT)"));  // JSON array of column indices
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_sheet_columns ("
+      "  sheet_id INTEGER NOT NULL,"
+      "  col_index INTEGER NOT NULL,"
+      "  name TEXT NOT NULL,"
+      "  color TEXT,"
+      "  PRIMARY KEY (sheet_id, col_index))"));
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_sheet_cells ("
+      "  sheet_id INTEGER NOT NULL,"
+      "  row_num INTEGER NOT NULL,"
+      "  col_index INTEGER NOT NULL,"
+      "  value TEXT NOT NULL,"
+      "  PRIMARY KEY (sheet_id, row_num, col_index))"));
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_sheet_row_colors ("
+      "  sheet_id INTEGER NOT NULL,"
+      "  row_num INTEGER NOT NULL,"
+      "  color TEXT NOT NULL,"
+      "  PRIMARY KEY (sheet_id, row_num))"));
+
   return db;
 }
 
@@ -435,6 +462,188 @@ ConfigManager::HighlightColorMap ConfigManager::LoadHighlightColors(void) const 
       result.emplace(id, std::make_pair(fg, bg));
   }
   return result;
+}
+
+// --- Spreadsheet persistence ---
+
+int ConfigManager::SaveSheet(const SheetData &sheet) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
+
+  d->project_db.transaction();
+
+  QSqlQuery q(d->project_db);
+  int sheet_id = sheet.sheet_id;
+
+  if (sheet_id < 0) {
+    // Insert new sheet.
+    q.prepare(QStringLiteral(
+        "INSERT INTO gui_sheets (name) VALUES (?)"));
+    q.addBindValue(sheet.name);
+    q.exec();
+    sheet_id = q.lastInsertId().toInt();
+  } else {
+    // Update existing sheet name.
+    q.prepare(QStringLiteral(
+        "UPDATE gui_sheets SET name = ? WHERE sheet_id = ?"));
+    q.addBindValue(sheet.name);
+    q.addBindValue(sheet_id);
+    q.exec();
+
+    // Clear old data.
+    q.prepare(QStringLiteral("DELETE FROM gui_sheet_columns WHERE sheet_id = ?"));
+    q.addBindValue(sheet_id);
+    q.exec();
+    q.prepare(QStringLiteral("DELETE FROM gui_sheet_cells WHERE sheet_id = ?"));
+    q.addBindValue(sheet_id);
+    q.exec();
+    q.prepare(QStringLiteral("DELETE FROM gui_sheet_row_colors WHERE sheet_id = ?"));
+    q.addBindValue(sheet_id);
+    q.exec();
+  }
+
+  // Save columns.
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_sheet_columns (sheet_id, col_index, name, color) "
+      "VALUES (?, ?, ?, ?)"));
+  for (int i = 0; i < sheet.columns.size(); ++i) {
+    q.addBindValue(sheet_id);
+    q.addBindValue(i);
+    q.addBindValue(sheet.columns[i].first);
+    q.addBindValue(sheet.columns[i].second.isValid()
+                   ? sheet.columns[i].second.name(QColor::HexArgb)
+                   : QString());
+    q.exec();
+  }
+
+  // Save cells.
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_sheet_cells (sheet_id, row_num, col_index, value) "
+      "VALUES (?, ?, ?, ?)"));
+  for (int r = 0; r < sheet.cells.size(); ++r) {
+    for (int c = 0; c < sheet.cells[r].size(); ++c) {
+      if (!sheet.cells[r][c].isEmpty()) {
+        q.addBindValue(sheet_id);
+        q.addBindValue(r);
+        q.addBindValue(c);
+        q.addBindValue(sheet.cells[r][c]);
+        q.exec();
+      }
+    }
+  }
+
+  // Save row colors.
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_sheet_row_colors (sheet_id, row_num, color) "
+      "VALUES (?, ?, ?)"));
+  for (auto it = sheet.row_colors.constBegin();
+       it != sheet.row_colors.constEnd(); ++it) {
+    q.addBindValue(sheet_id);
+    q.addBindValue(it.key());
+    q.addBindValue(it.value().name(QColor::HexArgb));
+    q.exec();
+  }
+
+  d->project_db.commit();
+  return sheet_id;
+}
+
+QVector<ConfigManager::SheetData> ConfigManager::LoadAllSheets(void) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+
+  QVector<SheetData> result;
+
+  QSqlQuery q(d->project_db);
+  q.exec(QStringLiteral("SELECT sheet_id, name FROM gui_sheets ORDER BY sheet_id"));
+
+  while (q.next()) {
+    SheetData sheet;
+    sheet.sheet_id = q.value(0).toInt();
+    sheet.name = q.value(1).toString();
+
+    // Load columns.
+    QSqlQuery cq(d->project_db);
+    cq.prepare(QStringLiteral(
+        "SELECT col_index, name, color FROM gui_sheet_columns "
+        "WHERE sheet_id = ? ORDER BY col_index"));
+    cq.addBindValue(sheet.sheet_id);
+    cq.exec();
+    while (cq.next()) {
+      QString col_name = cq.value(1).toString();
+      QString col_color_str = cq.value(2).toString();
+      QColor col_color = col_color_str.isEmpty() ? QColor()
+                                                  : QColor(col_color_str);
+      sheet.columns.push_back({col_name, col_color});
+    }
+
+    // Load cells — find max row.
+    QSqlQuery rq(d->project_db);
+    rq.prepare(QStringLiteral(
+        "SELECT MAX(row_num) FROM gui_sheet_cells WHERE sheet_id = ?"));
+    rq.addBindValue(sheet.sheet_id);
+    rq.exec();
+    int max_row = -1;
+    if (rq.next()) {
+      max_row = rq.value(0).toInt();
+    }
+
+    int num_cols = static_cast<int>(sheet.columns.size());
+    sheet.cells.resize(max_row + 1);
+    for (auto &row : sheet.cells) {
+      row.resize(num_cols);
+    }
+
+    QSqlQuery cellq(d->project_db);
+    cellq.prepare(QStringLiteral(
+        "SELECT row_num, col_index, value FROM gui_sheet_cells "
+        "WHERE sheet_id = ?"));
+    cellq.addBindValue(sheet.sheet_id);
+    cellq.exec();
+    while (cellq.next()) {
+      int r = cellq.value(0).toInt();
+      int c = cellq.value(1).toInt();
+      if (r < sheet.cells.size() && c < num_cols) {
+        sheet.cells[r][c] = cellq.value(2).toString();
+      }
+    }
+
+    // Load row colors.
+    QSqlQuery rcq(d->project_db);
+    rcq.prepare(QStringLiteral(
+        "SELECT row_num, color FROM gui_sheet_row_colors WHERE sheet_id = ?"));
+    rcq.addBindValue(sheet.sheet_id);
+    rcq.exec();
+    while (rcq.next()) {
+      int row = rcq.value(0).toInt();
+      QColor color(rcq.value(1).toString());
+      if (color.isValid()) {
+        sheet.row_colors[row] = color;
+      }
+    }
+
+    result.push_back(std::move(sheet));
+  }
+
+  return result;
+}
+
+void ConfigManager::DeleteSheet(int sheet_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+
+  d->project_db.transaction();
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral("DELETE FROM gui_sheet_cells WHERE sheet_id = ?"));
+  q.addBindValue(sheet_id);
+  q.exec();
+  q.prepare(QStringLiteral("DELETE FROM gui_sheet_columns WHERE sheet_id = ?"));
+  q.addBindValue(sheet_id);
+  q.exec();
+  q.prepare(QStringLiteral("DELETE FROM gui_sheet_row_colors WHERE sheet_id = ?"));
+  q.addBindValue(sheet_id);
+  q.exec();
+  q.prepare(QStringLiteral("DELETE FROM gui_sheets WHERE sheet_id = ?"));
+  q.addBindValue(sheet_id);
+  q.exec();
+  d->project_db.commit();
 }
 
 // --- Navigation history ---

@@ -7,6 +7,9 @@
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
 #include <QFont>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QUndoStack>
 
 #include <algorithm>
@@ -618,6 +621,111 @@ QColor SpreadsheetModel::RowColor(int row) const {
 QColor SpreadsheetModel::ColumnColor(int col) const {
   auto it = m_col_colors.find(col);
   return (it != m_col_colors.end()) ? it.value() : QColor();
+}
+
+QString SpreadsheetModel::value_to_json(const QVariant &value) {
+  if (!value.isValid()) {
+    return {};
+  }
+
+  if (value.userType() == QMetaType::Bool) {
+    return value.toBool() ? QStringLiteral("{\"t\":\"b\",\"v\":1}")
+                          : QStringLiteral("{\"t\":\"b\",\"v\":0}");
+  }
+
+  if (value.canConvert<TokenRange>()) {
+    // Serialize tokens as JSON array of {kind, category, data}.
+    auto range = value.value<TokenRange>();
+    QString json = QStringLiteral("{\"t\":\"tr\",\"v\":[");
+    bool first = true;
+    for (Token tok : range) {
+      if (!first) json += QLatin1Char(',');
+      first = false;
+      auto td = tok.data();
+      QString data = QString::fromUtf8(td.data(),
+                                       static_cast<qsizetype>(td.size()));
+      // Escape quotes and backslashes in data.
+      data.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
+      data.replace(QLatin1Char('"'), QStringLiteral("\\\""));
+      json += QStringLiteral("{\"k\":%1,\"c\":%2,\"d\":\"%3\"}")
+          .arg(static_cast<int>(tok.kind()))
+          .arg(static_cast<int>(tok.category()))
+          .arg(data);
+    }
+    json += QStringLiteral("]}");
+    return json;
+  }
+
+  if (value.canConvert<Token>()) {
+    auto tok = value.value<Token>();
+    auto td = tok.data();
+    QString data = QString::fromUtf8(td.data(),
+                                     static_cast<qsizetype>(td.size()));
+    data.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
+    data.replace(QLatin1Char('"'), QStringLiteral("\\\""));
+    return QStringLiteral("{\"t\":\"tok\",\"k\":%1,\"c\":%2,\"d\":\"%3\"}")
+        .arg(static_cast<int>(tok.kind()))
+        .arg(static_cast<int>(tok.category()))
+        .arg(data);
+  }
+
+  // Default: string.
+  QString text = value.toString();
+  text.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
+  text.replace(QLatin1Char('"'), QStringLiteral("\\\""));
+  return QStringLiteral("{\"t\":\"s\",\"v\":\"%1\"}").arg(text);
+}
+
+QVariant SpreadsheetModel::value_from_json(const QString &json) {
+  if (json.isEmpty()) {
+    return {};
+  }
+
+  QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+  if (!doc.isObject()) {
+    // Legacy: treat as plain string if not JSON.
+    return json;
+  }
+
+  QJsonObject obj = doc.object();
+  QString type = obj[QStringLiteral("t")].toString();
+
+  if (type == QLatin1String("b")) {
+    return obj[QStringLiteral("v")].toInt() != 0;
+  }
+
+  if (type == QLatin1String("s")) {
+    return obj[QStringLiteral("v")].toString();
+  }
+
+  if (type == QLatin1String("tok")) {
+    UserToken ut;
+    ut.kind = static_cast<TokenKind>(obj[QStringLiteral("k")].toInt());
+    ut.category = static_cast<TokenCategory>(obj[QStringLiteral("c")].toInt());
+    ut.data = obj[QStringLiteral("d")].toString().toStdString();
+    std::vector<CustomToken> toks;
+    toks.emplace_back(std::move(ut));
+    return QVariant::fromValue(TokenRange::create(std::move(toks)));
+  }
+
+  if (type == QLatin1String("tr")) {
+    auto arr = obj[QStringLiteral("v")].toArray();
+    std::vector<CustomToken> toks;
+    for (const auto &elem : arr) {
+      auto to = elem.toObject();
+      UserToken ut;
+      ut.kind = static_cast<TokenKind>(to[QStringLiteral("k")].toInt());
+      ut.category = static_cast<TokenCategory>(to[QStringLiteral("c")].toInt());
+      ut.data = to[QStringLiteral("d")].toString().toStdString();
+      toks.emplace_back(std::move(ut));
+    }
+    if (!toks.empty()) {
+      return QVariant::fromValue(TokenRange::create(std::move(toks)));
+    }
+    return {};
+  }
+
+  return {};
 }
 
 }  // namespace mx::gui
