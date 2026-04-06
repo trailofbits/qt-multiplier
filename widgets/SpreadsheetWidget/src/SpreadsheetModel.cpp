@@ -9,6 +9,8 @@
 #include <QFont>
 #include <QUndoStack>
 
+#include <algorithm>
+
 #include <multiplier/Frontend/Token.h>
 #include <multiplier/Index.h>
 
@@ -87,6 +89,13 @@ QVariant SpreadsheetModel::data(const QModelIndex &index, int role) const {
         QFont font;
         font.setItalic(true);
         return font;
+      }
+      return {};
+    }
+
+    case Qt::TextAlignmentRole: {
+      if (cell.userType() == QMetaType::Bool) {
+        return static_cast<int>(Qt::AlignCenter);
       }
       return {};
     }
@@ -217,6 +226,29 @@ bool SpreadsheetModel::setData(const QModelIndex &index, const QVariant &value,
   m_undo_stack->push(
       new SetCellValueCommand(this, row, col, old_val, new_val));
   return true;
+}
+
+void SpreadsheetModel::sort(int column, Qt::SortOrder order) {
+  if (column < 0 || column >= m_columns.size() || m_rows.isEmpty()) {
+    return;
+  }
+
+  emit layoutAboutToBeChanged();
+
+  std::stable_sort(m_rows.begin(), m_rows.end(),
+      [column, order] (const QVector<QVariant> &a,
+                       const QVector<QVariant> &b) {
+        QString at = (column < a.size())
+            ? display_text_for(a[column]) : QString();
+        QString bt = (column < b.size())
+            ? display_text_for(b[column]) : QString();
+        if (order == Qt::AscendingOrder) {
+          return at.compare(bt, Qt::CaseInsensitive) < 0;
+        }
+        return bt.compare(at, Qt::CaseInsensitive) < 0;
+      });
+
+  emit layoutChanged();
 }
 
 Qt::ItemFlags SpreadsheetModel::flags(const QModelIndex &index) const {

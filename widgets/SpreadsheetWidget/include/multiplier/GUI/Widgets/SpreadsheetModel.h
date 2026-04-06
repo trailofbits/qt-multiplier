@@ -82,6 +82,9 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
                      const QVariant &value,
                      int role = Qt::EditRole) Q_DECL_FINAL;
 
+  // Stable sort by column.
+  void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) Q_DECL_FINAL;
+
   // Row / column mutation.
   bool insertRows(int row, int count,
                   const QModelIndex &parent = QModelIndex()) Q_DECL_FINAL;

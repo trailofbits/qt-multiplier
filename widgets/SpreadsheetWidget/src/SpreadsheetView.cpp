@@ -30,8 +30,11 @@ namespace mx::gui {
 SpreadsheetView::SpreadsheetView(QWidget *parent)
     : QTableView(parent) {
 
-  // Sorting.
-  setSortingEnabled(true);
+  // Clicking column headers selects the column (not sort).
+  // Sorting is available via the column header context menu.
+  setSortingEnabled(false);
+  horizontalHeader()->setSectionsClickable(true);
+  horizontalHeader()->setSortIndicatorShown(true);
 
   // Movable headers.
   horizontalHeader()->setSectionsMovable(true);
@@ -142,6 +145,15 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
       if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
         sm->ClearColumnColor(col);
       }
+    });
+    menu.addSeparator();
+    menu.addAction(tr("Sort Ascending"), this, [this, col] () {
+      sortByColumn(col, Qt::AscendingOrder);
+      horizontalHeader()->setSortIndicator(col, Qt::AscendingOrder);
+    });
+    menu.addAction(tr("Sort Descending"), this, [this, col] () {
+      sortByColumn(col, Qt::DescendingOrder);
+      horizontalHeader()->setSortIndicator(col, Qt::DescendingOrder);
     });
     menu.exec(horizontalHeader()->mapToGlobal(pos));
   });
