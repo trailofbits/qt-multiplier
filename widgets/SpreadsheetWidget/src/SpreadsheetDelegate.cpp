@@ -127,13 +127,23 @@ void SpreadsheetDelegate::paint(QPainter *painter,
           }
         }
       } else {
-        // Draw the whole token string at once for proper kerning.
-        QRectF text_rect(pos.x(), pos.y() - fm.ascent(),
-                         opt.rect.right() - pos.x(), fm.height());
-        painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
-                          text);
-        auto br = painter->boundingRect(text_rect, Qt::AlignLeft, text);
-        pos.setX(pos.x() + br.width());
+        // Split by newlines and draw each line separately.
+        auto lines = text.split(QLatin1Char('\n'));
+        for (int li = 0; li < lines.size(); ++li) {
+          if (li > 0) {
+            pos.setX(opt.rect.left() + 2);
+            pos.setY(pos.y() + fm.height());
+          }
+          const auto &line = lines[li];
+          if (!line.isEmpty()) {
+            QRectF text_rect(pos.x(), pos.y() - fm.ascent(),
+                             opt.rect.right() - pos.x(), fm.height());
+            painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                              line);
+            auto br = painter->boundingRect(text_rect, Qt::AlignLeft, line);
+            pos.setX(pos.x() + br.width());
+          }
+        }
       }
     }
     painter->restore();
@@ -274,10 +284,19 @@ QSize SpreadsheetDelegate::sizeHint(const QStyleOptionViewItem &option,
           font.setBold(cs.bold);
           font.setItalic(cs.italic);
           p.setFont(font);
-          auto rect = p.boundingRect(
-              QRectF(0, 0, 9999, fm.height()),
-              Qt::AlignLeft, text);
-          x += rect.width();
+          // Handle multiline tokens.
+          auto tok_lines = text.split(QLatin1Char('\n'));
+          for (int li = 0; li < tok_lines.size(); ++li) {
+            if (li > 0) {
+              width = std::max(width, x);
+              x = 0;
+              ++lines;
+            }
+            auto rect = p.boundingRect(
+                QRectF(0, 0, 9999, fm.height()),
+                Qt::AlignLeft, tok_lines[li]);
+            x += rect.width();
+          }
           font = theme->Font();
           p.setFont(font);
         }

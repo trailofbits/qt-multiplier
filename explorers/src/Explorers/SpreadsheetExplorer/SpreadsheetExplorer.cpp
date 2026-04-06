@@ -525,7 +525,8 @@ void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {
     d->tab_widget->AddTab(container);
   }
 
-  d->dock->show();
+  // Don't force show — the dock visibility is managed by
+  // QMainWindow::restoreState from the saved window layout.
 }
 
 }  // namespace mx::gui
