@@ -124,6 +124,10 @@ class ConfigManagerImpl {
 
 ConfigManager::~ConfigManager(void) {
   d->shutting_down = true;
+  if (auto theme = d->theme_manager.Theme()) {
+    std::cerr << "~ConfigManager: saving theme_id='"
+              << theme->Id().toStdString() << "'" << std::endl;
+  }
   SaveSettings();
 }
 

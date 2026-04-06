@@ -1482,6 +1482,14 @@ bool CodeWidget::eventFilter(QObject *object, QEvent *event) {
         update();
       }
     }
+
+    // Forward key events from code_area to our keyPressEvent handler,
+    // since the code_area widget receives focus but key events may not
+    // propagate to the parent CodeWidget.
+    if (event->type() == QEvent::KeyPress) {
+      keyPressEvent(static_cast<QKeyEvent *>(event));
+      return true;
+    }
   }
 
   return false;
