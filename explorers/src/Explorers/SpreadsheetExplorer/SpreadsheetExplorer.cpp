@@ -22,6 +22,7 @@
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/GUI/Widgets/SpreadsheetDelegate.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 #include <multiplier/GUI/Widgets/SpreadsheetView.h>
 #include <multiplier/GUI/Widgets/TabWidget.h>
@@ -208,15 +209,20 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
   auto *view = new SpreadsheetView(container);
   view->setModel(model);
 
-  // Apply theme colors to headers and grid.
+  // Install themed delegate for syntax-highlighted token rendering.
   auto &theme_manager = d->config_manager.ThemeManager();
-  auto apply_theme = [view] (const ThemeManager &tm) {
+  auto *delegate = new SpreadsheetDelegate(theme_manager.Theme(), view);
+  view->setItemDelegate(delegate);
+
+  // Apply theme colors to headers, grid, delegate, and font.
+  auto apply_theme = [view, delegate] (const ThemeManager &tm) {
     auto theme = tm.Theme();
     view->ApplyThemeColors(
         theme->GutterBackgroundColor(),
         theme->GutterForegroundColor(),
         theme->GutterBackgroundColor().darker(120));
     view->setFont(theme->Font());
+    delegate->SetTheme(theme);
   };
   apply_theme(theme_manager);
   connect(&theme_manager, &ThemeManager::ThemeChanged, view, apply_theme);

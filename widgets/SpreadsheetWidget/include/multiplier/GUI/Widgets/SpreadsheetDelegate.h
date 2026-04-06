@@ -10,18 +10,25 @@
 
 #include <QStyledItemDelegate>
 
+#include <multiplier/GUI/Interfaces/ITheme.h>
+
 namespace mx::gui {
 
 // Item delegate for the spreadsheet view. Renders Token / TokenRange cells
-// using theme colours. FormulaCell values display their cached result.
-// Bool cells are rendered as check-boxes via the default delegate.
+// with per-token syntax highlighting via the current theme. FormulaCell
+// values display their cached result. Bool cells are rendered as checkboxes.
 // QString cells use a QPlainTextEdit editor supporting multiline (Shift+Enter).
 class SpreadsheetDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   Q_OBJECT
 
+  IThemePtr theme;
+
  public:
-  explicit SpreadsheetDelegate(QObject *parent = nullptr);
+  explicit SpreadsheetDelegate(IThemePtr theme_,
+                               QObject *parent = nullptr);
   virtual ~SpreadsheetDelegate(void);
+
+  void SetTheme(IThemePtr new_theme);
 
   void paint(QPainter *painter, const QStyleOptionViewItem &option,
              const QModelIndex &index) const Q_DECL_FINAL;
