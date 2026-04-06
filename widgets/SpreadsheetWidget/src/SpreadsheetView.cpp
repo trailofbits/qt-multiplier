@@ -18,6 +18,8 @@
 
 #include <multiplier/Index.h>
 
+#include <iostream>
+
 Q_DECLARE_METATYPE(mx::TokenRange)
 
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
@@ -185,6 +187,12 @@ void SpreadsheetView::paste_at_selection(void) {
 
   const QMimeData *mime = clip->mimeData();
 
+  std::cerr << "PASTE: formats=";
+  for (const auto &f : mime->formats()) {
+    std::cerr << f.toStdString() << " ";
+  }
+  std::cerr << std::endl;
+
   // Check for token range data from the code explorer.
   if (mime->hasFormat(
           QStringLiteral("application/x-qtmultiplier-tokens"))) {
@@ -194,6 +202,7 @@ void SpreadsheetView::paste_at_selection(void) {
 
     quint32 count = 0;
     stream >> count;
+    std::cerr << "PASTE: token count=" << count << std::endl;
 
     // Collect tokens into one cell as a TokenRange.
     std::vector<CustomToken> tokens;

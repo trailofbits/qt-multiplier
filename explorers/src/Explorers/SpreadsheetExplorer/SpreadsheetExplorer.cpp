@@ -19,6 +19,7 @@
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 #include <multiplier/GUI/Widgets/SpreadsheetView.h>
@@ -50,14 +51,23 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
       d(new PrivateData(config_manager, parent)) {
 
   auto &action_manager = config_manager.ActionManager();
+  auto &media_manager = config_manager.MediaManager();
 
-  action_manager.Register(
+  auto new_sheet_trigger = action_manager.Register(
       this, "com.trailofbits.action.NewBlankSheet",
       &SpreadsheetExplorer::OnNewBlankSheet);
 
   action_manager.Register(
       this, "com.trailofbits.action.OpenInSpreadsheet",
       &SpreadsheetExplorer::OnOpenInSpreadsheet);
+
+  // Toolbar button for creating a new sheet.
+  NamedAction new_sheet_named_action;
+  new_sheet_named_action.name = tr("New Sheet");
+  new_sheet_named_action.action = new_sheet_trigger;
+  parent->AddToolBarButton(
+      media_manager.Icon("com.trailofbits.icon.PopOut"),
+      new_sheet_named_action);
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &SpreadsheetExplorer::OnIndexChanged);
@@ -216,6 +226,16 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
     int col = sel.isValid() ? sel.column() + 1
                             : model->columnCount();
     model->insertColumn(col);
+  });
+
+  auto *add_check_col = toolbar->addAction(tr("+ Checkbox Col"));
+  connect(add_check_col, &QAction::triggered, view, [model] () {
+    int col = model->columnCount();
+    model->insertColumn(col);
+    // Fill the new column with false (checkbox) values.
+    for (int r = 0; r < model->rowCount(); ++r) {
+      model->set_cell_value(r, col, QVariant(false));
+    }
   });
 
   toolbar->addSeparator();

@@ -180,8 +180,9 @@ Qt::ItemFlags SpreadsheetModel::flags(const QModelIndex &index) const {
     return base | Qt::ItemIsUserCheckable;
   }
 
-  // QString and FormulaCell are editable.
-  if (cell.canConvert<QString>() || cell.canConvert<FormulaCell>()) {
+  // Empty cells, QString, and FormulaCell are editable.
+  if (!cell.isValid() || cell.canConvert<QString>() ||
+      cell.canConvert<FormulaCell>()) {
     return base | Qt::ItemIsEditable;
   }
 

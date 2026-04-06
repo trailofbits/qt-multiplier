@@ -397,7 +397,7 @@ ConfigManager::HighlightColorMap ConfigManager::LoadHighlightColors(void) const 
 
 void ConfigManager::SaveNavigationHistory(
     const std::vector<NavigationEntry> &entries, const QString &key) const {
-  if (!d->project_db.isOpen()) return;
+  if (!d || !d->project_db.isValid() || !d->project_db.isOpen()) return;
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral("DELETE FROM gui_history WHERE widget_key = ?"));
   q.addBindValue(key);
@@ -415,7 +415,7 @@ void ConfigManager::SaveNavigationHistory(
 
 std::vector<ConfigManager::NavigationEntry>
 ConfigManager::LoadNavigationHistory(const QString &key) const {
-  if (!d->project_db.isOpen()) return {};
+  if (!d || !d->project_db.isValid() || !d->project_db.isOpen()) return {};
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
       "SELECT entity_id, label FROM gui_history "

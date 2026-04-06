@@ -31,6 +31,7 @@
 #include <QWheelEvent>
 
 #include <cmath>
+#include <iostream>
 #include <multiplier/AST/AddrLabelExpr.h>
 #include <multiplier/AST/DeclRefExpr.h>
 #include <multiplier/AST/LabelStmt.h>
@@ -3310,6 +3311,8 @@ void CodeWidget::PrivateData::CopySelectionToClipboard(void) const {
 
   // Also put a TokenRange on the clipboard for rich paste into spreadsheets.
   TokenRange tokens = BuildSelectionTokenRange();
+  std::cerr << "COPY: selection='" << token_model.selection.toStdString().substr(0, 40)
+            << "' tokens.size()=" << tokens.size() << std::endl;
   if (!tokens.empty()) {
     // Serialize the token range as a QByteArray via QDataStream.
     QByteArray data;
