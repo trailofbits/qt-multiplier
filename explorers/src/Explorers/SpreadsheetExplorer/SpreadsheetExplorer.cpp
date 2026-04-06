@@ -155,6 +155,7 @@ void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
   d->dock = new IWindowWidget;
   d->dock->setWindowTitle(tr("Sheets"));
   d->dock->setContentsMargins(0, 0, 0, 0);
+  d->dock->setMinimumHeight(100);
 
   d->tab_widget = new TabWidget(d->dock);
   d->tab_widget->setDocumentMode(true);

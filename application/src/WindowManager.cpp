@@ -214,6 +214,8 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
 #endif
 
   dock_widget->setWidget(widget);
+  dock_widget->setMinimumHeight(100);
+  dock_widget->setMinimumWidth(100);
 
   d->dock_configs.emplace(dock_widget, config);
 
