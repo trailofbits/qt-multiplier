@@ -13,13 +13,10 @@
 #include <QDataStream>
 #include <QHeaderView>
 #include <QKeyEvent>
-#include <QMouseEvent>
 #include <QMenu>
 #include <QMimeData>
 
 #include <multiplier/Index.h>
-
-#include <iostream>
 
 Q_DECLARE_METATYPE(mx::TokenRange)
 
@@ -31,13 +28,9 @@ namespace mx::gui {
 SpreadsheetView::SpreadsheetView(QWidget *parent)
     : QTableView(parent) {
 
-  // Column header clicks select the column. Sorting via context menu only.
+  // Sorting via context menu only (stable sort in model).
   setSortingEnabled(false);
-  horizontalHeader()->setSectionsClickable(false);
   horizontalHeader()->setSortIndicatorShown(true);
-
-  // Manually select column on header press via event filter.
-  horizontalHeader()->viewport()->installEventFilter(this);
 
   // Movable headers.
   horizontalHeader()->setSectionsMovable(true);
@@ -164,28 +157,6 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
 
 SpreadsheetView::~SpreadsheetView(void) {}
 
-bool SpreadsheetView::eventFilter(QObject *object, QEvent *event) {
-  // Handle column selection on header click.
-  if (object == horizontalHeader()->viewport() &&
-      event->type() == QEvent::MouseButtonPress) {
-    auto *me = static_cast<QMouseEvent *>(event);
-    int col = horizontalHeader()->logicalIndexAt(me->pos());
-    if (col >= 0) {
-      if (me->modifiers() & Qt::ShiftModifier) {
-        selectionModel()->select(
-            model()->index(0, col),
-            QItemSelectionModel::Select | QItemSelectionModel::Columns);
-      } else {
-        selectionModel()->select(
-            model()->index(0, col),
-            QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Columns);
-      }
-      return true;  // Consume the event so it doesn't trigger sorting.
-    }
-  }
-  return QTableView::eventFilter(object, event);
-}
-
 void SpreadsheetView::ApplyThemeColors(const QColor &gutter_bg,
                                        const QColor &gutter_fg,
                                        const QColor &grid_color) {
@@ -251,12 +222,6 @@ void SpreadsheetView::paste_at_selection(void) {
 
   const QMimeData *mime = clip->mimeData();
 
-  std::cerr << "PASTE: formats=";
-  for (const auto &f : mime->formats()) {
-    std::cerr << f.toStdString() << " ";
-  }
-  std::cerr << std::endl;
-
   // Check for token range data from the code explorer.
   if (mime->hasFormat(
           QStringLiteral("application/x-qtmultiplier-tokens"))) {
@@ -266,7 +231,6 @@ void SpreadsheetView::paste_at_selection(void) {
 
     quint32 count = 0;
     stream >> count;
-    std::cerr << "PASTE: token count=" << count << std::endl;
 
     // Collect tokens into one cell as a TokenRange.
     std::vector<CustomToken> tokens;
@@ -304,15 +268,9 @@ void SpreadsheetView::paste_at_selection(void) {
 
     if (!tokens.empty()) {
       auto range = TokenRange::create(std::move(tokens));
-      std::cerr << "PASTE: created TokenRange size=" << range.size()
-                << " empty=" << range.empty() << std::endl;
-      auto var = QVariant::fromValue(range);
-      std::cerr << "PASTE: variant type=" << var.typeName()
-                << " canConvertTR=" << var.canConvert<TokenRange>()
-                << std::endl;
       if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
-        sm->set_cell_value(current.row(), current.column(), var);
-        std::cerr << "PASTE: set_cell_value called" << std::endl;
+        sm->set_cell_value(current.row(), current.column(),
+                           QVariant::fromValue(range));
       }
       return;
     }

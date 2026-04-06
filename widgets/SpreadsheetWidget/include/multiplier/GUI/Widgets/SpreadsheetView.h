@@ -43,7 +43,6 @@ class SpreadsheetView Q_DECL_FINAL : public QTableView {
 
  protected:
   void keyPressEvent(QKeyEvent *event) Q_DECL_FINAL;
-  bool eventFilter(QObject *object, QEvent *event) Q_DECL_FINAL;
 
  private slots:
   void OnContextMenu(const QPoint &pos);

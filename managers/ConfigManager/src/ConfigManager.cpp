@@ -133,10 +133,6 @@ class ConfigManagerImpl {
 
 ConfigManager::~ConfigManager(void) {
   d->shutting_down = true;
-  if (auto theme = d->theme_manager.Theme()) {
-    std::cerr << "~ConfigManager: saving theme_id='"
-              << theme->Id().toStdString() << "'" << std::endl;
-  }
   SaveSettings();
 
   // Force WAL checkpoint so data is written to the main DB file before
@@ -294,19 +290,9 @@ void ConfigManager::SaveSettings(void) const {
   SetSetting(d->global_db, QStringLiteral("font_size_delta"),
              QString::number(d->theme_manager.FontSizeDelta()));
   if (auto theme = d->theme_manager.Theme()) {
-    std::cerr << "SaveSettings: writing theme_id='"
-              << theme->Id().toStdString() << "'" << std::endl;
     SetSetting(d->global_db, QStringLiteral("theme_id"), theme->Id());
   }
-  if (!d->global_db.commit()) {
-    std::cerr << "SaveSettings: COMMIT FAILED: "
-              << d->global_db.lastError().text().toStdString() << std::endl;
-  }
-
-  // Verify the write.
-  auto verify = GetSetting(d->global_db, QStringLiteral("theme_id"));
-  std::cerr << "SaveSettings: verify readback='" << verify.toStdString()
-            << "'" << std::endl;
+  d->global_db.commit();
 }
 
 void ConfigManager::LoadSettings(void) {
@@ -321,14 +307,9 @@ void ConfigManager::LoadSettings(void) {
   if (delta != 0) d->theme_manager.SetFontSizeDelta(delta);
 
   auto theme_id = GetSetting(d->global_db, QStringLiteral("theme_id"));
-  std::cerr << "LoadSettings: theme_id='" << theme_id.toStdString() << "'"
-            << std::endl;
   if (!theme_id.isEmpty()) {
     if (auto theme = d->theme_manager.Find(theme_id)) {
-      std::cerr << "LoadSettings: found theme, setting it" << std::endl;
       d->theme_manager.SetTheme(theme);
-    } else {
-      std::cerr << "LoadSettings: theme NOT found!" << std::endl;
     }
   }
 

@@ -31,7 +31,6 @@
 #include <QWheelEvent>
 
 #include <cmath>
-#include <iostream>
 #include <multiplier/AST/AddrLabelExpr.h>
 #include <multiplier/AST/DeclRefExpr.h>
 #include <multiplier/AST/LabelStmt.h>
@@ -1818,12 +1817,6 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
       break;
 
     default:
-      // Support Ctrl-C.
-      std::cerr << "KEY: ks='" << ks.toString().toStdString()
-                << "' copy_ks='" << kCopyKeqSequence.toString().toStdString()
-                << "' sel_cursor=" << d->selection_start_cursor.has_value()
-                << " sel_empty=" << d->token_model.selection.isEmpty()
-                << std::endl;
       if (ks == kCopyKeqSequence && d->selection_start_cursor &&
           !d->token_model.selection.isEmpty()) {
         d->CopySelectionToClipboard();
@@ -3333,8 +3326,6 @@ void CodeWidget::PrivateData::CopySelectionToClipboard(void) const {
 
   // Also put a TokenRange on the clipboard for rich paste into spreadsheets.
   TokenRange tokens = BuildSelectionTokenRange();
-  std::cerr << "COPY: selection='" << token_model.selection.toStdString().substr(0, 40)
-            << "' tokens.size()=" << tokens.size() << std::endl;
   if (!tokens.empty()) {
     // Serialize the token range as a QByteArray via QDataStream.
     QByteArray data;
@@ -3363,7 +3354,6 @@ void CodeWidget::ActOnContextMenu(IWindowManager *, QMenu *menu,
     menu->addAction(copy_selection);
     connect(copy_selection, &QAction::triggered,
             this, [this] (void) {
-                    std::cerr << "CONTEXT_COPY: triggered" << std::endl;
                     d->CopySelectionToClipboard();
                   });
   }
