@@ -21,6 +21,7 @@ target_link_libraries("mx_spreadsheet_widget"
   PRIVATE
     "mx_cxx_flags"
     "mx_config_manager"
+    "mx_simple_text_input_dialog"
     "mx_theme_manager"
 
   PUBLIC

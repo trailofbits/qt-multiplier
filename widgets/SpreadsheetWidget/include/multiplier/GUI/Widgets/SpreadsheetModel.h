@@ -76,6 +76,9 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
   Qt::ItemFlags flags(const QModelIndex &index) const Q_DECL_FINAL;
   QVariant headerData(int section, Qt::Orientation orientation,
                       int role = Qt::DisplayRole) const Q_DECL_FINAL;
+  bool setHeaderData(int section, Qt::Orientation orientation,
+                     const QVariant &value,
+                     int role = Qt::EditRole) Q_DECL_FINAL;
 
   // Row / column mutation.
   bool insertRows(int row, int count,

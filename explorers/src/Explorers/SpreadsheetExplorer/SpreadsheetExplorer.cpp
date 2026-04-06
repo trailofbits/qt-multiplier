@@ -10,6 +10,8 @@
 #include <QMenu>
 #include <QVBoxLayout>
 
+#include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
+
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
@@ -31,6 +33,7 @@ struct SpreadsheetExplorer::PrivateData {
 
   IWindowWidget *dock{nullptr};
   TabWidget *tab_widget{nullptr};
+  int sheet_counter{0};
 
   inline PrivateData(ConfigManager &config_manager_, IWindowManager *manager_)
       : config_manager(config_manager_),
@@ -91,12 +94,62 @@ void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
     }
   });
 
-  // Double-click on empty tab bar area creates a new sheet.
+  // Double-click on a tab renames it; on empty area creates a new sheet.
   connect(d->tab_widget->tabBar(), &QTabBar::tabBarDoubleClicked,
           this, [this] (int index) {
     if (index == -1) {
       OnNewBlankSheet({});
+    } else {
+      // Rename tab.
+      auto current_name = d->tab_widget->tabText(index);
+      SimpleTextInputDialog dialog(tr("Enter the new tab name"),
+                                   current_name, d->tab_widget);
+      dialog.setWindowTitle(tr("Rename Sheet"));
+      if (dialog.exec() == QDialog::Accepted) {
+        auto opt_name = dialog.TextInput();
+        if (opt_name.has_value() && !opt_name->isEmpty()) {
+          d->tab_widget->setTabText(index, opt_name.value());
+        }
+      }
     }
+  });
+
+  // Right-click on tab bar shows context menu.
+  d->tab_widget->tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(d->tab_widget->tabBar(), &QWidget::customContextMenuRequested,
+          this, [this] (const QPoint &pos) {
+    int index = d->tab_widget->tabBar()->tabAt(pos);
+    QMenu menu(d->tab_widget);
+
+    menu.addAction(tr("New Sheet"), this, [this] () {
+      OnNewBlankSheet({});
+    });
+
+    if (index >= 0) {
+      menu.addSeparator();
+      menu.addAction(tr("Rename..."), this, [this, index] () {
+        auto current_name = d->tab_widget->tabText(index);
+        SimpleTextInputDialog dialog(tr("Enter the new tab name"),
+                                     current_name, d->tab_widget);
+        dialog.setWindowTitle(tr("Rename Sheet"));
+        if (dialog.exec() == QDialog::Accepted) {
+          auto opt_name = dialog.TextInput();
+          if (opt_name.has_value() && !opt_name->isEmpty()) {
+            d->tab_widget->setTabText(index, opt_name.value());
+          }
+        }
+      });
+      menu.addAction(tr("Close"), this, [this, index] () {
+        auto *widget = d->tab_widget->widget(index);
+        d->tab_widget->RemoveTab(index);
+        widget->deleteLater();
+        if (!d->tab_widget->count()) {
+          d->dock->hide();
+        }
+      });
+    }
+
+    menu.exec(d->tab_widget->tabBar()->mapToGlobal(pos));
   });
 
   auto layout = new QVBoxLayout(d->dock);
@@ -145,7 +198,8 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
 
   auto *view = new SpreadsheetView(d->tab_widget);
   view->setModel(model);
-  view->setWindowTitle(tr("New Sheet"));
+  ++(d->sheet_counter);
+  view->setWindowTitle(tr("Sheet %1").arg(d->sheet_counter));
 
   d->tab_widget->InsertTab(0, view);
   d->dock->show();

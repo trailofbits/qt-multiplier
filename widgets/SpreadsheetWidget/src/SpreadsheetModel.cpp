@@ -188,6 +188,19 @@ QVariant SpreadsheetModel::headerData(int section, Qt::Orientation orientation,
   return {};
 }
 
+bool SpreadsheetModel::setHeaderData(int section, Qt::Orientation orientation,
+                                     const QVariant &value, int role) {
+  if (role != Qt::EditRole || orientation != Qt::Horizontal) {
+    return false;
+  }
+  if (section < 0 || section >= m_columns.size()) {
+    return false;
+  }
+  m_columns[section].name = value.toString();
+  emit headerDataChanged(Qt::Horizontal, section, section);
+  return true;
+}
+
 bool SpreadsheetModel::insertRows(int row, int count,
                                   const QModelIndex &parent) {
   if (parent.isValid() || count <= 0) {

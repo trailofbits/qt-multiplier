@@ -14,6 +14,7 @@
 #include <QMenu>
 #include <QMimeData>
 
+#include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
 namespace mx::gui {
@@ -40,10 +41,43 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
   setWordWrap(false);
   setTextElideMode(Qt::ElideRight);
 
-  // Context menu.
+  // Context menu on cells.
   setContextMenuPolicy(Qt::CustomContextMenu);
   connect(this, &QWidget::customContextMenuRequested,
           this, &SpreadsheetView::OnContextMenu);
+
+  // Context menu on column headers for rename/delete/insert.
+  horizontalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(horizontalHeader(), &QWidget::customContextMenuRequested,
+          this, [this] (const QPoint &pos) {
+    int col = horizontalHeader()->logicalIndexAt(pos);
+    if (col < 0) return;
+
+    QMenu menu(this);
+    menu.addAction(tr("Rename Column..."), this, [this, col] () {
+      auto current = model()->headerData(col, Qt::Horizontal).toString();
+      SimpleTextInputDialog dialog(tr("Enter the new column name"),
+                                   current, this);
+      dialog.setWindowTitle(tr("Rename Column"));
+      if (dialog.exec() == QDialog::Accepted) {
+        auto opt_name = dialog.TextInput();
+        if (opt_name.has_value() && !opt_name->isEmpty()) {
+          model()->setHeaderData(col, Qt::Horizontal, opt_name.value());
+        }
+      }
+    });
+    menu.addSeparator();
+    menu.addAction(tr("Insert Column Left"), this, [this, col] () {
+      model()->insertColumn(col);
+    });
+    menu.addAction(tr("Insert Column Right"), this, [this, col] () {
+      model()->insertColumn(col + 1);
+    });
+    menu.addAction(tr("Remove Column"), this, [this, col] () {
+      model()->removeColumn(col);
+    });
+    menu.exec(horizontalHeader()->mapToGlobal(pos));
+  });
 }
 
 SpreadsheetView::~SpreadsheetView(void) {}
