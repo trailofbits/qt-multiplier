@@ -389,13 +389,14 @@ void SpreadsheetDelegate::setModelData(QWidget *editor,
 void SpreadsheetDelegate::updateEditorGeometry(
     QWidget *editor, const QStyleOptionViewItem &option,
     const QModelIndex &) const {
-  // Start at the cell position but extend width to the viewport edge
-  // so there's more room to type.
+  // Start at the cell, extend to viewport edge, and give enough
+  // height for multiline editing (Shift+Enter).
   QRect rect = option.rect;
   if (option.widget) {
     int viewport_right = option.widget->width();
     rect.setRight(std::max(rect.right(), viewport_right - 2));
   }
+  rect.setHeight(std::max(rect.height(), 80));
   editor->setGeometry(rect);
 }
 
