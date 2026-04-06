@@ -369,6 +369,7 @@ class TokenModel Q_DECL_FINAL : public IModel {
   Token token;
   QString text;
   QString selection;
+  TokenRange selection_tokens;
 
   bool HasTokenOrSelection(void) const noexcept {
     return token || !selection.isEmpty();
@@ -423,6 +424,11 @@ class TokenModel Q_DECL_FINAL : public IModel {
         return text;
       case CodeWidget::SelectedTextRole:
         return selection;
+      case CodeWidget::SelectedTokensRole:
+        if (!selection_tokens.empty()) {
+          return QVariant::fromValue(selection_tokens);
+        }
+        return {};
     }
     return {};
   }
@@ -1705,12 +1711,14 @@ void CodeWidget::mousePressEvent(QMouseEvent *event) {
 
   // Update the selection in the model.
   d->token_model.selection.clear();
+  d->token_model.selection_tokens = TokenRange();
   auto sel_size = d->selection_end_offset - d->selection_start_offset;
   if (d->selection_start_cursor && 0 <= d->selection_start_offset &&
       0 <= d->selection_end_offset && 0 < sel_size &&
       (d->selection_start_offset + sel_size) <= d->scene.document.size()) {
     d->token_model.selection
         = d->scene.document.sliced(d->selection_start_offset, sel_size);
+    d->token_model.selection_tokens = d->BuildSelectionTokenRange();
   }
 
   // Calculate the index of the current line.

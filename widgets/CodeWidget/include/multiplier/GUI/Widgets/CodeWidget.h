@@ -108,7 +108,8 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
   virtual ~CodeWidget(void);
 
   enum : int {
-    SelectedTextRole = IModel::MultiplierUserRole
+    SelectedTextRole = IModel::MultiplierUserRole,
+    SelectedTokensRole
   };
 
   // Create a code widget with the given configuration manager (used for theme

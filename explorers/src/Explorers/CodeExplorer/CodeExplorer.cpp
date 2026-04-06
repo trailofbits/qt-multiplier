@@ -26,11 +26,16 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QDataStream>
+#include <QIODevice>
 #include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
+#include <QMimeData>
 
 #include <unordered_map>
+
+Q_DECLARE_METATYPE(mx::TokenRange)
 
 namespace mx::gui {
 namespace {
@@ -305,11 +310,36 @@ void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
     
     auto sel_text = index.data(CodeWidget::SelectedTextRole).toString();
     if (!sel_text.isEmpty()) {
+      auto sel_tokens = index.data(CodeWidget::SelectedTokensRole);
       auto copy_selection = new QAction(tr("Copy"), menu);
       menu->addAction(copy_selection);
       connect(copy_selection, &QAction::triggered,
-              [sel_text = std::move(sel_text)] (void) {
-                qApp->clipboard()->setText(sel_text);
+              [sel_text, sel_tokens] (void) {
+                auto *mime = new QMimeData;
+                mime->setText(sel_text);
+
+                // Add token data for rich paste into spreadsheets.
+                if (sel_tokens.isValid() && sel_tokens.canConvert<TokenRange>()) {
+                  auto range = sel_tokens.value<TokenRange>();
+                  if (!range.empty()) {
+                    QByteArray data;
+                    QDataStream stream(&data, QIODevice::WriteOnly);
+                    auto count = static_cast<quint32>(range.size());
+                    stream << count;
+                    for (Token tok : range) {
+                      stream << static_cast<quint64>(tok.id().Pack());
+                      stream << static_cast<quint32>(tok.kind());
+                      stream << static_cast<quint32>(tok.category());
+                      auto td = tok.data();
+                      stream << QString::fromUtf8(
+                          td.data(), static_cast<qsizetype>(td.size()));
+                    }
+                    mime->setData(QStringLiteral(
+                        "application/x-qtmultiplier-tokens"), data);
+                  }
+                }
+
+                qApp->clipboard()->setMimeData(mime);
               });
     }
   }
