@@ -109,6 +109,7 @@ class ConfigManagerImpl {
 
   unsigned tab_width{kDefaultTabWidth};
   bool use_tab_stops{true};
+  bool settings_loaded{false};
   bool shutting_down{false};
   QString db_path;
 
@@ -155,12 +156,12 @@ ConfigManager::~ConfigManager(void) {
 ConfigManager::ConfigManager(QApplication &application, QObject *parent)
     : QObject(parent),
       d(std::make_shared<ConfigManagerImpl>(application, this)) {
-  // Auto-save on theme change, but not during shutdown (when proxy
-  // destruction can reset the theme to default).
+  // Auto-save on theme change, but not during startup (before
+  // LoadSettings) or shutdown (when proxy destruction resets theme).
   using TM = class ThemeManager;
   connect(&(d->theme_manager), &TM::ThemeChanged,
           this, [this] (const TM &) {
-            if (!d->shutting_down) {
+            if (d->settings_loaded && !d->shutting_down) {
               SaveSettings();
             }
           });
@@ -330,6 +331,8 @@ void ConfigManager::LoadSettings(void) {
       std::cerr << "LoadSettings: theme NOT found!" << std::endl;
     }
   }
+
+  d->settings_loaded = true;
 }
 
 // --- Per-project settings ---
