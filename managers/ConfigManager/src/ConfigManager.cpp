@@ -286,6 +286,8 @@ void ConfigManager::SaveSettings(void) const {
     std::cerr << "SaveSettings: global_db not open!" << std::endl;
     return;
   }
+
+  d->global_db.transaction();
   SetSetting(d->global_db, QStringLiteral("use_tab_stops"),
              d->use_tab_stops ? QStringLiteral("1") : QStringLiteral("0"));
   SetSetting(d->global_db, QStringLiteral("font_size_delta"),
@@ -295,6 +297,15 @@ void ConfigManager::SaveSettings(void) const {
               << theme->Id().toStdString() << "'" << std::endl;
     SetSetting(d->global_db, QStringLiteral("theme_id"), theme->Id());
   }
+  if (!d->global_db.commit()) {
+    std::cerr << "SaveSettings: COMMIT FAILED: "
+              << d->global_db.lastError().text().toStdString() << std::endl;
+  }
+
+  // Verify the write.
+  auto verify = GetSetting(d->global_db, QStringLiteral("theme_id"));
+  std::cerr << "SaveSettings: verify readback='" << verify.toStdString()
+            << "'" << std::endl;
 }
 
 void ConfigManager::LoadSettings(void) {
