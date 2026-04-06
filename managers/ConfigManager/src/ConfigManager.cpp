@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <QSqlDatabase>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <multiplier/Index.h>
 
@@ -73,11 +74,18 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
 static void SetSetting(QSqlDatabase &db, const QString &key,
                         const QString &value) {
   QSqlQuery q(db);
-  q.prepare(QStringLiteral(
-      "INSERT OR REPLACE INTO gui_settings (key, value) VALUES (?, ?)"));
+  if (!q.prepare(QStringLiteral(
+      "INSERT OR REPLACE INTO gui_settings (key, value) VALUES (?, ?)"))) {
+    std::cerr << "SetSetting prepare failed: "
+              << q.lastError().text().toStdString() << std::endl;
+    return;
+  }
   q.addBindValue(key);
   q.addBindValue(value);
-  q.exec();
+  if (!q.exec()) {
+    std::cerr << "SetSetting exec failed for key='" << key.toStdString()
+              << "': " << q.lastError().text().toStdString() << std::endl;
+  }
 }
 
 static QString GetSetting(QSqlDatabase &db, const QString &key,
@@ -274,13 +282,19 @@ void ConfigManager::SetUseTabStops(bool use) {
 // --- Global settings ---
 
 void ConfigManager::SaveSettings(void) const {
-  if (!d->global_db.isOpen()) return;
+  if (!d->global_db.isValid() || !d->global_db.isOpen()) {
+    std::cerr << "SaveSettings: global_db not open!" << std::endl;
+    return;
+  }
   SetSetting(d->global_db, QStringLiteral("use_tab_stops"),
              d->use_tab_stops ? QStringLiteral("1") : QStringLiteral("0"));
   SetSetting(d->global_db, QStringLiteral("font_size_delta"),
              QString::number(d->theme_manager.FontSizeDelta()));
-  if (auto theme = d->theme_manager.Theme())
+  if (auto theme = d->theme_manager.Theme()) {
+    std::cerr << "SaveSettings: writing theme_id='"
+              << theme->Id().toStdString() << "'" << std::endl;
     SetSetting(d->global_db, QStringLiteral("theme_id"), theme->Id());
+  }
 }
 
 void ConfigManager::LoadSettings(void) {
