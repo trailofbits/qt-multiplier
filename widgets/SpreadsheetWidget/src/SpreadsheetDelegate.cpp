@@ -389,9 +389,7 @@ void SpreadsheetDelegate::setModelData(QWidget *editor,
 void SpreadsheetDelegate::updateEditorGeometry(
     QWidget *editor, const QStyleOptionViewItem &option,
     const QModelIndex &) const {
-  QRect rect = option.rect;
-  rect.setHeight(std::max(rect.height(), 80));
-  editor->setGeometry(rect);
+  editor->setGeometry(option.rect);
 }
 
 bool SpreadsheetDelegate::eventFilter(QObject *object, QEvent *event) {
