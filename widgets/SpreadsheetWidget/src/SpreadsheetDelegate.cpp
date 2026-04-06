@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QKeyEvent>
 #include <QPainter>
+#include <QPixmap>
 #include <QPlainTextEdit>
 #include <QPointF>
 #include <QStyle>
@@ -113,10 +114,16 @@ void SpreadsheetDelegate::paint(QPainter *painter,
             pos.setX(opt.rect.left() + 2);
             pos.setY(pos.y() + fm.height());
           } else if (ch == QLatin1Char('\t')) {
-            pos.setX(pos.x() + fm.horizontalAdvance(QLatin1Char(' ')) *
+            auto sr = painter->boundingRect(
+                QRectF(0, 0, 9999, fm.height()),
+                Qt::AlignLeft, QStringLiteral(" "));
+            pos.setX(pos.x() + sr.width() *
                      static_cast<qreal>(tab_width));
           } else if (ch == QLatin1Char(' ')) {
-            pos.setX(pos.x() + fm.horizontalAdvance(ch));
+            auto sr = painter->boundingRect(
+                QRectF(0, 0, 9999, fm.height()),
+                Qt::AlignLeft, QStringLiteral(" "));
+            pos.setX(pos.x() + sr.width());
           }
         }
       } else {
@@ -125,7 +132,8 @@ void SpreadsheetDelegate::paint(QPainter *painter,
                          opt.rect.right() - pos.x(), fm.height());
         painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
                           text);
-        pos.setX(pos.x() + fm.horizontalAdvance(text));
+        auto br = painter->boundingRect(text_rect, Qt::AlignLeft, text);
+        pos.setX(pos.x() + br.width());
       }
     }
     painter->restore();
@@ -180,6 +188,90 @@ void SpreadsheetDelegate::paint(QPainter *painter,
 
   // Bool and QString: fall through to the default delegate.
   QStyledItemDelegate::paint(painter, option, index);
+}
+
+QSize SpreadsheetDelegate::sizeHint(const QStyleOptionViewItem &option,
+                                    const QModelIndex &index) const {
+  QVariant raw = index.data(SpreadsheetRoles::RawValueRole);
+
+  if ((raw.canConvert<TokenRange>() || raw.canConvert<Token>()) && theme) {
+    QFont font = theme->Font();
+    QFontMetricsF fm(font);
+
+    // Use a dummy painter for accurate boundingRect measurements.
+    QPixmap dummy(1, 1);
+    QPainter p(&dummy);
+    p.setFont(font);
+
+    qreal width = 0;
+    qreal x = 0;
+    int lines = 1;
+
+    if (raw.canConvert<TokenRange>()) {
+      std::vector<Token> tokens;
+      for (Token tok : raw.value<TokenRange>()) {
+        tokens.push_back(std::move(tok));
+      }
+      while (!tokens.empty() &&
+             tokens.back().kind() == TokenKind::WHITESPACE) {
+        tokens.pop_back();
+      }
+
+      for (const auto &tok : tokens) {
+        auto tok_data = tok.data();
+        QString text = QString::fromUtf8(
+            tok_data.data(), static_cast<qsizetype>(tok_data.size()));
+
+        if (tok.kind() == TokenKind::WHITESPACE) {
+          for (auto ch : text) {
+            if (ch == QLatin1Char('\n')) {
+              width = std::max(width, x);
+              x = 0;
+              ++lines;
+            } else if (ch == QLatin1Char('\t')) {
+              auto space_rect = p.boundingRect(
+                  QRectF(0, 0, 9999, fm.height()),
+                  Qt::AlignLeft, QStringLiteral(" "));
+              x += space_rect.width() * static_cast<qreal>(tab_width);
+            } else {
+              auto ch_rect = p.boundingRect(
+                  QRectF(0, 0, 9999, fm.height()),
+                  Qt::AlignLeft, QString(ch));
+              x += ch_rect.width();
+            }
+          }
+        } else {
+          auto cs = theme->TokenColorAndStyle(tok);
+          font.setBold(cs.bold);
+          font.setItalic(cs.italic);
+          p.setFont(font);
+          auto rect = p.boundingRect(
+              QRectF(0, 0, 9999, fm.height()),
+              Qt::AlignLeft, text);
+          x += rect.width();
+          font = theme->Font();
+          p.setFont(font);
+        }
+      }
+    } else {
+      auto tok = raw.value<Token>();
+      auto tok_data = tok.data();
+      auto rect = p.boundingRect(
+          QRectF(0, 0, 9999, fm.height()),
+          Qt::AlignLeft,
+          QString::fromUtf8(tok_data.data(),
+                            static_cast<qsizetype>(tok_data.size())));
+      x = rect.width();
+    }
+
+    width = std::max(width, x);
+    int h = static_cast<int>(std::ceil(fm.height() *
+                static_cast<qreal>(lines))) + 4;
+    int w = static_cast<int>(std::ceil(width)) + 8;
+    return QSize(w, h);
+  }
+
+  return QStyledItemDelegate::sizeHint(option, index);
 }
 
 QWidget *SpreadsheetDelegate::createEditor(

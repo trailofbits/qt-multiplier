@@ -35,6 +35,9 @@ class SpreadsheetDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   void paint(QPainter *painter, const QStyleOptionViewItem &option,
              const QModelIndex &index) const Q_DECL_FINAL;
 
+  QSize sizeHint(const QStyleOptionViewItem &option,
+                 const QModelIndex &index) const Q_DECL_FINAL;
+
   QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
                         const QModelIndex &index) const Q_DECL_FINAL;
 
