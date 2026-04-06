@@ -246,9 +246,24 @@ void MainWindow::InitializeIndex(QApplication &application) {
 
   // Restore window layout now that all plugins and docks are created.
   QByteArray state, geometry;
-  if (d->config_manager.LoadWindowLayout(state, geometry)) {
+  if (d->config_manager.LoadWindowLayout(state, geometry) &&
+      !state.isEmpty()) {
     restoreGeometry(geometry);
     restoreState(state);
+  } else {
+    // First launch: show default docks. The docks are created hidden;
+    // show the ones that should be visible by default.
+    for (auto *child : findChildren<QDockWidget *>()) {
+      auto name = child->objectName();
+      // Show project explorer, entity explorer, and info explorer by default.
+      if (name.contains(QStringLiteral("ProjectExplorer")) ||
+          name.contains(QStringLiteral("EntityExplorer")) ||
+          name.contains(QStringLiteral("InformationExplorer"))) {
+        child->show();
+      }
+    }
+    // Maximize on first launch.
+    showMaximized();
   }
 }
 
