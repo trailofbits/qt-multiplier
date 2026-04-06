@@ -194,6 +194,10 @@ void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
         auto opt_name = dialog.TextInput();
         if (opt_name.has_value() && !opt_name->isEmpty()) {
           d->tab_widget->setTabText(index, opt_name.value());
+          // Sync to container windowTitle for persistence.
+          if (auto *w = d->tab_widget->widget(index)) {
+            w->setWindowTitle(opt_name.value());
+          }
         }
       }
     }
@@ -221,6 +225,9 @@ void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
           auto opt_name = dialog.TextInput();
           if (opt_name.has_value() && !opt_name->isEmpty()) {
             d->tab_widget->setTabText(index, opt_name.value());
+            if (auto *w = d->tab_widget->widget(index)) {
+              w->setWindowTitle(opt_name.value());
+            }
           }
         }
       });
@@ -529,6 +536,11 @@ void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {
     d->tab_widget->AddTab(container);
   }
 
+  // Force the tab widget to update its display.
+  if (!sheets.isEmpty() && d->tab_widget->count() > 0) {
+    d->tab_widget->setCurrentIndex(0);
+    d->tab_widget->update();
+  }
 }
 
 }  // namespace mx::gui
