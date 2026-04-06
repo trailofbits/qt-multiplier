@@ -19,6 +19,7 @@
 #include <multiplier/GUI/Explorers/ProjectExplorer.h>
 #include <multiplier/GUI/Explorers/ReferenceExplorer.h>
 #include <multiplier/GUI/Explorers/SpreadsheetExplorer.h>
+
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
@@ -281,6 +282,15 @@ void MainWindow::InitializeIndex(QApplication &application) {
     }
     // Maximize on first launch.
     showMaximized();
+  }
+
+  // Load persisted sheets AFTER restoreState so the dock visibility
+  // from the saved layout is preserved.
+  for (const auto &plugin : d->plugins) {
+    if (auto *sheet = dynamic_cast<SpreadsheetExplorer *>(plugin.get())) {
+      sheet->LoadPersistedSheets();
+      break;
+    }
   }
 }
 

@@ -33,6 +33,9 @@ class SpreadsheetExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
                         const QModelIndex &index) Q_DECL_FINAL;
 
+  //! Load persisted sheets from the database. Call after restoreState.
+  void LoadPersistedSheets(void);
+
  private:
   void CreateDockWidget(IWindowManager *manager);
 

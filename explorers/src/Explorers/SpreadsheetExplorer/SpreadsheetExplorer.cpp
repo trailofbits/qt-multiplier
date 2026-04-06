@@ -143,9 +143,12 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
     file_menu->addAction(new_sheet_action);
   }
 
-  // Load persisted sheets from the project database.
-  // The DB is already open because InitializePlugins runs after SetIndex.
-  OnIndexChanged(config_manager);
+  // Sheets are loaded via LoadPersistedSheets() called from MainWindow
+  // after restoreState, so dock visibility is handled correctly.
+}
+
+void SpreadsheetExplorer::LoadPersistedSheets(void) {
+  OnIndexChanged(d->config_manager);
 }
 
 void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
