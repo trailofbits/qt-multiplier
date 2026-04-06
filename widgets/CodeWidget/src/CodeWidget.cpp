@@ -3284,20 +3284,15 @@ TokenRange CodeWidget::PrivateData::BuildSelectionTokenRange(void) const {
     // Stop at entities entirely after the selection.
     if (entity_start >= sel_end) break;
 
-    // Compute overlap.
+    // Compute overlap within the entity's display text (which is one
+    // line of the token — the scene splits multiline tokens into
+    // multiple entities).
     int overlap_start = std::max(entity_start, sel_start);
     int overlap_end = std::min(entity_end, sel_end);
 
-    bool fully_covered = (overlap_start == entity_start &&
-                          overlap_end == entity_end);
-
-    if (fully_covered && entity.token_index < scene.tokens.size()) {
-      // Use the actual token.
-      result.emplace_back(scene.tokens[entity.token_index]);
-    } else {
-      // Partial token — create a UserToken with the substring.
-      QString sub = data.text.mid(overlap_start - entity_start,
-                                  overlap_end - overlap_start);
+    QString sub = data.text.mid(overlap_start - entity_start,
+                                overlap_end - overlap_start);
+    {
       UserToken ut;
       ut.data = sub.toStdString();
 
