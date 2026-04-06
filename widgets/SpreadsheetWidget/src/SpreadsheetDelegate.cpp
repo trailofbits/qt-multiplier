@@ -126,8 +126,17 @@ void SpreadsheetDelegate::paint(QPainter *painter,
             pos.setX(pos.x() + sr.width());
           }
         }
+      } else if (!text.contains(QLatin1Char('\n'))) {
+        // Single-line token: draw as one string.
+        QRectF text_rect(pos.x(), pos.y() - fm.ascent(),
+                         opt.rect.right() - pos.x(), fm.height());
+        painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                          text);
+        auto br = painter->boundingRect(text_rect, Qt::AlignLeft, text);
+        pos.setX(pos.x() + br.width());
       } else {
-        // Split by newlines and draw each line separately.
+        // Multiline token: split and draw each line.
+        text.remove(QLatin1Char('\r'));
         auto lines = text.split(QLatin1Char('\n'));
         for (int li = 0; li < lines.size(); ++li) {
           if (li > 0) {
@@ -136,11 +145,10 @@ void SpreadsheetDelegate::paint(QPainter *painter,
           }
           const auto &line = lines[li];
           if (!line.isEmpty()) {
-            QRectF text_rect(pos.x(), pos.y() - fm.ascent(),
-                             opt.rect.right() - pos.x(), fm.height());
-            painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
-                              line);
-            auto br = painter->boundingRect(text_rect, Qt::AlignLeft, line);
+            painter->drawText(pos, line);
+            auto br = painter->boundingRect(
+                QRectF(0, 0, 9999, fm.height()),
+                Qt::AlignLeft, line);
             pos.setX(pos.x() + br.width());
           }
         }

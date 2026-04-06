@@ -96,12 +96,8 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
   setWindowIcon(
       d->config_manager.MediaManager().Icon("com.trailofbits.icon.Logo"));
 
-  // Restore window layout (dock positions, geometry) from settings.
-  QByteArray state, geometry;
-  if (d->config_manager.LoadWindowLayout(state, geometry)) {
-    restoreGeometry(geometry);
-    restoreState(state);
-  }
+  // Window layout is restored in InitializeIndex after all plugins
+  // and docks are created.
 }
 
 void MainWindow::InitializePlugins(void) {
@@ -246,6 +242,13 @@ void MainWindow::InitializeIndex(QApplication &application) {
   auto &theme_manager = d->config_manager.ThemeManager();
   if (auto theme = theme_manager.Find(parser.value(theme_option))) {
     theme_manager.SetTheme(std::move(theme));
+  }
+
+  // Restore window layout now that all plugins and docks are created.
+  QByteArray state, geometry;
+  if (d->config_manager.LoadWindowLayout(state, geometry)) {
+    restoreGeometry(geometry);
+    restoreState(state);
   }
 }
 
