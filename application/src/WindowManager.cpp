@@ -141,6 +141,7 @@ void WindowManager::AddCentralWidget(IWindowWidget *widget,
 void WindowManager::CreateToolBarIfMissing(void) {
   if (!d->toolbar) {
     d->toolbar = new QToolBar(tr("Main Toolbar"), d->window);
+    d->toolbar->setObjectName(QStringLiteral("com.trailofbits.toolbar.Main"));
     d->toolbar->setIconSize(QSize(24, 24));
     auto view_menu = Menu(tr("View"));
     view_menu->addAction(d->toolbar->toggleViewAction());
@@ -202,6 +203,7 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
   widget->setParent(d->window);
 
   auto dock_widget = new QDockWidget(widget->windowTitle(), d->window);
+  dock_widget->setObjectName(config.id);
 
 #ifdef MXQT_EVAL_COPY
   dock_widget->setAllowedAreas(Qt::LeftDockWidgetArea |

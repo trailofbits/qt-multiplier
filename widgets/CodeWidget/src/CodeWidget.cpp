@@ -1335,6 +1335,7 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
           this, &CodeWidget::OnGoToLineNumber);
 
   d->code_area = new QWidget();
+  d->code_area->setFocusPolicy(Qt::StrongFocus);
   d->code_area->setMouseTracking(true);
   d->code_area->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   d->code_area->setMinimumWidth(200);

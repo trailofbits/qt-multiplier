@@ -129,6 +129,19 @@ ConfigManager::~ConfigManager(void) {
               << theme->Id().toStdString() << "'" << std::endl;
   }
   SaveSettings();
+
+  // Force WAL checkpoint so data is written to the main DB file before
+  // the connection is destroyed.
+  if (d->global_db.isValid() && d->global_db.isOpen()) {
+    QSqlQuery q(d->global_db);
+    q.exec(QStringLiteral("PRAGMA wal_checkpoint(FULL)"));
+    d->global_db.close();
+  }
+  if (d->project_db.isValid() && d->project_db.isOpen()) {
+    QSqlQuery q(d->project_db);
+    q.exec(QStringLiteral("PRAGMA wal_checkpoint(FULL)"));
+    d->project_db.close();
+  }
 }
 
 ConfigManager::ConfigManager(QApplication &application, QObject *parent)
