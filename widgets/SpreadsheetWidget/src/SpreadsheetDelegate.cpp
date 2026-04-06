@@ -126,16 +126,9 @@ void SpreadsheetDelegate::paint(QPainter *painter,
             pos.setX(pos.x() + sr.width());
           }
         }
-      } else if (!text.contains(QLatin1Char('\n'))) {
-        // Single-line token: draw as one string.
-        QRectF text_rect(pos.x(), pos.y() - fm.ascent(),
-                         opt.rect.right() - pos.x(), fm.height());
-        painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
-                          text);
-        auto br = painter->boundingRect(text_rect, Qt::AlignLeft, text);
-        pos.setX(pos.x() + br.width());
       } else {
-        // Multiline token: split and draw each line.
+        // Handle tokens that may contain newlines (multiline comments etc).
+        // Remove \r and split by \n, drawing each line.
         text.remove(QLatin1Char('\r'));
         auto lines = text.split(QLatin1Char('\n'));
         for (int li = 0; li < lines.size(); ++li) {
