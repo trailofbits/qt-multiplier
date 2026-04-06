@@ -285,10 +285,12 @@ void MainWindow::InitializeIndex(QApplication &application) {
     showMaximized();
   }
 
-  // Debug: show dock visibility after restore.
+  // Debug: show dock visibility and size after restore.
   for (auto *child : findChildren<QDockWidget *>()) {
     std::cerr << "DOCK: " << child->objectName().toStdString()
-              << " visible=" << child->isVisible() << std::endl;
+              << " visible=" << child->isVisible()
+              << " size=" << child->width() << "x" << child->height()
+              << std::endl;
   }
 
   // Load persisted sheets AFTER restoreState so the dock visibility
@@ -297,6 +299,18 @@ void MainWindow::InitializeIndex(QApplication &application) {
     if (auto *sheet = dynamic_cast<SpreadsheetExplorer *>(plugin.get())) {
       sheet->LoadPersistedSheets();
       break;
+    }
+  }
+
+  // Ensure visible docks have a reasonable minimum height.
+  // restoreState can leave dock areas with zero-height splitters.
+  for (auto *dock : findChildren<QDockWidget *>()) {
+    if (dock->isVisible() && dock->height() < 50) {
+      dock->setMinimumHeight(100);
+      // Reset after layout settles.
+      QTimer::singleShot(0, dock, [dock] () {
+        dock->setMinimumHeight(0);
+      });
     }
   }
 }
