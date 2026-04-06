@@ -101,6 +101,7 @@ class ConfigManagerImpl {
 
   unsigned tab_width{kDefaultTabWidth};
   bool use_tab_stops{true};
+  bool shutting_down{false};
   QString db_path;
 
   QSqlDatabase global_db;
@@ -121,14 +122,23 @@ class ConfigManagerImpl {
   }
 };
 
-ConfigManager::~ConfigManager(void) { SaveSettings(); }
+ConfigManager::~ConfigManager(void) {
+  d->shutting_down = true;
+  SaveSettings();
+}
 
 ConfigManager::ConfigManager(QApplication &application, QObject *parent)
     : QObject(parent),
       d(std::make_shared<ConfigManagerImpl>(application, this)) {
+  // Auto-save on theme change, but not during shutdown (when proxy
+  // destruction can reset the theme to default).
   using TM = class ThemeManager;
   connect(&(d->theme_manager), &TM::ThemeChanged,
-          this, [this] (const TM &) { SaveSettings(); });
+          this, [this] (const TM &) {
+            if (!d->shutting_down) {
+              SaveSettings();
+            }
+          });
 }
 
 class ActionManager &ConfigManager::ActionManager(void) const noexcept {

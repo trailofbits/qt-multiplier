@@ -1802,6 +1802,11 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
 
     default:
       // Support Ctrl-C.
+      std::cerr << "KEY: ks='" << ks.toString().toStdString()
+                << "' copy_ks='" << kCopyKeqSequence.toString().toStdString()
+                << "' sel_cursor=" << d->selection_start_cursor.has_value()
+                << " sel_empty=" << d->token_model.selection.isEmpty()
+                << std::endl;
       if (ks == kCopyKeqSequence && d->selection_start_cursor &&
           !d->token_model.selection.isEmpty()) {
         d->CopySelectionToClipboard();
