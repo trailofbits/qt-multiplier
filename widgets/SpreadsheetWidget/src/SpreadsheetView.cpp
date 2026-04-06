@@ -249,9 +249,15 @@ void SpreadsheetView::paste_at_selection(void) {
 
     if (!tokens.empty()) {
       auto range = TokenRange::create(std::move(tokens));
+      std::cerr << "PASTE: created TokenRange size=" << range.size()
+                << " empty=" << range.empty() << std::endl;
+      auto var = QVariant::fromValue(range);
+      std::cerr << "PASTE: variant type=" << var.typeName()
+                << " canConvertTR=" << var.canConvert<TokenRange>()
+                << std::endl;
       if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
-        sm->set_cell_value(current.row(), current.column(),
-                           QVariant::fromValue(range));
+        sm->set_cell_value(current.row(), current.column(), var);
+        std::cerr << "PASTE: set_cell_value called" << std::endl;
       }
       return;
     }
