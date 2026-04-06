@@ -57,16 +57,18 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &SpreadsheetExplorer::OnIndexChanged);
 
-  // Add "New Spreadsheet" to the View menu (visible immediately).
+  // Create the dock eagerly (hidden) so it appears in View > Explorers.
+  CreateDockWidget(parent);
+
+  // Add "New Spreadsheet" to the File menu.
   auto *new_sheet_action = new QAction(tr("New Spreadsheet"), this);
   new_sheet_action->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
   connect(new_sheet_action, &QAction::triggered,
           this, [this] () { OnNewBlankSheet({}); });
 
-  auto *view_menu = parent->Menu(tr("View"));
-  if (view_menu) {
-    view_menu->addSeparator();
-    view_menu->addAction(new_sheet_action);
+  auto *file_menu = parent->Menu(tr("File"));
+  if (file_menu) {
+    file_menu->addAction(new_sheet_action);
   }
 }
 
@@ -114,9 +116,6 @@ void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
 }
 
 void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
-  if (!d->dock) {
-    CreateDockWidget(d->manager);
-  }
 
   auto *model = new SpreadsheetModel;
 
