@@ -30,6 +30,7 @@
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
 #include <multiplier/Index.h>
 
+#include <QCloseEvent>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QFileDialog>
@@ -74,8 +75,13 @@ struct MainWindow::PrivateData {
 };
 
 MainWindow::~MainWindow(void) {
-  d->config_manager.SaveWindowLayout(saveState(), saveGeometry());
   d->config_manager.SaveSettings();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+  // Save window layout while the window is still fully alive.
+  d->config_manager.SaveWindowLayout(saveState(), saveGeometry());
+  QMainWindow::closeEvent(event);
 }
 
 MainWindow::MainWindow(QApplication &application, QWidget *parent)
@@ -249,7 +255,18 @@ void MainWindow::InitializeIndex(QApplication &application) {
   if (d->config_manager.LoadWindowLayout(state, geometry) &&
       !state.isEmpty()) {
     restoreGeometry(geometry);
-    restoreState(state);
+    bool ok = restoreState(state);
+    // If restore failed (e.g. stale state), fall through to defaults.
+    if (!ok) {
+      for (auto *child : findChildren<QDockWidget *>()) {
+        auto name = child->objectName();
+        if (name.contains(QStringLiteral("ProjectExplorer")) ||
+            name.contains(QStringLiteral("EntityExplorer")) ||
+            name.contains(QStringLiteral("InformationExplorer"))) {
+          child->show();
+        }
+      }
+    }
   } else {
     // First launch: show default docks. The docks are created hidden;
     // show the ones that should be visible by default.
