@@ -190,6 +190,7 @@ void ThemeManager::PopulateViewMenu(QMenu *menu) {
 
   populate_theme_menu(*this);
   connect(this, &ThemeManager::ThemeListChanged, this, populate_theme_menu);
+  connect(this, &ThemeManager::ThemeChanged, this, populate_theme_menu);
 
   // --- Font size controls ---
   menu->addSeparator();
