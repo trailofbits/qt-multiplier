@@ -70,5 +70,17 @@
 ### Cycle 1 (2026-04-05)
 - Completed Phase 1: widget library, explorer, CMake integration, build passes
 - Completed Phase 2: QUndoStack, all command classes, Ctrl+Z/Shift+Z, context menu undo/redo
-- Test data with strings and bools in blank sheets
-- Next: Phase 3 (sorting/filtering) or Phase 4 (copy/paste)
+
+### Cycle 2 (2026-04-06)
+- Token copy/paste from code explorer to sheets (with kind/category)
+- All cells editable with smart token-preserving substring edits
+- Multiline cells via Shift+Enter with QPlainTextEdit editor
+- Row/column background colors with QColorDialog
+- Bottom toolbar (+ Row, + Col, + Checkbox Col, Del, Move)
+- New Sheet toolbar button, File > New Sheet menu
+- Theme-colored headers, grid lines, alternating row colors
+- Fixed: empty cells editable, crash on exit, checkbox rendering
+- Renamed Spreadsheets to Sheets
+- **BLOCKER**: Sheet persistence not yet implemented (Phase 5). Sheets
+  are lost on exit. Theme/settings persistence works (verified in DB).
+- Next: Phase 5 (SQLite persistence) is critical
