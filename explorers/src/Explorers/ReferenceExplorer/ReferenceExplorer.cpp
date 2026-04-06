@@ -67,7 +67,13 @@ struct ReferenceExplorer::PrivateData {
         manager(manager_) {}
 };
 
-ReferenceExplorer::~ReferenceExplorer(void) {}
+ReferenceExplorer::~ReferenceExplorer(void) {
+  if (d->view) {
+    d->config_manager.SaveHeaderState(
+        QStringLiteral("refexplorer_active_tab"),
+        QByteArray::number(d->view->currentIndex()));
+  }
+}
 
 ReferenceExplorer::ReferenceExplorer(ConfigManager &config_manager,
                                      IWindowManager *parent)

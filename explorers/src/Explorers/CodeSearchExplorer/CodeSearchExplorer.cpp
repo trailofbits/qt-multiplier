@@ -142,7 +142,13 @@ struct CodeSearchExplorer::PrivateData {
   }
 };
 
-CodeSearchExplorer::~CodeSearchExplorer(void) {}
+CodeSearchExplorer::~CodeSearchExplorer(void) {
+  if (d->tab_widget) {
+    d->config_manager.SaveHeaderState(
+        QStringLiteral("codesearch_active_tab"),
+        QByteArray::number(d->tab_widget->currentIndex()));
+  }
+}
 
 CodeSearchExplorer::CodeSearchExplorer(ConfigManager &config_manager,
                                        IWindowManager *parent)
