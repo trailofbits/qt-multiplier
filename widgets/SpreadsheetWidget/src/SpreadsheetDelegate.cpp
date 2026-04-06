@@ -389,7 +389,14 @@ void SpreadsheetDelegate::setModelData(QWidget *editor,
 void SpreadsheetDelegate::updateEditorGeometry(
     QWidget *editor, const QStyleOptionViewItem &option,
     const QModelIndex &) const {
-  editor->setGeometry(option.rect);
+  // Start at the cell position but extend width to the viewport edge
+  // so there's more room to type.
+  QRect rect = option.rect;
+  if (option.widget) {
+    int viewport_right = option.widget->width();
+    rect.setRight(std::max(rect.right(), viewport_right - 2));
+  }
+  editor->setGeometry(rect);
 }
 
 bool SpreadsheetDelegate::eventFilter(QObject *object, QEvent *event) {
