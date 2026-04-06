@@ -12,6 +12,8 @@
 #include <QActionGroup>
 #include <QDir>
 #include <QMenu>
+
+#include <iostream>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <multiplier/Index.h>
@@ -266,9 +268,15 @@ void ConfigManager::LoadSettings(void) {
   if (delta != 0) d->theme_manager.SetFontSizeDelta(delta);
 
   auto theme_id = GetSetting(d->global_db, QStringLiteral("theme_id"));
+  std::cerr << "LoadSettings: theme_id='" << theme_id.toStdString() << "'"
+            << std::endl;
   if (!theme_id.isEmpty()) {
-    if (auto theme = d->theme_manager.Find(theme_id))
+    if (auto theme = d->theme_manager.Find(theme_id)) {
+      std::cerr << "LoadSettings: found theme, setting it" << std::endl;
       d->theme_manager.SetTheme(theme);
+    } else {
+      std::cerr << "LoadSettings: theme NOT found!" << std::endl;
+    }
   }
 }
 

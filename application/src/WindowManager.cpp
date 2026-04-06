@@ -167,13 +167,9 @@ QAction *WindowManager::AddToolBarButton(
   auto tool_action = new QAction(icon, action.name, tool_button);
   tool_button->setDefaultAction(tool_action);
 
-  connect(tool_action, &QAction::toggled,
-          [data = action.data, action = action.action] (bool toggled) {
-            if (data.isValid()) {
-              action.Trigger(data);
-            } else {
-              action.Trigger(QVariant::fromValue(toggled));
-            }
+  connect(tool_action, &QAction::triggered,
+          [data = action.data, action = action.action] () {
+            action.Trigger(data);
           });
 
   d->toolbar->addWidget(tool_button);
