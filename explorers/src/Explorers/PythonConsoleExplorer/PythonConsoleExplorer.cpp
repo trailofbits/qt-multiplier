@@ -20,7 +20,7 @@
 namespace mx::gui {
 
 struct PythonConsoleExplorer::PrivateData {
-  const ConfigManager &config_manager;
+  ConfigManager &config_manager;
   IWindowManager * const manager;
 
   IWindowWidget *dock{nullptr};
@@ -46,6 +46,7 @@ PythonConsoleExplorer::PythonConsoleExplorer(ConfigManager &config_manager,
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &PythonConsoleExplorer::OnIndexChanged);
 
+  // Register the dock shell (without creating the Python widget yet).
   CreateDockWidget(parent);
 }
 
@@ -54,17 +55,8 @@ void PythonConsoleExplorer::CreateDockWidget(IWindowManager *manager) {
   d->dock->setWindowTitle(tr("Python Console"));
   d->dock->setContentsMargins(0, 0, 0, 0);
 
-  auto &theme_manager = d->config_manager.ThemeManager();
-
-  d->console = new PythonConsoleWidget(
-      theme_manager, d->config_manager.Index(), d->dock);
-
-  connect(&theme_manager, &ThemeManager::ThemeChanged,
-          d->console, &PythonConsoleWidget::OnThemeChanged);
-
   auto layout = new QVBoxLayout(d->dock);
   layout->setContentsMargins(0, 0, 0, 0);
-  layout->addWidget(d->console, 1);
   d->dock->setLayout(layout);
 
   IWindowManager::DockConfig config;
@@ -74,8 +66,25 @@ void PythonConsoleExplorer::CreateDockWidget(IWindowManager *manager) {
   config.app_menu_location = {tr("View"), tr("Explorers")};
   manager->AddDockWidget(d->dock, config);
 
-  // Hidden by default; shown via View > Explorers menu or action.
+  // Hidden by default; Python is initialized lazily when first shown.
   d->dock->hide();
+}
+
+void PythonConsoleExplorer::EnsureConsoleCreated(void) {
+  if (d->console) {
+    return;
+  }
+
+  auto &theme_manager = d->config_manager.ThemeManager();
+
+  d->console = new PythonConsoleWidget(
+      theme_manager, d->config_manager.Index(), d->dock);
+
+  connect(&theme_manager, &ThemeManager::ThemeChanged,
+          d->console, &PythonConsoleWidget::OnThemeChanged);
+
+  auto *layout = d->dock->layout();
+  layout->addWidget(d->console);
 }
 
 void PythonConsoleExplorer::ActOnPrimaryClick(
@@ -84,7 +93,6 @@ void PythonConsoleExplorer::ActOnPrimaryClick(
     return;
   }
 
-  // Update the `here` variable in the Python console to the clicked entity.
   auto entity = IModel::EntitySkipThroughTokens(index);
   if (!std::holds_alternative<NotAnEntity>(entity)) {
     d->console->SetHere(std::move(entity));
@@ -93,16 +101,15 @@ void PythonConsoleExplorer::ActOnPrimaryClick(
 
 void PythonConsoleExplorer::OnOpenPythonConsole(const QVariant &) {
   if (d->dock) {
+    EnsureConsoleCreated();
     d->dock->show();
     d->dock->EmitRequestAttention();
   }
 }
 
-void PythonConsoleExplorer::OnIndexChanged(
-    const ConfigManager &config_manager) {
-  // The PythonConsoleWidget is initialized with the index at construction.
-  // If the index changes, we'd need to recreate the console. For now,
-  // this is a no-op since we only support one database per session.
+void PythonConsoleExplorer::OnIndexChanged(const ConfigManager &) {
+  // Python console is initialized with the index at creation time.
+  // If the index changes, we'd need to recreate the console.
 }
 
 }  // namespace mx::gui

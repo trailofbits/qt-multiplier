@@ -10,11 +10,11 @@
 - [ ] Hard-code test data to verify token rendering
 
 ## Phase 2: Mutations + undo/redo
-- [ ] QUndoStack integration
-- [ ] SetCellValueCommand, InsertRowsCommand, RemoveRowsCommand, etc.
-- [ ] Internal vs public mutation API split
-- [ ] Context menu for row/column operations
-- [ ] Ctrl+Z / Ctrl+Shift+Z
+- [x] QUndoStack integration
+- [x] SetCellValueCommand, InsertRowsCommand, RemoveRowsCommand, etc.
+- [x] Internal vs public mutation API split
+- [x] Context menu for row/column operations
+- [x] Ctrl+Z / Ctrl+Shift+Z
 
 ## Phase 3: Sorting and filtering
 - [ ] SpreadsheetProxyModel with lessThan override
@@ -53,10 +53,15 @@
 - [ ] Error display
 - [ ] Python formula editor with auto-complete popup (reuse PythonCompletionModel from PythonConsoleWidget)
 
+## Future: Global undo support
+- [ ] Make macro (un)expansion undoable (QUndoCommand wrapping ExpandedMacrosModel changes)
+- [ ] Make highlight color set/remove undoable (QUndoCommand wrapping HighlightThemeProxy changes)
+- [ ] Consider a global QUndoStack for the application (vs per-widget stacks)
+
 ## Cycle Log
 
 ### Cycle 1 (2026-04-05)
-- Started Phase 1
-- Creating widget library files (SpreadsheetModel, SpreadsheetView, SpreadsheetDelegate)
-- Creating SpreadsheetExplorer plugin
-- Next: build and verify
+- Completed Phase 1: widget library, explorer, CMake integration, build passes
+- Completed Phase 2: QUndoStack, all command classes, Ctrl+Z/Shift+Z, context menu undo/redo
+- Test data with strings and bools in blank sheets
+- Next: Phase 3 (sorting/filtering) or Phase 4 (copy/paste)

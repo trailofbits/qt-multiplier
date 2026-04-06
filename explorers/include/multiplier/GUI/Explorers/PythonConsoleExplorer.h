@@ -32,6 +32,7 @@ class PythonConsoleExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
  private:
   void CreateDockWidget(IWindowManager *manager);
+  void EnsureConsoleCreated(void);
 
  private slots:
   void OnOpenPythonConsole(const QVariant &data);
