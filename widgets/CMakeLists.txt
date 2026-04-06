@@ -17,6 +17,7 @@ if(MX_ENABLE_PYTHON_BINDINGS)
 endif()
 add_subdirectory("SearchWidget")
 add_subdirectory("SimpleTextInputDialog")
+add_subdirectory("SpreadsheetWidget")
 add_subdirectory("TabWidget")
 add_subdirectory("TreeWidget")
 add_subdirectory("GeneratorWidget")  # Relies on TreeWidget, SearchWidget, FilterSettingsWidget

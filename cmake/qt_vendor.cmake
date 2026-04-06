@@ -55,7 +55,7 @@ function(_mxqt_find_system_qt)
     message(STATUS "qt-multiplier: Looking for system Qt installation...")
 
     find_package(Qt6 REQUIRED COMPONENTS
-        Core Gui Widgets Concurrent Core5Compat Test
+        Core Gui Widgets Concurrent Core5Compat Sql Test
     )
 
     if(Qt6_FOUND)
@@ -90,7 +90,7 @@ function(_mxqt_setup_qt_from_source)
         set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" PARENT_SCOPE)
 
         find_package(Qt6 REQUIRED COMPONENTS
-            Core Gui Widgets Concurrent Core5Compat Test
+            Core Gui Widgets Concurrent Core5Compat Sql Test
         )
 
         if(Qt6_FOUND)

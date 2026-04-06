@@ -14,6 +14,7 @@ add_library("mx_explorers"
   include/multiplier/GUI/Explorers/InformationExplorer.h
   include/multiplier/GUI/Explorers/ProjectExplorer.h
   include/multiplier/GUI/Explorers/ReferenceExplorer.h
+  include/multiplier/GUI/Explorers/SpreadsheetExplorer.h
 
   include/multiplier/GUI/Interfaces/IInfoGenerator.h
   include/multiplier/GUI/Interfaces/IInformationExplorerPlugin.h
@@ -68,6 +69,8 @@ add_library("mx_explorers"
   src/Explorers/ProjectExplorer/ProjectExplorer.cpp
 
   src/Explorers/ReferenceExplorer/ReferenceExplorer.cpp
+
+  src/Explorers/SpreadsheetExplorer/SpreadsheetExplorer.cpp
 )
 
 if(MX_ENABLE_PYTHON_BINDINGS)
@@ -87,6 +90,7 @@ target_link_libraries("mx_explorers"
     "mx_generator_widget"
     "mx_history_widget"
     "mx_line_edit_widget"
+    "mx_spreadsheet_widget"
     "mx_media_manager"
     "mx_search_widget"
     "mx_simple_text_input_dialog"

@@ -12,6 +12,7 @@ set(qt_component_list
   "Widgets"
   "Concurrent"
   "Core5Compat"
+  "Sql"
   "Test"
 )
 
