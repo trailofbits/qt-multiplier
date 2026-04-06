@@ -70,6 +70,14 @@ add_library("mx_explorers"
   src/Explorers/ReferenceExplorer/ReferenceExplorer.cpp
 )
 
+if(MX_ENABLE_PYTHON_BINDINGS)
+  target_sources("mx_explorers" PRIVATE
+    include/multiplier/GUI/Explorers/PythonConsoleExplorer.h
+    src/Explorers/PythonConsoleExplorer/PythonConsoleExplorer.cpp
+  )
+  target_compile_definitions("mx_explorers" PUBLIC MX_ENABLE_PYTHON=1)
+endif()
+
 target_link_libraries("mx_explorers"
   PRIVATE
     "mx_action_manager"
@@ -86,6 +94,7 @@ target_link_libraries("mx_explorers"
     "mx_tab_widget"
     "mx_tree_widget"
     "mx_util_component"
+    $<$<BOOL:${MX_ENABLE_PYTHON_BINDINGS}>:mx_python_console_widget>
 
   PUBLIC
     "mx_gap_library"

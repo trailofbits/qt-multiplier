@@ -33,4 +33,11 @@ void FontSizeProxy::Reset(void) {
   }
 }
 
+void FontSizeProxy::SetDelta(int d) {
+  if (delta != d) {
+    delta = d;
+    EmitThemeProxyChanged();
+  }
+}
+
 }  // namespace mx::gui

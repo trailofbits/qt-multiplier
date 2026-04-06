@@ -8,6 +8,7 @@
 
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 
+#include <QColor>
 #include <QDockWidget>
 #include <QString>
 
@@ -54,7 +55,7 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
 
   //! Force the docking system to re-resolve its palette-based stylesheet.
   //! Call this after the application palette changes (e.g. theme switch).
-  void RefreshDockStylesheet(void);
+  void RefreshDockStylesheet(const QColor &bg_color);
 
  private:
   void CreateToolBarIfMissing(void);

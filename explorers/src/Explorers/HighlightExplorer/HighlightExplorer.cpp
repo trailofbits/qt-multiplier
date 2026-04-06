@@ -256,9 +256,35 @@ HighlightExplorer::ActOnKeyPress(IWindowManager *,
   return std::nullopt;
 }
 
-void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
-  ClearAllColors();
-  EmitColorUpdate();
+void HighlightExplorer::OnIndexChanged(const ConfigManager &config_manager) {
+  // Load saved highlight colors for the new project.
+  auto saved_colors = config_manager.LoadHighlightColors();
+  if (saved_colors.empty()) {
+    return;
+  }
+
+  if (!d->dock) {
+    CreateDockWidget();
+  }
+
+  if (!d->proxy) {
+    d->proxy = new HighlightThemeProxy;
+    d->theme_manager.AddProxy(
+        std::unique_ptr<HighlightThemeProxy>(d->proxy));
+  }
+
+  d->proxy->color_map = std::move(saved_colors);
+
+  // Populate the list model with the restored entities.
+  const auto &index = config_manager.Index();
+  for (const auto &[id, colors] : d->proxy->color_map) {
+    VariantEntity entity = index.entity(EntityId(id));
+    if (!std::holds_alternative<NotAnEntity>(entity)) {
+      d->model->AddEntity(entity);
+    }
+  }
+
+  d->proxy->SendUpdate();
 }
 
 void HighlightExplorer::ClearAllHighlights() {
@@ -503,6 +529,13 @@ HighlightExplorer::EmitColorUpdate() {
       d->proxy = nullptr;
     } else {
       d->proxy->SendUpdate();
+    }
+
+    // Persist highlight colors.
+    if (d->proxy) {
+      d->config_manager.SaveHighlightColors(d->proxy->color_map);
+    } else {
+      d->config_manager.SaveHighlightColors({});
     }
   }
 

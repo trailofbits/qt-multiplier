@@ -11,6 +11,9 @@
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
 #include <multiplier/GUI/Explorers/CodeSearchExplorer.h>
 #include <multiplier/GUI/Explorers/EntityExplorer.h>
+#ifdef MX_ENABLE_PYTHON
+# include <multiplier/GUI/Explorers/PythonConsoleExplorer.h>
+#endif
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
 #include <multiplier/GUI/Explorers/InformationExplorer.h>
 #include <multiplier/GUI/Explorers/ProjectExplorer.h>
@@ -69,7 +72,10 @@ struct MainWindow::PrivateData {
         window_manager(new WindowManager(main_window)) {}
 };
 
-MainWindow::~MainWindow(void) {}
+MainWindow::~MainWindow(void) {
+  d->config_manager.SaveWindowLayout(saveState(), saveGeometry());
+  d->config_manager.SaveSettings();
+}
 
 MainWindow::MainWindow(QApplication &application, QWidget *parent)
     : QMainWindow(parent),
@@ -79,12 +85,22 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 
   InitializeMenus();
   InitializeThemes();
+  // Load persistent settings after themes are registered so the saved
+  // theme can be restored.
+  d->config_manager.LoadSettings();
   // InitializeIndex is called after the event loop starts (from main)
   // so that file dialogs work properly on macOS.
   InitializeDocks();
 
   setWindowIcon(
       d->config_manager.MediaManager().Icon("com.trailofbits.icon.Logo"));
+
+  // Restore window layout (dock positions, geometry) from settings.
+  QByteArray state, geometry;
+  if (d->config_manager.LoadWindowLayout(state, geometry)) {
+    restoreGeometry(geometry);
+    restoreState(state);
+  }
 }
 
 void MainWindow::InitializePlugins(void) {
@@ -109,6 +125,10 @@ void MainWindow::InitializePlugins(void) {
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeSearchExplorer(d->config_manager, wm));
+
+#ifdef MX_ENABLE_PYTHON
+  d->plugins.emplace_back(new PythonConsoleExplorer(d->config_manager, wm));
+#endif
 
   for (const auto &plugin : d->plugins) {
     connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
@@ -156,8 +176,9 @@ void MainWindow::InitializeThemes(void) {
   // When the theme changes, force the docking system to re-resolve its
   // palette-based stylesheet so tab bars, scrollbars, etc. update.
   connect(&theme_manager, &ThemeManager::ThemeChanged,
-          this, [this](const ThemeManager &) {
-            d->window_manager->RefreshDockStylesheet();
+          this, [this](const ThemeManager &tm) {
+            d->window_manager->RefreshDockStylesheet(
+                tm.Theme()->DefaultBackgroundColor());
           });
 }
 
@@ -205,7 +226,7 @@ void MainWindow::InitializeIndex(QApplication &application) {
   }
 
   d->config_manager.SetIndex(Index::in_memory_cache(
-      Index::from_database(db_path.toStdString())));
+      Index::from_database(db_path.toStdString())), db_path);
 
   InitializePlugins();
 

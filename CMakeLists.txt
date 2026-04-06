@@ -50,8 +50,7 @@ find_package("multiplier" REQUIRED GLOBAL)
 
 add_library("mx_multiplier_library" INTERFACE)
 
-if(FALSE AND MX_ENABLE_PYTHON_BINDINGS)
-  find_dependency(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
+if(MX_ENABLE_PYTHON_BINDINGS)
   target_link_libraries("mx_multiplier_library"
     INTERFACE
       Python3::Python

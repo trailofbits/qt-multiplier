@@ -13,6 +13,7 @@
 #include <QString>
 #include <QWidget>
 
+#include <functional>
 #include <memory>
 #include <multiplier/Index.h>
 #include <optional>
@@ -57,6 +58,24 @@ class HistoryWidget final : public QWidget {
   //! Commits our "last current" location to the history. This makes our last
   //! current location visible in the history menu.
   void CommitCurrentItemToHistory(void);
+
+  //! Iterate over history items (oldest to newest).
+  //! The callback receives each item's QVariant data and label.
+  using HistoryVisitor =
+      std::function<void(const QVariant &item, const QString &label)>;
+  void ForEachHistoryItem(const HistoryVisitor &visitor) const;
+
+  //! Save navigation history to project settings.
+  //! `key` identifies which history this is (e.g., "CodeExplorer",
+  //! "CodePreview", "InfoExplorer").
+  //! `entity_extractor` converts a history QVariant item to an entity ID.
+  using EntityExtractor =
+      std::function<mx::RawEntityId(const QVariant &item)>;
+  void SaveToProject(const QString &key,
+                     const EntityExtractor &extractor) const;
+
+  //! Load navigation history from project settings and populate.
+  void LoadFromProject(const QString &key);
 
  signals:
   void GoToHistoricalItem(const QVariant &item);

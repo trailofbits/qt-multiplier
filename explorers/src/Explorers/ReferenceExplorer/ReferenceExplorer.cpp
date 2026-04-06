@@ -172,6 +172,13 @@ void ReferenceExplorer::CreateDockWidget(void) {
 
 void ReferenceExplorer::OnTabBarClose(int i) {
   auto widget = d->view->widget(i);
+
+  // Save header state before closing.
+  if (auto *tree = qobject_cast<TreeGeneratorWidget *>(widget)) {
+    QString key = QStringLiteral("RefExplorer_") + d->view->tabText(i);
+    d->config_manager.SaveHeaderState(key, tree->HeaderState());
+  }
+
   d->view->RemoveTab(i);
   widget->close();
 
@@ -234,6 +241,13 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
           this, &IMainWindowPlugin::RequestPrimaryClick);
 
   tree_view->InstallGenerator(std::move(generator));
+
+  // Restore saved header state if available.
+  QString key = QStringLiteral("RefExplorer_") + tree_view->windowTitle();
+  auto state = d->config_manager.LoadHeaderState(key);
+  if (!state.isEmpty()) {
+    tree_view->RestoreHeaderState(state);
+  }
 
   d->view->InsertTab(0, tree_view);
   d->dock->show();

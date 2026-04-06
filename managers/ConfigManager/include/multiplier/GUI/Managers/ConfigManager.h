@@ -11,8 +11,14 @@
 
 #include <QAbstractItemView>
 #include <QApplication>
+#include <QColor>
 #include <QObject>
+#include <QSet>
 #include <QString>
+
+#include <unordered_map>
+
+#include <multiplier/Types.h>
 
 class QMenu;
 
@@ -51,8 +57,10 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   //! Get access to the current index.
   const class Index &Index(void) const noexcept;
 
-  //! Change the current index.
-  void SetIndex(const class Index &index) noexcept;
+  //! Change the current index. `db_path` is used to derive the project
+  //! settings file path (e.g., /path/to/foo.db -> /path/to/foo.qmx).
+  void SetIndex(const class Index &index,
+                const QString &db_path = {}) noexcept;
 
   //! Return the shared file location cache. This is used to compute locations
   //! of things, taking into account the current configuration (tab width, and
@@ -81,8 +89,62 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   //! Let each manager populate a View menu with its relevant actions.
   void PopulateViewMenu(QMenu *menu);
 
+  //! Get the current tab width (in spaces).
+  unsigned TabWidth(void) const noexcept;
+
+  //! Set the tab width (in spaces). Persists to settings.
+  void SetTabWidth(unsigned width);
+
+  //! Get/set whether tab stops are used for location calculations.
+  bool UseTabStops(void) const noexcept;
+  void SetUseTabStops(bool use);
+
+  //! Save all persistent settings to disk.
+  void SaveSettings(void) const;
+
+  //! Load persistent settings from disk.
+  void LoadSettings(void);
+
+  //! Save/load header state (column ordering, widths, etc.) for a named view.
+  void SaveHeaderState(const QString &id, const QByteArray &state) const;
+  QByteArray LoadHeaderState(const QString &id) const;
+
+  //! Save/load the main window layout (dock positions, sizes, visibility).
+  void SaveWindowLayout(const QByteArray &state,
+                        const QByteArray &geometry) const;
+  bool LoadWindowLayout(QByteArray &state, QByteArray &geometry) const;
+
+  //! Save/load per-project settings (sibling .qmx file next to the .db).
+  void SaveProjectSettings(void) const;
+  void LoadProjectSettings(void);
+
+  //! Save/load expanded macros (per-project).
+  void SaveExpandedMacros(const QSet<mx::RawEntityId> &macros) const;
+  QSet<mx::RawEntityId> LoadExpandedMacros(void) const;
+
+  //! Save/load entity highlight colors (per-project).
+  using HighlightColorMap =
+      std::unordered_map<mx::RawEntityId, std::pair<QColor, QColor>>;
+  void SaveHighlightColors(const HighlightColorMap &colors) const;
+  HighlightColorMap LoadHighlightColors(void) const;
+
+  //! Save/load navigation history (per-project).
+  struct NavigationEntry {
+    mx::RawEntityId entity_id{mx::kInvalidEntityId};
+    unsigned line{0};
+    unsigned column{0};
+    QString label;
+  };
+  void SaveNavigationHistory(
+      const std::vector<NavigationEntry> &entries,
+      const QString &key = QStringLiteral("Main")) const;
+  std::vector<NavigationEntry> LoadNavigationHistory(
+      const QString &key = QStringLiteral("Main")) const;
+
  signals:
   void IndexChanged(const ConfigManager &config_manager);
+  void TabWidthChanged(unsigned tab_width);
+  void UseTabStopsChanged(bool use_tab_stops);
 };
 
 }  // namespace mx::gui

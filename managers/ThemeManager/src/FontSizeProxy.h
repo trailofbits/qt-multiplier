@@ -25,6 +25,9 @@ class FontSizeProxy final : public IThemeProxy {
   void Increment(void);
   void Decrement(void);
   void Reset(void);
+
+  int Delta(void) const { return delta; }
+  void SetDelta(int d);
 };
 
 }  // namespace mx::gui

@@ -56,6 +56,12 @@ class ThemeManager Q_DECL_FINAL : public QObject {
   //! View menu. The ThemeManager owns the actions and keeps them up-to-date.
   void PopulateViewMenu(QMenu *menu);
 
+  //! Get the current font size delta (offset from base font size).
+  int FontSizeDelta(void) const;
+
+  //! Set the font size delta. Creates the font size proxy if needed.
+  void SetFontSizeDelta(int delta);
+
  signals:
   //! Emitted when the theme has changed. Sends out the new theme.
   void ThemeChanged(const ThemeManager &theme_manager);

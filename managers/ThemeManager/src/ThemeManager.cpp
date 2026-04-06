@@ -216,4 +216,19 @@ void ThemeManager::PopulateViewMenu(QMenu *menu) {
   });
 }
 
+int ThemeManager::FontSizeDelta(void) const {
+  if (d->font_size_proxy) {
+    return d->font_size_proxy->Delta();
+  }
+  return 0;
+}
+
+void ThemeManager::SetFontSizeDelta(int delta) {
+  if (delta != 0) {
+    EnsureFontSizeProxy(this, d.get())->SetDelta(delta);
+  } else if (d->font_size_proxy) {
+    d->font_size_proxy->Reset();
+  }
+}
+
 }  // namespace mx::gui

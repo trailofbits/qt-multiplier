@@ -79,7 +79,16 @@ struct CodePreviewWidget::PrivateData {
 const QString CodePreviewWidget::kModelId(
     "com.trailofbits.CodePreviewModel");
 
-CodePreviewWidget::~CodePreviewWidget(void) {}
+CodePreviewWidget::~CodePreviewWidget(void) {
+  if (d->history) {
+    d->history->SaveToProject(
+        QStringLiteral("CodePreview"),
+        [] (const QVariant &item) -> RawEntityId {
+          if (!item.canConvert<VariantEntity>()) return kInvalidEntityId;
+          return EntityId(item.value<VariantEntity>()).Pack();
+        });
+  }
+}
 
 CodePreviewWidget::CodePreviewWidget(
     const ConfigManager &config_manager,
@@ -154,6 +163,11 @@ CodePreviewWidget::CodePreviewWidget(
 
   setContentsMargins(0, 0, 0, 0);
   setLayout(layout);
+
+  // Restore history from project settings.
+  if (d->history) {
+    d->history->LoadFromProject(QStringLiteral("CodePreview"));
+  }
 }
 
 void CodePreviewWidget::OnPopOutPressed(void) {

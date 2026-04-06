@@ -50,6 +50,10 @@ class TreeGeneratorWidget Q_DECL_FINAL : public IWindowWidget {
   //! Install a new generator.
   void InstallGenerator(ITreeGeneratorPtr generator);
 
+  //! Save/restore the header (column ordering, widths).
+  QByteArray HeaderState(void) const;
+  void RestoreHeaderState(const QByteArray &state);
+
  private:
 
   //! Used to update the OSD buttons

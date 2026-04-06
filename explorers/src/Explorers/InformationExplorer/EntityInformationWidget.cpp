@@ -148,7 +148,16 @@ struct EntityInformationWidget::PrivateData {
             "com.trailofbits.action.OpenPinnedEntityInfo")) {}
 };
 
-EntityInformationWidget::~EntityInformationWidget(void) {}
+EntityInformationWidget::~EntityInformationWidget(void) {
+  if (d->history) {
+    d->history->SaveToProject(
+        QStringLiteral("InfoExplorer"),
+        [] (const QVariant &item) -> RawEntityId {
+          if (!item.canConvert<VariantEntity>()) return kInvalidEntityId;
+          return EntityId(item.value<VariantEntity>()).Pack();
+        });
+  }
+}
 
 EntityInformationWidget::EntityInformationWidget(
     const ConfigManager &config_manager, bool enable_history,
@@ -298,6 +307,14 @@ EntityInformationWidget::EntityInformationWidget(
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           d->model, &EntityInformationModel::OnIndexChanged);
+
+  // Restore history when a database is loaded.
+  if (d->history) {
+    connect(&config_manager, &ConfigManager::IndexChanged,
+            this, [this] (const ConfigManager &) {
+      d->history->LoadFromProject(QStringLiteral("InfoExplorer"));
+    });
+  }
 
   connect(d->sort_model, &QAbstractItemModel::rowsInserted,
           this, &EntityInformationWidget::ExpandAllBelow);

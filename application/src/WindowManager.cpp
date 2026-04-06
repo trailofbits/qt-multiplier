@@ -353,12 +353,25 @@ QMainWindow *WindowManager::Window(void) const noexcept {
   return d->window;
 }
 
-void WindowManager::RefreshDockStylesheet(void) {
-  if (d->central_widget) {
-    // Re-apply the same stylesheet to force Qt to re-resolve palette()
-    // references against the newly active palette.
-    d->central_widget->setStyleSheet(d->central_widget->styleSheet());
+void WindowManager::RefreshDockStylesheet(const QColor &bg_color) {
+  if (!d->central_widget) {
+    return;
   }
+
+  // Derive a splitter handle color from the theme background.
+  // Lighten dark backgrounds, darken light backgrounds.
+  int luma = bg_color.red() * 299 + bg_color.green() * 587
+           + bg_color.blue() * 114;
+  QColor handle_color = (luma > 128000) ? bg_color.darker(130)
+                                        : bg_color.lighter(160);
+
+  auto ss = QString(
+      "ads--CDockContainerWidget ads--CDockSplitter::handle {"
+      "  background: %1;"
+      "}")
+      .arg(handle_color.name());
+
+  d->central_widget->setStyleSheet(ss);
 }
 
 }  // namespace mx::gui

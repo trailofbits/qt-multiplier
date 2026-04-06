@@ -162,7 +162,14 @@ struct CodeExplorer::PrivateData {
   }
 };
 
-CodeExplorer::~CodeExplorer(void) {}
+CodeExplorer::~CodeExplorer(void) {
+  d->history->SaveToProject(
+      QStringLiteral("CodeExplorer"),
+      [] (const QVariant &item) -> RawEntityId {
+        if (!item.canConvert<Location>()) return kInvalidEntityId;
+        return EntityId(item.value<Location>().first).Pack();
+      });
+}
 
 CodeExplorer::CodeExplorer(ConfigManager &config_manager,
                            IWindowManager *parent)
@@ -179,6 +186,9 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
   d->expand_macro_trigger = action_manager.Register(
       this, "com.trailofbits.action.ExpandMacro",
       &CodeExplorer::OnExpandMacro);
+
+  // Restore expanded macros from project settings.
+  d->scene_options.macros_to_expand = config_manager.LoadExpandedMacros();
 
   (void) action_manager.Register(
       this, "com.trailofbits.action.OpenEntityPreview",
@@ -208,6 +218,24 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
   // view shows.
   connect(d->history, &HistoryWidget::GoToHistoricalItem,
           this, &CodeExplorer::OnGoToHistoricalItem);
+
+  // Restore navigation history when a database is loaded.
+  connect(&config_manager, &ConfigManager::IndexChanged,
+          this, [this] (const ConfigManager &cm) {
+    auto entries = cm.LoadNavigationHistory(QStringLiteral("CodeExplorer"));
+    const auto &index = cm.Index();
+    for (const auto &entry : entries) {
+      VariantEntity entity = index.entity(EntityId(entry.entity_id));
+      if (std::holds_alternative<NotAnEntity>(entity)) continue;
+
+      CodeWidget::OpaqueLocation loc;
+      d->history->SetCurrentItem(
+          QVariant::fromValue(Location(entity, loc)),
+          entry.label.isEmpty() ? std::nullopt
+                                : std::optional<QString>(entry.label));
+      d->history->CommitCurrentItemToHistory();
+    }
+  });
 }
 
 void CodeExplorer::OnToggleBrowseMode(const QVariant &data) {
@@ -544,6 +572,7 @@ void CodeExplorer::OnExpandMacro(const QVariant &data) {
     connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
             this, [this] (const QSet<RawEntityId> &macros_to_expand) {
               d->scene_options.macros_to_expand = macros_to_expand;
+              d->config_manager.SaveExpandedMacros(macros_to_expand);
             });
 
     IWindowManager::DockConfig config;

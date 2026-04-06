@@ -7,11 +7,13 @@
 #include <multiplier/GUI/Explorers/CodeSearchExplorer.h>
 
 #include <QAction>
+#include <QDir>
 #include <QHeaderView>
 #include <QLabel>
 #include <QMainWindow>
 #include <QMenu>
 #include <QPainter>
+#include <QSettings>
 #include <QSortFilterProxyModel>
 #include <QTableView>
 #include <QThreadPool>
@@ -252,6 +254,12 @@ QTableView *CodeSearchExplorer::CreateResultsTable(QWidget *parent) {
         connect(action, &QAction::toggled, this,
                 [model = tab.model] (bool checked) {
           model->SetShowFullPaths(checked);
+          // Persist the setting.
+          QSettings settings(
+              QDir::homePath() + QStringLiteral("/.settings.qmx"),
+              QSettings::IniFormat);
+          settings.setValue(
+              QStringLiteral("CodeSearch/show_full_paths"), checked);
         });
         menu.exec(table->horizontalHeader()->mapToGlobal(pos));
         break;
@@ -270,6 +278,20 @@ QTableView *CodeSearchExplorer::CreateResultsTable(QWidget *parent) {
             table->setFont(tm.Theme()->Font());
             table->viewport()->update();
           });
+
+  // Save header state on column move/resize.
+  auto save_header = [this, table] () {
+    auto *header = table->horizontalHeader();
+    int cols = table->model() ? table->model()->columnCount() : 0;
+    if (cols > 0) {
+      QString key = QStringLiteral("CodeSearch_%1cols").arg(cols);
+      d->config_manager.SaveHeaderState(key, header->saveState());
+    }
+  };
+  connect(table->horizontalHeader(), &QHeaderView::sectionMoved,
+          this, save_header);
+  connect(table->horizontalHeader(), &QHeaderView::sectionResized,
+          this, save_header);
 
   return table;
 }
@@ -301,6 +323,14 @@ void CodeSearchExplorer::OnSearchTriggered(void) {
   layout->addWidget(status_label);
 
   auto *model = new CodeSearchResultsModel(container);
+  {
+    QSettings settings(
+        QDir::homePath() + QStringLiteral("/.settings.qmx"),
+        QSettings::IniFormat);
+    model->SetShowFullPaths(
+        settings.value(QStringLiteral("CodeSearch/show_full_paths"),
+                       false).toBool());
+  }
   auto *sort_proxy = new QSortFilterProxyModel(container);
   sort_proxy->setSourceModel(model);
 
@@ -346,8 +376,19 @@ void CodeSearchExplorer::OnSearchTriggered(void) {
             if (it == d->tabs.end()) return;
             auto &t = it->second;
             if (v != t.search_version->load()) return;
+            bool was_empty = (t.result_count == 0);
             t.result_count = t.model->AppendRows(std::move(rows));
             t.status_label->setText(tr("%1 results").arg(t.result_count));
+
+            // Restore saved header state on first batch of results.
+            if (was_empty && t.result_count > 0) {
+              int cols = t.model->columnCount();
+              QString key = QStringLiteral("CodeSearch_%1cols").arg(cols);
+              auto state = d->config_manager.LoadHeaderState(key);
+              if (!state.isEmpty()) {
+                t.table->horizontalHeader()->restoreState(state);
+              }
+            }
           });
 
   connect(runnable, &CodeSearchRunnable::Finished,
