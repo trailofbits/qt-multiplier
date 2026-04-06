@@ -127,22 +127,34 @@ void SpreadsheetDelegate::paint(QPainter *painter,
           }
         }
       } else {
-        // Handle tokens that may contain newlines (multiline comments etc).
-        // Remove \r and split by \n, drawing each line.
-        text.remove(QLatin1Char('\r'));
-        auto lines = text.split(QLatin1Char('\n'));
-        for (int li = 0; li < lines.size(); ++li) {
-          if (li > 0) {
-            pos.setX(opt.rect.left() + 2);
-            pos.setY(pos.y() + fm.height());
-          }
-          const auto &line = lines[li];
-          if (!line.isEmpty()) {
-            painter->drawText(pos, line);
-            auto br = painter->boundingRect(
-                QRectF(0, 0, 9999, fm.height()),
-                Qt::AlignLeft, line);
-            pos.setX(pos.x() + br.width());
+        // Draw token text, handling embedded newlines by splitting
+        // into segments and drawing each one.
+        qsizetype start = 0;
+        qsizetype len = text.size();
+        for (qsizetype i = 0; i <= len; ++i) {
+          bool is_end = (i == len);
+          bool is_newline = (!is_end &&
+                             (text[i] == QLatin1Char('\n') ||
+                              text[i] == QLatin1Char('\r')));
+          if (is_end || is_newline) {
+            if (i > start) {
+              QString segment = text.mid(start, i - start);
+              painter->drawText(pos, segment);
+              auto br = painter->boundingRect(
+                  QRectF(0, 0, 9999, fm.height()),
+                  Qt::AlignLeft, segment);
+              pos.setX(pos.x() + br.width());
+            }
+            if (is_newline) {
+              pos.setX(opt.rect.left() + 2);
+              pos.setY(pos.y() + fm.height());
+              // Skip \r\n as a pair.
+              if (text[i] == QLatin1Char('\r') && i + 1 < len &&
+                  text[i + 1] == QLatin1Char('\n')) {
+                ++i;
+              }
+            }
+            start = i + 1;
           }
         }
       }
@@ -285,18 +297,31 @@ QSize SpreadsheetDelegate::sizeHint(const QStyleOptionViewItem &option,
           font.setBold(cs.bold);
           font.setItalic(cs.italic);
           p.setFont(font);
-          // Handle multiline tokens.
-          auto tok_lines = text.split(QLatin1Char('\n'));
-          for (int li = 0; li < tok_lines.size(); ++li) {
-            if (li > 0) {
-              width = std::max(width, x);
-              x = 0;
-              ++lines;
+          // Measure each line segment of the token.
+          qsizetype start = 0;
+          qsizetype tlen = text.size();
+          for (qsizetype i = 0; i <= tlen; ++i) {
+            bool is_end = (i == tlen);
+            bool is_nl = (!is_end && (text[i] == QLatin1Char('\n') ||
+                                      text[i] == QLatin1Char('\r')));
+            if (is_end || is_nl) {
+              if (i > start) {
+                auto rect = p.boundingRect(
+                    QRectF(0, 0, 9999, fm.height()),
+                    Qt::AlignLeft, text.mid(start, i - start));
+                x += rect.width();
+              }
+              if (is_nl) {
+                width = std::max(width, x);
+                x = 0;
+                ++lines;
+                if (text[i] == QLatin1Char('\r') && i + 1 < tlen &&
+                    text[i + 1] == QLatin1Char('\n')) {
+                  ++i;
+                }
+              }
+              start = i + 1;
             }
-            auto rect = p.boundingRect(
-                QRectF(0, 0, 9999, fm.height()),
-                Qt::AlignLeft, tok_lines[li]);
-            x += rect.width();
           }
           font = theme->Font();
           p.setFont(font);
