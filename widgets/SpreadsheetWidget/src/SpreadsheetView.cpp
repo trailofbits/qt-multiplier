@@ -247,6 +247,24 @@ void SpreadsheetView::paste_at_selection(void) {
       tokens.emplace_back(std::move(ut));
     }
 
+    // Strip leading and trailing whitespace tokens.
+    while (!tokens.empty()) {
+      auto *ut = std::get_if<UserToken>(&tokens.front());
+      if (ut && ut->kind == TokenKind::WHITESPACE) {
+        tokens.erase(tokens.begin());
+      } else {
+        break;
+      }
+    }
+    while (!tokens.empty()) {
+      auto *ut = std::get_if<UserToken>(&tokens.back());
+      if (ut && ut->kind == TokenKind::WHITESPACE) {
+        tokens.pop_back();
+      } else {
+        break;
+      }
+    }
+
     if (!tokens.empty()) {
       auto range = TokenRange::create(std::move(tokens));
       std::cerr << "PASTE: created TokenRange size=" << range.size()
@@ -378,7 +396,7 @@ void SpreadsheetView::OnContextMenu(const QPoint &pos) {
       menu.addAction(tr("Paste as Text"), this, [this] () {
         auto *clip = QApplication::clipboard();
         if (!clip) return;
-        QString text = clip->text();
+        QString text = clip->text().trimmed();
         if (text.isEmpty()) return;
         QModelIndex current = currentIndex();
         if (!current.isValid() || !model()) return;
