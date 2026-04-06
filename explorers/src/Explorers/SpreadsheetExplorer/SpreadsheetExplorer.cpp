@@ -58,6 +58,13 @@ struct SpreadsheetExplorer::PrivateData {
 };
 
 void SpreadsheetExplorer::PrivateData::SaveAllSheets(void) const {
+  // Save the active tab index.
+  if (tab_widget) {
+    config_manager.SaveHeaderState(
+        QStringLiteral("sheets_active_tab"),
+        QByteArray::number(tab_widget->currentIndex()));
+  }
+
   for (const auto &[widget, tab] : tabs) {
     ConfigManager::SheetData data;
     data.sheet_id = tab.sheet_id;
@@ -536,9 +543,16 @@ void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {
     d->tab_widget->AddTab(container);
   }
 
-  // Force the tab widget to update its display.
+  // Restore the active tab index and force display update.
   if (!sheets.isEmpty() && d->tab_widget->count() > 0) {
-    d->tab_widget->setCurrentIndex(0);
+    auto saved_index = d->config_manager.LoadHeaderState(
+        QStringLiteral("sheets_active_tab"));
+    int idx = saved_index.isEmpty() ? 0 : saved_index.toInt();
+    if (idx >= 0 && idx < d->tab_widget->count()) {
+      d->tab_widget->setCurrentIndex(idx);
+    } else {
+      d->tab_widget->setCurrentIndex(0);
+    }
     d->tab_widget->update();
   }
 }
