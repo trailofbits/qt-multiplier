@@ -406,6 +406,7 @@ void SpreadsheetExplorer::OnNewBlankSheet(const QVariant &) {
 
   d->tab_widget->InsertTab(0, container);
   d->dock->show();
+  d->dock->raise();
   d->dock->EmitRequestAttention();
 }
 
@@ -528,8 +529,12 @@ void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {
     d->tab_widget->AddTab(container);
   }
 
-  // Don't force show — the dock visibility is managed by
-  // QMainWindow::restoreState from the saved window layout.
+  // If we loaded sheets, make sure the dock is visible and raised.
+  if (!sheets.isEmpty() && d->dock) {
+    d->dock->show();
+    d->dock->raise();
+    d->dock->EmitRequestAttention();
+  }
 }
 
 }  // namespace mx::gui

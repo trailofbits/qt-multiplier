@@ -32,6 +32,7 @@
 #include <multiplier/Index.h>
 
 #include <QCloseEvent>
+#include <iostream>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QFileDialog>
@@ -282,6 +283,12 @@ void MainWindow::InitializeIndex(QApplication &application) {
     }
     // Maximize on first launch.
     showMaximized();
+  }
+
+  // Debug: show dock visibility after restore.
+  for (auto *child : findChildren<QDockWidget *>()) {
+    std::cerr << "DOCK: " << child->objectName().toStdString()
+              << " visible=" << child->isVisible() << std::endl;
   }
 
   // Load persisted sheets AFTER restoreState so the dock visibility
