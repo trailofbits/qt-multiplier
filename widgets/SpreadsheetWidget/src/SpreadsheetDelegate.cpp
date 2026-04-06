@@ -14,6 +14,9 @@
 #include <multiplier/Frontend/Token.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
+Q_DECLARE_METATYPE(mx::Token)
+Q_DECLARE_METATYPE(mx::TokenRange)
+
 namespace mx::gui {
 
 SpreadsheetDelegate::SpreadsheetDelegate(QObject *parent)

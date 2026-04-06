@@ -10,8 +10,13 @@
 #include <QUndoStack>
 
 #include <multiplier/Frontend/Token.h>
+#include <multiplier/Index.h>
 
 #include "SpreadsheetCommands.h"
+
+Q_DECLARE_METATYPE(mx::Token)
+Q_DECLARE_METATYPE(mx::TokenRange)
+Q_DECLARE_METATYPE(mx::UserToken)
 
 namespace mx::gui {
 

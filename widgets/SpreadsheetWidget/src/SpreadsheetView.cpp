@@ -17,6 +17,8 @@
 
 #include <multiplier/Index.h>
 
+Q_DECLARE_METATYPE(mx::TokenRange)
+
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
@@ -141,15 +143,15 @@ void SpreadsheetView::paste_at_selection(void) {
     std::vector<CustomToken> tokens;
     for (quint32 i = 0; i < count; ++i) {
       quint64 entity_id = 0;
+      quint32 kind = 0;
+      quint32 category = 0;
       QString display_text;
-      stream >> entity_id >> display_text;
+      stream >> entity_id >> kind >> category >> display_text;
 
-      // Try to reconstruct the real token from entity ID. Since we
-      // don't have an Index here, create a UserToken with the text.
       UserToken ut;
       ut.data = display_text.toStdString();
-      ut.kind = TokenKind::UNKNOWN;
-      ut.category = TokenCategory::UNKNOWN;
+      ut.kind = static_cast<TokenKind>(kind);
+      ut.category = static_cast<TokenCategory>(category);
       tokens.emplace_back(std::move(ut));
     }
 

@@ -3319,7 +3319,8 @@ void CodeWidget::PrivateData::CopySelectionToClipboard(void) const {
     stream << count;
     for (Token tok : tokens) {
       stream << static_cast<quint64>(tok.id().Pack());
-      // Write the display text as fallback.
+      stream << static_cast<quint32>(tok.kind());
+      stream << static_cast<quint32>(tok.category());
       auto tok_data = tok.data();
       stream << QString::fromUtf8(tok_data.data(),
                                   static_cast<qsizetype>(tok_data.size()));
