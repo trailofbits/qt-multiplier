@@ -6,6 +6,8 @@
 
 #include <multiplier/GUI/Explorers/SpreadsheetExplorer.h>
 
+#include <QAction>
+#include <QMenu>
 #include <QVBoxLayout>
 
 #include <multiplier/GUI/Interfaces/IModel.h>
@@ -54,6 +56,18 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &SpreadsheetExplorer::OnIndexChanged);
+
+  // Add "New Spreadsheet" to the View menu (visible immediately).
+  auto *new_sheet_action = new QAction(tr("New Spreadsheet"), this);
+  new_sheet_action->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+  connect(new_sheet_action, &QAction::triggered,
+          this, [this] () { OnNewBlankSheet({}); });
+
+  auto *view_menu = parent->Menu(tr("View"));
+  if (view_menu) {
+    view_menu->addSeparator();
+    view_menu->addAction(new_sheet_action);
+  }
 }
 
 void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
