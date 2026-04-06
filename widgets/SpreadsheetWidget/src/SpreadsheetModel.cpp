@@ -65,10 +65,10 @@ QVariant SpreadsheetModel::data(const QModelIndex &index, int role) const {
       if (cell.canConvert<FormulaCell>()) {
         return cell.value<FormulaCell>().formula;
       }
-      if (cell.canConvert<QString>()) {
-        return cell.toString();
-      }
-      return {};
+      // For all cell types (including Token/TokenRange), return the
+      // display text for editing. If the user doesn't change it, we
+      // preserve the original value (no downgrade).
+      return display_text_for(cell);
     }
 
     case Qt::CheckStateRole: {
@@ -137,8 +137,16 @@ bool SpreadsheetModel::setData(const QModelIndex &index, const QVariant &value,
 
   QVariant old_val = m_rows[row][col];
   QString text = value.toString();
+  QString old_text = display_text_for(old_val);
+
+  // If the text didn't change, preserve the original value (no downgrade
+  // from Token/TokenRange to QString).
+  if (text == old_text) {
+    return false;
+  }
 
   QVariant new_val;
+
   // Detect formula mode: text starting with '='.
   if (text.startsWith(QLatin1Char('='))) {
     FormulaCell fc;
@@ -146,6 +154,58 @@ bool SpreadsheetModel::setData(const QModelIndex &index, const QVariant &value,
     fc.cached_result = QVariant();
     fc.is_stale = true;
     new_val = QVariant::fromValue(fc);
+
+  // If the old value was a TokenRange and the edit is a pure substring
+  // (prefix/suffix trimmed), try to preserve token structure.
+  } else if (old_val.canConvert<TokenRange>() &&
+             old_text.contains(text) && !text.isEmpty()) {
+    auto range = old_val.value<TokenRange>();
+    qsizetype trim_start = old_text.indexOf(text);
+    qsizetype trim_end = trim_start + text.size();
+
+    // Walk tokens and find which ones overlap [trim_start, trim_end).
+    std::vector<CustomToken> kept;
+    qsizetype pos = 0;
+    for (Token tok : range) {
+      auto tok_data = tok.data();
+      QString tok_text = QString::fromUtf8(
+          tok_data.data(), static_cast<qsizetype>(tok_data.size()));
+      qsizetype tok_start = pos;
+      qsizetype tok_end = pos + tok_text.size();
+      pos = tok_end;
+
+      if (tok_end <= trim_start || tok_start >= trim_end) {
+        continue;  // Token entirely outside the kept range.
+      }
+
+      // Compute overlap.
+      qsizetype overlap_start = std::max(tok_start, trim_start);
+      qsizetype overlap_end = std::min(tok_end, trim_end);
+      bool fully_covered = (overlap_start == tok_start &&
+                            overlap_end == tok_end);
+
+      if (fully_covered) {
+        kept.emplace_back(std::move(tok));
+      } else {
+        // Partial token — create a UserToken with the substring.
+        QString sub = tok_text.mid(
+            static_cast<qsizetype>(overlap_start - tok_start),
+            static_cast<qsizetype>(overlap_end - overlap_start));
+        UserToken ut;
+        ut.data = sub.toStdString();
+        ut.kind = tok.kind();
+        ut.category = tok.category();
+        ut.related_entity = tok.related_entity();
+        kept.emplace_back(std::move(ut));
+      }
+    }
+
+    if (!kept.empty()) {
+      new_val = QVariant::fromValue(TokenRange::create(std::move(kept)));
+    } else {
+      new_val = QVariant(text);
+    }
+
   } else {
     new_val = QVariant(text);
   }
@@ -170,10 +230,8 @@ Qt::ItemFlags SpreadsheetModel::flags(const QModelIndex &index) const {
 
   const QVariant &cell = m_rows[row][col];
 
-  // Token and TokenRange cells are read-only.
-  if (cell.canConvert<Token>() || cell.canConvert<TokenRange>()) {
-    return base;
-  }
+  // All cells are editable — token cells downgrade to text on edit.
+  // (Token/TokenRange cells also support copy & paste of rich data.)
 
   // Bool cells are checkable but not text-editable.
   if (cell.userType() == QMetaType::Bool) {

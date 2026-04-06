@@ -86,10 +86,7 @@ QWidget *SpreadsheetDelegate::createEditor(
 
   QVariant raw = index.data(SpreadsheetRoles::RawValueRole);
 
-  // Token and bool cells are not text-editable.
-  if (raw.canConvert<Token>() || raw.canConvert<TokenRange>()) {
-    return nullptr;
-  }
+  // Bool cells: toggled via checkbox, not text-editable.
   if (raw.userType() == QMetaType::Bool) {
     return nullptr;
   }
