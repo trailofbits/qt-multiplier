@@ -368,6 +368,24 @@ void SpreadsheetView::OnContextMenu(const QPoint &pos) {
                  this, &SpreadsheetView::copy_selection);
   menu.addAction(tr("Paste"), QKeySequence::Paste,
                  this, &SpreadsheetView::paste_at_selection);
+
+  // "Paste as Text" — forces plain text paste even if tokens are available.
+  {
+    auto *clip = QApplication::clipboard();
+    if (clip && clip->mimeData() &&
+        clip->mimeData()->hasFormat(
+            QStringLiteral("application/x-qtmultiplier-tokens"))) {
+      menu.addAction(tr("Paste as Text"), this, [this] () {
+        auto *clip = QApplication::clipboard();
+        if (!clip) return;
+        QString text = clip->text();
+        if (text.isEmpty()) return;
+        QModelIndex current = currentIndex();
+        if (!current.isValid() || !model()) return;
+        model()->setData(current, text, Qt::EditRole);
+      });
+    }
+  }
   menu.addAction(tr("Cut"), QKeySequence::Cut,
                  this, &SpreadsheetView::cut_selection);
   menu.addAction(tr("Delete"), QKeySequence::Delete,

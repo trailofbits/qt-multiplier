@@ -81,6 +81,13 @@
 - Theme-colored headers, grid lines, alternating row colors
 - Fixed: empty cells editable, crash on exit, checkbox rendering
 - Renamed Spreadsheets to Sheets
+- Fixed: theme persistence (blocked auto-save before LoadSettings),
+  theme menu radio buttons, WAL checkpoint on exit
+- Fixed: token copy goes through CodeExplorer path (SelectedTokensRole)
+- Fixed: SpreadsheetDelegate renders tokens with per-token syntax colors
+- Fixed: whole-token drawing for proper kerning, configurable tab width
+- Fixed: toolbar button (triggered vs toggled), dock objectNames
 - **BLOCKER**: Sheet persistence not yet implemented (Phase 5). Sheets
-  are lost on exit. Theme/settings persistence works (verified in DB).
+  are lost on exit.
 - Next: Phase 5 (SQLite persistence) is critical
+- Next: extract shared token painting utility (duplicated in 3 places)

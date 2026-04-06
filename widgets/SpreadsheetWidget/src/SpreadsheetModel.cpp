@@ -526,6 +526,11 @@ QString SpreadsheetModel::display_text_for(const QVariant &value) {
     for (auto tok : range) {
       result += QString::fromStdString(std::string(tok.data()));
     }
+    // Strip trailing whitespace so row height isn't inflated.
+    while (result.endsWith(QLatin1Char('\n')) ||
+           result.endsWith(QLatin1Char('\r'))) {
+      result.chop(1);
+    }
     return result;
   }
 

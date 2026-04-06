@@ -62,6 +62,17 @@ void SpreadsheetDelegate::paint(QPainter *painter,
     }
 
     auto range = raw.value<TokenRange>();
+
+    // Collect tokens, stripping trailing whitespace-only tokens.
+    std::vector<Token> tokens;
+    for (Token tok : range) {
+      tokens.push_back(std::move(tok));
+    }
+    while (!tokens.empty() &&
+           tokens.back().kind() == TokenKind::WHITESPACE) {
+      tokens.pop_back();
+    }
+
     QFont font = theme->Font();
     QFontMetricsF fm(font);
 
@@ -73,7 +84,7 @@ void SpreadsheetDelegate::paint(QPainter *painter,
 
     QPointF pos(opt.rect.left() + 2, opt.rect.top() + fm.ascent());
 
-    for (Token tok : range) {
+    for (const auto &tok : tokens) {
       auto cs = theme->TokenColorAndStyle(tok);
 
       if (!cs.foreground_color.isValid()) {
