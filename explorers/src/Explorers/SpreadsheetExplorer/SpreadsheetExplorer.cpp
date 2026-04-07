@@ -543,17 +543,28 @@ void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {
     d->tab_widget->AddTab(container);
   }
 
-  // Restore the active tab index and force display update.
+  // Restore the active tab index and force display.
   if (!sheets.isEmpty() && d->tab_widget->count() > 0) {
     auto saved_index = d->config_manager.LoadHeaderState(
         QStringLiteral("sheets_active_tab"));
     int idx = saved_index.isEmpty() ? 0 : saved_index.toInt();
-    if (idx >= 0 && idx < d->tab_widget->count()) {
-      d->tab_widget->setCurrentIndex(idx);
-    } else {
-      d->tab_widget->setCurrentIndex(0);
+    if (idx < 0 || idx >= d->tab_widget->count()) {
+      idx = 0;
     }
+    d->tab_widget->setCurrentIndex(idx);
+
+    // Force the current tab's widget to be visible.
+    if (auto *w = d->tab_widget->currentWidget()) {
+      w->show();
+    }
+    d->tab_widget->show();
     d->tab_widget->update();
+
+    // If the dock is too small (collapsed splitter from saved state),
+    // resize it to a reasonable height.
+    if (d->dock->height() <= 100) {
+      d->dock->resize(d->dock->width(), 250);
+    }
   }
 }
 
