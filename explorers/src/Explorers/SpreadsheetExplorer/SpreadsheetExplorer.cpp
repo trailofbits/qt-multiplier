@@ -7,6 +7,7 @@
 #include <multiplier/GUI/Explorers/SpreadsheetExplorer.h>
 
 #include <QAction>
+#include <QTimer>
 #include <QMenu>
 #include <QToolBar>
 #include <QToolButton>
@@ -155,7 +156,12 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
 }
 
 void SpreadsheetExplorer::LoadPersistedSheets(void) {
-  OnIndexChanged(d->config_manager);
+  // Defer loading until the event loop has processed the initial
+  // layout from restoreState. Without this, tabs added to the
+  // TabWidget don't display.
+  QTimer::singleShot(0, this, [this] () {
+    OnIndexChanged(d->config_manager);
+  });
 }
 
 void SpreadsheetExplorer::CreateDockWidget(IWindowManager *manager) {
