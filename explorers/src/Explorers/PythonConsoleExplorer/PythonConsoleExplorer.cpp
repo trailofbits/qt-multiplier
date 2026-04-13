@@ -63,11 +63,9 @@ void PythonConsoleExplorer::CreateDockWidget(IWindowManager *manager) {
   config.id = "com.trailofbits.dock.PythonConsole";
   config.location = IWindowManager::DockLocation::Bottom;
   config.tabify = true;
+  config.start_hidden = true;
   config.app_menu_location = {tr("View"), tr("Explorers")};
   manager->AddDockWidget(d->dock, config);
-
-  // Hidden by default; Python is initialized lazily when first shown.
-  d->dock->hide();
 }
 
 void PythonConsoleExplorer::EnsureConsoleCreated(void) {

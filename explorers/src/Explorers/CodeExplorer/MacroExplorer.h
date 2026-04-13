@@ -7,6 +7,7 @@
 #pragma once
 
 #include <memory>
+#include <multiplier/Frontend/Macro.h>
 #include <multiplier/GUI/Interfaces/IWindowWidget.h>
 
 QT_BEGIN_NAMESPACE
@@ -44,6 +45,9 @@ class MacroExplorer Q_DECL_FINAL : public IWindowWidget {
   bool eventFilter(QObject *obj, QEvent *event) Q_DECL_FINAL;
   void resizeEvent(QResizeEvent *) Q_DECL_FINAL;
   void focusOutEvent(QFocusEvent *) Q_DECL_FINAL;
+
+ signals:
+  void RequestRemoveMacro(::mx::Macro macro);
 
  private slots:
   void OnIconsChanged(const MediaManager &media_manager);

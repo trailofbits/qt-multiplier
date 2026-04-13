@@ -19,6 +19,7 @@
 #include <multiplier/Frontend/Token.h>
 #include <multiplier/Frontend/TokenKind.h>
 #include <multiplier/GUI/Interfaces/ITheme.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
 Q_DECLARE_METATYPE(mx::Token)
@@ -139,10 +140,18 @@ void SpreadsheetDelegate::paint(QPainter *painter,
           if (is_end || is_newline) {
             if (i > start) {
               QString segment = text.mid(start, i - start);
-              painter->drawText(pos, segment);
               auto br = painter->boundingRect(
                   QRectF(0, 0, 9999, fm.height()),
                   Qt::AlignLeft, segment);
+
+              // Paint entity highlight background behind the token.
+              if (cs.background_color.isValid() && !selected) {
+                QRectF bg_rect(pos.x(), pos.y() - fm.ascent(),
+                               br.width(), fm.height());
+                painter->fillRect(bg_rect, cs.background_color);
+              }
+
+              painter->drawText(pos, segment);
               pos.setX(pos.x() + br.width());
             }
             if (is_newline) {
@@ -186,10 +195,66 @@ void SpreadsheetDelegate::paint(QPainter *painter,
     painter->setPen(cs.foreground_color);
     QRect text_rect = style->subElementRect(
         QStyle::SE_ItemViewItemText, &opt, opt.widget);
+
+    // Paint entity highlight background behind the token.
+    bool is_selected = (opt.state & QStyle::State_Selected);
+    if (cs.background_color.isValid() && !is_selected) {
+      painter->fillRect(text_rect, cs.background_color);
+    }
+
     auto tok_data = tok.data();
     painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
                       QString::fromUtf8(tok_data.data(),
                                         static_cast<qsizetype>(tok_data.size())));
+    painter->restore();
+    return;
+  }
+
+  // DocumentCell: draw a document icon with optional summary text.
+  if (raw.canConvert<DocumentCell>()) {
+    QStyleOptionViewItem opt = option;
+    initStyleOption(&opt, index);
+
+    auto *style = opt.widget ? opt.widget->style() : QApplication::style();
+    style->drawPrimitive(QStyle::PE_PanelItemViewItem, &opt, painter,
+                         opt.widget);
+
+    auto dc = raw.value<DocumentCell>();
+
+    // Lazy title refresh: check the global version counter.
+    if (dc.doc_id >= 0 && config_manager_) {
+      auto version = ConfigManager::DocumentTitleVersion();
+      auto it = doc_title_cache.find(dc.doc_id);
+      if (it == doc_title_cache.end() || it->second < version) {
+        auto fresh_title = config_manager_->LoadDocumentTitle(dc.doc_id);
+        doc_title_cache[dc.doc_id] = {fresh_title, version};
+        dc.title = fresh_title;
+      } else {
+        dc.title = it->first;
+      }
+    }
+
+    // Draw a standard file icon.
+    QIcon doc_icon = style->standardIcon(QStyle::SP_FileIcon);
+    int icon_size = opt.rect.height() - 4;
+    QRect icon_rect(opt.rect.left() + 4, opt.rect.top() + 2,
+                    icon_size, icon_size);
+    doc_icon.paint(painter, icon_rect);
+
+    // Draw summary text.
+    QString preview = dc.title.isEmpty()
+        ? QObject::tr("(empty document)")
+        : dc.title;
+
+    QRect text_rect = opt.rect;
+    text_rect.setLeft(icon_rect.right() + 6);
+    painter->save();
+    if (opt.state & QStyle::State_Selected) {
+      painter->setPen(opt.palette.color(QPalette::HighlightedText));
+    } else {
+      painter->setPen(opt.palette.color(QPalette::Text));
+    }
+    painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter, preview);
     painter->restore();
     return;
   }
@@ -398,6 +463,34 @@ void SpreadsheetDelegate::updateEditorGeometry(
   }
   rect.setHeight(std::max(rect.height(), 80));
   editor->setGeometry(rect);
+}
+
+bool SpreadsheetDelegate::editorEvent(QEvent *event,
+                                      QAbstractItemModel *model,
+                                      const QStyleOptionViewItem &option,
+                                      const QModelIndex &index) {
+  // Toggle bool (checkbox) cells on click or Space/Enter key press.
+  QVariant raw = index.data(SpreadsheetRoles::RawValueRole);
+  if (raw.userType() == QMetaType::Bool) {
+    if (event->type() == QEvent::MouseButtonRelease ||
+        event->type() == QEvent::MouseButtonDblClick) {
+      int state = index.data(Qt::CheckStateRole).toInt();
+      int toggled = (state == Qt::Checked) ? Qt::Unchecked : Qt::Checked;
+      model->setData(index, toggled, Qt::CheckStateRole);
+      return true;
+    }
+    if (event->type() == QEvent::KeyPress) {
+      auto *ke = static_cast<QKeyEvent *>(event);
+      if (ke->key() == Qt::Key_Space || ke->key() == Qt::Key_Return ||
+          ke->key() == Qt::Key_Enter) {
+        int state = index.data(Qt::CheckStateRole).toInt();
+        int toggled = (state == Qt::Checked) ? Qt::Unchecked : Qt::Checked;
+        model->setData(index, toggled, Qt::CheckStateRole);
+        return true;
+      }
+    }
+  }
+  return QStyledItemDelegate::editorEvent(event, model, option, index);
 }
 
 bool SpreadsheetDelegate::eventFilter(QObject *object, QEvent *event) {

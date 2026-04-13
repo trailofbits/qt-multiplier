@@ -36,6 +36,15 @@ struct FormulaCell {
   QString error_message;
 };
 
+// A cell that references a nested document (rich text). The content lives
+// in the gui_documents DB table, keyed by doc_id. Copying a cell copies
+// the reference, not the content.
+struct DocumentCell {
+  int doc_id{-1};    // Primary key in gui_documents (-1 = not yet persisted).
+  QString title;     // Cached document title, shown in the cell.
+};
+
+
 // Metadata for a single column.
 struct ColumnDefinition {
   QString name;
@@ -110,8 +119,11 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
   static QString display_text_for(const QVariant &value);
 
   // Serialize/deserialize a cell value to/from a JSON string.
+  // value_from_json takes an optional Index to resolve entity IDs
+  // back to VariantEntity for highlight color support.
   static QString value_to_json(const QVariant &value);
-  static QVariant value_from_json(const QString &json);
+  static QVariant value_from_json(const QString &json,
+                                  const mx::Index *index = nullptr);
 
   // Set a single cell value (creates an undo command).
   void set_cell_value(int row, int col, const QVariant &value);
@@ -152,3 +164,4 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
 }  // namespace mx::gui
 
 Q_DECLARE_METATYPE(mx::gui::FormulaCell)
+Q_DECLARE_METATYPE(mx::gui::DocumentCell)

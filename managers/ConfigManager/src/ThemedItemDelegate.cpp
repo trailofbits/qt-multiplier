@@ -285,33 +285,35 @@ void ThemedItemDelegate::paint(QPainter *painter,
   painter->restore();
 }
 
-// QSize ThemedItemDelegate::sizeHint(
-//     const QStyleOptionViewItem &option, const QModelIndex &index) const {
+QSize ThemedItemDelegate::sizeHint(
+    const QStyleOptionViewItem &option, const QModelIndex &index) const {
 
-//   QStyleOptionViewItem opt(option);
-//   initStyleOption(&opt, index);
-//   QStyle *style = opt.widget ? opt.widget->style() : qApp->style();
+  auto base = QStyledItemDelegate::sizeHint(option, index);
 
-//   QPointF pos = GetRectPosition(option.rect);
-//   QRectF empty_rect(pos.x(), pos.y(), space_width, line_height);
-//   MeasuringPainter painter(empty_rect);
+  // For token cells, count newlines to compute the proper height.
+  TokenRange tokens = IModel::TokensToDisplay(index);
+  if (tokens) {
+    int num_lines = 1;
+    for (Token tok : tokens) {
+      auto td = tok.data();
+      for (size_t i = 0; i < td.size(); ++i) {
+        if (td[i] == '\n') {
+          ++num_lines;
+          // Skip \r\n as a pair.
+          if (i + 1 < td.size() && td[i + 1] == '\r') ++i;
+        } else if (td[i] == '\r') {
+          ++num_lines;
+        }
+      }
+    }
+    int h = static_cast<int>(std::ceil(line_height * num_lines)) + 4;
+    if (h > base.height()) {
+      base.setHeight(h);
+    }
+  }
 
-//   QColor dummy_color;
-//   if (TokenRange tokens = IModel::TokensToDisplay(index)) {
-//     PaintTokens(&painter, option, std::move(tokens), dummy_color, dummy_color);
-//   } else {
-//     PaintText(&painter, option, index.data(Qt::DisplayRole).toString(),
-//               {}, pos);
-//   }
-
-//   return style
-//       ->sizeFromContents(
-//           QStyle::ContentsType::CT_ItemViewItem,
-//           &opt,
-//           QSizeF(painter.area.width(), painter.area.height()).toSize(),
-//           opt.widget)
-//       .grownBy(QMargins(0, 0, static_cast<int>(space_width), 0));
-// }
+  return base;
+}
 
 bool ThemedItemDelegate::editorEvent(QEvent *, QAbstractItemModel *,
                                      const QStyleOptionViewItem &,

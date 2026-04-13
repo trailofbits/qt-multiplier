@@ -192,29 +192,6 @@ void ThemeManager::PopulateViewMenu(QMenu *menu) {
   connect(this, &ThemeManager::ThemeListChanged, this, populate_theme_menu);
   connect(this, &ThemeManager::ThemeChanged, this, populate_theme_menu);
 
-  // --- Font size controls ---
-  menu->addSeparator();
-
-  auto increase_font = new QAction(tr("Increase Font Size"), menu);
-  increase_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus));
-  menu->addAction(increase_font);
-  connect(increase_font, &QAction::triggered, this, [this]() {
-    EnsureFontSizeProxy(this, d.get())->Increment();
-  });
-
-  auto decrease_font = new QAction(tr("Decrease Font Size"), menu);
-  decrease_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus));
-  menu->addAction(decrease_font);
-  connect(decrease_font, &QAction::triggered, this, [this]() {
-    EnsureFontSizeProxy(this, d.get())->Decrement();
-  });
-
-  auto reset_font = new QAction(tr("Reset Font Size"), menu);
-  reset_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
-  menu->addAction(reset_font);
-  connect(reset_font, &QAction::triggered, this, [this]() {
-    EnsureFontSizeProxy(this, d.get())->Reset();
-  });
 }
 
 int ThemeManager::FontSizeDelta(void) const {

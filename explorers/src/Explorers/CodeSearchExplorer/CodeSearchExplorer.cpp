@@ -26,7 +26,10 @@
 #include <multiplier/GUI/Managers/ActionManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/LineEditWidget.h>
+#include <multiplier/GUI/Widgets/SpreadsheetModel.h>
+#include <multiplier/GUI/Widgets/SearchWidget.h>
 #include <multiplier/GUI/Widgets/TabWidget.h>
 #include <multiplier/Index.h>
 #include <multiplier/Re2.h>
@@ -48,21 +51,28 @@ static const QString kModelId =
 class ColumnTintDelegate Q_DECL_FINAL : public QAbstractItemDelegate {
   QAbstractItemDelegate *inner{nullptr};
   IThemePtr theme;
+  unsigned tab_width_{4};
 
   void RebuildInner(IThemePtr new_theme) {
     delete inner;
     theme = std::move(new_theme);
-    inner = new ThemedItemDelegate(theme, std::nullopt, 4u, this);
+    inner = new ThemedItemDelegate(theme, std::nullopt, tab_width_, this);
   }
 
  public:
-  explicit ColumnTintDelegate(IThemePtr theme_, QObject *parent = nullptr)
-      : QAbstractItemDelegate(parent) {
+  explicit ColumnTintDelegate(IThemePtr theme_, unsigned tab_width = 4u,
+                               QObject *parent = nullptr)
+      : QAbstractItemDelegate(parent), tab_width_(tab_width) {
     RebuildInner(std::move(theme_));
   }
 
   void OnThemeChanged(const ThemeManager &tm) {
     RebuildInner(tm.Theme());
+  }
+
+  void SetTabWidth(unsigned tw) {
+    tab_width_ = tw;
+    RebuildInner(theme);
   }
 
   void paint(QPainter *painter, const QStyleOptionViewItem &option,
@@ -98,6 +108,7 @@ struct SearchTab {
   QSortFilterProxyModel *sort_proxy;
   QTableView *table;
   QLabel *status_label;
+  SearchWidget *filter_widget;
   QWidget *container;  // The widget added to the TabWidget.
   AtomicU64Ptr search_version;
   int result_count{0};
@@ -120,6 +131,7 @@ struct CodeSearchExplorer::PrivateData {
 
   const TriggerHandle open_entity_trigger;
   const TriggerHandle preview_entity_trigger;
+  const TriggerHandle open_in_spreadsheet_trigger;
 
   // Track per-tab state so we can route signals correctly.
   // Key: the container widget pointer.
@@ -131,7 +143,9 @@ struct CodeSearchExplorer::PrivateData {
         open_entity_trigger(config_manager.ActionManager().Find(
             "com.trailofbits.action.OpenEntity")),
         preview_entity_trigger(config_manager.ActionManager().Find(
-            "com.trailofbits.action.OpenEntityPreview")) {}
+            "com.trailofbits.action.OpenEntityPreview")),
+        open_in_spreadsheet_trigger(config_manager.ActionManager().Find(
+            "com.trailofbits.action.OpenInSpreadsheet")) {}
 
   SearchTab *CurrentTab(void) {
     if (!tab_widget) return nullptr;
@@ -206,6 +220,66 @@ void CodeSearchExplorer::CreateDockWidget(IWindowManager *manager) {
   connect(d->tab_widget->tabBar(), &QTabBar::tabCloseRequested,
           this, &CodeSearchExplorer::OnTabClose);
 
+  // Right-click on tab bar.
+  d->tab_widget->tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(d->tab_widget->tabBar(), &QWidget::customContextMenuRequested,
+          this, [this] (const QPoint &pos) {
+    int index = d->tab_widget->tabBar()->tabAt(pos);
+    if (index < 0) return;
+
+    auto *widget = d->tab_widget->widget(index);
+    auto it = d->tabs.find(widget);
+    if (it == d->tabs.end()) return;
+    auto &tab = it->second;
+
+    QMenu menu(d->tab_widget);
+
+    if (tab.model->rowCount() > 0) {
+      menu.addAction(tr("Open in Sheet"), this, [this, &tab] () {
+        auto *model = tab.model;
+        int cols = model->columnCount();
+        int rows = model->rowCount();
+
+        ConfigManager::SheetData sheet;
+        sheet.name = tab.container->windowTitle();
+
+        for (int c = 0; c < cols; ++c) {
+          ConfigManager::SheetColumnInfo ci;
+          ci.name = model->headerData(c, Qt::Horizontal).toString();
+          sheet.columns.push_back(ci);
+        }
+
+        sheet.cells.resize(rows);
+        for (int r = 0; r < rows; ++r) {
+          sheet.cells[r].resize(cols);
+          for (int c = 0; c < cols; ++c) {
+            auto idx = model->index(r, c);
+            QVariant raw = idx.data(IModel::TokenRangeDisplayRole);
+            if (raw.isValid() && raw.canConvert<TokenRange>()) {
+              sheet.cells[r][c] = SpreadsheetModel::value_to_json(raw);
+            } else {
+              QString text = idx.data(Qt::DisplayRole).toString();
+              if (!text.isEmpty()) {
+                sheet.cells[r][c] = SpreadsheetModel::value_to_json(
+                    QVariant(text));
+              }
+            }
+          }
+        }
+
+        d->open_in_spreadsheet_trigger.Trigger(
+            QVariant::fromValue(sheet));
+      });
+      menu.addSeparator();
+    }
+
+    menu.addAction(tr("Close"), this, [this, index] () {
+      OnTabClose(index);
+    });
+
+    menu.exec(d->tab_widget->tabBar()->mapToGlobal(pos));
+  });
+
   auto layout = new QVBoxLayout(d->dock);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(d->tab_widget, 1);
@@ -274,9 +348,13 @@ QTableView *CodeSearchExplorer::CreateResultsTable(QWidget *parent) {
   });
 
   // Themed delegate with column tinting.
-  auto *tint = new ColumnTintDelegate(theme_manager.Theme(), table);
+  auto *tint = new ColumnTintDelegate(
+      theme_manager.Theme(), d->config_manager.TabWidth(), table);
   table->setItemDelegate(tint);
   table->setFont(theme_manager.Theme()->Font());
+
+  connect(&d->config_manager, &ConfigManager::TabWidthChanged,
+          table, [tint] (unsigned tw) { tint->SetTabWidth(tw); });
 
   connect(&theme_manager, &ThemeManager::ThemeChanged,
           table, [tint, table] (const ThemeManager &tm) {
@@ -320,6 +398,7 @@ void CodeSearchExplorer::OnSearchTriggered(void) {
 
   // Create a new tab for this search.
   auto *container = new QWidget(d->tab_widget);
+  container->setAutoFillBackground(true);
   auto *layout = new QVBoxLayout(container);
   layout->setContentsMargins(0, 0, 0, 0);
 
@@ -339,10 +418,36 @@ void CodeSearchExplorer::OnSearchTriggered(void) {
   }
   auto *sort_proxy = new QSortFilterProxyModel(container);
   sort_proxy->setSourceModel(model);
+  sort_proxy->setFilterKeyColumn(-1);  // Filter across all columns.
 
   auto *table = CreateResultsTable(container);
   table->setModel(sort_proxy);
   layout->addWidget(table, 1);
+
+  // Filter widget (Ctrl+F to activate, Escape to dismiss).
+  auto &media_manager = d->config_manager.MediaManager();
+  auto *filter_widget = new SearchWidget(
+      media_manager, SearchWidget::Mode::Filter, container);
+  layout->addWidget(filter_widget);
+
+  connect(filter_widget, &SearchWidget::SearchParametersChanged,
+          this, [sort_proxy, filter_widget] () {
+    auto &params = filter_widget->Parameters();
+    QRegularExpression::PatternOptions opts{
+        QRegularExpression::NoPatternOption};
+    if (!params.case_sensitive) {
+      opts |= QRegularExpression::CaseInsensitiveOption;
+    }
+    auto pattern = QString::fromStdString(params.pattern);
+    if (params.type == SearchWidget::SearchParameters::Type::Text) {
+      pattern = QRegularExpression::escape(pattern);
+      if (params.whole_word) {
+        pattern = QStringLiteral("\\b") + pattern + QStringLiteral("\\b");
+      }
+    }
+    sort_proxy->setFilterRegularExpression(
+        QRegularExpression(pattern, opts));
+  });
 
   container->setLayout(layout);
   container->setWindowTitle(pattern);
@@ -352,6 +457,7 @@ void CodeSearchExplorer::OnSearchTriggered(void) {
   tab.sort_proxy = sort_proxy;
   tab.table = table;
   tab.status_label = status_label;
+  tab.filter_widget = filter_widget;
   tab.container = container;
   tab.search_version = std::make_shared<AtomicU64>(0u);
 

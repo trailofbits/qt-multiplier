@@ -66,9 +66,11 @@ struct SearchWidget::PrivateData final {
 
 SearchWidget::~SearchWidget(void) {}
 
-void SearchWidget::UpdateSearchResultCount(size_t search_result_count) {
+void SearchWidget::UpdateSearchResultCount(size_t search_result_count,
+                                            size_t start_at) {
   d->search_result_count = search_result_count;
-  d->current_search_result = 0;
+  d->current_search_result = (start_at < search_result_count)
+      ? start_at : 0;
 
   d->show_next_result->setEnabled(d->search_result_count != 0);
   d->show_prev_result->setEnabled(d->search_result_count != 0);

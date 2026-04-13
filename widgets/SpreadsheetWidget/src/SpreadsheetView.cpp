@@ -6,6 +6,7 @@
 
 #include <multiplier/GUI/Widgets/SpreadsheetView.h>
 
+#include <QAbstractButton>
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
@@ -14,14 +15,22 @@
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QMimeData>
+#include <QSortFilterProxyModel>
 
 #include <multiplier/Index.h>
 
 Q_DECLARE_METATYPE(mx::TokenRange)
 
+#include <multiplier/Frontend/TokenKind.h>
+#include <multiplier/GUI/Interfaces/ITheme.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
+#include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Widgets/SimpleTextInputDialog.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
+
+Q_DECLARE_METATYPE(mx::Token)
 
 namespace mx::gui {
 
@@ -31,6 +40,14 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
   // Sorting via context menu only (stable sort in model).
   setSortingEnabled(false);
   horizontalHeader()->setSortIndicatorShown(true);
+
+  // Cmd/Ctrl+click on a column header selects the column without sorting.
+  connect(horizontalHeader(), &QHeaderView::sectionClicked,
+          this, [this] (int col) {
+    if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
+      selectColumn(col);
+    }
+  });
 
   // Movable headers.
   horizontalHeader()->setSectionsMovable(true);
@@ -52,6 +69,33 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
   setWordWrap(true);
   setTextElideMode(Qt::ElideNone);
   verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+
+  // Context menu on the corner button (select-all).
+  if (auto *corner = findChild<QAbstractButton *>()) {
+    corner->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(corner, &QWidget::customContextMenuRequested,
+            this, [this, corner] (const QPoint &pos) {
+      QMenu menu(this);
+      menu.addAction(tr("Copy"), QKeySequence::Copy,
+                     this, &SpreadsheetView::copy_selection);
+      menu.addAction(tr("Paste"), QKeySequence::Paste,
+                     this, &SpreadsheetView::paste_at_selection);
+      menu.addAction(tr("Cut"), QKeySequence::Cut,
+                     this, &SpreadsheetView::cut_selection);
+      menu.addAction(tr("Delete"), QKeySequence::Delete,
+                     this, &SpreadsheetView::delete_selection);
+      menu.addSeparator();
+      menu.addAction(tr("Copy as Markdown"), this,
+                     &SpreadsheetView::copy_as_markdown);
+      menu.addAction(tr("Copy as HTML"), this,
+                     &SpreadsheetView::copy_as_html);
+      menu.addAction(tr("Copy as CSV"), this,
+                     &SpreadsheetView::copy_as_csv);
+      menu.addAction(tr("Copy as TSV"), this,
+                     &SpreadsheetView::copy_as_tsv);
+      menu.exec(corner->mapToGlobal(pos));
+    });
+  }
 
   // Context menu on row headers for insert/delete/move/color.
   verticalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -143,6 +187,16 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
       }
     });
     menu.addSeparator();
+
+    auto *clickable_action = menu.addAction(tr("Clickable Tokens"));
+    clickable_action->setCheckable(true);
+    clickable_action->setChecked(clickable_columns_.contains(col));
+    connect(clickable_action, &QAction::toggled, this,
+            [this, col] (bool checked) {
+      SetColumnClickable(col, checked);
+    });
+
+    menu.addSeparator();
     menu.addAction(tr("Sort Ascending"), this, [this, col] () {
       sortByColumn(col, Qt::AscendingOrder);
       horizontalHeader()->setSortIndicator(col, Qt::AscendingOrder);
@@ -156,6 +210,36 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
 }
 
 SpreadsheetView::~SpreadsheetView(void) {}
+
+void SpreadsheetView::SetColumnClickable(int col, bool clickable) {
+  if (clickable) {
+    clickable_columns_.insert(col);
+  } else {
+    clickable_columns_.remove(col);
+  }
+}
+
+void SpreadsheetView::mousePressEvent(QMouseEvent *event) {
+  auto idx = indexAt(event->pos());
+  if (idx.isValid()) {
+    QVariant raw = idx.data(SpreadsheetRoles::RawValueRole);
+
+    // Document cells: open viewer on click, but also allow normal selection.
+    if (raw.canConvert<DocumentCell>()) {
+      emit DocumentCellClicked(idx);
+    }
+
+    // Clickable-tokens columns: navigate on click, select only the cell.
+    if (clickable_columns_.contains(idx.column())) {
+      selectionModel()->select(idx, QItemSelectionModel::ClearAndSelect);
+      setCurrentIndex(idx);
+      emit TokenClicked(idx);
+      event->accept();
+      return;
+    }
+  }
+  QTableView::mousePressEvent(event);
+}
 
 void SpreadsheetView::ApplyThemeColors(const QColor &gutter_bg,
                                        const QColor &gutter_fg,
@@ -193,9 +277,9 @@ void SpreadsheetView::copy_selection(void) {
               return a.column() < b.column();
             });
 
+  // Plain text (tab-separated).
   QString text;
   int prev_row = indexes.first().row();
-
   for (const auto &idx : indexes) {
     if (idx.row() != prev_row) {
       text += QLatin1Char('\n');
@@ -206,7 +290,50 @@ void SpreadsheetView::copy_selection(void) {
     text += idx.data(Qt::DisplayRole).toString();
   }
 
-  QApplication::clipboard()->setText(text);
+  // Rich format: serialize raw cell values as JSON grid so cross-sheet
+  // paste preserves tokens, booleans, colors, etc.
+  int min_row = indexes.first().row(), min_col = indexes.first().column();
+  int max_row = min_row, max_col = min_col;
+  for (const auto &idx : indexes) {
+    min_row = std::min(min_row, idx.row());
+    max_row = std::max(max_row, idx.row());
+    min_col = std::min(min_col, idx.column());
+    max_col = std::max(max_col, idx.column());
+  }
+
+  // Build a JSON array of rows, each row an array of JSON cell strings.
+  QByteArray rich;
+  QDataStream stream(&rich, QIODevice::WriteOnly);
+  stream << static_cast<qint32>(max_row - min_row + 1);
+  stream << static_cast<qint32>(max_col - min_col + 1);
+
+  // Build a map for quick lookup.
+  QMap<QPair<int,int>, QModelIndex> grid;
+  for (const auto &idx : indexes) {
+    grid[{idx.row(), idx.column()}] = idx;
+  }
+
+  for (int r = min_row; r <= max_row; ++r) {
+    for (int c = min_col; c <= max_col; ++c) {
+      auto it = grid.find({r, c});
+      if (it != grid.end()) {
+        QVariant raw = it.value().data(SpreadsheetRoles::RawValueRole);
+        if (raw.isValid()) {
+          stream << SpreadsheetModel::value_to_json(raw);
+        } else {
+          stream << QString();
+        }
+      } else {
+        stream << QString();
+      }
+    }
+  }
+
+  auto *mime = new QMimeData;
+  mime->setText(text);
+  mime->setData(QStringLiteral("application/x-qtmultiplier-sheet-cells"),
+                rich);
+  QApplication::clipboard()->setMimeData(mime);
 }
 
 void SpreadsheetView::paste_at_selection(void) {
@@ -215,12 +342,99 @@ void SpreadsheetView::paste_at_selection(void) {
     return;
   }
 
-  QModelIndex current = currentIndex();
-  if (!current.isValid() || !model()) {
+  if (!model()) return;
+
+  // Use the top-left cell of the selection as the paste origin.
+  QModelIndex current;
+  auto sel = selectionModel()->selectedIndexes();
+  if (!sel.isEmpty()) {
+    int min_row = sel.first().row(), min_col = sel.first().column();
+    for (const auto &idx : sel) {
+      min_row = std::min(min_row, idx.row());
+      min_col = std::min(min_col, idx.column());
+    }
+    current = model()->index(min_row, min_col);
+  } else {
+    current = currentIndex();
+  }
+  if (!current.isValid()) return;
+
+  const QMimeData *mime = clip->mimeData();
+
+  // Resolve the source SpreadsheetModel through any proxy.
+  SpreadsheetModel *sm = nullptr;
+  auto *m = model();
+  if (auto *proxy = qobject_cast<QSortFilterProxyModel *>(m)) {
+    sm = qobject_cast<SpreadsheetModel *>(proxy->sourceModel());
+  } else {
+    sm = qobject_cast<SpreadsheetModel *>(m);
+  }
+
+  int start_row = current.row();
+  int start_col = current.column();
+
+  // Check for document reference paste.
+  if (mime->hasFormat(
+          QStringLiteral("application/x-qtmultiplier-document"))) {
+    auto data = mime->data(
+        QStringLiteral("application/x-qtmultiplier-document"));
+    QDataStream stream(&data, QIODevice::ReadOnly);
+    qint32 doc_id = -1;
+    stream >> doc_id;
+    if (doc_id >= 0 && sm) {
+      DocumentCell dc;
+      dc.doc_id = doc_id;
+      // Load the title from the DB for cell display.
+      if (config_manager_) {
+        dc.title = config_manager_->LoadDocumentTitle(doc_id);
+      }
+      sm->set_cell_value(start_row, start_col,
+                         QVariant::fromValue(dc));
+    }
     return;
   }
 
-  const QMimeData *mime = clip->mimeData();
+  // Check for sheet cell grid data (cross-sheet copy).
+  if (mime->hasFormat(
+          QStringLiteral("application/x-qtmultiplier-sheet-cells"))) {
+    auto data = mime->data(
+        QStringLiteral("application/x-qtmultiplier-sheet-cells"));
+    QDataStream stream(&data, QIODevice::ReadOnly);
+
+    qint32 num_rows = 0, num_cols = 0;
+    stream >> num_rows >> num_cols;
+
+    if (sm) {
+      sm->undoStack()->beginMacro(tr("Paste"));
+
+      // Expand to fit.
+      while (sm->rowCount() < start_row + num_rows) {
+        sm->insertRow(sm->rowCount());
+      }
+      while (sm->columnCount() < start_col + num_cols) {
+        sm->insertColumn(sm->columnCount());
+      }
+
+      const mx::Index *index = config_manager_
+          ? &config_manager_->Index() : nullptr;
+
+      for (int r = 0; r < num_rows; ++r) {
+        for (int c = 0; c < num_cols; ++c) {
+          QString json;
+          stream >> json;
+          if (json.isEmpty()) {
+            sm->set_cell_value(start_row + r, start_col + c, QVariant());
+          } else {
+            sm->set_cell_value(start_row + r, start_col + c,
+                SpreadsheetModel::value_from_json(json, index));
+          }
+        }
+      }
+
+      sm->undoStack()->endMacro();
+    }
+    return;
+  }
 
   // Check for token range data from the code explorer.
   if (mime->hasFormat(
@@ -235,16 +449,30 @@ void SpreadsheetView::paste_at_selection(void) {
     // Collect tokens into one cell as a TokenRange.
     std::vector<CustomToken> tokens;
     for (quint32 i = 0; i < count; ++i) {
-      quint64 entity_id = 0;
+      quint64 token_id = 0;
       quint32 kind = 0;
       quint32 category = 0;
       QString display_text;
-      stream >> entity_id >> kind >> category >> display_text;
+      quint64 related_eid = 0;
+      stream >> token_id >> kind >> category >> display_text;
+
+      // Read the related entity ID if present (newer format).
+      if (!stream.atEnd()) {
+        stream >> related_eid;
+      }
 
       UserToken ut;
       ut.data = display_text.toStdString();
       ut.kind = static_cast<TokenKind>(kind);
       ut.category = static_cast<TokenCategory>(category);
+
+      // Resolve the related entity from the index so that
+      // highlight colors carry through to sheet cells.
+      if (related_eid != kInvalidEntityId && config_manager_) {
+        ut.related_entity =
+            config_manager_->Index().entity(EntityId(related_eid));
+      }
+
       tokens.emplace_back(std::move(ut));
     }
 
@@ -266,12 +494,10 @@ void SpreadsheetView::paste_at_selection(void) {
       }
     }
 
-    if (!tokens.empty()) {
+    if (!tokens.empty() && sm) {
       auto range = TokenRange::create(std::move(tokens));
-      if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
-        sm->set_cell_value(current.row(), current.column(),
-                           QVariant::fromValue(range));
-      }
+      sm->set_cell_value(start_row, start_col,
+                         QVariant::fromValue(range));
       return;
     }
   }
@@ -283,17 +509,32 @@ void SpreadsheetView::paste_at_selection(void) {
   }
 
   QStringList rows = text.split(QLatin1Char('\n'));
-  int start_row = current.row();
-  int start_col = current.column();
 
-  for (int r = 0; r < rows.size(); ++r) {
-    QStringList cells = rows[r].split(QLatin1Char('\t'));
-    for (int c = 0; c < cells.size(); ++c) {
-      QModelIndex idx = model()->index(start_row + r, start_col + c);
-      if (idx.isValid()) {
-        model()->setData(idx, cells[c], Qt::EditRole);
+  if (sm) {
+    sm->undoStack()->beginMacro(tr("Paste"));
+
+    // Expand to fit.
+    int max_cols = 0;
+    for (const auto &row : rows) {
+      max_cols = std::max(max_cols,
+                          static_cast<int>(row.split(QLatin1Char('\t')).size()));
+    }
+    while (sm->rowCount() < start_row + rows.size()) {
+      sm->insertRow(sm->rowCount());
+    }
+    while (sm->columnCount() < start_col + max_cols) {
+      sm->insertColumn(sm->columnCount());
+    }
+
+    for (int r = 0; r < rows.size(); ++r) {
+      QStringList cells = rows[r].split(QLatin1Char('\t'));
+      for (int c = 0; c < cells.size(); ++c) {
+        sm->set_cell_value(start_row + r, start_col + c,
+                           QVariant(cells[c]));
       }
     }
+
+    sm->undoStack()->endMacro();
   }
 }
 
@@ -312,13 +553,273 @@ void SpreadsheetView::delete_selection(void) {
 }
 
 void SpreadsheetView::copy_as_markdown(void) {
-  // TODO(Phase 4): Emit markdown-formatted table to clipboard.
-  copy_selection();
+  auto indexes = selectionModel()->selectedIndexes();
+  if (indexes.isEmpty()) return;
+
+  std::sort(indexes.begin(), indexes.end(),
+            [](const QModelIndex &a, const QModelIndex &b) {
+              if (a.row() != b.row()) return a.row() < b.row();
+              return a.column() < b.column();
+            });
+
+  // Determine column range.
+  int min_col = indexes.first().column();
+  int max_col = min_col;
+  for (const auto &idx : indexes) {
+    min_col = std::min(min_col, idx.column());
+    max_col = std::max(max_col, idx.column());
+  }
+
+  // Build a row-major map of cell texts.
+  QMap<int, QMap<int, QString>> grid;
+  for (const auto &idx : indexes) {
+    QVariant raw = idx.data(SpreadsheetRoles::RawValueRole);
+    QString text;
+    if (raw.userType() == QMetaType::Bool) {
+      text = raw.toBool() ? QStringLiteral("[x]") : QStringLiteral("[ ]");
+    } else if (raw.canConvert<TokenRange>() || raw.canConvert<Token>()) {
+      // Wrap token text in backticks.
+      text = QLatin1Char('`') + idx.data(Qt::DisplayRole).toString()
+             + QLatin1Char('`');
+    } else {
+      text = idx.data(Qt::DisplayRole).toString();
+    }
+    // Escape pipe characters.
+    text.replace(QLatin1Char('|'), QStringLiteral("\\|"));
+    grid[idx.row()][idx.column()] = text;
+  }
+
+  // Header row.
+  QString md;
+  QString sep;
+  for (int c = min_col; c <= max_col; ++c) {
+    QString hdr = model()->headerData(c, Qt::Horizontal).toString();
+    hdr.replace(QLatin1Char('|'), QStringLiteral("\\|"));
+    md += QStringLiteral("| ") + hdr + QLatin1Char(' ');
+    sep += QStringLiteral("| --- ");
+  }
+  md += QStringLiteral("|\n");
+  sep += QStringLiteral("|\n");
+  md += sep;
+
+  // Data rows.
+  for (auto row_it = grid.constBegin(); row_it != grid.constEnd(); ++row_it) {
+    for (int c = min_col; c <= max_col; ++c) {
+      md += QStringLiteral("| ") + row_it.value().value(c) + QLatin1Char(' ');
+    }
+    md += QStringLiteral("|\n");
+  }
+
+  QApplication::clipboard()->setText(md);
 }
 
 void SpreadsheetView::copy_as_html(void) {
-  // TODO(Phase 4): Emit HTML-formatted table to clipboard.
-  copy_selection();
+  auto indexes = selectionModel()->selectedIndexes();
+  if (indexes.isEmpty()) return;
+
+  std::sort(indexes.begin(), indexes.end(),
+            [](const QModelIndex &a, const QModelIndex &b) {
+              if (a.row() != b.row()) return a.row() < b.row();
+              return a.column() < b.column();
+            });
+
+  int min_col = indexes.first().column();
+  int max_col = min_col;
+  for (const auto &idx : indexes) {
+    min_col = std::min(min_col, idx.column());
+    max_col = std::max(max_col, idx.column());
+  }
+
+  IThemePtr theme;
+  if (config_manager_) {
+    theme = config_manager_->ThemeManager().Theme();
+  }
+
+  auto cell_html = [&](const QModelIndex &idx) -> QString {
+    QVariant raw = idx.data(SpreadsheetRoles::RawValueRole);
+
+    if (raw.userType() == QMetaType::Bool) {
+      return raw.toBool() ? QStringLiteral("&#9745;")
+                          : QStringLiteral("&#9744;");
+    }
+
+    if (raw.canConvert<TokenRange>() && theme) {
+      QString html;
+      for (Token tok : raw.value<TokenRange>()) {
+        if (tok.kind() == TokenKind::WHITESPACE) {
+          auto td = tok.data();
+          QString ws = QString::fromUtf8(td.data(),
+                                         static_cast<qsizetype>(td.size()));
+          ws.replace(QLatin1Char(' '), QStringLiteral("&nbsp;"));
+          ws.replace(QLatin1Char('\n'), QStringLiteral("<br>"));
+          ws.replace(QLatin1Char('\t'), QStringLiteral("&nbsp;&nbsp;&nbsp;&nbsp;"));
+          html += ws;
+          continue;
+        }
+        auto cs = theme->TokenColorAndStyle(tok);
+        if (!cs.foreground_color.isValid()) {
+          cs.foreground_color = theme->DefaultForegroundColor();
+        }
+        auto td = tok.data();
+        QString text = QString::fromUtf8(td.data(),
+                                         static_cast<qsizetype>(td.size()))
+                           .toHtmlEscaped();
+        QString s = QStringLiteral("color:") + cs.foreground_color.name();
+        if (cs.bold) s += QStringLiteral(";font-weight:bold");
+        if (cs.italic) s += QStringLiteral(";font-style:italic");
+        if (cs.background_color.isValid()) {
+          s += QStringLiteral(";background:") + cs.background_color.name();
+        }
+        html += QStringLiteral("<span style=\"") + s
+                + QStringLiteral("\">") + text
+                + QStringLiteral("</span>");
+      }
+      return html;
+    }
+
+    if (raw.canConvert<Token>() && theme) {
+      auto tok = raw.value<Token>();
+      auto cs = theme->TokenColorAndStyle(tok);
+      if (!cs.foreground_color.isValid()) {
+        cs.foreground_color = theme->DefaultForegroundColor();
+      }
+      auto td = tok.data();
+      QString text = QString::fromUtf8(td.data(),
+                                       static_cast<qsizetype>(td.size()))
+                         .toHtmlEscaped();
+      QString s = QStringLiteral("color:") + cs.foreground_color.name();
+      if (cs.bold) s += QStringLiteral(";font-weight:bold");
+      if (cs.italic) s += QStringLiteral(";font-style:italic");
+      return QStringLiteral("<span style=\"") + s
+             + QStringLiteral("\">") + text + QStringLiteral("</span>");
+    }
+
+    return idx.data(Qt::DisplayRole).toString().toHtmlEscaped();
+  };
+
+  QMap<int, QMap<int, QString>> grid;
+  for (const auto &idx : indexes) {
+    grid[idx.row()][idx.column()] = cell_html(idx);
+  }
+
+  QString html = QStringLiteral(
+      "<table border=1 cellpadding=4 cellspacing=0"
+      " style=\"font-family:monospace;border-collapse:collapse\">\n<tr>");
+  for (int c = min_col; c <= max_col; ++c) {
+    html += QStringLiteral("<th>")
+            + model()->headerData(c, Qt::Horizontal).toString().toHtmlEscaped()
+            + QStringLiteral("</th>");
+  }
+  html += QStringLiteral("</tr>\n");
+
+  for (auto row_it = grid.constBegin(); row_it != grid.constEnd(); ++row_it) {
+    html += QStringLiteral("<tr>");
+    for (int c = min_col; c <= max_col; ++c) {
+      html += QStringLiteral("<td>") + row_it.value().value(c)
+              + QStringLiteral("</td>");
+    }
+    html += QStringLiteral("</tr>\n");
+  }
+  html += QStringLiteral("</table>");
+
+  auto *mime = new QMimeData;
+  mime->setHtml(html);
+  mime->setText(html);
+  QApplication::clipboard()->setMimeData(mime);
+}
+
+void SpreadsheetView::copy_as_csv(void) {
+  auto indexes = selectionModel()->selectedIndexes();
+  if (indexes.isEmpty()) return;
+
+  std::sort(indexes.begin(), indexes.end(),
+            [](const QModelIndex &a, const QModelIndex &b) {
+              if (a.row() != b.row()) return a.row() < b.row();
+              return a.column() < b.column();
+            });
+
+  int min_col = indexes.first().column();
+  int max_col = min_col;
+  for (const auto &idx : indexes) {
+    min_col = std::min(min_col, idx.column());
+    max_col = std::max(max_col, idx.column());
+  }
+
+  // Build row-major grid of display text.
+  QMap<int, QMap<int, QString>> grid;
+  for (const auto &idx : indexes) {
+    grid[idx.row()][idx.column()] = idx.data(Qt::DisplayRole).toString();
+  }
+
+  auto quote_csv = [](const QString &s) -> QString {
+    if (s.contains(QLatin1Char(',')) || s.contains(QLatin1Char('"')) ||
+        s.contains(QLatin1Char('\n'))) {
+      QString escaped = s;
+      escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+      return QLatin1Char('"') + escaped + QLatin1Char('"');
+    }
+    return s;
+  };
+
+  QString csv;
+
+  // Header row.
+  for (int c = min_col; c <= max_col; ++c) {
+    if (c > min_col) csv += QLatin1Char(',');
+    csv += quote_csv(model()->headerData(c, Qt::Horizontal).toString());
+  }
+  csv += QLatin1Char('\n');
+
+  for (auto row_it = grid.constBegin(); row_it != grid.constEnd(); ++row_it) {
+    for (int c = min_col; c <= max_col; ++c) {
+      if (c > min_col) csv += QLatin1Char(',');
+      csv += quote_csv(row_it.value().value(c));
+    }
+    csv += QLatin1Char('\n');
+  }
+
+  QApplication::clipboard()->setText(csv);
+}
+
+void SpreadsheetView::copy_as_tsv(void) {
+  auto indexes = selectionModel()->selectedIndexes();
+  if (indexes.isEmpty()) return;
+
+  std::sort(indexes.begin(), indexes.end(),
+            [](const QModelIndex &a, const QModelIndex &b) {
+              if (a.row() != b.row()) return a.row() < b.row();
+              return a.column() < b.column();
+            });
+
+  int min_col = indexes.first().column();
+  int max_col = min_col;
+  for (const auto &idx : indexes) {
+    min_col = std::min(min_col, idx.column());
+    max_col = std::max(max_col, idx.column());
+  }
+
+  QMap<int, QMap<int, QString>> grid;
+  for (const auto &idx : indexes) {
+    grid[idx.row()][idx.column()] = idx.data(Qt::DisplayRole).toString();
+  }
+
+  QString tsv;
+
+  for (int c = min_col; c <= max_col; ++c) {
+    if (c > min_col) tsv += QLatin1Char('\t');
+    tsv += model()->headerData(c, Qt::Horizontal).toString();
+  }
+  tsv += QLatin1Char('\n');
+
+  for (auto row_it = grid.constBegin(); row_it != grid.constEnd(); ++row_it) {
+    for (int c = min_col; c <= max_col; ++c) {
+      if (c > min_col) tsv += QLatin1Char('\t');
+      tsv += row_it.value().value(c);
+    }
+    tsv += QLatin1Char('\n');
+  }
+
+  QApplication::clipboard()->setText(tsv);
 }
 
 void SpreadsheetView::keyPressEvent(QKeyEvent *event) {
@@ -336,18 +837,6 @@ void SpreadsheetView::keyPressEvent(QKeyEvent *event) {
   }
   if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
     delete_selection();
-    return;
-  }
-  if (event->matches(QKeySequence::Undo)) {
-    if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
-      sm->undoStack()->undo();
-    }
-    return;
-  }
-  if (event->matches(QKeySequence::Redo)) {
-    if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
-      sm->undoStack()->redo();
-    }
     return;
   }
   // Ctrl+Shift+C -> copy as markdown.
@@ -408,11 +897,65 @@ void SpreadsheetView::OnContextMenu(const QPoint &pos) {
                  &SpreadsheetView::copy_as_markdown);
   menu.addAction(tr("Copy as HTML"), this,
                  &SpreadsheetView::copy_as_html);
+  menu.addAction(tr("Copy as CSV"), this,
+                 &SpreadsheetView::copy_as_csv);
+  menu.addAction(tr("Copy as TSV"), this,
+                 &SpreadsheetView::copy_as_tsv);
 
   menu.addSeparator();
 
-  // Row / column operations.
+  // Cell type operations.
   QModelIndex idx = indexAt(pos);
+  if (idx.isValid() && model()) {
+    QVariant raw = idx.data(SpreadsheetRoles::RawValueRole);
+    if (!raw.canConvert<DocumentCell>()) {
+      menu.addAction(tr("Insert Document"), this, [this, idx] () {
+        DocumentCell dc;
+        SpreadsheetModel *sm2 = nullptr;
+        auto *m2 = model();
+        if (auto *proxy = qobject_cast<QSortFilterProxyModel *>(m2)) {
+          sm2 = qobject_cast<SpreadsheetModel *>(proxy->sourceModel());
+        } else {
+          sm2 = qobject_cast<SpreadsheetModel *>(m2);
+        }
+        if (sm2) {
+          sm2->set_cell_value(idx.row(), idx.column(),
+                              QVariant::fromValue(dc));
+          emit DocumentCellClicked(
+              model()->index(idx.row(), idx.column()));
+        }
+      });
+    }
+
+    // Clear Cell — works on all selected cells.
+    menu.addAction(tr("Clear Cell"), this, [this] () {
+      auto sel = selectionModel()->selectedIndexes();
+      if (sel.isEmpty()) return;
+      SpreadsheetModel *sm2 = nullptr;
+      auto *m2 = model();
+      if (auto *proxy = qobject_cast<QSortFilterProxyModel *>(m2)) {
+        sm2 = qobject_cast<SpreadsheetModel *>(proxy->sourceModel());
+      } else {
+        sm2 = qobject_cast<SpreadsheetModel *>(m2);
+      }
+      if (!sm2) return;
+      sm2->undoStack()->beginMacro(tr("Clear Cells"));
+      for (const auto &i : sel) {
+        int r = i.row(), c = i.column();
+        if (auto *proxy = qobject_cast<QSortFilterProxyModel *>(m2)) {
+          auto src = proxy->mapToSource(i);
+          r = src.row();
+          c = src.column();
+        }
+        sm2->set_cell_value(r, c, QVariant());
+      }
+      sm2->undoStack()->endMacro();
+    });
+
+    menu.addSeparator();
+  }
+
+  // Row / column operations.
   if (idx.isValid() && model()) {
     int row = idx.row();
     int col = idx.column();

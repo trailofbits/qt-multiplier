@@ -10,6 +10,7 @@
 #include <multiplier/Frontend/TokenTree.h>
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
 #include <multiplier/GUI/Explorers/CodeSearchExplorer.h>
+#include <multiplier/GUI/Explorers/DocumentExplorer.h>
 #include <multiplier/GUI/Explorers/EntityExplorer.h>
 #ifdef MX_ENABLE_PYTHON
 # include <multiplier/GUI/Explorers/PythonConsoleExplorer.h>
@@ -32,7 +33,6 @@
 #include <multiplier/Index.h>
 
 #include <QCloseEvent>
-#include <iostream>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QFileDialog>
@@ -40,6 +40,8 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QTimer>
+#include <QToolButton>
+#include <QUndoGroup>
 
 #include <vector>
 
@@ -111,6 +113,37 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 void MainWindow::InitializePlugins(void) {
   auto wm = d->window_manager;
 
+  // Global undo/redo toolbar buttons — added first so they appear
+  // at the left of the toolbar.
+  {
+    auto &undo_group = d->config_manager.UndoGroup();
+    auto &media_manager = d->config_manager.MediaManager();
+
+    auto *undo_action = undo_group.createUndoAction(this, tr("Undo"));
+    undo_action->setShortcut(QKeySequence::Undo);
+    undo_action->setIcon(media_manager.Icon("com.trailofbits.icon.Undo"));
+
+    auto *redo_action = undo_group.createRedoAction(this, tr("Redo"));
+    redo_action->setShortcut(QKeySequence::Redo);
+    redo_action->setIcon(media_manager.Icon("com.trailofbits.icon.Redo"));
+
+    auto *undo_btn = new QToolButton(this);
+    undo_btn->setDefaultAction(undo_action);
+    undo_btn->setIconSize(QSize(16, 16));
+    wm->AddToolBarWidget(undo_btn);
+
+    auto *redo_btn = new QToolButton(this);
+    redo_btn->setDefaultAction(redo_action);
+    redo_btn->setIconSize(QSize(16, 16));
+    wm->AddToolBarWidget(redo_btn);
+
+
+    // Also add to the Edit menu.
+    auto *edit_menu = wm->Menu(tr("Edit"));
+    edit_menu->addAction(undo_action);
+    edit_menu->addAction(redo_action);
+  }
+
   d->plugins.emplace_back(new ProjectExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new EntityExplorer(d->config_manager, wm));
   
@@ -130,6 +163,7 @@ void MainWindow::InitializePlugins(void) {
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new SpreadsheetExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new DocumentExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeSearchExplorer(d->config_manager, wm));
 
 #ifdef MX_ENABLE_PYTHON
@@ -146,6 +180,7 @@ void MainWindow::InitializePlugins(void) {
     connect(plugin.get(), &IMainWindowPlugin::RequestKeyPress,
             this, &MainWindow::OnRequestKeyPress);
   }
+
 }
 
 void MainWindow::InitializeMenus(void) {
@@ -261,6 +296,9 @@ void MainWindow::InitializeIndex(QApplication &application) {
     // If restore failed (e.g. stale state), fall through to defaults.
     if (!ok) {
       for (auto *child : findChildren<QDockWidget *>()) {
+        child->hide();
+      }
+      for (auto *child : findChildren<QDockWidget *>()) {
         auto name = child->objectName();
         if (name.contains(QStringLiteral("ProjectExplorer")) ||
             name.contains(QStringLiteral("EntityExplorer")) ||
@@ -270,11 +308,12 @@ void MainWindow::InitializeIndex(QApplication &application) {
       }
     }
   } else {
-    // First launch: show default docks. The docks are created hidden;
-    // show the ones that should be visible by default.
+    // First launch: hide all docks, then show only the defaults.
+    for (auto *child : findChildren<QDockWidget *>()) {
+      child->hide();
+    }
     for (auto *child : findChildren<QDockWidget *>()) {
       auto name = child->objectName();
-      // Show project explorer, entity explorer, and info explorer by default.
       if (name.contains(QStringLiteral("ProjectExplorer")) ||
           name.contains(QStringLiteral("EntityExplorer")) ||
           name.contains(QStringLiteral("InformationExplorer"))) {
@@ -283,14 +322,6 @@ void MainWindow::InitializeIndex(QApplication &application) {
     }
     // Maximize on first launch.
     showMaximized();
-  }
-
-  // Debug: show dock visibility and size after restore.
-  for (auto *child : findChildren<QDockWidget *>()) {
-    std::cerr << "DOCK: " << child->objectName().toStdString()
-              << " visible=" << child->isVisible()
-              << " size=" << child->width() << "x" << child->height()
-              << std::endl;
   }
 
   // Load persisted sheets AFTER restoreState so the dock visibility

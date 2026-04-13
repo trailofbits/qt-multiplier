@@ -22,6 +22,7 @@
 #include <multiplier/Types.h>
 
 class QMenu;
+class QUndoGroup;
 
 namespace mx {
 class FileLocationCache;
@@ -54,6 +55,10 @@ class ConfigManager Q_DECL_FINAL : public QObject {
 
   //! Get access to the global media manager.
   class MediaManager &MediaManager(void) const noexcept;
+
+  //! Get access to the global undo group. All QUndoStacks should be added
+  //! to this group so that the global undo/redo toolbar buttons work.
+  QUndoGroup &UndoGroup(void) const noexcept;
 
   //! Get access to the current index.
   const class Index &Index(void) const noexcept;
@@ -130,16 +135,64 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   HighlightColorMap LoadHighlightColors(void) const;
 
   //! Save/load spreadsheet sheets (per-project).
+  struct SheetColumnInfo {
+    QString name;
+    QColor color;
+    bool clickable{false};
+  };
+
   struct SheetData {
     int sheet_id{-1};
     QString name;
-    QVector<QPair<QString, QColor>> columns;  // (name, color)
+    QString description;
+    QString closed_at;  // ISO 8601 timestamp; empty = open.
+    QVector<SheetColumnInfo> columns;
     QVector<QVector<QString>> cells;          // cells[row][col] = JSON value
     QHash<int, QColor> row_colors;
   };
   int SaveSheet(const SheetData &sheet) const;
-  QVector<SheetData> LoadAllSheets(void) const;
+  QVector<SheetData> LoadOpenSheets(void) const;
   void DeleteSheet(int sheet_id) const;
+
+  struct ClosedSheetInfo {
+    int sheet_id{-1};
+    QString name;
+    QString description;
+    QString closed_at;
+  };
+  QVector<ClosedSheetInfo> LoadClosedSheets(void) const;
+  SheetData LoadSheetById(int sheet_id) const;
+
+  //! Document storage (per-project). Documents are stored by ID so
+  //! multiple sheet cells can reference the same document.
+  int CreateDocument(const QString &content = {},
+                     const QString &title = {}) const;
+  QString LoadDocumentContent(int doc_id) const;
+  QString LoadDocumentTitle(int doc_id) const;
+  void SaveDocumentContent(int doc_id, const QString &content) const;
+  void SaveDocumentTitle(int doc_id, const QString &title) const;
+
+  //! Monotonic counter bumped whenever any document title changes.
+  //! DocumentCell rendering compares its cached timestamp against this.
+  static quint64 DocumentTitleVersion(void) { return doc_title_version_; }
+  static void BumpDocumentTitleVersion(void) { ++doc_title_version_; }
+
+  struct DocumentInfo {
+    int doc_id{-1};
+    QString title;
+    QString description;
+    QString created_at;
+    QString updated_at;
+  };
+  QVector<DocumentInfo> LoadAllDocuments(void) const;
+  void SaveDocumentDescription(int doc_id, const QString &desc) const;
+  void SoftDeleteDocument(int doc_id) const;
+  void UndeleteDocument(int doc_id) const;
+  int DocumentReferenceCount(int doc_id) const;
+
+  //! Save/load which document tabs are open (per-project).
+  void SaveOpenDocumentIds(const QVector<int> &doc_ids) const;
+  QVector<int> LoadOpenDocumentIds(void) const;
 
   //! Save/load navigation history (per-project).
   struct NavigationEntry {
@@ -158,6 +211,11 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   void IndexChanged(const ConfigManager &config_manager);
   void TabWidthChanged(unsigned tab_width);
   void UseTabStopsChanged(bool use_tab_stops);
+
+ private:
+  static quint64 doc_title_version_;
 };
 
 }  // namespace mx::gui
+
+Q_DECLARE_METATYPE(mx::gui::ConfigManager::SheetData)

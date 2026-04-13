@@ -959,6 +959,7 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
       [](const IRBlock &) -> VariantEntity { return NotAnEntity{}; },
       [](const IRInstruction &) -> VariantEntity { return NotAnEntity{}; },
       [](const IRObject &) -> VariantEntity { return NotAnEntity{}; },
+      [](const IRStructure &) -> VariantEntity { return NotAnEntity{}; },
       [](const NotAnEntity &) -> VariantEntity { return NotAnEntity{}; }};
   return std::visit<VariantEntity>(VariantEntityVisitor, ent);
 }

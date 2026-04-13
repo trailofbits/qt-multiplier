@@ -55,8 +55,10 @@ class SearchWidget Q_DECL_FINAL : public QWidget {
   SearchWidget(const MediaManager &media_manager, Mode mode,
                QWidget *parent = nullptr);
 
-  //! Called by the other client widget to update the search result count
-  void UpdateSearchResultCount(size_t search_result_count);
+  //! Called by the other client widget to update the search result count.
+  //! If `start_at` is provided, the initial result is set to that index.
+  void UpdateSearchResultCount(size_t search_result_count,
+                               size_t start_at = 0);
 
   //! Return the current search paramters.
   const SearchParameters &Parameters(void) const;

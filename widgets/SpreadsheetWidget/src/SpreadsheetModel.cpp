@@ -163,8 +163,13 @@ bool SpreadsheetModel::setData(const QModelIndex &index, const QVariant &value,
 
   QVariant new_val;
 
-  // Detect formula mode: text starting with '='.
-  if (text.startsWith(QLatin1Char('='))) {
+  // Detect special cell types and formula mode.
+  if (text.compare(QStringLiteral("=doc"), Qt::CaseInsensitive) == 0) {
+    DocumentCell dc;
+    // doc_id stays -1; the viewer will allocate an ID when opened.
+    new_val = QVariant::fromValue(dc);
+
+  } else if (text.startsWith(QLatin1Char('='))) {
     FormulaCell fc;
     fc.formula = text;
     fc.cached_result = QVariant();
@@ -539,6 +544,13 @@ QString SpreadsheetModel::display_text_for(const QVariant &value) {
     return {};
   }
 
+  if (value.canConvert<DocumentCell>()) {
+    auto dc = value.value<DocumentCell>();
+    return dc.title.isEmpty()
+        ? QStringLiteral("[doc:%1]").arg(dc.doc_id)
+        : dc.title;
+  }
+
   if (value.canConvert<FormulaCell>()) {
     const auto fc = value.value<FormulaCell>();
     if (!fc.error_message.isEmpty()) {
@@ -633,6 +645,13 @@ QString SpreadsheetModel::value_to_json(const QVariant &value) {
                           : QStringLiteral("{\"t\":\"b\",\"v\":0}");
   }
 
+  if (value.canConvert<DocumentCell>()) {
+    auto dc = value.value<DocumentCell>();
+    return QStringLiteral("{\"t\":\"doc\",\"id\":%1,\"tl\":\"%2\"}")
+        .arg(dc.doc_id)
+        .arg(dc.title.replace(QLatin1Char('"'), QStringLiteral("\\\"")));
+  }
+
   if (value.canConvert<TokenRange>()) {
     // Serialize tokens as JSON array of {kind, category, data}.
     auto range = value.value<TokenRange>();
@@ -647,10 +666,12 @@ QString SpreadsheetModel::value_to_json(const QVariant &value) {
       // Escape quotes and backslashes in data.
       data.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
       data.replace(QLatin1Char('"'), QStringLiteral("\\\""));
-      json += QStringLiteral("{\"k\":%1,\"c\":%2,\"d\":\"%3\"}")
+      auto eid = tok.related_entity_id().Pack();
+      json += QStringLiteral("{\"k\":%1,\"c\":%2,\"d\":\"%3\",\"e\":%4}")
           .arg(static_cast<int>(tok.kind()))
           .arg(static_cast<int>(tok.category()))
-          .arg(data);
+          .arg(data)
+          .arg(static_cast<qint64>(eid));
     }
     json += QStringLiteral("]}");
     return json;
@@ -663,10 +684,12 @@ QString SpreadsheetModel::value_to_json(const QVariant &value) {
                                      static_cast<qsizetype>(td.size()));
     data.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
     data.replace(QLatin1Char('"'), QStringLiteral("\\\""));
-    return QStringLiteral("{\"t\":\"tok\",\"k\":%1,\"c\":%2,\"d\":\"%3\"}")
+    auto eid = tok.related_entity_id().Pack();
+    return QStringLiteral("{\"t\":\"tok\",\"k\":%1,\"c\":%2,\"d\":\"%3\",\"e\":%4}")
         .arg(static_cast<int>(tok.kind()))
         .arg(static_cast<int>(tok.category()))
-        .arg(data);
+        .arg(data)
+        .arg(static_cast<qint64>(eid));
   }
 
   // Default: string.
@@ -676,7 +699,8 @@ QString SpreadsheetModel::value_to_json(const QVariant &value) {
   return QStringLiteral("{\"t\":\"s\",\"v\":\"%1\"}").arg(text);
 }
 
-QVariant SpreadsheetModel::value_from_json(const QString &json) {
+QVariant SpreadsheetModel::value_from_json(const QString &json,
+                                            const mx::Index *index) {
   if (json.isEmpty()) {
     return {};
   }
@@ -698,11 +722,23 @@ QVariant SpreadsheetModel::value_from_json(const QString &json) {
     return obj[QStringLiteral("v")].toString();
   }
 
+  if (type == QLatin1String("doc")) {
+    DocumentCell dc;
+    dc.doc_id = obj[QStringLiteral("id")].toInt(-1);
+    dc.title = obj[QStringLiteral("tl")].toString();
+    return QVariant::fromValue(dc);
+  }
+
   if (type == QLatin1String("tok")) {
     UserToken ut;
     ut.kind = static_cast<TokenKind>(obj[QStringLiteral("k")].toInt());
     ut.category = static_cast<TokenCategory>(obj[QStringLiteral("c")].toInt());
     ut.data = obj[QStringLiteral("d")].toString().toStdString();
+    auto eid = static_cast<RawEntityId>(
+        obj[QStringLiteral("e")].toDouble());
+    if (eid != kInvalidEntityId && index) {
+      ut.related_entity = index->entity(EntityId(eid));
+    }
     std::vector<CustomToken> toks;
     toks.emplace_back(std::move(ut));
     return QVariant::fromValue(TokenRange::create(std::move(toks)));
@@ -717,6 +753,11 @@ QVariant SpreadsheetModel::value_from_json(const QString &json) {
       ut.kind = static_cast<TokenKind>(to[QStringLiteral("k")].toInt());
       ut.category = static_cast<TokenCategory>(to[QStringLiteral("c")].toInt());
       ut.data = to[QStringLiteral("d")].toString().toStdString();
+      auto eid = static_cast<RawEntityId>(
+          to[QStringLiteral("e")].toDouble());
+      if (eid != kInvalidEntityId && index) {
+        ut.related_entity = index->entity(EntityId(eid));
+      }
       toks.emplace_back(std::move(ut));
     }
     if (!toks.empty()) {

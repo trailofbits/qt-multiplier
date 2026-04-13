@@ -8,9 +8,13 @@
 
 #pragma once
 
+#include <QHash>
+#include <QPair>
 #include <QStyledItemDelegate>
 
 #include <multiplier/GUI/Interfaces/ITheme.h>
+
+namespace mx::gui { class ConfigManager; }
 
 namespace mx::gui {
 
@@ -23,6 +27,8 @@ class SpreadsheetDelegate Q_DECL_FINAL : public QStyledItemDelegate {
 
   IThemePtr theme;
   unsigned tab_width{4};
+  ConfigManager *config_manager_{nullptr};
+  mutable QHash<int, QPair<QString, quint64>> doc_title_cache;
 
  public:
   explicit SpreadsheetDelegate(IThemePtr theme_, unsigned tab_width_ = 4,
@@ -31,6 +37,7 @@ class SpreadsheetDelegate Q_DECL_FINAL : public QStyledItemDelegate {
 
   void SetTheme(IThemePtr new_theme);
   void SetTabWidth(unsigned tw);
+  void SetConfigManager(ConfigManager *cm) { config_manager_ = cm; }
 
   void paint(QPainter *painter, const QStyleOptionViewItem &option,
              const QModelIndex &index) const Q_DECL_FINAL;
@@ -50,6 +57,10 @@ class SpreadsheetDelegate Q_DECL_FINAL : public QStyledItemDelegate {
   void updateEditorGeometry(QWidget *editor,
                             const QStyleOptionViewItem &option,
                             const QModelIndex &index) const Q_DECL_FINAL;
+
+  bool editorEvent(QEvent *event, QAbstractItemModel *model,
+                   const QStyleOptionViewItem &option,
+                   const QModelIndex &index) Q_DECL_FINAL;
 
   bool eventFilter(QObject *object, QEvent *event) Q_DECL_FINAL;
 };

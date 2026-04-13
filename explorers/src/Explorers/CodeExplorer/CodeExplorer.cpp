@@ -32,6 +32,9 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QMimeData>
+#include <QUndoCommand>
+#include <QUndoGroup>
+#include <QUndoStack>
 
 #include <unordered_map>
 
@@ -114,6 +117,36 @@ static VariantEntity EntityForExpansion(VariantEntity entity) {
 
 using Location = std::pair<VariantEntity, CodeWidget::OpaqueLocation>;
 
+// Undoable command for expanding a macro.
+class ExpandMacroCommand : public QUndoCommand {
+ public:
+  ExpandMacroCommand(ExpandedMacrosModel *model_, Macro macro_)
+      : QUndoCommand(QObject::tr("Expand Macro")),
+        model(model_), macro(std::move(macro_)) {}
+
+  void redo(void) override { model->AddMacro(macro); }
+  void undo(void) override { model->RemoveMacro(macro); }
+
+ private:
+  ExpandedMacrosModel *model;
+  Macro macro;
+};
+
+// Undoable command for unexpanding a macro.
+class UnexpandMacroCommand : public QUndoCommand {
+ public:
+  UnexpandMacroCommand(ExpandedMacrosModel *model_, Macro macro_)
+      : QUndoCommand(QObject::tr("Unexpand Macro")),
+        model(model_), macro(std::move(macro_)) {}
+
+  void redo(void) override { model->RemoveMacro(macro); }
+  void undo(void) override { model->AddMacro(macro); }
+
+ private:
+  ExpandedMacrosModel *model;
+  Macro macro;
+};
+
 }  // namespace
 
 struct CodeExplorer::PrivateData {
@@ -136,6 +169,7 @@ struct CodeExplorer::PrivateData {
 
   ExpandedMacrosModel *macro_explorer_model{nullptr};
   MacroExplorer *macro_explorer{nullptr};
+  QUndoStack *macro_undo_stack{nullptr};
 
   bool browse_mode{false};
   QAction *browse_mode_action{nullptr};
@@ -194,6 +228,40 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
 
   // Restore expanded macros from project settings.
   d->scene_options.macros_to_expand = config_manager.LoadExpandedMacros();
+
+  d->macro_undo_stack = new QUndoStack(this);
+  config_manager.UndoGroup().addStack(d->macro_undo_stack);
+
+  // Create macro explorer eagerly (hidden) so it appears in View > Explorers
+  // and restoreState can restore its visibility.
+  d->macro_explorer_model = new ExpandedMacrosModel(d->config_manager, this);
+  d->macro_explorer = new MacroExplorer(
+      d->config_manager, d->macro_explorer_model);
+
+  connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
+          this, &CodeExplorer::ExpandMacros);
+
+  connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
+          this, [this] (const QSet<RawEntityId> &macros_to_expand) {
+            d->scene_options.macros_to_expand = macros_to_expand;
+            d->config_manager.SaveExpandedMacros(macros_to_expand);
+          });
+
+  connect(d->macro_explorer, &MacroExplorer::RequestRemoveMacro,
+          this, [this] (Macro macro) {
+    d->config_manager.UndoGroup().setActiveStack(d->macro_undo_stack);
+    d->macro_undo_stack->push(new UnexpandMacroCommand(
+        d->macro_explorer_model, std::move(macro)));
+  });
+
+  {
+    IWindowManager::DockConfig mconfig;
+    mconfig.tabify = true;
+    mconfig.start_hidden = true;
+    mconfig.id = "com.trailofbits.dock.MacroExplorer";
+    mconfig.app_menu_location = {tr("View"), tr("Explorers")};
+    parent->AddDockWidget(d->macro_explorer, mconfig);
+  }
 
   (void) action_manager.Register(
       this, "com.trailofbits.action.OpenEntityPreview",
@@ -333,6 +401,8 @@ void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
                       auto td = tok.data();
                       stream << QString::fromUtf8(
                           td.data(), static_cast<qsizetype>(td.size()));
+                      stream << static_cast<quint64>(
+                          tok.related_entity_id().Pack());
                     }
                     mime->setData(QStringLiteral(
                         "application/x-qtmultiplier-tokens"), data);
@@ -526,7 +596,7 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
     IWindowManager::DockConfig config;
     config.id = "com.trailofbits.dock.CodePreview";
     config.location = IWindowManager::DockLocation::Bottom;
-    config.app_menu_location = {tr("View")};
+    config.app_menu_location = {tr("View"), tr("Drawers")};
     d->manager->AddDockWidget(d->preview, config);
   }
 
@@ -589,30 +659,12 @@ void CodeExplorer::OnExpandMacro(const QVariant &data) {
     return;
   }
 
-  if (!d->macro_explorer) {
-    d->macro_explorer_model = new ExpandedMacrosModel(d->config_manager, this);
-    d->macro_explorer = new MacroExplorer(
-        d->config_manager, d->macro_explorer_model);
+  d->config_manager.UndoGroup().setActiveStack(d->macro_undo_stack);
+  d->macro_undo_stack->push(new ExpandMacroCommand(
+      d->macro_explorer_model, std::move(std::get<Macro>(entity))));
 
-    connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
-            this, &CodeExplorer::ExpandMacros);
-
-    // Keep our shadow model of scene options in sync with the macro explorer.
-    // The macro explorer actually does the real double-checking of things.
-    connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
-            this, [this] (const QSet<RawEntityId> &macros_to_expand) {
-              d->scene_options.macros_to_expand = macros_to_expand;
-              d->config_manager.SaveExpandedMacros(macros_to_expand);
-            });
-
-    IWindowManager::DockConfig config;
-    config.tabify = true;
-    config.id = "com.trailofbits.dock.MacroExplorer";
-    config.app_menu_location = {tr("View"), tr("Explorers")};
-    d->manager->AddDockWidget(d->macro_explorer, config);
-  }
-
-  d->macro_explorer_model->AddMacro(std::move(std::get<Macro>(entity)));
+  d->macro_explorer->show();
+  d->macro_explorer->EmitRequestAttention();
 }
 
 void CodeExplorer::OnRenameEntity(QVector<RawEntityId> entity_ids,

@@ -71,7 +71,7 @@ static constexpr qreal kCursorDisp = -0.5;
 //            `QPainter` uses this internally. It seems that
 //            `QPainter::boundingRect` can take a `QTextOption` that can be
 //            configured with tab info.
-static constexpr auto kTabWidth = 4u;
+// Tab width is now stored in PrivateData and set from ConfigManager.
 
 struct Entity {
 
@@ -540,6 +540,8 @@ struct CodeWidget::PrivateData {
   int selection_start_offset{-1};
   int selection_end_offset{-1};
 
+  unsigned tab_width{4u};
+
   bool click_was_primary{false};
   bool click_was_secondary{false};
 
@@ -841,7 +843,7 @@ void CodeWidget::PrivateData::ImportTokenNode(
 
       // TODO(pag): Configurable tab width; tab stops
       case QChar::Tabulation:
-        for (auto i = 0u; i < kTabWidth; ++i) {
+        for (auto i = 0u; i < tab_width; ++i) {
           b.AddChar(QChar::Space);
         }
         break;
@@ -1302,6 +1304,9 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
       &CodeWidget::OnToggleBrowseMode);
 
   d->browse_mode = browse_mode;
+  d->tab_width = config_manager.TabWidth();
+  connect(&config_manager, &ConfigManager::TabWidthChanged,
+          this, [this] (unsigned tw) { d->tab_width = tw; });
 
   d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
   d->vertical_scrollbar->setSingleStep(1);
@@ -3195,7 +3200,20 @@ void CodeWidget::OnSearchParametersChange(void) {
 
   d->search_result_list.erase(it, d->search_result_list.end());
 
-  d->search_widget->UpdateSearchResultCount(d->search_result_list.size());
+  // Find the result closest to (at or after) the cursor position.
+  size_t start_at = 0;
+  if (d->selection_start_offset >= 0 && !d->search_result_list.empty()) {
+    auto cursor_pos = static_cast<qsizetype>(d->selection_start_offset);
+    for (size_t idx = 0; idx < d->search_result_list.size(); ++idx) {
+      if (d->search_result_list[idx].first >= cursor_pos) {
+        start_at = idx;
+        break;
+      }
+    }
+  }
+
+  d->search_widget->UpdateSearchResultCount(
+      d->search_result_list.size(), start_at);
 }
 
 void CodeWidget::OnShowSearchResult(size_t result_index) {
@@ -3335,6 +3353,7 @@ void CodeWidget::PrivateData::CopySelectionToClipboard(void) const {
       auto tok_data = tok.data();
       stream << QString::fromUtf8(tok_data.data(),
                                   static_cast<qsizetype>(tok_data.size()));
+      stream << static_cast<quint64>(tok.related_entity_id().Pack());
     }
     mime->setData(QStringLiteral("application/x-qtmultiplier-tokens"), data);
   }

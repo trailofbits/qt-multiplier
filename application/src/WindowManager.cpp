@@ -29,6 +29,7 @@
 #include <QUrl>
 #include <QClipboard>
 #include <QAction>
+#include <QTimer>
 
 #include <unordered_map>
 #include <filesystem>
@@ -311,6 +312,10 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
       }
     }
   }
+
+  if (config.start_hidden) {
+    dock_widget->hide();
+  }
 }
 
 //! Invoked when a `dock_widget`s internal widget does `->close()`.
@@ -365,11 +370,31 @@ void WindowManager::RefreshDockStylesheet(const QColor &bg_color) {
   QColor handle_color = (luma > 128000) ? bg_color.darker(130)
                                         : bg_color.lighter(160);
 
+  // Compute contrasting text color for tabs.
+  QColor text_color = (luma > 128000) ? QColor(Qt::black) : QColor(Qt::white);
+  QColor inactive_text = text_color;
+  inactive_text.setAlpha(180);
+
   auto ss = QString(
       "ads--CDockContainerWidget ads--CDockSplitter::handle {"
       "  background: %1;"
+      "}"
+      "QTabBar::tab {"
+      "  color: %2;"
+      "}"
+      "QTabBar::tab:!selected {"
+      "  color: %3;"
       "}")
-      .arg(handle_color.name());
+      .arg(handle_color.name())
+      .arg(text_color.name())
+      .arg(inactive_text.name(QColor::HexArgb));
+
+  // Also style the main window's dock tab bars.
+  d->window->setStyleSheet(QString(
+      "QTabBar::tab { color: %1; }"
+      "QTabBar::tab:!selected { color: %2; }")
+      .arg(text_color.name())
+      .arg(inactive_text.name(QColor::HexArgb)));
 
   d->central_widget->setStyleSheet(ss);
 }

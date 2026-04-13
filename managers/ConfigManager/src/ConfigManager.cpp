@@ -10,8 +10,10 @@
 #include <multiplier/Frontend/Token.h>
 
 #include <QActionGroup>
+#include <QDateTime>
 #include <QDir>
 #include <QMenu>
+#include <QUndoGroup>
 
 #include <iostream>
 #include <QSqlDatabase>
@@ -26,6 +28,9 @@
 #include "ThemedItemDelegate.h"
 
 namespace mx::gui {
+
+quint64 ConfigManager::doc_title_version_ = 0;
+
 namespace {
 
 static constexpr unsigned kDefaultTabWidth = 4u;
@@ -73,14 +78,26 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "CREATE TABLE IF NOT EXISTS gui_sheets ("
       "  sheet_id INTEGER PRIMARY KEY AUTOINCREMENT,"
       "  name TEXT NOT NULL,"
-      "  column_order TEXT)"));  // JSON array of column indices
+      "  description TEXT,"
+      "  closed_at TEXT,"
+      "  column_order TEXT)"));
+  // Migration for existing DBs: add columns if missing.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_sheets ADD COLUMN description TEXT"));
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_sheets ADD COLUMN closed_at TEXT"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_sheet_columns ("
       "  sheet_id INTEGER NOT NULL,"
       "  col_index INTEGER NOT NULL,"
       "  name TEXT NOT NULL,"
       "  color TEXT,"
+      "  clickable INTEGER NOT NULL DEFAULT 0,"
       "  PRIMARY KEY (sheet_id, col_index))"));
+  // Migration.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_sheet_columns ADD COLUMN "
+      "clickable INTEGER NOT NULL DEFAULT 0"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_sheet_cells ("
       "  sheet_id INTEGER NOT NULL,"
@@ -94,6 +111,26 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  row_num INTEGER NOT NULL,"
       "  color TEXT NOT NULL,"
       "  PRIMARY KEY (sheet_id, row_num))"));
+
+  // Document storage table.
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_documents ("
+      "  doc_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  content TEXT NOT NULL DEFAULT '',"
+      "  title TEXT,"
+      "  description TEXT,"
+      "  created_at TEXT,"
+      "  updated_at TEXT,"
+      "  deleted INTEGER NOT NULL DEFAULT 0)"));
+  // Migration for existing DBs.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_documents ADD COLUMN description TEXT"));
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_documents ADD COLUMN created_at TEXT"));
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_documents ADD COLUMN updated_at TEXT"));
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_documents ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"));
 
   return db;
 }
@@ -133,6 +170,7 @@ class ConfigManagerImpl {
   class ActionManager action_manager;
   class FileLocationCache file_location_cache;
   class Index index;
+  QUndoGroup undo_group;
 
   unsigned tab_width{kDefaultTabWidth};
   bool use_tab_stops{true};
@@ -206,6 +244,10 @@ const class Index &ConfigManager::Index(void) const noexcept {
   return d->index;
 }
 
+QUndoGroup &ConfigManager::UndoGroup(void) const noexcept {
+  return d->undo_group;
+}
+
 void ConfigManager::SetIndex(const class Index &index,
                              const QString &db_path) noexcept {
   if (!d->db_path.isEmpty()) SaveProjectSettings();
@@ -254,16 +296,47 @@ void ConfigManager::PopulateViewMenu(QMenu *menu) {
   d->theme_manager.PopulateViewMenu(menu);
 
   menu->addSeparator();
-  auto tab_menu = new QMenu(tr("Tab Size"), menu);
-  menu->addMenu(tab_menu);
 
-  auto tab_group = new QActionGroup(tab_menu);
+  // --- Font & Tabs submenu ---
+  auto *ft_menu = new QMenu(tr("Font && Tabs"), menu);
+  menu->addMenu(ft_menu);
+
+  // Font size controls.
+  auto *increase_font = new QAction(tr("Increase Font Size"), ft_menu);
+  increase_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus));
+  ft_menu->addAction(increase_font);
+  connect(increase_font, &QAction::triggered, this, [this] () {
+    d->theme_manager.SetFontSizeDelta(d->theme_manager.FontSizeDelta() + 1);
+  });
+
+  auto *decrease_font = new QAction(tr("Decrease Font Size"), ft_menu);
+  decrease_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus));
+  ft_menu->addAction(decrease_font);
+  connect(decrease_font, &QAction::triggered, this, [this] () {
+    d->theme_manager.SetFontSizeDelta(d->theme_manager.FontSizeDelta() - 1);
+  });
+
+  auto *reset_font = new QAction(tr("Reset Font Size"), ft_menu);
+  reset_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+  ft_menu->addAction(reset_font);
+  connect(reset_font, &QAction::triggered, this, [this] () {
+    d->theme_manager.SetFontSizeDelta(0);
+  });
+
+  ft_menu->addSeparator();
+
+  // Tab size submenu.
+  auto *tab_menu = new QMenu(tr("Tab Size"), ft_menu);
+  ft_menu->addMenu(tab_menu);
+
+  auto *tab_group = new QActionGroup(tab_menu);
   tab_group->setExclusive(true);
   for (unsigned i = 1; i <= 16; ++i) {
-    auto action = new QAction(QString::number(i), tab_group);
+    auto *action = new QAction(QString::number(i), tab_group);
     action->setCheckable(true);
     action->setChecked(i == d->tab_width);
-    connect(action, &QAction::triggered, this, [this, i] () { SetTabWidth(i); });
+    connect(action, &QAction::triggered, this,
+            [this, i] () { SetTabWidth(i); });
     tab_menu->addAction(action);
   }
   connect(this, &ConfigManager::TabWidthChanged,
@@ -272,10 +345,11 @@ void ConfigManager::PopulateViewMenu(QMenu *menu) {
               a->setChecked(a->text().toUInt() == w);
           });
 
-  auto tab_stops_action = new QAction(tr("Use Tab Stops"), menu);
+  // Use Tab Stops toggle.
+  auto *tab_stops_action = new QAction(tr("Use Tab Stops"), ft_menu);
   tab_stops_action->setCheckable(true);
   tab_stops_action->setChecked(d->use_tab_stops);
-  menu->addAction(tab_stops_action);
+  ft_menu->addAction(tab_stops_action);
   connect(tab_stops_action, &QAction::toggled,
           this, &ConfigManager::SetUseTabStops);
   connect(this, &ConfigManager::UseTabStopsChanged,
@@ -356,9 +430,10 @@ void ConfigManager::LoadProjectSettings(void) {
   auto tw = GetSetting(d->project_db, QStringLiteral("tab_width"));
   if (!tw.isEmpty()) {
     unsigned val = tw.toUInt();
-    if (val >= 1 && val <= 16) {
+    if (val >= 1 && val <= 16 && val != d->tab_width) {
       d->tab_width = val;
       d->RebuildFileLocationCache();
+      emit TabWidthChanged(val);
     }
   }
 }
@@ -391,36 +466,38 @@ QByteArray ConfigManager::LoadHeaderState(const QString &id) const {
 
 void ConfigManager::SaveWindowLayout(const QByteArray &state,
                                      const QByteArray &geometry) const {
-  if (!d->global_db.isOpen()) return;
-  SetSetting(d->global_db, QStringLiteral("window_state"),
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  SetSetting(d->project_db, QStringLiteral("window_state"),
              QString::fromLatin1(state.toBase64()));
-  SetSetting(d->global_db, QStringLiteral("window_geometry"),
+  SetSetting(d->project_db, QStringLiteral("window_geometry"),
              QString::fromLatin1(geometry.toBase64()));
 }
 
 bool ConfigManager::LoadWindowLayout(QByteArray &state,
                                      QByteArray &geometry) const {
-  if (!d->global_db.isOpen()) return false;
-  auto s = GetSetting(d->global_db, QStringLiteral("window_state"));
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return false;
+  auto s = GetSetting(d->project_db, QStringLiteral("window_state"));
   if (s.isEmpty()) return false;
   state = QByteArray::fromBase64(s.toLatin1());
   geometry = QByteArray::fromBase64(
-      GetSetting(d->global_db, QStringLiteral("window_geometry")).toLatin1());
+      GetSetting(d->project_db, QStringLiteral("window_geometry")).toLatin1());
   return true;
 }
 
 // --- Expanded macros ---
 
 void ConfigManager::SaveExpandedMacros(const QSet<RawEntityId> &macros) const {
-  if (!d->project_db.isOpen()) return;
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  d->project_db.transaction();
   QSqlQuery q(d->project_db);
   q.exec(QStringLiteral("DELETE FROM gui_expanded_macros"));
   q.prepare(QStringLiteral(
       "INSERT INTO gui_expanded_macros (entity_id) VALUES (?)"));
   for (auto id : macros) {
-    q.addBindValue(qulonglong(id));
+    q.addBindValue(static_cast<qint64>(id));
     q.exec();
   }
+  d->project_db.commit();
 }
 
 QSet<RawEntityId> ConfigManager::LoadExpandedMacros(void) const {
@@ -436,17 +513,19 @@ QSet<RawEntityId> ConfigManager::LoadExpandedMacros(void) const {
 // --- Highlight colors ---
 
 void ConfigManager::SaveHighlightColors(const HighlightColorMap &colors) const {
-  if (!d->project_db.isOpen()) return;
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  d->project_db.transaction();
   QSqlQuery q(d->project_db);
   q.exec(QStringLiteral("DELETE FROM gui_highlight_colors"));
   q.prepare(QStringLiteral(
       "INSERT INTO gui_highlight_colors (entity_id, fg, bg) VALUES (?, ?, ?)"));
   for (const auto &[id, fg_bg] : colors) {
-    q.addBindValue(qulonglong(id));
+    q.addBindValue(static_cast<qint64>(id));
     q.addBindValue(fg_bg.first.name(QColor::HexArgb));
     q.addBindValue(fg_bg.second.name(QColor::HexArgb));
     q.exec();
   }
+  d->project_db.commit();
 }
 
 ConfigManager::HighlightColorMap ConfigManager::LoadHighlightColors(void) const {
@@ -477,15 +556,25 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
   if (sheet_id < 0) {
     // Insert new sheet.
     q.prepare(QStringLiteral(
-        "INSERT INTO gui_sheets (name) VALUES (?)"));
+        "INSERT INTO gui_sheets (name, description, closed_at) "
+        "VALUES (?, ?, ?)"));
     q.addBindValue(sheet.name);
+    q.addBindValue(sheet.description.isEmpty() ? QVariant()
+                                                : sheet.description);
+    q.addBindValue(sheet.closed_at.isEmpty() ? QVariant()
+                                              : sheet.closed_at);
     q.exec();
     sheet_id = q.lastInsertId().toInt();
   } else {
-    // Update existing sheet name.
+    // Update existing sheet.
     q.prepare(QStringLiteral(
-        "UPDATE gui_sheets SET name = ? WHERE sheet_id = ?"));
+        "UPDATE gui_sheets SET name = ?, description = ?, closed_at = ? "
+        "WHERE sheet_id = ?"));
     q.addBindValue(sheet.name);
+    q.addBindValue(sheet.description.isEmpty() ? QVariant()
+                                                : sheet.description);
+    q.addBindValue(sheet.closed_at.isEmpty() ? QVariant()
+                                              : sheet.closed_at);
     q.addBindValue(sheet_id);
     q.exec();
 
@@ -503,15 +592,17 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
 
   // Save columns.
   q.prepare(QStringLiteral(
-      "INSERT INTO gui_sheet_columns (sheet_id, col_index, name, color) "
-      "VALUES (?, ?, ?, ?)"));
+      "INSERT INTO gui_sheet_columns "
+      "(sheet_id, col_index, name, color, clickable) "
+      "VALUES (?, ?, ?, ?, ?)"));
   for (int i = 0; i < sheet.columns.size(); ++i) {
     q.addBindValue(sheet_id);
     q.addBindValue(i);
-    q.addBindValue(sheet.columns[i].first);
-    q.addBindValue(sheet.columns[i].second.isValid()
-                   ? sheet.columns[i].second.name(QColor::HexArgb)
+    q.addBindValue(sheet.columns[i].name);
+    q.addBindValue(sheet.columns[i].color.isValid()
+                   ? sheet.columns[i].color.name(QColor::HexArgb)
                    : QString());
+    q.addBindValue(sheet.columns[i].clickable ? 1 : 0);
     q.exec();
   }
 
@@ -547,32 +638,36 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
   return sheet_id;
 }
 
-QVector<ConfigManager::SheetData> ConfigManager::LoadAllSheets(void) const {
+QVector<ConfigManager::SheetData> ConfigManager::LoadOpenSheets(void) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
 
   QVector<SheetData> result;
 
   QSqlQuery q(d->project_db);
-  q.exec(QStringLiteral("SELECT sheet_id, name FROM gui_sheets ORDER BY sheet_id"));
+  q.exec(QStringLiteral(
+      "SELECT sheet_id, name, description FROM gui_sheets "
+      "WHERE closed_at IS NULL ORDER BY sheet_id"));
 
   while (q.next()) {
     SheetData sheet;
     sheet.sheet_id = q.value(0).toInt();
     sheet.name = q.value(1).toString();
+    sheet.description = q.value(2).toString();
 
     // Load columns.
     QSqlQuery cq(d->project_db);
     cq.prepare(QStringLiteral(
-        "SELECT col_index, name, color FROM gui_sheet_columns "
+        "SELECT col_index, name, color, clickable FROM gui_sheet_columns "
         "WHERE sheet_id = ? ORDER BY col_index"));
     cq.addBindValue(sheet.sheet_id);
     cq.exec();
     while (cq.next()) {
-      QString col_name = cq.value(1).toString();
-      QString col_color_str = cq.value(2).toString();
-      QColor col_color = col_color_str.isEmpty() ? QColor()
-                                                  : QColor(col_color_str);
-      sheet.columns.push_back({col_name, col_color});
+      SheetColumnInfo ci;
+      ci.name = cq.value(1).toString();
+      auto col_color_str = cq.value(2).toString();
+      ci.color = col_color_str.isEmpty() ? QColor() : QColor(col_color_str);
+      ci.clickable = cq.value(3).toInt() != 0;
+      sheet.columns.push_back(ci);
     }
 
     // Load cells — find max row.
@@ -644,6 +739,262 @@ void ConfigManager::DeleteSheet(int sheet_id) const {
   q.addBindValue(sheet_id);
   q.exec();
   d->project_db.commit();
+}
+
+QVector<ConfigManager::ClosedSheetInfo>
+ConfigManager::LoadClosedSheets(void) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+
+  QSqlQuery q(d->project_db);
+  q.exec(QStringLiteral(
+      "SELECT sheet_id, name, description, closed_at FROM gui_sheets "
+      "WHERE closed_at IS NOT NULL ORDER BY closed_at DESC"));
+
+  QVector<ClosedSheetInfo> result;
+  while (q.next()) {
+    ClosedSheetInfo info;
+    info.sheet_id = q.value(0).toInt();
+    info.name = q.value(1).toString();
+    info.description = q.value(2).toString();
+    info.closed_at = q.value(3).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+ConfigManager::SheetData ConfigManager::LoadSheetById(int sheet_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT sheet_id, name, description FROM gui_sheets "
+      "WHERE sheet_id = ?"));
+  q.addBindValue(sheet_id);
+  q.exec();
+  if (!q.next()) return {};
+
+  SheetData sheet;
+  sheet.sheet_id = q.value(0).toInt();
+  sheet.name = q.value(1).toString();
+  sheet.description = q.value(2).toString();
+
+  // Load columns.
+  QSqlQuery cq(d->project_db);
+  cq.prepare(QStringLiteral(
+      "SELECT col_index, name, color, clickable FROM gui_sheet_columns "
+      "WHERE sheet_id = ? ORDER BY col_index"));
+  cq.addBindValue(sheet_id);
+  cq.exec();
+  while (cq.next()) {
+    SheetColumnInfo ci;
+    ci.name = cq.value(1).toString();
+    auto col_color_str = cq.value(2).toString();
+    ci.color = col_color_str.isEmpty() ? QColor() : QColor(col_color_str);
+    ci.clickable = cq.value(3).toInt() != 0;
+    sheet.columns.push_back(ci);
+  }
+
+  // Load cells.
+  QSqlQuery rq(d->project_db);
+  rq.prepare(QStringLiteral(
+      "SELECT MAX(row_num) FROM gui_sheet_cells WHERE sheet_id = ?"));
+  rq.addBindValue(sheet_id);
+  rq.exec();
+  int max_row = -1;
+  if (rq.next()) {
+    max_row = rq.value(0).toInt();
+  }
+
+  int num_cols = static_cast<int>(sheet.columns.size());
+  sheet.cells.resize(max_row + 1);
+  for (auto &row : sheet.cells) {
+    row.resize(num_cols);
+  }
+
+  QSqlQuery cellq(d->project_db);
+  cellq.prepare(QStringLiteral(
+      "SELECT row_num, col_index, value FROM gui_sheet_cells "
+      "WHERE sheet_id = ?"));
+  cellq.addBindValue(sheet_id);
+  cellq.exec();
+  while (cellq.next()) {
+    int r = cellq.value(0).toInt();
+    int c = cellq.value(1).toInt();
+    if (r < sheet.cells.size() && c < num_cols) {
+      sheet.cells[r][c] = cellq.value(2).toString();
+    }
+  }
+
+  // Load row colors.
+  QSqlQuery rcq(d->project_db);
+  rcq.prepare(QStringLiteral(
+      "SELECT row_num, color FROM gui_sheet_row_colors WHERE sheet_id = ?"));
+  rcq.addBindValue(sheet_id);
+  rcq.exec();
+  while (rcq.next()) {
+    int row = rcq.value(0).toInt();
+    QColor color(rcq.value(1).toString());
+    if (color.isValid()) {
+      sheet.row_colors[row] = color;
+    }
+  }
+
+  // Clear the closed_at timestamp so it's now open.
+  q.prepare(QStringLiteral(
+      "UPDATE gui_sheets SET closed_at = NULL WHERE sheet_id = ?"));
+  q.addBindValue(sheet_id);
+  q.exec();
+
+  return sheet;
+}
+
+// --- Documents ---
+
+int ConfigManager::CreateDocument(const QString &content,
+                                  const QString &title) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_documents (content, title, created_at, updated_at) "
+      "VALUES (?, ?, ?, ?)"));
+  q.addBindValue(content.isNull() ? QStringLiteral("") : content);
+  q.addBindValue(title);
+  q.addBindValue(now);
+  q.addBindValue(now);
+  if (!q.exec()) return -1;
+  auto id = q.lastInsertId();
+  return id.isValid() ? id.toInt() : -1;
+}
+
+QString ConfigManager::LoadDocumentContent(int doc_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT content FROM gui_documents WHERE doc_id = ?"));
+  q.addBindValue(doc_id);
+  q.exec();
+  return q.next() ? q.value(0).toString() : QString();
+}
+
+QString ConfigManager::LoadDocumentTitle(int doc_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT title FROM gui_documents WHERE doc_id = ?"));
+  q.addBindValue(doc_id);
+  q.exec();
+  return q.next() ? q.value(0).toString() : QString();
+}
+
+void ConfigManager::SaveDocumentContent(int doc_id,
+                                        const QString &content) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_documents SET content = ?, updated_at = ? "
+      "WHERE doc_id = ?"));
+  q.addBindValue(content);
+  q.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+  q.addBindValue(doc_id);
+  q.exec();
+}
+
+void ConfigManager::SaveDocumentTitle(int doc_id,
+                                      const QString &title) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_documents SET title = ? WHERE doc_id = ?"));
+  q.addBindValue(title);
+  q.addBindValue(doc_id);
+  q.exec();
+  BumpDocumentTitleVersion();
+}
+
+QVector<ConfigManager::DocumentInfo>
+ConfigManager::LoadAllDocuments(void) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.exec(QStringLiteral(
+      "SELECT doc_id, title, description, created_at, updated_at "
+      "FROM gui_documents WHERE deleted = 0 ORDER BY doc_id"));
+  QVector<DocumentInfo> result;
+  while (q.next()) {
+    DocumentInfo info;
+    info.doc_id = q.value(0).toInt();
+    info.title = q.value(1).toString();
+    info.description = q.value(2).toString();
+    info.created_at = q.value(3).toString();
+    info.updated_at = q.value(4).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+void ConfigManager::SaveDocumentDescription(int doc_id,
+                                            const QString &desc) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_documents SET description = ? WHERE doc_id = ?"));
+  q.addBindValue(desc);
+  q.addBindValue(doc_id);
+  q.exec();
+}
+
+void ConfigManager::SoftDeleteDocument(int doc_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_documents SET deleted = 1 WHERE doc_id = ?"));
+  q.addBindValue(doc_id);
+  q.exec();
+}
+
+void ConfigManager::UndeleteDocument(int doc_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_documents SET deleted = 0 WHERE doc_id = ?"));
+  q.addBindValue(doc_id);
+  q.exec();
+}
+
+int ConfigManager::DocumentReferenceCount(int doc_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return 0;
+  // Search for cells containing this doc_id as a document reference.
+  // The JSON format is {"t":"doc","id":N,...}
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT COUNT(*) FROM gui_sheet_cells "
+      "WHERE value LIKE ?"));
+  q.addBindValue(QStringLiteral("%%\"t\":\"doc\",\"id\":%1%%").arg(doc_id));
+  q.exec();
+  return q.next() ? q.value(0).toInt() : 0;
+}
+
+void ConfigManager::SaveOpenDocumentIds(
+    const QVector<int> &doc_ids) const {
+  QString val;
+  for (int i = 0; i < doc_ids.size(); ++i) {
+    if (i > 0) val += QLatin1Char(',');
+    val += QString::number(doc_ids[i]);
+  }
+  SaveHeaderState(QStringLiteral("open_doc_ids"),
+                  val.toUtf8());
+}
+
+QVector<int> ConfigManager::LoadOpenDocumentIds(void) const {
+  auto data = LoadHeaderState(QStringLiteral("open_doc_ids"));
+  if (data.isEmpty()) return {};
+  QVector<int> result;
+  for (const auto &s : QString::fromUtf8(data).split(QLatin1Char(','))) {
+    bool ok = false;
+    int id = s.toInt(&ok);
+    if (ok && id > 0) result.push_back(id);
+  }
+  return result;
 }
 
 // --- Navigation history ---

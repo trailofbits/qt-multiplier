@@ -6,6 +6,7 @@
 
 #include "ExpandedMacrosModel.h"
 
+#include <multiplier/Frontend/DefineMacroDirective.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
 #include <multiplier/GUI/Util.h>
@@ -51,6 +52,17 @@ void ExpandedMacrosModel::OnIndexChanged(const ConfigManager &config_manager) {
   d->location.clear();
   d->file_location_cache = config_manager.FileLocationCache();
   emit endResetModel();
+
+  // Restore expanded macros from the database.
+  auto saved_macros = config_manager.LoadExpandedMacros();
+  if (!saved_macros.isEmpty()) {
+    const auto &index = config_manager.Index();
+    for (auto id : saved_macros) {
+      if (auto macro = Macro::by_id(index, mx::EntityId(id))) {
+        AddMacro(std::move(macro.value()));
+      }
+    }
+  }
 }
 
 void ExpandedMacrosModel::OnThemeChanged(const ThemeManager &theme_manager) {

@@ -28,6 +28,9 @@
         <file alias="com.trailofbits.icon.Close">Icons/close.png</file>
         <file alias="com.trailofbits.icon.SortAscending">Icons/sort_ascending.png</file>
         <file alias="com.trailofbits.icon.NewSheet">Icons/new_sheet.png</file>
+        <file alias="com.trailofbits.icon.Undo">Icons/undo.svg</file>
+        <file alias="com.trailofbits.icon.Redo">Icons/redo.svg</file>
+        <file alias="com.trailofbits.icon.NewDocument">Icons/new_document.svg</file>
     </qresource>
     <qresource>
         <file alias="com.trailofbits.font.SourceCodePro-Black">Fonts/Source_Code_Pro/static/SourceCodePro-Black.ttf</file>
