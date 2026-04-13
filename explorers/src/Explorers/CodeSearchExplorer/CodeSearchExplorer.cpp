@@ -308,6 +308,7 @@ QTableView *CodeSearchExplorer::CreateResultsTable(QWidget *parent) {
   table->setWordWrap(false);
   table->setTextElideMode(Qt::ElideRight);
   table->verticalHeader()->hide();
+  table->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
   table->horizontalHeader()->setDefaultAlignment(
       Qt::AlignLeft | Qt::AlignVCenter);
   table->horizontalHeader()->setSectionsMovable(true);
