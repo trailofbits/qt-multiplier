@@ -17,6 +17,7 @@
 #include <QSortFilterProxyModel>
 #include <QTableView>
 #include <QThreadPool>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <multiplier/GUI/Interfaces/IModel.h>
@@ -424,6 +425,14 @@ void CodeSearchExplorer::OnSearchTriggered(void) {
   auto *table = CreateResultsTable(container);
   table->setModel(sort_proxy);
   layout->addWidget(table, 1);
+
+  // Default the Match column to ~80% of the viewport width.
+  QTimer::singleShot(0, table, [table] () {
+    int vw = table->viewport()->width();
+    if (vw > 0) {
+      table->setColumnWidth(0, static_cast<int>(vw * 0.8));
+    }
+  });
 
   // Filter widget (Ctrl+F to activate, Escape to dismiss).
   auto &media_manager = d->config_manager.MediaManager();
