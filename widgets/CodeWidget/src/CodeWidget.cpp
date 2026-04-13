@@ -570,10 +570,21 @@ struct CodeWidget::PrivateData {
   Scene scene;
 
   // Semi-persistent layers of the "picture" of what is rendered.
+  // These images are viewport-sized (+ buffer), NOT full-document-sized.
   QImage background_canvas;
   QImage foreground_canvas;
   QImage highlight_canvas;
   QImage line_number_canvas;
+
+  // The range of lines currently rendered in the canvas images.
+  // rendered_y_offset is the document-space Y coordinate of the top
+  // of the rendered images.
+  int rendered_first_line{0};
+  int rendered_last_line{0};
+  int rendered_y_offset{0};
+
+  // Number of buffer lines above/below the viewport to render.
+  static constexpr int kRenderBufferLines = 50;
 
   // Sets of entities that configure what gets shown from `token_tree`.
   QSet<RawEntityId> macros_to_expand;
@@ -601,6 +612,8 @@ struct CodeWidget::PrivateData {
   void UpdateScrollbars(void);
   void RecomputeScene(void);
   void RecomputeCanvas(void);
+  void RecomputeVisibleCanvas(void);
+  bool NeedsViewportRerender(void) const;
   void RecomputeLineNumbers(void);
   void RecomputeHighlights(void);
   void RecomputeSelection(QPainter &blitter);
@@ -1574,14 +1587,21 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   }
 
   // ---------------------------------------------------------------------------
-  // Draw the code background layer. If any tokens have background colors then
-  // they are in this layer.
-  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->background_canvas);
+  // Check if we need to re-render the viewport (scrolled past buffer).
+  if (d->NeedsViewportRerender()) {
+    d->RecomputeVisibleCanvas();
+    d->RecomputeHighlights();
+  }
+
+  // The rendered images are offset from the full document by rendered_y_offset.
+  int draw_y = -(d->scroll_y - d->rendered_y_offset);
 
   // ---------------------------------------------------------------------------
-  // Draw the entity highlights. If the cursor is on an token, then all tokens
-  // with the same related entity IDs are highlighted. Here, we only actually
-  // change the background color.
+  // Draw the code background layer.
+  blitter.drawImage(-d->scroll_x, draw_y, d->background_canvas);
+
+  // ---------------------------------------------------------------------------
+  // Draw the entity highlights.
   if (d->current_entity) {
     blitter.drawImage(-d->scroll_x, -d->scroll_y, d->highlight_canvas);
   }
@@ -1594,12 +1614,12 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   }
 
   // ---------------------------------------------------------------------------
-  // Draw the line numbers.
+  // Draw the line numbers (still full-height for now).
   blitter.drawImage(-d->scroll_x, -d->scroll_y, d->line_number_canvas);
 
   // ---------------------------------------------------------------------------
   // Paint the code.
-  blitter.drawImage(-d->scroll_x, -d->scroll_y, d->foreground_canvas);
+  blitter.drawImage(-d->scroll_x, draw_y, d->foreground_canvas);
 
   // ---------------------------------------------------------------------------
   // Paint the cursor.
@@ -2583,9 +2603,8 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
         line_height, static_cast<int>(std::ceil(r.height())));
   }
 
-  // Figure out the canvas size. This is the maximum number of characters we
-  // have, plus a margin for one on the left and one on the right, to allow for
-  // italic text to "lean in" and spill over into those margins.
+  // Figure out the canvas size. This is the FULL document size, used for
+  // scrollbar calculations. The actual rendered images are viewport-sized.
   canvas_rect = QRect(
       0, 0,
       (max_char_width * static_cast<int>(scene.max_logical_columns + 2)),
@@ -2593,92 +2612,66 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 
   UpdateScrollbars();
 
-  QImage fg(static_cast<int>(canvas_rect.width() * dpi_ratio),
-            static_cast<int>(canvas_rect.height() * dpi_ratio),
-            QImage::Format_ARGB32_Premultiplied);
-
-  QImage bg(static_cast<int>(canvas_rect.width() * dpi_ratio),
-            static_cast<int>(canvas_rect.height() * dpi_ratio),
-            QImage::Format_ARGB32_Premultiplied);
-
-  fg.setDevicePixelRatio(dpi_ratio);
-  bg.setDevicePixelRatio(dpi_ratio);
-
-  // Fill the contents with transparent pixels, rather than leaving them
-  // undefined.
-  fg.fill(0);
-  bg.fill(0);
-
-  QPainter fg_painter(&fg);
-  QPainter bg_painter(&bg);
-
-  InitializePainterOptions(fg_painter);
-  InitializePainterOptions(bg_painter);
-
-  fg_painter.setFont(bold_italic_font);
-
-  monospace[0] = QChar::Space;
-  space_rect = fg_painter.boundingRect(canvas_rect, monospace, to);
-  space_width = space_rect.width();
+  // Measure space width using a temporary painter.
+  {
+    QPixmap dummy(max_char_width * 4, line_height * 4);
+    QPainter p(&dummy);
+    InitializePainterOptions(p);
+    p.setFont(bold_italic_font);
+    monospace[0] = QChar::Space;
+    space_rect = p.boundingRect(canvas_rect, monospace, to);
+    space_width = space_rect.width();
+  }
 
   RecomputeLineNumbers();  // Computes `left_margin` using `space_width`.
   right_margin = space_width;
 
   Q_ASSERT(0 < space_width);
 
-  // Start new lines indented with a single space. This helps us account for
-  // italic character writing outside of their minimum-sized bounding box.
-  qreal x = left_margin;
-  qreal y = 0;
-  int logical_column_number = 1;
-  int logical_line_number = 1;
-
   // Try to detect if the font is monospaced.
   is_monospaced =
       font_metrics_bi.maxWidth() == font_metrics.maxWidth() &&
       font_metrics_bi.horizontalAdvance(".") == font_metrics_bi.maxWidth();
 
-  for (Entity &e : scene.entities) {
-    Data &data = scene.data[e.data_index_and_config >> kFormatShift];
-    const Token &token = scene.tokens[e.token_index];
+  // Position pass: compute e.x for ALL entities (no painting).
+  // This is needed for click/selection even on off-screen entities.
+  {
+    qreal x = left_margin;
+    int logical_column_number = 1;
+    int logical_line_number = 1;
 
-    Q_ASSERT(!data.text.isEmpty());
+    for (Entity &e : scene.entities) {
+      Data &data = scene.data[e.data_index_and_config >> kFormatShift];
+      const Token &token = scene.tokens[e.token_index];
 
-    // Synchronize our logical and physical positions. This ends up accounting
-    // for whitespace.
-    while (logical_line_number < e.logical_line_number) {
-      y += line_height;
-      x = left_margin;
-      logical_line_number += 1;
-      logical_column_number = 1;
+      while (logical_line_number < e.logical_line_number) {
+        x = left_margin;
+        logical_line_number += 1;
+        logical_column_number = 1;
+      }
+
+      while (logical_column_number < e.logical_column_number) {
+        logical_column_number += 1;
+        x += space_width;
+      }
+
+      e.x = x;
+
+      // Also compute rect_config from theme.
+      ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
+      unsigned rect_config = (cs.bold ? kBoldMask : 0u) |
+                             (cs.italic ? kItalicMask : 0u);
+      e.data_index_and_config = (e.data_index_and_config & ~kFormatMask) |
+                                rect_config;
+
+      logical_column_number += static_cast<int>(data.text.size());
     }
-
-    while (logical_column_number < e.logical_column_number) {
-      logical_column_number += 1;
-      x += space_width;
-    }
-
-    // NOTE(pag): Mutate this in-place so that we always know where each
-    //            entity is. This is required for click and selection managent.
-    e.x = x;
-
-    ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
-
-    // Figure out the configuration for this entity, and update it in place.
-    unsigned rect_config = (cs.bold ? kBoldMask : 0u) |
-                           (cs.italic ? kItalicMask : 0u);
-    e.data_index_and_config |= rect_config;
-
-    PaintToken(fg_painter, bg_painter, data, rect_config, cs, x, y);
-
-    logical_column_number += static_cast<int>(data.text.size());
   }
 
-  fg_painter.end();
-  bg_painter.end();
-
-  foreground_canvas.swap(fg);
-  background_canvas.swap(bg);
+  // Force a viewport render.
+  rendered_first_line = -1;
+  rendered_last_line = -1;
+  RecomputeVisibleCanvas();
 
   // TODO(pag): `scroll_x` and `scroll_y` probably don't make sense anymore.
   if (cursor) {
@@ -2687,6 +2680,90 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   }
 
   RecomputeHighlights();
+}
+
+bool CodeWidget::PrivateData::NeedsViewportRerender(void) const {
+  if (line_height <= 0 || scene.entities.empty()) return false;
+
+  // What lines are currently visible?
+  int first_visible = scroll_y / line_height;
+  int last_visible = first_visible + (viewport.height() / line_height) + 2;
+
+  // Are we still within the rendered buffer?
+  return first_visible < rendered_first_line ||
+         last_visible > rendered_last_line;
+}
+
+void CodeWidget::PrivateData::RecomputeVisibleCanvas(void) {
+  if (line_height <= 0 || scene.entities.empty()) return;
+
+  // Determine visible line range with buffer.
+  int first_visible = scroll_y / line_height;
+  int viewport_lines = (viewport.height() / line_height) + 2;
+
+  int first_render = std::max(0, first_visible - kRenderBufferLines);
+  int last_render = std::min(scene.num_lines,
+                             first_visible + viewport_lines + kRenderBufferLines);
+
+  rendered_first_line = first_render;
+  rendered_last_line = last_render;
+  rendered_y_offset = first_render * line_height;
+
+  int render_height = (last_render - first_render) * line_height;
+  int render_width = canvas_rect.width();
+
+  // Allocate viewport-sized images.
+  QImage fg(static_cast<int>(render_width * dpi_ratio),
+            static_cast<int>(render_height * dpi_ratio),
+            QImage::Format_ARGB32_Premultiplied);
+  QImage bg(static_cast<int>(render_width * dpi_ratio),
+            static_cast<int>(render_height * dpi_ratio),
+            QImage::Format_ARGB32_Premultiplied);
+
+  fg.setDevicePixelRatio(dpi_ratio);
+  bg.setDevicePixelRatio(dpi_ratio);
+  fg.fill(0);
+  bg.fill(0);
+
+  QPainter fg_painter(&fg);
+  QPainter bg_painter(&bg);
+  InitializePainterOptions(fg_painter);
+  InitializePainterOptions(bg_painter);
+
+  // Find the first entity on the first rendered line.
+  unsigned start_entity = 0;
+  if (first_render > 0 &&
+      first_render <= static_cast<int>(scene.logical_line_index.size())) {
+    start_entity = scene.logical_line_index[
+        static_cast<size_t>(first_render - 1)];
+  }
+
+  // Paint only entities in the visible range.
+  for (unsigned ei = start_entity; ei < scene.entities.size(); ++ei) {
+    Entity &e = scene.entities[ei];
+    if (e.logical_line_number > last_render) break;
+
+    Data &data = scene.data[e.data_index_and_config >> kFormatShift];
+    const Token &token = scene.tokens[e.token_index];
+
+    if (data.text.isEmpty()) continue;
+
+    // Y position relative to the rendered region.
+    qreal y = static_cast<qreal>((e.logical_line_number - 1) * line_height)
+              - rendered_y_offset;
+    qreal x = e.x;  // Already computed in position pass.
+
+    ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
+    unsigned rect_config = e.data_index_and_config & kFormatMask;
+
+    PaintToken(fg_painter, bg_painter, data, rect_config, cs, x, y);
+  }
+
+  fg_painter.end();
+  bg_painter.end();
+
+  foreground_canvas.swap(fg);
+  background_canvas.swap(bg);
 }
 
 void CodeWidget::PrivateData::ScrollToPoint(
