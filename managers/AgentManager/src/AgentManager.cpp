@@ -10,6 +10,7 @@
 #include "AgentSession.h"
 #include "AgentTool.h"
 #include "AgentToolRegistry.h"
+#include "tools/SessionTools.h"
 
 #include "tools/SpreadsheetTools.h"
 #include "tools/TaskTools.h"
@@ -97,6 +98,10 @@ int64_t AgentManager::createSession(const QString &name,
   connect(s, &AgentSession::sessionCompleted, this,
           [this, session_id](const QString &summary) {
             emit sessionCompleted(session_id, summary);
+          });
+  connect(s, &AgentSession::sessionFinished, this,
+          [this, session_id](const SessionResult &result) {
+            emit sessionFinished(session_id, result);
           });
   connect(s, &AgentSession::sessionError, this,
           [this, session_id](const QString &error) {
@@ -244,6 +249,10 @@ int64_t AgentManager::createObserverSession(
   connect(s, &AgentSession::sessionCompleted, this,
           [this, session_id](const QString &summary) {
             emit sessionCompleted(session_id, summary);
+          });
+  connect(s, &AgentSession::sessionFinished, this,
+          [this, session_id](const SessionResult &result) {
+            emit sessionFinished(session_id, result);
           });
   connect(s, &AgentSession::sessionError, this,
           [this, session_id](const QString &error) {

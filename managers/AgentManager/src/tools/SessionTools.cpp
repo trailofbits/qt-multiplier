@@ -168,6 +168,88 @@ QJsonObject LogObservationTool::execute(const QJsonObject &args) {
 }
 
 // ===========================================================================
+// FinishTool
+// ===========================================================================
+
+SessionResult FinishTool::s_last_result;
+bool FinishTool::s_was_called = false;
+
+QString FinishTool::name(void) const {
+  return QStringLiteral("finish");
+}
+
+QString FinishTool::description(void) const {
+  return QStringLiteral(
+      "Call when you are done with your current work. Provide a summary of "
+      "what was accomplished, optional next actions, and a status.");
+}
+
+QJsonObject FinishTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("summary")] = string_prop(
+      QStringLiteral("Summary of what was accomplished"));
+
+  QJsonObject next_actions_prop;
+  next_actions_prop[QStringLiteral("type")] = QStringLiteral("array");
+  next_actions_prop[QStringLiteral("description")] =
+      QStringLiteral("Suggested follow-up actions");
+  QJsonObject items;
+  items[QStringLiteral("type")] = QStringLiteral("string");
+  next_actions_prop[QStringLiteral("items")] = items;
+  props[QStringLiteral("next_actions")] = next_actions_prop;
+
+  QJsonObject status_prop;
+  status_prop[QStringLiteral("type")] = QStringLiteral("string");
+  status_prop[QStringLiteral("description")] =
+      QStringLiteral("Status: completed, blocked, or needs_input");
+  status_prop[QStringLiteral("enum")] = QJsonArray{
+      QStringLiteral("completed"), QStringLiteral("blocked"),
+      QStringLiteral("needs_input")};
+  props[QStringLiteral("status")] = status_prop;
+
+  return make_schema(props, {QStringLiteral("summary")});
+}
+
+QJsonObject FinishTool::execute(const QJsonObject &args) {
+  QString summary = args[QStringLiteral("summary")].toString();
+  if (summary.isEmpty()) {
+    return error_result(QStringLiteral("summary is required"));
+  }
+
+  SessionResult result;
+  result.summary = summary;
+  result.status = args[QStringLiteral("status")].toString(
+      QStringLiteral("completed"));
+
+  auto actions = args[QStringLiteral("next_actions")].toArray();
+  for (const auto &a : actions) {
+    auto s = a.toString();
+    if (!s.isEmpty()) {
+      result.next_actions.append(s);
+    }
+  }
+
+  s_last_result = result;
+  s_was_called = true;
+
+  QJsonObject r;
+  r[QStringLiteral("acknowledged")] = true;
+  return r;
+}
+
+SessionResult FinishTool::lastResult(void) {
+  return s_last_result;
+}
+
+bool FinishTool::wasCalledAndReset(void) {
+  if (s_was_called) {
+    s_was_called = false;
+    return true;
+  }
+  return false;
+}
+
+// ===========================================================================
 // Registration
 // ===========================================================================
 
@@ -176,6 +258,7 @@ void registerSessionTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<GetAuditContextTool>(ctx));
   registry.registerTool(std::make_unique<SaveCheckpointTool>(ctx));
   registry.registerTool(std::make_unique<LogObservationTool>(ctx));
+  registry.registerTool(std::make_unique<FinishTool>(ctx));
 }
 
 }  // namespace mx::gui

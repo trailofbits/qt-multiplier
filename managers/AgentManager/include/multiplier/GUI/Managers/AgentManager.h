@@ -10,6 +10,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 #include <memory>
@@ -74,6 +75,8 @@ class AgentManager Q_DECL_FINAL : public QObject {
   void sessionPaused(int64_t session_id);
   void sessionResumed(int64_t session_id);
   void sessionCompleted(int64_t session_id, const QString &summary);
+  void sessionFinished(int64_t session_id,
+                       const mx::gui::SessionResult &result);
   void sessionError(int64_t session_id, const QString &error);
   void tokenUsageUpdated(int64_t session_id, int prompt_tokens,
                          int completion_tokens);

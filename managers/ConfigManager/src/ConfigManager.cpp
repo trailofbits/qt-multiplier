@@ -427,6 +427,14 @@ void ConfigManager::SetUseTabStops(bool use) {
   emit UseTabStopsChanged(use);
 }
 
+QString ConfigManager::PythonInterpreterPath(void) const {
+  return GetSetting(d->global_db, QStringLiteral("python_interpreter_path"));
+}
+
+void ConfigManager::SetPythonInterpreterPath(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("python_interpreter_path"), path);
+}
+
 // --- Global settings ---
 
 void ConfigManager::SaveSettings(void) const {

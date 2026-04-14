@@ -10,6 +10,7 @@
 #include <QJsonObject>
 #include <QMetaType>
 #include <QString>
+#include <QStringList>
 
 namespace mx::gui {
 
@@ -24,6 +25,13 @@ struct AgentMessage {
   QJsonObject tool_result;
   QDateTime timestamp;
   int token_count{0};
+};
+
+// Structured result from the finish tool.
+struct SessionResult {
+  QString summary;
+  QStringList next_actions;
+  QString status;  // "completed", "blocked", "needs_input"
 };
 
 }  // namespace mx::gui

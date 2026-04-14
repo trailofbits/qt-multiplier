@@ -12,6 +12,7 @@
 
 namespace mx::gui {
 
+struct SessionResult;
 class ConfigManager;
 class IWindowManager;
 
@@ -45,6 +46,7 @@ class AgentExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void OnTokenUsageUpdated(int64_t session_id, int prompt_tokens,
                            int completion_tokens);
   void OnSessionCompleted(int64_t session_id, const QString &summary);
+  void OnSessionFinished(int64_t session_id, const SessionResult &result);
   void OnSessionError(int64_t session_id, const QString &error);
   void OnSessionSelected(int64_t session_id);
   void OnSessionResumeRequested(int64_t session_id);

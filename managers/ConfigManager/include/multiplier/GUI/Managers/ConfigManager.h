@@ -106,6 +106,10 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   bool UseTabStops(void) const noexcept;
   void SetUseTabStops(bool use);
 
+  //! Python interpreter path for agent scripting.
+  QString PythonInterpreterPath(void) const;
+  void SetPythonInterpreterPath(const QString &path);
+
   //! Save all persistent settings to disk.
   void SaveSettings(void) const;
 

@@ -7,6 +7,7 @@
 #include "AgentSession.h"
 #include "AgentTool.h"
 #include "AgentToolRegistry.h"
+#include "tools/SessionTools.h"
 
 #include <QElapsedTimer>
 #include <QJsonArray>
@@ -221,6 +222,7 @@ void AgentSession::runLoop(void) {
     }
 
     // Process each tool call.
+    bool finish_called = false;
     for (const auto &call : response.tool_calls) {
       if (m_cancelled.loadRelaxed()) {
         m_running.storeRelaxed(0);
@@ -262,6 +264,20 @@ void AgentSession::runLoop(void) {
           QJsonDocument(result).toJson(QJsonDocument::Compact));
       addMessage(QStringLiteral("tool_result"), result_str,
                  call.name, call.id, {}, result);
+
+      // Check if the finish tool was called.
+      if (call.name == QStringLiteral("finish")) {
+        finish_called = true;
+      }
+    }
+
+    // If the finish tool was called, stop the loop and emit the result.
+    if (finish_called && FinishTool::wasCalledAndReset()) {
+      auto session_result = FinishTool::lastResult();
+      m_running.storeRelaxed(0);
+      emit sessionFinished(session_result);
+      emit sessionCompleted(session_result.summary);
+      return;
     }
 
     ++iteration;

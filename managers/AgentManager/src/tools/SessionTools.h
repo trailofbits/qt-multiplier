@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <multiplier/GUI/Managers/AgentManager.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 
 #include "AgentTool.h"
@@ -53,6 +54,24 @@ class LogObservationTool Q_DECL_FINAL : public AgentTool {
   QString description(void) const Q_DECL_FINAL;
   QJsonObject parametersSchema(void) const Q_DECL_FINAL;
   QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
+class FinishTool Q_DECL_FINAL : public AgentTool {
+  SessionToolContext *m_ctx;
+ public:
+  explicit FinishTool(SessionToolContext *ctx) : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+
+  // Access the last finish result (set after execute).
+  static SessionResult lastResult(void);
+  static bool wasCalledAndReset(void);
+
+ private:
+  static SessionResult s_last_result;
+  static bool s_was_called;
 };
 
 }  // namespace mx::gui

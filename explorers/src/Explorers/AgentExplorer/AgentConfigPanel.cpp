@@ -7,9 +7,11 @@
 #include "AgentConfigPanel.h"
 
 #include <QComboBox>
+#include <QFileDialog>
 #include <QLabel>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QLineEdit>
 #include <QMenu>
 #include <QPlainTextEdit>
@@ -72,6 +74,16 @@ Keep your task board current. Create tasks before starting work. Update status a
 - **Navigation tools**: search_entities, get_definition, get_references, list_files
 - **Python tools**: run_python (execute scripts using Multiplier Python bindings), create_script_file
 - **Session tools**: get_audit_context, save_checkpoint, log_observation
+- **Completion**: finish (call when done with current work -- provide summary and next actions)
+
+## Completing Work
+
+When you finish your current work, always call the finish tool with:
+- A summary of what you accomplished
+- Suggested next actions for follow-up
+- Status: "completed" if done, "blocked" if stuck, "needs_input" if you need human guidance
+
+This ensures your work is properly recorded and the human knows what to do next.
 
 ## Important Guidelines
 
@@ -115,6 +127,8 @@ struct AgentConfigPanel::PrivateData {
   QPushButton *load_prompt_button{nullptr};
   QSpinBox *max_iterations_spin{nullptr};
   QDoubleSpinBox *temperature_spin{nullptr};
+  QLineEdit *python_path_edit{nullptr};
+  QPushButton *python_browse_btn{nullptr};
   int prompt_doc_id{-1};  // Document ID backing the system prompt.
 
   explicit PrivateData(LLMManager &lm, ConfigManager &cm)
@@ -217,6 +231,38 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->temperature_spin->setDecimals(1);
   form->addRow(tr("Temperature:"), d->temperature_spin);
 
+  // Separator.
+  auto *sep3 = new QFrame(content);
+  sep3->setFrameShape(QFrame::HLine);
+  sep3->setFrameShadow(QFrame::Sunken);
+  form->addRow(sep3);
+
+  // Python interpreter path.
+  form->addRow(new QLabel(tr("Python"), content));
+
+  auto *python_row = new QWidget(content);
+  auto *python_layout = new QHBoxLayout(python_row);
+  python_layout->setContentsMargins(0, 0, 0, 0);
+  python_layout->setSpacing(4);
+
+  d->python_path_edit = new QLineEdit(python_row);
+  d->python_path_edit->setPlaceholderText(tr("System default"));
+  d->python_path_edit->setText(d->config_manager.PythonInterpreterPath());
+  python_layout->addWidget(d->python_path_edit, 1);
+
+  d->python_browse_btn = new QPushButton(tr("Browse..."), python_row);
+  python_layout->addWidget(d->python_browse_btn);
+
+  form->addRow(tr("Interpreter:"), python_row);
+
+  auto *python_hint = new QLabel(
+      tr("Path to Python with multiplier bindings installed"), content);
+  auto hint_font = python_hint->font();
+  hint_font.setPointSize(hint_font.pointSize() - 1);
+  python_hint->setFont(hint_font);
+  python_hint->setWordWrap(true);
+  form->addRow(QString(), python_hint);
+
   scroll->setWidget(content);
   outer_layout->addWidget(scroll);
 
@@ -231,6 +277,11 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
           this, &AgentConfigPanel::onModelChanged);
   connect(d->load_prompt_button, &QPushButton::clicked,
           this, &AgentConfigPanel::onLoadPromptClicked);
+  connect(d->python_browse_btn, &QPushButton::clicked,
+          this, &AgentConfigPanel::onBrowsePythonClicked);
+  connect(d->python_path_edit, &QLineEdit::editingFinished, this, [this] {
+    d->config_manager.SetPythonInterpreterPath(d->python_path_edit->text());
+  });
 
   // Save prompt edits back to the backing document.
   connect(d->system_prompt_edit, &QPlainTextEdit::textChanged, this, [this] {
@@ -332,6 +383,16 @@ void AgentConfigPanel::onLoadPromptClicked(void) {
   }
   menu->popup(d->load_prompt_button->mapToGlobal(
       d->load_prompt_button->rect().bottomLeft()));
+}
+
+void AgentConfigPanel::onBrowsePythonClicked(void) {
+  auto path = QFileDialog::getOpenFileName(
+      this, tr("Select Python Interpreter"), QStringLiteral("/usr"),
+      tr("Executables (*)"));
+  if (!path.isEmpty()) {
+    d->python_path_edit->setText(path);
+    d->config_manager.SetPythonInterpreterPath(path);
+  }
 }
 
 void AgentConfigPanel::populateModels(const QString &backend_type) {

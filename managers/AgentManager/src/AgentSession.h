@@ -48,6 +48,7 @@ class AgentSession Q_DECL_FINAL : public QObject {
   void sessionPaused(void);
   void sessionResumed(void);
   void sessionCompleted(const QString &summary);
+  void sessionFinished(const mx::gui::SessionResult &result);
   void sessionError(const QString &error);
   void tokenUsageUpdated(int prompt_tokens, int completion_tokens);
 

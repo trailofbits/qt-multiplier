@@ -243,6 +243,8 @@ void AgentExplorer::ConnectSignals(void) {
           this, &AgentExplorer::OnTokenUsageUpdated);
   connect(d->agent_manager, &AgentManager::sessionCompleted,
           this, &AgentExplorer::OnSessionCompleted);
+  connect(d->agent_manager, &AgentManager::sessionFinished,
+          this, &AgentExplorer::OnSessionFinished);
   connect(d->agent_manager, &AgentManager::sessionError,
           this, &AgentExplorer::OnSessionError);
   connect(d->agent_manager, &AgentManager::toolCallStarted,
@@ -402,6 +404,54 @@ void AgentExplorer::OnSessionCompleted(int64_t session_id,
 
   d->config_manager.UpdateAgentSessionStatus(
       session_id, QStringLiteral("completed"));
+  d->session_list->refresh();
+}
+
+void AgentExplorer::OnSessionFinished(int64_t session_id,
+                                       const SessionResult &result) {
+  if (session_id != d->current_session_id) {
+    return;
+  }
+
+  // Show summary as a system message.
+  AgentMessage summary_msg;
+  summary_msg.role = QStringLiteral("system");
+
+  if (result.status == QStringLiteral("blocked")) {
+    summary_msg.content =
+        tr("Blocked: %1").arg(result.summary);
+  } else if (result.status == QStringLiteral("needs_input")) {
+    summary_msg.content =
+        tr("Needs input: %1").arg(result.summary);
+  } else {
+    summary_msg.content =
+        tr("Completed: %1").arg(result.summary);
+  }
+  d->conversation->addMessage(summary_msg);
+
+  // Show next actions as clickable suggestion buttons.
+  if (!result.next_actions.isEmpty()) {
+    AgentMessage actions_msg;
+    actions_msg.role = QStringLiteral("system");
+    actions_msg.content = tr("Suggested next actions:");
+    d->conversation->addMessage(actions_msg);
+
+    for (const auto &action : result.next_actions) {
+      auto *btn = new QPushButton(action, d->conversation);
+      btn->setStyleSheet(
+          QStringLiteral("QPushButton { text-align: left; padding: 6px 12px; "
+                         "border: 1px solid palette(mid); border-radius: 4px; }"
+                         "QPushButton:hover { background: palette(midlight); }"));
+      btn->setCursor(Qt::PointingHandCursor);
+      connect(btn, &QPushButton::clicked, this,
+              [this, action] { OnSendMessage(action); });
+      d->conversation->layout()->addWidget(btn);
+    }
+  }
+
+  d->config_manager.UpdateAgentSessionStatus(
+      session_id, result.status.isEmpty() ? QStringLiteral("completed")
+                                          : result.status);
   d->session_list->refresh();
 }
 
