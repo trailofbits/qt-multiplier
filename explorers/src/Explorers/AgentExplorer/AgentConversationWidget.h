@@ -1,0 +1,52 @@
+// Copyright (c) 2024-present, Trail of Bits, Inc.
+// All rights reserved.
+//
+// This source code is licensed in accordance with the terms specified in
+// the LICENSE file found in the root directory of this source tree.
+
+#pragma once
+
+#include <QJsonObject>
+#include <QWidget>
+
+#include <memory>
+
+namespace mx::gui {
+
+struct AgentMessage;
+class ThemeManager;
+
+class AgentConversationWidget Q_DECL_FINAL : public QWidget {
+  Q_OBJECT
+
+  struct PrivateData;
+  std::unique_ptr<PrivateData> d;
+
+ public:
+  virtual ~AgentConversationWidget(void);
+
+  explicit AgentConversationWidget(ThemeManager &theme_manager,
+                                   QWidget *parent = nullptr);
+
+ signals:
+  void sendMessageRequested(const QString &text);
+
+ public slots:
+  void addMessage(const AgentMessage &msg);
+  void updateTokens(int prompt_tokens, int completion_tokens);
+  void clear(void);
+
+ private slots:
+  void onSendClicked(void);
+  void onThemeChanged(const ThemeManager &tm);
+
+ private:
+  void addMessageBubble(const QString &role, const QString &content,
+                        const QString &tool_name = {},
+                        const QJsonObject &tool_args = {},
+                        const QJsonObject &tool_result = {});
+  void scrollToBottom(void);
+  void applyThemeColors(void);
+};
+
+}  // namespace mx::gui

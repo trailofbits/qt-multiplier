@@ -11,6 +11,11 @@
 #include "AgentTool.h"
 #include "AgentToolRegistry.h"
 
+#include "tools/SpreadsheetTools.h"
+#include "tools/DocumentTools.h"
+#include "tools/NavigationTools.h"
+#include "tools/SessionTools.h"
+
 #include <unordered_map>
 
 namespace mx::gui {
@@ -141,6 +146,25 @@ void AgentManager::setMaxIterations(int max) {
 
 void AgentManager::setLLMConfig(const LLMConfig &config) {
   d->llm_config = config;
+}
+
+void AgentManager::registerBuiltinTools(ConfigManager &config_manager) {
+  // Allocate persistent contexts owned by this manager.
+  auto *ss_ctx = new SpreadsheetToolContext;
+  ss_ctx->config = &config_manager;
+  registerSpreadsheetTools(d->tool_registry, ss_ctx);
+
+  auto *doc_ctx = new DocumentToolContext;
+  doc_ctx->config = &config_manager;
+  registerDocumentTools(d->tool_registry, doc_ctx);
+
+  auto *nav_ctx = new NavigationToolContext;
+  nav_ctx->config = &config_manager;
+  registerNavigationTools(d->tool_registry, nav_ctx);
+
+  auto *sess_ctx = new SessionToolContext;
+  sess_ctx->config = &config_manager;
+  registerSessionTools(d->tool_registry, sess_ctx);
 }
 
 void AgentManager::registerTool(std::unique_ptr<AgentTool> tool) {

@@ -28,18 +28,29 @@ class AgentExplorer Q_DECL_FINAL : public IMainWindowPlugin {
                          IWindowManager *parent = nullptr);
 
  private:
-  void CreateDockWidget(IWindowManager *manager);
+  void CreateDockWidgets(IWindowManager *manager);
+  void ConnectSignals(void);
+  void RegisterTools(void);
+  void LoadSession(int64_t session_id);
 
  private slots:
-  void OnSendMessage(void);
+  void OnSendMessage(const QString &text);
   void OnNewSession(void);
   void OnPauseResume(void);
   void OnStop(void);
-  void OnMessageAdded(int64_t session_id, const class AgentMessage &msg);
+  void OnMessageAdded(int64_t session_id, const struct AgentMessage &msg);
   void OnTokenUsageUpdated(int64_t session_id, int prompt_tokens,
                            int completion_tokens);
   void OnSessionCompleted(int64_t session_id, const QString &summary);
   void OnSessionError(int64_t session_id, const QString &error);
+  void OnSessionSelected(int64_t session_id);
+  void OnSessionResumeRequested(int64_t session_id);
+  void OnSessionDeleteRequested(int64_t session_id);
+  void OnConfigChanged(void);
+  void OnToolCallStarted(int64_t session_id, const QString &name,
+                         const QJsonObject &args);
+  void OnToolCallCompleted(int64_t session_id, const QString &name,
+                           const QJsonObject &result, int duration_ms);
 };
 
 }  // namespace mx::gui

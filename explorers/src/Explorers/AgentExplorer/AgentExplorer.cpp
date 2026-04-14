@@ -9,10 +9,9 @@
 #include <QAction>
 #include <QDateTime>
 #include <QHBoxLayout>
+#include <QJsonObject>
 #include <QLabel>
-#include <QLineEdit>
 #include <QPushButton>
-#include <QTextEdit>
 #include <QToolBar>
 #include <QVBoxLayout>
 
@@ -26,6 +25,11 @@
 #include <multiplier/GUI/Managers/LLMManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 
+#include "AgentConversationWidget.h"
+#include "AgentConfigPanel.h"
+#include "AgentToolLogWidget.h"
+#include "AgentSessionListWidget.h"
+
 namespace mx::gui {
 
 struct AgentExplorer::PrivateData {
@@ -35,17 +39,24 @@ struct AgentExplorer::PrivateData {
   LLMManager *llm_manager{nullptr};
   AgentManager *agent_manager{nullptr};
 
-  IWindowWidget *dock{nullptr};
-  QTextEdit *conversation_display{nullptr};
-  QLineEdit *input_line{nullptr};
-  QPushButton *send_button{nullptr};
-  QLabel *token_label{nullptr};
-  QAction *pause_resume_action{nullptr};
-  QAction *stop_action{nullptr};
+  // Dock widgets.
+  IWindowWidget *main_dock{nullptr};
+  IWindowWidget *config_dock{nullptr};
+  IWindowWidget *tool_log_dock{nullptr};
+  IWindowWidget *session_list_dock{nullptr};
+
+  // Child widgets.
+  AgentConversationWidget *conversation{nullptr};
+  AgentConfigPanel *config_panel{nullptr};
+  AgentToolLogWidget *tool_log{nullptr};
+  AgentSessionListWidget *session_list{nullptr};
+
+  // Toolbar buttons.
+  QPushButton *new_session_btn{nullptr};
+  QPushButton *pause_btn{nullptr};
+  QPushButton *stop_btn{nullptr};
 
   int64_t current_session_id{-1};
-  int total_prompt_tokens{0};
-  int total_completion_tokens{0};
   bool paused{false};
 
   inline PrivateData(ConfigManager &config_manager_, IWindowManager *manager_)
@@ -65,7 +76,142 @@ AgentExplorer::AgentExplorer(ConfigManager &config_manager,
   d->llm_manager->loadConfig();
   d->agent_manager = new AgentManager(*d->llm_manager, this);
 
-  // Connect AgentManager signals.
+  // Register all built-in tools.
+  RegisterTools();
+
+  // Build UI.
+  CreateDockWidgets(parent);
+
+  // Wire signals.
+  ConnectSignals();
+}
+
+void AgentExplorer::RegisterTools(void) {
+  d->agent_manager->registerBuiltinTools(d->config_manager);
+}
+
+void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
+  auto &theme_manager = d->config_manager.ThemeManager();
+
+  // Main dock: conversation.
+  d->main_dock = new IWindowWidget;
+  d->main_dock->setWindowTitle(tr("Agent"));
+  d->main_dock->setContentsMargins(0, 0, 0, 0);
+
+  auto *main_layout = new QVBoxLayout(d->main_dock);
+  main_layout->setContentsMargins(4, 4, 4, 4);
+  main_layout->setSpacing(4);
+
+  // Toolbar.
+  auto *toolbar_layout = new QHBoxLayout;
+  toolbar_layout->setContentsMargins(0, 0, 0, 0);
+
+  d->new_session_btn = new QPushButton(tr("New Session"), d->main_dock);
+  toolbar_layout->addWidget(d->new_session_btn);
+
+  d->pause_btn = new QPushButton(tr("Pause"), d->main_dock);
+  toolbar_layout->addWidget(d->pause_btn);
+
+  d->stop_btn = new QPushButton(tr("Stop"), d->main_dock);
+  toolbar_layout->addWidget(d->stop_btn);
+
+  toolbar_layout->addStretch();
+  main_layout->addLayout(toolbar_layout);
+
+  // Conversation widget.
+  d->conversation = new AgentConversationWidget(theme_manager, d->main_dock);
+  main_layout->addWidget(d->conversation, 1);
+
+  {
+    IWindowManager::DockConfig config;
+    config.id = "com.trailofbits.dock.AgentExplorer";
+    config.location = IWindowManager::DockLocation::Bottom;
+    config.tabify = true;
+    config.start_hidden = true;
+    config.app_menu_location = {tr("View"), tr("Explorers")};
+    manager->AddDockWidget(d->main_dock, config);
+  }
+
+  // Right dock: config panel.
+  d->config_dock = new IWindowWidget;
+  d->config_dock->setWindowTitle(tr("Agent Config"));
+  d->config_dock->setContentsMargins(0, 0, 0, 0);
+
+  auto *config_layout = new QVBoxLayout(d->config_dock);
+  config_layout->setContentsMargins(0, 0, 0, 0);
+
+  d->config_panel = new AgentConfigPanel(
+      *d->llm_manager, d->config_manager, d->config_dock);
+  config_layout->addWidget(d->config_panel);
+
+  {
+    IWindowManager::DockConfig config;
+    config.id = "com.trailofbits.dock.AgentConfig";
+    config.location = IWindowManager::DockLocation::Right;
+    config.tabify = true;
+    config.start_hidden = true;
+    config.app_menu_location = {tr("View"), tr("Explorers")};
+    manager->AddDockWidget(d->config_dock, config);
+  }
+
+  // Bottom dock: tool log.
+  d->tool_log_dock = new IWindowWidget;
+  d->tool_log_dock->setWindowTitle(tr("Agent Tool Log"));
+  d->tool_log_dock->setContentsMargins(0, 0, 0, 0);
+
+  auto *tool_layout = new QVBoxLayout(d->tool_log_dock);
+  tool_layout->setContentsMargins(0, 0, 0, 0);
+
+  d->tool_log = new AgentToolLogWidget(d->tool_log_dock);
+  tool_layout->addWidget(d->tool_log);
+
+  {
+    IWindowManager::DockConfig config;
+    config.id = "com.trailofbits.dock.AgentToolLog";
+    config.location = IWindowManager::DockLocation::Bottom;
+    config.tabify = true;
+    config.start_hidden = true;
+    config.app_menu_location = {tr("View"), tr("Explorers")};
+    manager->AddDockWidget(d->tool_log_dock, config);
+  }
+
+  // Left dock: session list.
+  d->session_list_dock = new IWindowWidget;
+  d->session_list_dock->setWindowTitle(tr("Agent Sessions"));
+  d->session_list_dock->setContentsMargins(0, 0, 0, 0);
+
+  auto *session_layout = new QVBoxLayout(d->session_list_dock);
+  session_layout->setContentsMargins(0, 0, 0, 0);
+
+  d->session_list = new AgentSessionListWidget(
+      d->config_manager, d->session_list_dock);
+  session_layout->addWidget(d->session_list);
+
+  {
+    IWindowManager::DockConfig config;
+    config.id = "com.trailofbits.dock.AgentSessions";
+    config.location = IWindowManager::DockLocation::Left;
+    config.tabify = true;
+    config.start_hidden = true;
+    config.app_menu_location = {tr("View"), tr("Explorers")};
+    manager->AddDockWidget(d->session_list_dock, config);
+  }
+}
+
+void AgentExplorer::ConnectSignals(void) {
+  // Toolbar.
+  connect(d->new_session_btn, &QPushButton::clicked,
+          this, &AgentExplorer::OnNewSession);
+  connect(d->pause_btn, &QPushButton::clicked,
+          this, &AgentExplorer::OnPauseResume);
+  connect(d->stop_btn, &QPushButton::clicked,
+          this, &AgentExplorer::OnStop);
+
+  // Conversation send.
+  connect(d->conversation, &AgentConversationWidget::sendMessageRequested,
+          this, &AgentExplorer::OnSendMessage);
+
+  // AgentManager signals.
   connect(d->agent_manager, &AgentManager::messageAdded,
           this, &AgentExplorer::OnMessageAdded);
   connect(d->agent_manager, &AgentManager::tokenUsageUpdated,
@@ -74,79 +220,22 @@ AgentExplorer::AgentExplorer(ConfigManager &config_manager,
           this, &AgentExplorer::OnSessionCompleted);
   connect(d->agent_manager, &AgentManager::sessionError,
           this, &AgentExplorer::OnSessionError);
+  connect(d->agent_manager, &AgentManager::toolCallStarted,
+          this, &AgentExplorer::OnToolCallStarted);
+  connect(d->agent_manager, &AgentManager::toolCallCompleted,
+          this, &AgentExplorer::OnToolCallCompleted);
 
-  CreateDockWidget(parent);
-}
+  // Session list.
+  connect(d->session_list, &AgentSessionListWidget::sessionSelected,
+          this, &AgentExplorer::OnSessionSelected);
+  connect(d->session_list, &AgentSessionListWidget::sessionResumeRequested,
+          this, &AgentExplorer::OnSessionResumeRequested);
+  connect(d->session_list, &AgentSessionListWidget::sessionDeleteRequested,
+          this, &AgentExplorer::OnSessionDeleteRequested);
 
-void AgentExplorer::CreateDockWidget(IWindowManager *manager) {
-  d->dock = new IWindowWidget;
-  d->dock->setWindowTitle(tr("Agent"));
-  d->dock->setContentsMargins(0, 0, 0, 0);
-
-  auto *layout = new QVBoxLayout(d->dock);
-  layout->setContentsMargins(4, 4, 4, 4);
-
-  // Toolbar row.
-  auto *toolbar_layout = new QHBoxLayout;
-  toolbar_layout->setContentsMargins(0, 0, 0, 0);
-
-  auto *new_session_btn = new QPushButton(tr("New Session"), d->dock);
-  connect(new_session_btn, &QPushButton::clicked,
-          this, &AgentExplorer::OnNewSession);
-  toolbar_layout->addWidget(new_session_btn);
-
-  auto *pause_btn = new QPushButton(tr("Pause"), d->dock);
-  connect(pause_btn, &QPushButton::clicked,
-          this, &AgentExplorer::OnPauseResume);
-  toolbar_layout->addWidget(pause_btn);
-  // Store for toggling text.
-  d->pause_resume_action = new QAction(this);
-  d->pause_resume_action->setData(QVariant::fromValue(pause_btn));
-
-  auto *stop_btn = new QPushButton(tr("Stop"), d->dock);
-  connect(stop_btn, &QPushButton::clicked,
-          this, &AgentExplorer::OnStop);
-  toolbar_layout->addWidget(stop_btn);
-
-  toolbar_layout->addStretch();
-
-  d->token_label = new QLabel(tr("Tokens: 0 / 0"), d->dock);
-  toolbar_layout->addWidget(d->token_label);
-
-  layout->addLayout(toolbar_layout);
-
-  // Conversation display.
-  d->conversation_display = new QTextEdit(d->dock);
-  d->conversation_display->setReadOnly(true);
-  d->conversation_display->setAcceptRichText(true);
-  layout->addWidget(d->conversation_display, 1);
-
-  // Input row.
-  auto *input_layout = new QHBoxLayout;
-  input_layout->setContentsMargins(0, 0, 0, 0);
-
-  d->input_line = new QLineEdit(d->dock);
-  d->input_line->setPlaceholderText(tr("Type a message..."));
-  connect(d->input_line, &QLineEdit::returnPressed,
-          this, &AgentExplorer::OnSendMessage);
-  input_layout->addWidget(d->input_line, 1);
-
-  d->send_button = new QPushButton(tr("Send"), d->dock);
-  connect(d->send_button, &QPushButton::clicked,
-          this, &AgentExplorer::OnSendMessage);
-  input_layout->addWidget(d->send_button);
-
-  layout->addLayout(input_layout);
-
-  d->dock->setLayout(layout);
-
-  IWindowManager::DockConfig config;
-  config.id = "com.trailofbits.dock.AgentExplorer";
-  config.location = IWindowManager::DockLocation::Bottom;
-  config.tabify = true;
-  config.start_hidden = true;
-  config.app_menu_location = {tr("View"), tr("Explorers")};
-  manager->AddDockWidget(d->dock, config);
+  // Config changes.
+  connect(d->config_panel, &AgentConfigPanel::configChanged,
+          this, &AgentExplorer::OnConfigChanged);
 }
 
 void AgentExplorer::OnNewSession(void) {
@@ -155,51 +244,49 @@ void AgentExplorer::OnNewSession(void) {
     d->agent_manager->cancelSession(d->current_session_id);
   }
 
-  d->conversation_display->clear();
-  d->total_prompt_tokens = 0;
-  d->total_completion_tokens = 0;
-  d->token_label->setText(tr("Tokens: 0 / 0"));
+  d->conversation->clear();
+  d->tool_log->clear();
   d->paused = false;
+  d->pause_btn->setText(tr("Pause"));
 
-  // Create a new agent session with the active backend.
+  // Apply current config.
+  OnConfigChanged();
+
+  auto system_prompt = d->config_panel->systemPrompt();
   auto backend_name = d->llm_manager->activeBackendName();
   d->current_session_id = d->agent_manager->createSession(
-      tr("Session"), QString(), backend_name);
+      tr("Session"), system_prompt, backend_name);
 
   if (d->current_session_id >= 0) {
-    // Persist to DB.
     auto *backend = d->llm_manager->activeBackend();
     QString model_name = backend ? backend->name() : QString();
     d->config_manager.CreateAgentSession(
-        tr("Session"), QString(), backend_name, model_name);
-
-    d->conversation_display->append(
-        QStringLiteral("<i>New session started.</i>"));
-  } else {
-    d->conversation_display->append(
-        QStringLiteral("<b style=\"color:red\">Failed to create session. "
-                       "Check LLM backend configuration.</b>"));
+        tr("Session"), system_prompt, backend_name, model_name);
+    d->session_list->refresh();
   }
 }
 
-void AgentExplorer::OnSendMessage(void) {
-  auto text = d->input_line->text().trimmed();
-  if (text.isEmpty()) return;
+void AgentExplorer::OnSendMessage(const QString &text) {
+  if (text.isEmpty()) {
+    return;
+  }
 
   // Auto-create session if needed.
   if (d->current_session_id < 0) {
     OnNewSession();
-    if (d->current_session_id < 0) return;
+    if (d->current_session_id < 0) {
+      return;
+    }
   }
 
-  d->input_line->clear();
+  // Show user message in conversation.
+  AgentMessage user_msg;
+  user_msg.role = QStringLiteral("user");
+  user_msg.content = text;
+  user_msg.timestamp = QDateTime::currentDateTime();
+  d->conversation->addMessage(user_msg);
 
-  // Show user message.
-  d->conversation_display->append(
-      QStringLiteral("<p><b>You:</b> %1</p>")
-          .arg(text.toHtmlEscaped()));
-
-  // Persist user message.
+  // Persist.
   d->config_manager.SaveAgentMessage(
       d->current_session_id, QStringLiteral("user"), text);
 
@@ -208,97 +295,165 @@ void AgentExplorer::OnSendMessage(void) {
 }
 
 void AgentExplorer::OnPauseResume(void) {
-  if (d->current_session_id < 0) return;
+  if (d->current_session_id < 0) {
+    return;
+  }
 
   if (d->paused) {
     d->agent_manager->resumeSession(d->current_session_id);
     d->paused = false;
-    // Update button text.
-    auto btn = d->pause_resume_action->data().value<QPushButton *>();
-    if (btn) btn->setText(tr("Pause"));
-    d->conversation_display->append(
-        QStringLiteral("<i>Session resumed.</i>"));
+    d->pause_btn->setText(tr("Pause"));
   } else {
     d->agent_manager->pauseSession(d->current_session_id);
     d->paused = true;
-    auto btn = d->pause_resume_action->data().value<QPushButton *>();
-    if (btn) btn->setText(tr("Resume"));
-    d->conversation_display->append(
-        QStringLiteral("<i>Session paused.</i>"));
+    d->pause_btn->setText(tr("Resume"));
   }
 }
 
 void AgentExplorer::OnStop(void) {
-  if (d->current_session_id < 0) return;
+  if (d->current_session_id < 0) {
+    return;
+  }
   d->agent_manager->cancelSession(d->current_session_id);
   d->config_manager.UpdateAgentSessionStatus(
       d->current_session_id, QStringLiteral("cancelled"));
-  d->conversation_display->append(
-      QStringLiteral("<i>Session stopped.</i>"));
   d->current_session_id = -1;
   d->paused = false;
-  auto btn = d->pause_resume_action->data().value<QPushButton *>();
-  if (btn) btn->setText(tr("Pause"));
+  d->pause_btn->setText(tr("Pause"));
+  d->session_list->refresh();
 }
 
 void AgentExplorer::OnMessageAdded(int64_t session_id,
-                                   const AgentMessage &msg) {
-  if (session_id != d->current_session_id) return;
+                                    const AgentMessage &msg) {
+  if (session_id != d->current_session_id) {
+    return;
+  }
 
+  d->conversation->addMessage(msg);
+
+  // Persist assistant messages.
   if (msg.role == QStringLiteral("assistant")) {
-    d->conversation_display->append(
-        QStringLiteral("<p><b>Assistant:</b> %1</p>")
-            .arg(msg.content.toHtmlEscaped()));
-
-    // Persist.
     d->config_manager.SaveAgentMessage(
         session_id, msg.role, msg.content,
         msg.tool_name, msg.tool_call_id, {}, {},
         msg.token_count);
-
-  } else if (msg.role == QStringLiteral("tool_call")) {
-    d->conversation_display->append(
-        QStringLiteral("<p style=\"color:gray\"><i>Tool call: %1</i></p>")
-            .arg(msg.tool_name.toHtmlEscaped()));
-
-  } else if (msg.role == QStringLiteral("tool_result")) {
-    d->conversation_display->append(
-        QStringLiteral("<p style=\"color:gray\"><i>Tool result: %1</i></p>")
-            .arg(msg.content.left(200).toHtmlEscaped()));
   }
 }
 
 void AgentExplorer::OnTokenUsageUpdated(int64_t session_id,
-                                        int prompt_tokens,
-                                        int completion_tokens) {
-  if (session_id != d->current_session_id) return;
-  d->total_prompt_tokens += prompt_tokens;
-  d->total_completion_tokens += completion_tokens;
-  d->token_label->setText(
-      tr("Tokens: %1 / %2")
-          .arg(d->total_prompt_tokens)
-          .arg(d->total_completion_tokens));
-
+                                         int prompt_tokens,
+                                         int completion_tokens) {
+  if (session_id != d->current_session_id) {
+    return;
+  }
+  d->conversation->updateTokens(prompt_tokens, completion_tokens);
   d->config_manager.UpdateAgentSessionTokens(
       session_id, prompt_tokens, completion_tokens);
 }
 
 void AgentExplorer::OnSessionCompleted(int64_t session_id,
-                                       const QString &summary) {
-  if (session_id != d->current_session_id) return;
-  d->conversation_display->append(
-      QStringLiteral("<p><b style=\"color:green\">Session completed.</b> %1</p>")
-          .arg(summary.toHtmlEscaped()));
+                                        const QString &summary) {
+  if (session_id != d->current_session_id) {
+    return;
+  }
+
+  AgentMessage msg;
+  msg.role = QStringLiteral("system");
+  msg.content = tr("Session completed. %1").arg(summary);
+  d->conversation->addMessage(msg);
+
   d->config_manager.UpdateAgentSessionStatus(
       session_id, QStringLiteral("completed"));
+  d->session_list->refresh();
 }
 
 void AgentExplorer::OnSessionError(int64_t session_id,
-                                   const QString &error) {
-  if (session_id != d->current_session_id) return;
-  d->conversation_display->append(
-      QStringLiteral("<p><b style=\"color:red\">Error:</b> %1</p>")
-          .arg(error.toHtmlEscaped()));
+                                    const QString &error) {
+  if (session_id != d->current_session_id) {
+    return;
+  }
+
+  AgentMessage msg;
+  msg.role = QStringLiteral("system");
+  msg.content = tr("Error: %1").arg(error);
+  d->conversation->addMessage(msg);
+}
+
+void AgentExplorer::OnSessionSelected(int64_t session_id) {
+  LoadSession(session_id);
+}
+
+void AgentExplorer::OnSessionResumeRequested(int64_t session_id) {
+  d->agent_manager->resumeSession(session_id);
+  d->config_manager.UpdateAgentSessionStatus(
+      session_id, QStringLiteral("active"));
+  d->session_list->refresh();
+}
+
+void AgentExplorer::OnSessionDeleteRequested(int64_t session_id) {
+  if (session_id == d->current_session_id) {
+    d->agent_manager->cancelSession(session_id);
+    d->current_session_id = -1;
+    d->conversation->clear();
+    d->tool_log->clear();
+  }
+  d->config_manager.DeleteAgentSession(session_id);
+  d->session_list->refresh();
+}
+
+void AgentExplorer::OnConfigChanged(void) {
+  LLMConfig config;
+  config.temperature = d->config_panel->temperature();
+  config.model = d->llm_manager->backendConfig(
+      d->llm_manager->activeBackendName(), QStringLiteral("model"));
+  d->agent_manager->setLLMConfig(config);
+  d->agent_manager->setMaxIterations(d->config_panel->maxIterations());
+}
+
+void AgentExplorer::OnToolCallStarted(int64_t session_id, const QString &name,
+                                       const QJsonObject &args) {
+  if (session_id != d->current_session_id) {
+    return;
+  }
+  d->tool_log->onToolCallStarted(session_id, name, args);
+
+  // Also add to conversation as a collapsible tool_call message.
+  AgentMessage msg;
+  msg.session_id = session_id;
+  msg.role = QStringLiteral("tool_call");
+  msg.tool_name = name;
+  msg.tool_args = args;
+  d->conversation->addMessage(msg);
+}
+
+void AgentExplorer::OnToolCallCompleted(int64_t session_id,
+                                         const QString &name,
+                                         const QJsonObject &result,
+                                         int duration_ms) {
+  if (session_id != d->current_session_id) {
+    return;
+  }
+  d->tool_log->onToolCallCompleted(session_id, name, result, duration_ms);
+}
+
+void AgentExplorer::LoadSession(int64_t session_id) {
+  d->current_session_id = session_id;
+  d->conversation->clear();
+  d->tool_log->clear();
+
+  // Load persisted messages.
+  auto messages = d->config_manager.LoadAgentMessages(session_id);
+  for (const auto &info : messages) {
+    AgentMessage msg;
+    msg.message_id = info.message_id;
+    msg.session_id = info.session_id;
+    msg.role = info.role;
+    msg.content = info.content;
+    msg.tool_name = info.tool_name;
+    msg.tool_call_id = info.tool_call_id;
+    msg.token_count = info.token_count;
+    d->conversation->addMessage(msg);
+  }
 }
 
 }  // namespace mx::gui

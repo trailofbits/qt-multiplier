@@ -44,6 +44,9 @@ class AgentManager Q_DECL_FINAL : public QObject {
   void setMaxIterations(int max);
   void setLLMConfig(const LLMConfig &config);
 
+  // Register all built-in tools (spreadsheet, document, navigation, session).
+  void registerBuiltinTools(class ConfigManager &config_manager);
+
   // Tool registry access (for explorers to register tools).
   void registerTool(std::unique_ptr<AgentTool> tool);
 
