@@ -21,6 +21,9 @@ add_library("mx_agent_manager"
   src/tools/SpreadsheetTools.h
   src/tools/SpreadsheetTools.cpp
 
+  src/tools/TaskTools.h
+  src/tools/TaskTools.cpp
+
   src/tools/DocumentTools.h
   src/tools/DocumentTools.cpp
 

@@ -147,6 +147,7 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     int sheet_id{-1};
     QString name;
     QString description;
+    QString role;       // "general", "task_list", "findings", etc.
     QString closed_at;  // ISO 8601 timestamp; empty = open.
     QVector<SheetColumnInfo> columns;
     QVector<QVector<QString>> cells;          // cells[row][col] = JSON value

@@ -12,6 +12,7 @@
 #include "AgentToolRegistry.h"
 
 #include "tools/SpreadsheetTools.h"
+#include "tools/TaskTools.h"
 #include "tools/DocumentTools.h"
 #include "tools/NavigationTools.h"
 #include "tools/SessionTools.h"
@@ -172,6 +173,10 @@ void AgentManager::registerBuiltinTools(ConfigManager &config_manager) {
   auto *ss_ctx = new SpreadsheetToolContext;
   ss_ctx->config = &config_manager;
   registerSpreadsheetTools(d->tool_registry, ss_ctx);
+
+  auto *task_ctx = new TaskToolContext;
+  task_ctx->config = &config_manager;
+  registerTaskTools(d->tool_registry, task_ctx);
 
   auto *doc_ctx = new DocumentToolContext;
   doc_ctx->config = &config_manager;

@@ -87,6 +87,8 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
   q.exec(QStringLiteral(
       "ALTER TABLE gui_sheets ADD COLUMN closed_at TEXT"));
   q.exec(QStringLiteral(
+      "ALTER TABLE gui_sheets ADD COLUMN role TEXT DEFAULT 'general'"));
+  q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_sheet_columns ("
       "  sheet_id INTEGER NOT NULL,"
       "  col_index INTEGER NOT NULL,"
@@ -604,11 +606,13 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
   if (sheet_id < 0) {
     // Insert new sheet.
     q.prepare(QStringLiteral(
-        "INSERT INTO gui_sheets (name, description, closed_at) "
-        "VALUES (?, ?, ?)"));
+        "INSERT INTO gui_sheets (name, description, role, closed_at) "
+        "VALUES (?, ?, ?, ?)"));
     q.addBindValue(sheet.name);
     q.addBindValue(sheet.description.isEmpty() ? QVariant()
                                                 : sheet.description);
+    q.addBindValue(sheet.role.isEmpty() ? QStringLiteral("general")
+                                        : sheet.role);
     q.addBindValue(sheet.closed_at.isEmpty() ? QVariant()
                                               : sheet.closed_at);
     q.exec();
@@ -616,11 +620,13 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
   } else {
     // Update existing sheet.
     q.prepare(QStringLiteral(
-        "UPDATE gui_sheets SET name = ?, description = ?, closed_at = ? "
-        "WHERE sheet_id = ?"));
+        "UPDATE gui_sheets SET name = ?, description = ?, role = ?, "
+        "closed_at = ? WHERE sheet_id = ?"));
     q.addBindValue(sheet.name);
     q.addBindValue(sheet.description.isEmpty() ? QVariant()
                                                 : sheet.description);
+    q.addBindValue(sheet.role.isEmpty() ? QStringLiteral("general")
+                                        : sheet.role);
     q.addBindValue(sheet.closed_at.isEmpty() ? QVariant()
                                               : sheet.closed_at);
     q.addBindValue(sheet_id);
@@ -694,7 +700,7 @@ QVector<ConfigManager::SheetData> ConfigManager::LoadOpenSheets(void) const {
 
   QSqlQuery q(d->project_db);
   q.exec(QStringLiteral(
-      "SELECT sheet_id, name, description FROM gui_sheets "
+      "SELECT sheet_id, name, description, role FROM gui_sheets "
       "WHERE closed_at IS NULL ORDER BY sheet_id"));
 
   while (q.next()) {
@@ -702,6 +708,7 @@ QVector<ConfigManager::SheetData> ConfigManager::LoadOpenSheets(void) const {
     sheet.sheet_id = q.value(0).toInt();
     sheet.name = q.value(1).toString();
     sheet.description = q.value(2).toString();
+    sheet.role = q.value(3).toString();
 
     // Load columns.
     QSqlQuery cq(d->project_db);
@@ -817,7 +824,7 @@ ConfigManager::SheetData ConfigManager::LoadSheetById(int sheet_id) const {
 
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
-      "SELECT sheet_id, name, description FROM gui_sheets "
+      "SELECT sheet_id, name, description, role FROM gui_sheets "
       "WHERE sheet_id = ?"));
   q.addBindValue(sheet_id);
   q.exec();
@@ -827,6 +834,7 @@ ConfigManager::SheetData ConfigManager::LoadSheetById(int sheet_id) const {
   sheet.sheet_id = q.value(0).toInt();
   sheet.name = q.value(1).toString();
   sheet.description = q.value(2).toString();
+  sheet.role = q.value(3).toString();
 
   // Load columns.
   QSqlQuery cq(d->project_db);
