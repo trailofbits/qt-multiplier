@@ -20,7 +20,13 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 # The bundled libraries (Qt, ICU, multiplier) live in /usr/local/lib
 # inside the package. Tell dpkg-shlibdeps to look there so it doesn't
 # flag them as unresolved, while still detecting true system deps.
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS "${BUNDLE_DIR}/lib")
+# Include Python site-packages subdirectories for the multiplier Python
+# bindings (multiplier.cpython-*.so).
+file(GLOB _python_site_packages "${BUNDLE_DIR}/lib/python*/site-packages")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS
+    "${BUNDLE_DIR}/lib"
+    ${_python_site_packages}
+)
 
 # =============================================================================
 # Install the entire bundle into /usr/local
