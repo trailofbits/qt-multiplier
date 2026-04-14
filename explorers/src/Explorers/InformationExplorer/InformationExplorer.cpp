@@ -54,7 +54,14 @@ struct InformationExplorer::PrivateData {
             "com.trailofbits.action.OpenEntity")) {}
 };
 
-InformationExplorer::~InformationExplorer(void) {}
+InformationExplorer::~InformationExplorer(void) {
+  // Save the widget's history now while ConfigManager is alive.
+  // The widget may outlive this plugin (owned by QDockWidget), so
+  // we must save before ConfigManager is destroyed.
+  if (d->view) {
+    d->view->SaveHistory();
+  }
+}
 
 InformationExplorer::InformationExplorer(ConfigManager &config_manager,
                                          IWindowManager *parent)

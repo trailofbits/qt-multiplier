@@ -190,30 +190,23 @@ void ThemeManager::PopulateViewMenu(QMenu *menu) {
 
   populate_theme_menu(*this);
   connect(this, &ThemeManager::ThemeListChanged, this, populate_theme_menu);
+  connect(this, &ThemeManager::ThemeChanged, this, populate_theme_menu);
 
-  // --- Font size controls ---
-  menu->addSeparator();
+}
 
-  auto increase_font = new QAction(tr("Increase Font Size"), menu);
-  increase_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus));
-  menu->addAction(increase_font);
-  connect(increase_font, &QAction::triggered, this, [this]() {
-    EnsureFontSizeProxy(this, d.get())->Increment();
-  });
+int ThemeManager::FontSizeDelta(void) const {
+  if (d->font_size_proxy) {
+    return d->font_size_proxy->Delta();
+  }
+  return 0;
+}
 
-  auto decrease_font = new QAction(tr("Decrease Font Size"), menu);
-  decrease_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus));
-  menu->addAction(decrease_font);
-  connect(decrease_font, &QAction::triggered, this, [this]() {
-    EnsureFontSizeProxy(this, d.get())->Decrement();
-  });
-
-  auto reset_font = new QAction(tr("Reset Font Size"), menu);
-  reset_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
-  menu->addAction(reset_font);
-  connect(reset_font, &QAction::triggered, this, [this]() {
-    EnsureFontSizeProxy(this, d.get())->Reset();
-  });
+void ThemeManager::SetFontSizeDelta(int delta) {
+  if (delta != 0) {
+    EnsureFontSizeProxy(this, d.get())->SetDelta(delta);
+  } else if (d->font_size_proxy) {
+    d->font_size_proxy->Reset();
+  }
 }
 
 }  // namespace mx::gui

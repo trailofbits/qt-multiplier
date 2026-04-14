@@ -26,11 +26,19 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QDataStream>
+#include <QIODevice>
 #include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
+#include <QMimeData>
+#include <QUndoCommand>
+#include <QUndoGroup>
+#include <QUndoStack>
 
 #include <unordered_map>
+
+Q_DECLARE_METATYPE(mx::TokenRange)
 
 namespace mx::gui {
 namespace {
@@ -109,6 +117,36 @@ static VariantEntity EntityForExpansion(VariantEntity entity) {
 
 using Location = std::pair<VariantEntity, CodeWidget::OpaqueLocation>;
 
+// Undoable command for expanding a macro.
+class ExpandMacroCommand : public QUndoCommand {
+ public:
+  ExpandMacroCommand(ExpandedMacrosModel *model_, Macro macro_)
+      : QUndoCommand(QObject::tr("Expand Macro")),
+        model(model_), macro(std::move(macro_)) {}
+
+  void redo(void) override { model->AddMacro(macro); }
+  void undo(void) override { model->RemoveMacro(macro); }
+
+ private:
+  ExpandedMacrosModel *model;
+  Macro macro;
+};
+
+// Undoable command for unexpanding a macro.
+class UnexpandMacroCommand : public QUndoCommand {
+ public:
+  UnexpandMacroCommand(ExpandedMacrosModel *model_, Macro macro_)
+      : QUndoCommand(QObject::tr("Unexpand Macro")),
+        model(model_), macro(std::move(macro_)) {}
+
+  void redo(void) override { model->RemoveMacro(macro); }
+  void undo(void) override { model->AddMacro(macro); }
+
+ private:
+  ExpandedMacrosModel *model;
+  Macro macro;
+};
+
 }  // namespace
 
 struct CodeExplorer::PrivateData {
@@ -131,6 +169,7 @@ struct CodeExplorer::PrivateData {
 
   ExpandedMacrosModel *macro_explorer_model{nullptr};
   MacroExplorer *macro_explorer{nullptr};
+  QUndoStack *macro_undo_stack{nullptr};
 
   bool browse_mode{false};
   QAction *browse_mode_action{nullptr};
@@ -162,7 +201,51 @@ struct CodeExplorer::PrivateData {
   }
 };
 
-CodeExplorer::~CodeExplorer(void) {}
+CodeExplorer::~CodeExplorer(void) {
+  // Save preview history while ConfigManager is alive.
+  if (d->preview) {
+    d->preview->SaveHistory();
+  }
+
+  d->history->SaveToProject(
+      QStringLiteral("CodeExplorer"),
+      [] (const QVariant &item) -> RawEntityId {
+        if (!item.canConvert<Location>()) return kInvalidEntityId;
+        return EntityId(item.value<Location>().first).Pack();
+      });
+
+  // Save open entity IDs with cursor info.
+  // The restore order determines tab order, so save in a
+  // deterministic order (sorted by entity ID).
+  std::vector<std::pair<RawEntityId, CodeWidget *>> sorted_windows;
+  for (const auto &[id, pair] : d->opened_windows) {
+    if (pair.second) {
+      sorted_windows.emplace_back(id, pair.second);
+    }
+  }
+  std::sort(sorted_windows.begin(), sorted_windows.end(),
+            [](const auto &a, const auto &b) { return a.first < b.first; });
+
+  QString ids;
+  RawEntityId active_id = kInvalidEntityId;
+  for (const auto &[id, widget] : sorted_windows) {
+    if (!ids.isEmpty()) ids += QLatin1Char(';');
+    auto loc = widget->LastLocation();
+    ids += QString::number(static_cast<qint64>(id))
+           + QLatin1Char(':')
+           + QString::number(loc.scroll_y.relative)
+           + QLatin1Char(':')
+           + QString::number(loc.cursor_index);
+    if (widget->isVisible()) {
+      active_id = id;
+    }
+  }
+  d->config_manager.SaveHeaderState(
+      QStringLiteral("code_explorer_open_files"), ids.toUtf8());
+  d->config_manager.SaveHeaderState(
+      QStringLiteral("code_explorer_active_file"),
+      QByteArray::number(static_cast<qint64>(active_id)));
+}
 
 CodeExplorer::CodeExplorer(ConfigManager &config_manager,
                            IWindowManager *parent)
@@ -179,6 +262,43 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
   d->expand_macro_trigger = action_manager.Register(
       this, "com.trailofbits.action.ExpandMacro",
       &CodeExplorer::OnExpandMacro);
+
+  // Restore expanded macros from project settings.
+  d->scene_options.macros_to_expand = config_manager.LoadExpandedMacros();
+
+  d->macro_undo_stack = new QUndoStack(this);
+  config_manager.UndoGroup().addStack(d->macro_undo_stack);
+
+  // Create macro explorer eagerly (hidden) so it appears in View > Explorers
+  // and restoreState can restore its visibility.
+  d->macro_explorer_model = new ExpandedMacrosModel(d->config_manager, this);
+  d->macro_explorer = new MacroExplorer(
+      d->config_manager, d->macro_explorer_model);
+
+  connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
+          this, &CodeExplorer::ExpandMacros);
+
+  connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
+          this, [this] (const QSet<RawEntityId> &macros_to_expand) {
+            d->scene_options.macros_to_expand = macros_to_expand;
+            d->config_manager.SaveExpandedMacros(macros_to_expand);
+          });
+
+  connect(d->macro_explorer, &MacroExplorer::RequestRemoveMacro,
+          this, [this] (Macro macro) {
+    d->config_manager.UndoGroup().setActiveStack(d->macro_undo_stack);
+    d->macro_undo_stack->push(new UnexpandMacroCommand(
+        d->macro_explorer_model, std::move(macro)));
+  });
+
+  {
+    IWindowManager::DockConfig mconfig;
+    mconfig.tabify = true;
+    mconfig.start_hidden = true;
+    mconfig.id = "com.trailofbits.dock.MacroExplorer";
+    mconfig.app_menu_location = {tr("View"), tr("Explorers")};
+    parent->AddDockWidget(d->macro_explorer, mconfig);
+  }
 
   (void) action_manager.Register(
       this, "com.trailofbits.action.OpenEntityPreview",
@@ -202,12 +322,98 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
       media_manager.Pixmap("com.trailofbits.icon.BrowseMode"),
       tr("Browse Mode"), d->browse_mode_trigger);
 
-  d->browse_mode_action->setChecked(true);
+  d->browse_mode_action->setChecked(false);
 
   // When the user navigates the history, make sure that we change what the
   // view shows.
   connect(d->history, &HistoryWidget::GoToHistoricalItem,
           this, &CodeExplorer::OnGoToHistoricalItem);
+
+  // Restore navigation history when a database is loaded.
+  connect(&config_manager, &ConfigManager::IndexChanged,
+          this, [this] (const ConfigManager &cm) {
+    auto entries = cm.LoadNavigationHistory(QStringLiteral("CodeExplorer"));
+    const auto &index = cm.Index();
+    for (const auto &entry : entries) {
+      VariantEntity entity = index.entity(EntityId(entry.entity_id));
+      if (std::holds_alternative<NotAnEntity>(entity)) continue;
+
+      CodeWidget::OpaqueLocation loc;
+      d->history->SetCurrentItem(
+          QVariant::fromValue(Location(entity, loc)),
+          entry.label.isEmpty() ? std::nullopt
+                                : std::optional<QString>(entry.label));
+      d->history->CommitCurrentItemToHistory();
+    }
+
+    RestoreOpenFiles(cm);
+  });
+
+  // Also load for the initial index (SetIndex fires before constructor).
+  RestoreOpenFiles(config_manager);
+}
+
+void CodeExplorer::RestoreOpenFiles(const ConfigManager &cm) {
+  const auto &index = cm.Index();
+  auto saved = cm.LoadHeaderState(
+      QStringLiteral("code_explorer_open_files"));
+  if (saved.isEmpty()) return;
+
+  // Format: "eid:scrollYRel:cursorIdx;eid:scrollYRel:cursorIdx;..."
+  struct PendingRestore {
+    RawEntityId eid;
+    int scroll_y_relative;
+    int cursor_index;
+  };
+  QVector<PendingRestore> pending;
+
+  for (const auto &entry : QString::fromUtf8(saved)
+           .split(QLatin1Char(';'), Qt::SkipEmptyParts)) {
+    auto parts = entry.split(QLatin1Char(':'));
+    if (parts.isEmpty()) continue;
+
+    bool ok = false;
+    auto eid = static_cast<RawEntityId>(parts[0].toLongLong(&ok));
+    if (!ok || eid == kInvalidEntityId) continue;
+
+    PendingRestore pr;
+    pr.eid = eid;
+    pr.scroll_y_relative = (parts.size() > 1) ? parts[1].toInt() : -1;
+    pr.cursor_index = (parts.size() > 2) ? parts[2].toInt() : -1;
+    pending.push_back(pr);
+  }
+
+  for (const auto &pr : pending) {
+    VariantEntity entity = index.entity(EntityId(pr.eid));
+    if (std::holds_alternative<NotAnEntity>(entity)) continue;
+
+    OnOpenEntity(QVariant::fromValue(entity));
+
+    // Try to restore cursor position.
+    auto it = d->opened_windows.find(pr.eid);
+    if (it != d->opened_windows.end() && it->second.second) {
+      CodeWidget::OpaqueLocation loc;
+      loc.scroll_y.relative = pr.scroll_y_relative;
+      loc.cursor_index = pr.cursor_index;
+      loc.entity = entity;
+      it->second.second->TryGoToLocation(loc, false);
+    }
+  }
+
+  // Restore the active tab.
+  auto active_data = cm.LoadHeaderState(
+      QStringLiteral("code_explorer_active_file"));
+  if (!active_data.isEmpty()) {
+    bool ok = false;
+    auto active_eid = static_cast<RawEntityId>(
+        QString::fromUtf8(active_data).toLongLong(&ok));
+    if (ok && active_eid != kInvalidEntityId) {
+      auto it = d->opened_windows.find(active_eid);
+      if (it != d->opened_windows.end() && it->second.second) {
+        it->second.second->EmitRequestAttention();
+      }
+    }
+  }
 }
 
 void CodeExplorer::OnToggleBrowseMode(const QVariant &data) {
@@ -277,11 +483,38 @@ void CodeExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
     
     auto sel_text = index.data(CodeWidget::SelectedTextRole).toString();
     if (!sel_text.isEmpty()) {
+      auto sel_tokens = index.data(CodeWidget::SelectedTokensRole);
       auto copy_selection = new QAction(tr("Copy"), menu);
       menu->addAction(copy_selection);
       connect(copy_selection, &QAction::triggered,
-              [sel_text = std::move(sel_text)] (void) {
-                qApp->clipboard()->setText(sel_text);
+              [sel_text, sel_tokens] (void) {
+                auto *mime = new QMimeData;
+                mime->setText(sel_text);
+
+                // Add token data for rich paste into spreadsheets.
+                if (sel_tokens.isValid() && sel_tokens.canConvert<TokenRange>()) {
+                  auto range = sel_tokens.value<TokenRange>();
+                  if (!range.empty()) {
+                    QByteArray data;
+                    QDataStream stream(&data, QIODevice::WriteOnly);
+                    auto count = static_cast<quint32>(range.size());
+                    stream << count;
+                    for (Token tok : range) {
+                      stream << static_cast<quint64>(tok.id().Pack());
+                      stream << static_cast<quint32>(tok.kind());
+                      stream << static_cast<quint32>(tok.category());
+                      auto td = tok.data();
+                      stream << QString::fromUtf8(
+                          td.data(), static_cast<qsizetype>(td.size()));
+                      stream << static_cast<quint64>(
+                          tok.related_entity_id().Pack());
+                    }
+                    mime->setData(QStringLiteral(
+                        "application/x-qtmultiplier-tokens"), data);
+                  }
+                }
+
+                qApp->clipboard()->setMimeData(mime);
               });
     }
   }
@@ -468,7 +701,7 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
     IWindowManager::DockConfig config;
     config.id = "com.trailofbits.dock.CodePreview";
     config.location = IWindowManager::DockLocation::Bottom;
-    config.app_menu_location = {tr("View")};
+    config.app_menu_location = {tr("View"), tr("Drawers")};
     d->manager->AddDockWidget(d->preview, config);
   }
 
@@ -531,29 +764,12 @@ void CodeExplorer::OnExpandMacro(const QVariant &data) {
     return;
   }
 
-  if (!d->macro_explorer) {
-    d->macro_explorer_model = new ExpandedMacrosModel(d->config_manager, this);
-    d->macro_explorer = new MacroExplorer(
-        d->config_manager, d->macro_explorer_model);
+  d->config_manager.UndoGroup().setActiveStack(d->macro_undo_stack);
+  d->macro_undo_stack->push(new ExpandMacroCommand(
+      d->macro_explorer_model, std::move(std::get<Macro>(entity))));
 
-    connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
-            this, &CodeExplorer::ExpandMacros);
-
-    // Keep our shadow model of scene options in sync with the macro explorer.
-    // The macro explorer actually does the real double-checking of things.
-    connect(d->macro_explorer_model, &ExpandedMacrosModel::ExpandMacros,
-            this, [this] (const QSet<RawEntityId> &macros_to_expand) {
-              d->scene_options.macros_to_expand = macros_to_expand;
-            });
-
-    IWindowManager::DockConfig config;
-    config.tabify = true;
-    config.id = "com.trailofbits.dock.MacroExplorer";
-    config.app_menu_location = {tr("View"), tr("Explorers")};
-    d->manager->AddDockWidget(d->macro_explorer, config);
-  }
-
-  d->macro_explorer_model->AddMacro(std::move(std::get<Macro>(entity)));
+  d->macro_explorer->show();
+  d->macro_explorer->EmitRequestAttention();
 }
 
 void CodeExplorer::OnRenameEntity(QVector<RawEntityId> entity_ids,

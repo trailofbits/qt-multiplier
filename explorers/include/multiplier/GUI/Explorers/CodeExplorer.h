@@ -39,6 +39,7 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
 
  private:
   void OpenEntity(const VariantEntity &entity, bool add_to_history);
+  void RestoreOpenFiles(const ConfigManager &cm);
 
  private slots:
   void OnImplicitPreviewEntity(const QVariant &data);

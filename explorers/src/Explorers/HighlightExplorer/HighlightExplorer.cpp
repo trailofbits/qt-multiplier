@@ -25,6 +25,9 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPoint>
+#include <QUndoCommand>
+#include <QUndoGroup>
+#include <QUndoStack>
 #include <QVBoxLayout>
 
 #include <vector>
@@ -67,6 +70,7 @@ struct HighlightExplorer::PrivateData {
   QListView *view{nullptr};
   IWindowManager *manager{nullptr};
   HighlightExplorerWindowWidget *dock{nullptr};
+  QUndoStack *undo_stack{nullptr};
 
   bool color_update_scheduled{false};
   TriggerHandle toggle_highlight_color_trigger;
@@ -78,6 +82,87 @@ struct HighlightExplorer::PrivateData {
         theme_manager(config_manager.ThemeManager()),
         open_entity_trigger(config_manager.ActionManager().Find(
             "com.trailofbits.action.OpenEntity")) {}
+};
+
+// Undoable command for highlight color changes. Handles set, remove,
+// and change-color as a single atomic operation.
+//
+// old_color = nullopt means "was not highlighted".
+// new_color = nullopt means "set random color" or "remove" (per removing flag).
+class HighlightColorCommand : public QUndoCommand {
+ public:
+  // Set or change: new_color is the color to apply (nullopt = random).
+  // old_color is the previous color (nullopt = wasn't highlighted).
+  static HighlightColorCommand *Set(
+      HighlightExplorer *explorer,
+      HighlightExplorer::EntityInformation info,
+      std::optional<QColor> old_color,
+      std::optional<QColor> new_color) {
+    auto *cmd = new HighlightColorCommand(explorer, std::move(info));
+    cmd->old_color = std::move(old_color);
+    cmd->new_color = std::move(new_color);
+    cmd->removing = false;
+    cmd->setText(old_color.has_value()
+        ? QObject::tr("Change Highlight")
+        : QObject::tr("Set Highlight"));
+    return cmd;
+  }
+
+  // Remove: old_color is the color being removed.
+  static HighlightColorCommand *Remove(
+      HighlightExplorer *explorer,
+      HighlightExplorer::EntityInformation info,
+      QColor old_color) {
+    auto *cmd = new HighlightColorCommand(explorer, std::move(info));
+    cmd->old_color = std::move(old_color);
+    cmd->removing = true;
+    cmd->setText(QObject::tr("Remove Highlight"));
+    return cmd;
+  }
+
+  void redo(void) override {
+    if (removing) {
+      if (explorer->IsEntityHighlighted(info)) {
+        explorer->RemoveEntityHighlight(info);
+      }
+    } else {
+      if (explorer->IsEntityHighlighted(info)) {
+        explorer->RemoveEntityHighlight(info);
+      }
+      explorer->SetEntityHighlight(info, new_color);
+      // Capture the assigned color on first redo so subsequent
+      // undo/redo cycles are deterministic.
+      if (!new_color.has_value() && explorer->d->proxy) {
+        auto it = explorer->d->proxy->color_map.find(
+            info.id_list.front());
+        if (it != explorer->d->proxy->color_map.end()) {
+          new_color = it->second.second;
+        }
+      }
+    }
+    explorer->EmitColorUpdate();
+  }
+
+  void undo(void) override {
+    if (explorer->IsEntityHighlighted(info)) {
+      explorer->RemoveEntityHighlight(info);
+    }
+    if (old_color.has_value()) {
+      explorer->SetEntityHighlight(info, old_color.value());
+    }
+    explorer->EmitColorUpdate();
+  }
+
+ private:
+  HighlightColorCommand(HighlightExplorer *explorer_,
+                        HighlightExplorer::EntityInformation info_)
+      : explorer(explorer_), info(std::move(info_)) {}
+
+  HighlightExplorer *explorer;
+  HighlightExplorer::EntityInformation info;
+  std::optional<QColor> old_color;
+  std::optional<QColor> new_color;
+  bool removing{false};
 };
 
 HighlightExplorer::~HighlightExplorer(void) {}
@@ -101,6 +186,15 @@ HighlightExplorer::HighlightExplorer(ConfigManager &config_manager,
   d->toggle_highlight_color_trigger = action_manager.Register(
       this, "com.trailofbits.action.ToggleHighlightColor",
       &HighlightExplorer::OnToggleHighlightColorAction);
+
+  d->undo_stack = new QUndoStack(this);
+  config_manager.UndoGroup().addStack(d->undo_stack);
+
+  CreateDockWidget();
+
+  // Load any saved highlights. IndexChanged has already fired before
+  // this constructor runs, so we must load explicitly.
+  OnIndexChanged(config_manager);
 }
 
 void HighlightExplorer::CreateDockWidget(void) {
@@ -142,6 +236,7 @@ void HighlightExplorer::CreateDockWidget(void) {
 
   IWindowManager::DockConfig config;
   config.tabify = true;
+  config.start_hidden = true;
   config.id = "com.trailofbits.dock.HighlightExplorer";
   config.app_menu_location = {tr("View"), tr("Explorers")};
   d->manager->AddDockWidget(d->dock, config);
@@ -160,50 +255,56 @@ void HighlightExplorer::ActOnContextMenu(
   auto highlight_menu = new QMenu(tr("Highlights"), menu);
   menu->addMenu(highlight_menu);
 
+  // Helper: get the current highlight color for an entity (nullopt if not highlighted).
+  auto get_current_color = [this] (const EntityInformation &info)
+      -> std::optional<QColor> {
+    if (IsEntityHighlighted(info) && d->proxy) {
+      auto it = d->proxy->color_map.find(info.id_list.front());
+      if (it != d->proxy->color_map.end()) {
+        return it->second.second;
+      }
+    }
+    return std::nullopt;
+  };
+
+  // Helper: push a set/change highlight through the undo stack.
+  auto push_set = [this, get_current_color] (
+      const EntityInformation &info, std::optional<QColor> new_color) {
+    d->config_manager.UndoGroup().setActiveStack(d->undo_stack);
+    d->undo_stack->push(HighlightColorCommand::Set(
+        this, info, get_current_color(info), new_color));
+  };
+
+  // Helper: push a remove highlight through the undo stack.
+  auto push_remove = [this, get_current_color] (
+      const EntityInformation &info) {
+    auto old = get_current_color(info);
+    if (!old.has_value()) return;
+    d->config_manager.UndoGroup().setActiveStack(d->undo_stack);
+    d->undo_stack->push(HighlightColorCommand::Remove(
+        this, info, old.value()));
+  };
+
   auto set_entity_highlight = new QAction(tr("Set Color"), highlight_menu);
   highlight_menu->addAction(set_entity_highlight);
-  connect(
-    set_entity_highlight,
-    &QAction::triggered,
-    this,
-    [=, this]() {
+  connect(set_entity_highlight, &QAction::triggered, this,
+    [=]() {
       QColor color = QColorDialog::getColor();
-      if (!color.isValid()) {
-        return;
-      }
-
-      if (IsEntityHighlighted(entity_information)) {
-        RemoveEntityHighlight(entity_information);
-      }
-
-      SetEntityHighlight(entity_information, color);
-      EmitColorUpdate();
-    }
-  );
+      if (!color.isValid()) return;
+      push_set(entity_information, color);
+    });
 
   auto set_rand_entity_highlight = new QAction(tr("Set Random Color"), highlight_menu);
   highlight_menu->addAction(set_rand_entity_highlight);
-  connect(
-    set_rand_entity_highlight,
-    &QAction::triggered,
-    this,
-    [=, this]() {
-      if (IsEntityHighlighted(entity_information)) {
-        RemoveEntityHighlight(entity_information);
-      }
-
-      SetEntityHighlight(entity_information);
-      EmitColorUpdate();
-    }
-  );
+  connect(set_rand_entity_highlight, &QAction::triggered, this,
+    [=]() {
+      push_set(entity_information, std::nullopt);
+    });
 
   bool menu_separator_added{false};
   const auto L_addMenuSeparator = [&menu_separator_added,
                                    &highlight_menu]() {
-    if (menu_separator_added) {
-      return;
-    }
-
+    if (menu_separator_added) return;
     menu_separator_added = true;
     highlight_menu->addSeparator();
   };
@@ -213,15 +314,10 @@ void HighlightExplorer::ActOnContextMenu(
 
     auto remove_entity_highlight = new QAction(tr("Remove"), highlight_menu);
     highlight_menu->addAction(remove_entity_highlight);
-    connect(
-      remove_entity_highlight,
-      &QAction::triggered,
-      this,
-      [=, this]() {
-        RemoveEntityHighlight(entity_information);
-        EmitColorUpdate();
-      }
-    );
+    connect(remove_entity_highlight, &QAction::triggered, this,
+      [=]() {
+        push_remove(entity_information);
+      });
   }
 
   if (d->proxy && !d->proxy->color_map.empty()) {
@@ -256,9 +352,35 @@ HighlightExplorer::ActOnKeyPress(IWindowManager *,
   return std::nullopt;
 }
 
-void HighlightExplorer::OnIndexChanged(const ConfigManager &) {
-  ClearAllColors();
-  EmitColorUpdate();
+void HighlightExplorer::OnIndexChanged(const ConfigManager &config_manager) {
+  // Load saved highlight colors for the new project.
+  auto saved_colors = config_manager.LoadHighlightColors();
+  if (saved_colors.empty()) {
+    return;
+  }
+
+  if (!d->proxy) {
+    d->proxy = new HighlightThemeProxy;
+    d->theme_manager.AddProxy(
+        std::unique_ptr<HighlightThemeProxy>(d->proxy));
+  }
+
+  d->proxy->color_map = std::move(saved_colors);
+
+  // Populate the list model with the restored entities.
+  const auto &index = config_manager.Index();
+  for (const auto &[id, colors] : d->proxy->color_map) {
+    VariantEntity entity = index.entity(EntityId(id));
+    if (!std::holds_alternative<NotAnEntity>(entity)) {
+      d->model->AddEntity(entity);
+    }
+  }
+
+  d->proxy->SendUpdate();
+
+  // Show the dock since we have active highlights.
+  d->dock->show();
+  d->dock->EmitRequestAttention();
 }
 
 void HighlightExplorer::ClearAllHighlights() {
@@ -325,13 +447,25 @@ void HighlightExplorer::OnToggleHighlightColorAction(const QVariant &data) {
   }
 
   const auto &entity_information = opt_entity_info.value();
-  if (IsEntityHighlighted(entity_information)) {
-    RemoveEntityHighlight(entity_information);
-  } else {
-    SetEntityHighlight(entity_information);
+
+  std::optional<QColor> old_color;
+  if (IsEntityHighlighted(entity_information) && d->proxy) {
+    auto it = d->proxy->color_map.find(entity_information.id_list.front());
+    if (it != d->proxy->color_map.end()) {
+      old_color = it->second.second;
+    }
   }
 
-  EmitColorUpdate();
+  d->config_manager.UndoGroup().setActiveStack(d->undo_stack);
+  if (old_color.has_value()) {
+    // Currently highlighted → remove.
+    d->undo_stack->push(HighlightColorCommand::Remove(
+        this, entity_information, old_color.value()));
+  } else {
+    // Not highlighted → set random color.
+    d->undo_stack->push(HighlightColorCommand::Set(
+        this, entity_information, std::nullopt, std::nullopt));
+  }
 }
 
 std::optional<HighlightExplorer::EntityInformation>
@@ -449,10 +583,6 @@ HighlightExplorer::RemoveEntityHighlight(const EntityInformation &entity_info) {
 void
 HighlightExplorer::SetEntityHighlight(const EntityInformation &entity_info,
                                       const std::optional<QColor> &opt_color) {
-  if (!d->dock) {
-    CreateDockWidget();
-  }
-
   auto made_proxy = false;
   if (!d->proxy) {
     made_proxy = true;
@@ -474,9 +604,8 @@ HighlightExplorer::SetEntityHighlight(const EntityInformation &entity_info,
   
   if (made_proxy) {
     d->theme_manager.AddProxy(IThemeProxyPtr(d->proxy));
-  } else {
-    ScheduleColorUpdate();
   }
+  ScheduleColorUpdate();
 
   // Save random color highlights for later
   if (!opt_color.has_value()) {
@@ -503,6 +632,13 @@ HighlightExplorer::EmitColorUpdate() {
       d->proxy = nullptr;
     } else {
       d->proxy->SendUpdate();
+    }
+
+    // Persist highlight colors.
+    if (d->proxy) {
+      d->config_manager.SaveHighlightColors(d->proxy->color_map);
+    } else {
+      d->config_manager.SaveHighlightColors({});
     }
   }
 

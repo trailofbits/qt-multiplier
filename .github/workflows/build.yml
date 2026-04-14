@@ -39,5 +39,5 @@ jobs:
     with:
       platform: ubuntu-24.04
       build_type: ${{ matrix.build_type }}
-      multiplier_release: d5fd686
+      multiplier_release: c620dcc
       llvm_version: 18

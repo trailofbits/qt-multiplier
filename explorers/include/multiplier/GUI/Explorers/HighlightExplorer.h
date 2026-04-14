@@ -16,8 +16,12 @@
 
 namespace mx::gui {
 
+class HighlightColorCommand;
+
 class HighlightExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   Q_OBJECT
+
+  friend class HighlightColorCommand;
 
   struct PrivateData;
   std::unique_ptr<PrivateData> d;

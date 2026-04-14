@@ -29,6 +29,7 @@
 #include <QUrl>
 #include <QClipboard>
 #include <QAction>
+#include <QTimer>
 
 #include <unordered_map>
 #include <filesystem>
@@ -141,6 +142,7 @@ void WindowManager::AddCentralWidget(IWindowWidget *widget,
 void WindowManager::CreateToolBarIfMissing(void) {
   if (!d->toolbar) {
     d->toolbar = new QToolBar(tr("Main Toolbar"), d->window);
+    d->toolbar->setObjectName(QStringLiteral("com.trailofbits.toolbar.Main"));
     d->toolbar->setIconSize(QSize(24, 24));
     auto view_menu = Menu(tr("View"));
     view_menu->addAction(d->toolbar->toggleViewAction());
@@ -167,13 +169,9 @@ QAction *WindowManager::AddToolBarButton(
   auto tool_action = new QAction(icon, action.name, tool_button);
   tool_button->setDefaultAction(tool_action);
 
-  connect(tool_action, &QAction::toggled,
-          [data = action.data, action = action.action] (bool toggled) {
-            if (data.isValid()) {
-              action.Trigger(data);
-            } else {
-              action.Trigger(QVariant::fromValue(toggled));
-            }
+  connect(tool_action, &QAction::triggered,
+          [data = action.data, action = action.action] () {
+            action.Trigger(data);
           });
 
   d->toolbar->addWidget(tool_button);
@@ -206,6 +204,7 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
   widget->setParent(d->window);
 
   auto dock_widget = new QDockWidget(widget->windowTitle(), d->window);
+  dock_widget->setObjectName(config.id);
 
 #ifdef MXQT_EVAL_COPY
   dock_widget->setAllowedAreas(Qt::LeftDockWidgetArea |
@@ -216,6 +215,8 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
 #endif
 
   dock_widget->setWidget(widget);
+  dock_widget->setMinimumHeight(100);
+  dock_widget->setMinimumWidth(100);
 
   d->dock_configs.emplace(dock_widget, config);
 
@@ -311,6 +312,10 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
       }
     }
   }
+
+  if (config.start_hidden) {
+    dock_widget->hide();
+  }
 }
 
 //! Invoked when a `dock_widget`s internal widget does `->close()`.
@@ -353,12 +358,59 @@ QMainWindow *WindowManager::Window(void) const noexcept {
   return d->window;
 }
 
-void WindowManager::RefreshDockStylesheet(void) {
+QByteArray WindowManager::SaveCentralState(void) const {
   if (d->central_widget) {
-    // Re-apply the same stylesheet to force Qt to re-resolve palette()
-    // references against the newly active palette.
-    d->central_widget->setStyleSheet(d->central_widget->styleSheet());
+    return d->central_widget->saveState();
   }
+  return {};
+}
+
+bool WindowManager::RestoreCentralState(const QByteArray &state) {
+  if (d->central_widget && !state.isEmpty()) {
+    return d->central_widget->restoreState(state);
+  }
+  return false;
+}
+
+void WindowManager::RefreshDockStylesheet(const QColor &bg_color) {
+  if (!d->central_widget) {
+    return;
+  }
+
+  // Derive a splitter handle color from the theme background.
+  // Lighten dark backgrounds, darken light backgrounds.
+  int luma = bg_color.red() * 299 + bg_color.green() * 587
+           + bg_color.blue() * 114;
+  QColor handle_color = (luma > 128000) ? bg_color.darker(130)
+                                        : bg_color.lighter(160);
+
+  // Compute contrasting text color for tabs.
+  QColor text_color = (luma > 128000) ? QColor(Qt::black) : QColor(Qt::white);
+  QColor inactive_text = text_color;
+  inactive_text.setAlpha(180);
+
+  auto ss = QString(
+      "ads--CDockContainerWidget ads--CDockSplitter::handle {"
+      "  background: %1;"
+      "}"
+      "QTabBar::tab {"
+      "  color: %2;"
+      "}"
+      "QTabBar::tab:!selected {"
+      "  color: %3;"
+      "}")
+      .arg(handle_color.name())
+      .arg(text_color.name())
+      .arg(inactive_text.name(QColor::HexArgb));
+
+  // Also style the main window's dock tab bars.
+  d->window->setStyleSheet(QString(
+      "QTabBar::tab { color: %1; }"
+      "QTabBar::tab:!selected { color: %2; }")
+      .arg(text_color.name())
+      .arg(inactive_text.name(QColor::HexArgb)));
+
+  d->central_widget->setStyleSheet(ss);
 }
 
 }  // namespace mx::gui

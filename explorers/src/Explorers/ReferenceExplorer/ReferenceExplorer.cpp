@@ -67,7 +67,13 @@ struct ReferenceExplorer::PrivateData {
         manager(manager_) {}
 };
 
-ReferenceExplorer::~ReferenceExplorer(void) {}
+ReferenceExplorer::~ReferenceExplorer(void) {
+  if (d->view) {
+    d->config_manager.SaveHeaderState(
+        QStringLiteral("refexplorer_active_tab"),
+        QByteArray::number(d->view->currentIndex()));
+  }
+}
 
 ReferenceExplorer::ReferenceExplorer(ConfigManager &config_manager,
                                      IWindowManager *parent)
@@ -165,12 +171,20 @@ void ReferenceExplorer::CreateDockWidget(void) {
   IWindowManager::DockConfig config;
   config.id = "com.trailofbits.dock.ReferenceExplorer";
   config.location = IWindowManager::DockLocation::Bottom;
+  config.tabify = true;
   config.app_menu_location = {tr("View"), tr("Explorers")};
   d->manager->AddDockWidget(d->dock, config);
 }
 
 void ReferenceExplorer::OnTabBarClose(int i) {
   auto widget = d->view->widget(i);
+
+  // Save header state before closing.
+  if (auto *tree = qobject_cast<TreeGeneratorWidget *>(widget)) {
+    QString key = QStringLiteral("RefExplorer_") + d->view->tabText(i);
+    d->config_manager.SaveHeaderState(key, tree->HeaderState());
+  }
+
   d->view->RemoveTab(i);
   widget->close();
 
@@ -234,6 +248,13 @@ void ReferenceExplorer::OnOpenReferenceExplorer(const QVariant &data) {
 
   tree_view->InstallGenerator(std::move(generator));
 
+  // Restore saved header state if available.
+  QString key = QStringLiteral("RefExplorer_") + tree_view->windowTitle();
+  auto state = d->config_manager.LoadHeaderState(key);
+  if (!state.isEmpty()) {
+    tree_view->RestoreHeaderState(state);
+  }
+
   d->view->InsertTab(0, tree_view);
   d->dock->show();
   d->dock->EmitRequestAttention();
@@ -260,7 +281,15 @@ void ReferenceExplorer::OnSelectionChange(const QModelIndex &index) {
     return;
   }
 
-  d->preview_entity_trigger.Trigger(QVariant::fromValue(entity));
+  // Clicking on a File column opens in the main code explorer;
+  // other columns show in the preview pane.
+  auto header = index.model()->headerData(
+      index.column(), Qt::Horizontal, Qt::DisplayRole).toString();
+  if (header.contains(QStringLiteral("File"), Qt::CaseInsensitive)) {
+    d->open_entity_trigger.Trigger(QVariant::fromValue(entity));
+  } else {
+    d->preview_entity_trigger.Trigger(QVariant::fromValue(entity));
+  }
 }
 
 }  // namespace mx::gui

@@ -172,7 +172,7 @@ void MacroExplorer::OnCloseButtonPressed(void) {
 
   d->open->setVisible(false);
   d->close->setVisible(false);
-  d->model->RemoveMacro(std::move(std::get<Macro>(entity)));
+  emit RequestRemoveMacro(std::move(std::get<Macro>(entity)));
 }
 
 bool MacroExplorer::eventFilter(QObject *obj, QEvent *event) {

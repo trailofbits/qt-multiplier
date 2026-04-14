@@ -129,7 +129,7 @@ QString CallHierarchyGenerator::ColumnTitle(int col) const {
   switch (col) {
     case 0: return QObject::tr("Entity");
     case 1: return QObject::tr("Breadcrumbs");
-    case 2: return QObject::tr("File Name");
+    case 2: return QObject::tr("File");
     default: return QString();
   }
 }

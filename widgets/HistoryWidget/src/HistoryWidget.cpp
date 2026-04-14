@@ -15,9 +15,11 @@
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Widgets/CodeWidget.h>
 
+#include <QDir>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QMenu>
+#include <QSettings>
 #include <QThreadPool>
 #include <QToolButton>
 #include <QShortcut>
@@ -58,6 +60,7 @@ using ItemList = std::list<Item>;
 }  // namespace
 
 struct HistoryWidget::PrivateData {
+  const ConfigManager &config_manager;
   FileLocationCache file_cache;
 
   const unsigned max_history_size;
@@ -86,9 +89,10 @@ struct HistoryWidget::PrivateData {
   QShortcut *back_shortcut{nullptr};
   QShortcut *forward_shortcut{nullptr};
 
-  inline PrivateData(const FileLocationCache &file_cache_,
+  inline PrivateData(const ConfigManager &config_manager_,
                      unsigned max_history_size_)
-      : file_cache(file_cache_),
+      : config_manager(config_manager_),
+        file_cache(config_manager_.FileLocationCache()),
         max_history_size(max_history_size_),
         current_item_it(item_list.end()) {}
 
@@ -106,7 +110,7 @@ HistoryWidget::HistoryWidget(const ConfigManager &config_manager,
                              bool install_global_shortcuts,
                              QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData(config_manager.FileLocationCache(), max_history_size)) {
+      d(new PrivateData(config_manager, max_history_size)) {
 
   InitializeWidgets(parent, install_global_shortcuts);
 
@@ -567,6 +571,48 @@ HistoryWidget::PrivateData::NavigateForwardToHistoryItem(
   }
 
   return opt_next_location;
+}
+
+void HistoryWidget::ForEachHistoryItem(const HistoryVisitor &visitor) const {
+  for (const auto &item : d->item_list) {
+    visitor(item.item, item.name);
+  }
+}
+
+void HistoryWidget::SaveToProject(const QString &key,
+                                  const EntityExtractor &extractor) const {
+  d->config_manager.SaveNavigationHistory(
+      [&] () -> std::vector<ConfigManager::NavigationEntry> {
+        std::vector<ConfigManager::NavigationEntry> entries;
+        for (const auto &item : d->item_list) {
+          auto eid = extractor(item.item);
+          if (eid == kInvalidEntityId) continue;
+
+          ConfigManager::NavigationEntry entry;
+          entry.entity_id = eid;
+          entry.label = item.name;
+          entries.push_back(std::move(entry));
+        }
+        return entries;
+      }(),
+      key);
+}
+
+void HistoryWidget::LoadFromProject(const QString &key) {
+  auto entries = d->config_manager.LoadNavigationHistory(key);
+  if (entries.empty()) return;
+
+  const auto &index = d->config_manager.Index();
+  for (const auto &entry : entries) {
+    VariantEntity entity = index.entity(EntityId(entry.entity_id));
+    if (std::holds_alternative<NotAnEntity>(entity)) continue;
+
+    SetCurrentItem(
+        QVariant::fromValue(entity),
+        entry.label.isEmpty() ? std::nullopt
+                              : std::optional<QString>(entry.label));
+    CommitCurrentItemToHistory();
+  }
 }
 
 }  // namespace mx::gui

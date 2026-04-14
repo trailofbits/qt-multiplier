@@ -955,6 +955,11 @@ VariantEntity NamedDeclContaining(const VariantEntity &ent) {
       [](const Type &) -> VariantEntity { return NotAnEntity{}; },
       [](const TemplateArgument &) -> VariantEntity { return NotAnEntity{}; },
       [](const Compilation &) -> VariantEntity { return NotAnEntity{}; },
+      [](const IRFunction &) -> VariantEntity { return NotAnEntity{}; },
+      [](const IRBlock &) -> VariantEntity { return NotAnEntity{}; },
+      [](const IRInstruction &) -> VariantEntity { return NotAnEntity{}; },
+      [](const IRObject &) -> VariantEntity { return NotAnEntity{}; },
+      [](const IRStructure &) -> VariantEntity { return NotAnEntity{}; },
       [](const NotAnEntity &) -> VariantEntity { return NotAnEntity{}; }};
   return std::visit<VariantEntity>(VariantEntityVisitor, ent);
 }

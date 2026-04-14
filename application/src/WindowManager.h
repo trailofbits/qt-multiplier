@@ -8,6 +8,7 @@
 
 #include <multiplier/GUI/Interfaces/IWindowManager.h>
 
+#include <QColor>
 #include <QDockWidget>
 #include <QString>
 
@@ -52,9 +53,13 @@ class WindowManager Q_DECL_FINAL: public IWindowManager {
 
   QMenu *Menu(const QString &menu_name) Q_DECL_FINAL;
 
+  //! Save/restore the ADS central area state (tab order, active tab).
+  QByteArray SaveCentralState(void) const;
+  bool RestoreCentralState(const QByteArray &state);
+
   //! Force the docking system to re-resolve its palette-based stylesheet.
   //! Call this after the application palette changes (e.g. theme switch).
-  void RefreshDockStylesheet(void);
+  void RefreshDockStylesheet(const QColor &bg_color);
 
  private:
   void CreateToolBarIfMissing(void);

@@ -97,6 +97,7 @@ struct EntityInformationWidget::PrivateData {
   // Widget keeping track of the history of the entity information browser. May
   // be `nullptr`.
   HistoryWidget * const history;
+  bool history_saved{false};
 
   // Used to pop out a copy of the current entity info into a pinned info
   // browser. May be `nullptr`.
@@ -148,7 +149,20 @@ struct EntityInformationWidget::PrivateData {
             "com.trailofbits.action.OpenPinnedEntityInfo")) {}
 };
 
-EntityInformationWidget::~EntityInformationWidget(void) {}
+EntityInformationWidget::~EntityInformationWidget(void) {
+  SaveHistory();
+}
+
+void EntityInformationWidget::SaveHistory(void) {
+  if (!d->history || d->history_saved) return;
+  d->history_saved = true;
+  d->history->SaveToProject(
+      QStringLiteral("InfoExplorer"),
+      [] (const QVariant &item) -> RawEntityId {
+        if (!item.canConvert<VariantEntity>()) return kInvalidEntityId;
+        return EntityId(item.value<VariantEntity>()).Pack();
+      });
+}
 
 EntityInformationWidget::EntityInformationWidget(
     const ConfigManager &config_manager, bool enable_history,
@@ -298,6 +312,14 @@ EntityInformationWidget::EntityInformationWidget(
 
   connect(&config_manager, &ConfigManager::IndexChanged,
           d->model, &EntityInformationModel::OnIndexChanged);
+
+  // Restore history when a database is loaded.
+  if (d->history) {
+    connect(&config_manager, &ConfigManager::IndexChanged,
+            this, [this] (const ConfigManager &) {
+      d->history->LoadFromProject(QStringLiteral("InfoExplorer"));
+    });
+  }
 
   connect(d->sort_model, &QAbstractItemModel::rowsInserted,
           this, &EntityInformationWidget::ExpandAllBelow);

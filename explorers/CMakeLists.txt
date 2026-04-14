@@ -8,11 +8,15 @@
 
 add_library("mx_explorers"
   include/multiplier/GUI/Explorers/CodeExplorer.h
+  include/multiplier/GUI/Explorers/CodeSearchExplorer.h
   include/multiplier/GUI/Explorers/EntityExplorer.h
   include/multiplier/GUI/Explorers/HighlightExplorer.h
   include/multiplier/GUI/Explorers/InformationExplorer.h
   include/multiplier/GUI/Explorers/ProjectExplorer.h
   include/multiplier/GUI/Explorers/ReferenceExplorer.h
+  include/multiplier/GUI/Explorers/SpreadsheetExplorer.h
+  include/multiplier/GUI/Explorers/DocumentExplorer.h
+  include/multiplier/GUI/Explorers/AgentExplorer.h
 
   include/multiplier/GUI/Interfaces/IInfoGenerator.h
   include/multiplier/GUI/Interfaces/IInformationExplorerPlugin.h
@@ -31,6 +35,12 @@ add_library("mx_explorers"
   src/Explorers/CodeExplorer/ExpandedMacrosModel.h
   src/Explorers/CodeExplorer/MacroExplorer.cpp
   src/Explorers/CodeExplorer/MacroExplorer.h
+
+  src/Explorers/CodeSearchExplorer/CodeSearchExplorer.cpp
+  src/Explorers/CodeSearchExplorer/CodeSearchResultsModel.cpp
+  src/Explorers/CodeSearchExplorer/CodeSearchResultsModel.h
+  src/Explorers/CodeSearchExplorer/CodeSearchRunnable.cpp
+  src/Explorers/CodeSearchExplorer/CodeSearchRunnable.h
 
   src/Explorers/EntityExplorer/CategoryComboBox.cpp
   src/Explorers/EntityExplorer/CategoryComboBox.h
@@ -61,24 +71,50 @@ add_library("mx_explorers"
   src/Explorers/ProjectExplorer/ProjectExplorer.cpp
 
   src/Explorers/ReferenceExplorer/ReferenceExplorer.cpp
+
+  src/Explorers/SpreadsheetExplorer/SpreadsheetExplorer.cpp
+
+  src/Explorers/DocumentExplorer/DocumentExplorer.cpp
+
+  src/Explorers/AgentExplorer/AgentExplorer.cpp
+  src/Explorers/AgentExplorer/AgentConversationWidget.h
+  src/Explorers/AgentExplorer/AgentConversationWidget.cpp
+  src/Explorers/AgentExplorer/AgentConfigPanel.h
+  src/Explorers/AgentExplorer/AgentConfigPanel.cpp
+  src/Explorers/AgentExplorer/AgentToolLogWidget.h
+  src/Explorers/AgentExplorer/AgentToolLogWidget.cpp
+  src/Explorers/AgentExplorer/AgentSessionListWidget.h
+  src/Explorers/AgentExplorer/AgentSessionListWidget.cpp
 )
+
+if(MX_ENABLE_PYTHON_BINDINGS)
+  target_sources("mx_explorers" PRIVATE
+    include/multiplier/GUI/Explorers/PythonConsoleExplorer.h
+    src/Explorers/PythonConsoleExplorer/PythonConsoleExplorer.cpp
+  )
+  target_compile_definitions("mx_explorers" PUBLIC MX_ENABLE_PYTHON=1)
+endif()
 
 target_link_libraries("mx_explorers"
   PRIVATE
     "mx_action_manager"
+    "mx_agent_manager"
     "mx_code_widget"
     "mx_config_manager"
     "mx_cxx_flags"
     "mx_generator_widget"
     "mx_history_widget"
     "mx_line_edit_widget"
+    "mx_spreadsheet_widget"
     "mx_media_manager"
+    "mx_llm_manager"
     "mx_search_widget"
     "mx_simple_text_input_dialog"
     "mx_theme_manager"
     "mx_tab_widget"
     "mx_tree_widget"
     "mx_util_component"
+    $<$<BOOL:${MX_ENABLE_PYTHON_BINDINGS}>:mx_python_console_widget>
 
   PUBLIC
     "mx_gap_library"

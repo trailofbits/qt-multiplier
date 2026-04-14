@@ -18,11 +18,13 @@
 
 #include <QAction>
 #include <QClipboard>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QMenu>
+#include <QSettings>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTreeView>
@@ -194,6 +196,18 @@ void TreeGeneratorWidget::InitializeWidgets(
   QHeaderView *header = d->tree_view->header();
   header->setStretchLastSection(true);
 
+  // Load persisted file path display mode.
+  {
+    QSettings settings(
+        QDir::homePath() + QStringLiteral("/.multiplier.qmx"),
+        QSettings::IniFormat);
+    bool show_full = settings.value(
+        QStringLiteral("TreeView/show_full_paths"), false).toBool();
+    d->model->SetFilePathDisplayMode(
+        show_full ? FilePathDisplayMode::AbsolutePath
+                  : FilePathDisplayMode::FileNameOnly);
+  }
+
   // Add a context menu to the header for toggling file path display.
   header->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(header, &QHeaderView::customContextMenuRequested,
@@ -207,6 +221,11 @@ void TreeGeneratorWidget::InitializeWidgets(
       d->model->SetFilePathDisplayMode(
           checked ? FilePathDisplayMode::AbsolutePath
                   : FilePathDisplayMode::FileNameOnly);
+      QSettings settings(
+          QDir::homePath() + QStringLiteral("/.multiplier.qmx"),
+          QSettings::IniFormat);
+      settings.setValue(
+          QStringLiteral("TreeView/show_full_paths"), checked);
     });
     menu.exec(d->tree_view->header()->mapToGlobal(pos));
   });
@@ -787,6 +806,19 @@ void TreeGeneratorWidget::OnModelRequestFinished(void) {
 //! Used to hide the OSD buttons when focus is lost
 void TreeGeneratorWidget::focusOutEvent(QFocusEvent *) {
   UpdateItemButtons();
+}
+
+QByteArray TreeGeneratorWidget::HeaderState(void) const {
+  if (d->tree_view) {
+    return d->tree_view->header()->saveState();
+  }
+  return {};
+}
+
+void TreeGeneratorWidget::RestoreHeaderState(const QByteArray &state) {
+  if (d->tree_view && !state.isEmpty()) {
+    d->tree_view->header()->restoreState(state);
+  }
 }
 
 }  // namespace mx::gui

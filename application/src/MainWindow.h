@@ -33,6 +33,9 @@ class MainWindow Q_DECL_FINAL : public QMainWindow {
   void InitializeDocks(void);
   void InitializeIndex(QApplication &application);
 
+ protected:
+  void closeEvent(QCloseEvent *event) Q_DECL_OVERRIDE;
+
  public slots:
   //! Invoked on an index whose underlying model follows the `IModel` interface.
   void OnRequestSecondaryClick(const QModelIndex &index);

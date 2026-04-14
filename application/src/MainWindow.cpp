@@ -8,12 +8,20 @@
 #include "WindowManager.h"
 
 #include <multiplier/Frontend/TokenTree.h>
+#include <multiplier/GUI/Explorers/AgentExplorer.h>
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
+#include <multiplier/GUI/Explorers/CodeSearchExplorer.h>
+#include <multiplier/GUI/Explorers/DocumentExplorer.h>
 #include <multiplier/GUI/Explorers/EntityExplorer.h>
+#ifdef MX_ENABLE_PYTHON
+# include <multiplier/GUI/Explorers/PythonConsoleExplorer.h>
+#endif
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
 #include <multiplier/GUI/Explorers/InformationExplorer.h>
 #include <multiplier/GUI/Explorers/ProjectExplorer.h>
 #include <multiplier/GUI/Explorers/ReferenceExplorer.h>
+#include <multiplier/GUI/Explorers/SpreadsheetExplorer.h>
+
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
@@ -25,6 +33,7 @@
 #include <multiplier/GUI/Themes/BuiltinTheme.h>
 #include <multiplier/Index.h>
 
+#include <QCloseEvent>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QFileDialog>
@@ -32,6 +41,8 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QTimer>
+#include <QToolButton>
+#include <QUndoGroup>
 
 #include <vector>
 
@@ -68,7 +79,25 @@ struct MainWindow::PrivateData {
         window_manager(new WindowManager(main_window)) {}
 };
 
-MainWindow::~MainWindow(void) {}
+MainWindow::~MainWindow(void) {
+  d->config_manager.SaveSettings();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+  // Save window layout while the window is still fully alive.
+  d->config_manager.SaveWindowLayout(saveState(), saveGeometry());
+
+  // Save the ADS central area state (tab order, active tab, splitters).
+  d->config_manager.SaveHeaderState(
+      QStringLiteral("ads_central_state"),
+      d->window_manager->SaveCentralState());
+
+  // Destroy plugins now (while ConfigManager is still alive) so their
+  // destructors can safely save state to the database.
+  d->plugins.clear();
+
+  QMainWindow::closeEvent(event);
+}
 
 MainWindow::MainWindow(QApplication &application, QWidget *parent)
     : QMainWindow(parent),
@@ -78,16 +107,53 @@ MainWindow::MainWindow(QApplication &application, QWidget *parent)
 
   InitializeMenus();
   InitializeThemes();
+  // Load persistent settings after themes are registered so the saved
+  // theme can be restored.
+  d->config_manager.LoadSettings();
   // InitializeIndex is called after the event loop starts (from main)
   // so that file dialogs work properly on macOS.
   InitializeDocks();
 
   setWindowIcon(
       d->config_manager.MediaManager().Icon("com.trailofbits.icon.Logo"));
+
+  // Window layout is restored in InitializeIndex after all plugins
+  // and docks are created.
 }
 
 void MainWindow::InitializePlugins(void) {
   auto wm = d->window_manager;
+
+  // Global undo/redo toolbar buttons — added first so they appear
+  // at the left of the toolbar.
+  {
+    auto &undo_group = d->config_manager.UndoGroup();
+    auto &media_manager = d->config_manager.MediaManager();
+
+    auto *undo_action = undo_group.createUndoAction(this, tr("Undo"));
+    undo_action->setShortcut(QKeySequence::Undo);
+    undo_action->setIcon(media_manager.Icon("com.trailofbits.icon.Undo"));
+
+    auto *redo_action = undo_group.createRedoAction(this, tr("Redo"));
+    redo_action->setShortcut(QKeySequence::Redo);
+    redo_action->setIcon(media_manager.Icon("com.trailofbits.icon.Redo"));
+
+    auto *undo_btn = new QToolButton(this);
+    undo_btn->setDefaultAction(undo_action);
+    undo_btn->setIconSize(QSize(16, 16));
+    wm->AddToolBarWidget(undo_btn);
+
+    auto *redo_btn = new QToolButton(this);
+    redo_btn->setDefaultAction(redo_action);
+    redo_btn->setIconSize(QSize(16, 16));
+    wm->AddToolBarWidget(redo_btn);
+
+
+    // Also add to the Edit menu.
+    auto *edit_menu = wm->Menu(tr("Edit"));
+    edit_menu->addAction(undo_action);
+    edit_menu->addAction(redo_action);
+  }
 
   d->plugins.emplace_back(new ProjectExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new EntityExplorer(d->config_manager, wm));
@@ -107,6 +173,15 @@ void MainWindow::InitializePlugins(void) {
 
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new SpreadsheetExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new DocumentExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new CodeSearchExplorer(d->config_manager, wm));
+
+#ifdef MX_ENABLE_PYTHON
+  d->plugins.emplace_back(new PythonConsoleExplorer(d->config_manager, wm));
+#endif
+
+  d->plugins.emplace_back(new AgentExplorer(d->config_manager, wm));
 
   for (const auto &plugin : d->plugins) {
     connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
@@ -118,9 +193,13 @@ void MainWindow::InitializePlugins(void) {
     connect(plugin.get(), &IMainWindowPlugin::RequestKeyPress,
             this, &MainWindow::OnRequestKeyPress);
   }
+
 }
 
 void MainWindow::InitializeMenus(void) {
+  // Create File menu first so it appears before View and Help.
+  d->window_manager->Menu(tr("File"));
+
   d->view_menu = d->window_manager->Menu(tr("View"));
 
   // Let each manager add its items to the View menu.
@@ -154,8 +233,9 @@ void MainWindow::InitializeThemes(void) {
   // When the theme changes, force the docking system to re-resolve its
   // palette-based stylesheet so tab bars, scrollbars, etc. update.
   connect(&theme_manager, &ThemeManager::ThemeChanged,
-          this, [this](const ThemeManager &) {
-            d->window_manager->RefreshDockStylesheet();
+          this, [this](const ThemeManager &tm) {
+            d->window_manager->RefreshDockStylesheet(
+                tm.Theme()->DefaultBackgroundColor());
           });
 }
 
@@ -203,7 +283,7 @@ void MainWindow::InitializeIndex(QApplication &application) {
   }
 
   d->config_manager.SetIndex(Index::in_memory_cache(
-      Index::from_database(db_path.toStdString())));
+      Index::from_database(db_path.toStdString())), db_path);
 
   InitializePlugins();
 
@@ -218,6 +298,74 @@ void MainWindow::InitializeIndex(QApplication &application) {
   auto &theme_manager = d->config_manager.ThemeManager();
   if (auto theme = theme_manager.Find(parser.value(theme_option))) {
     theme_manager.SetTheme(std::move(theme));
+  }
+
+  // Restore window layout now that all plugins and docks are created.
+  QByteArray state, geometry;
+  if (d->config_manager.LoadWindowLayout(state, geometry) &&
+      !state.isEmpty()) {
+    restoreGeometry(geometry);
+    bool ok = restoreState(state);
+    // If restore failed (e.g. stale state), fall through to defaults.
+    if (!ok) {
+      for (auto *child : findChildren<QDockWidget *>()) {
+        child->hide();
+      }
+      for (auto *child : findChildren<QDockWidget *>()) {
+        auto name = child->objectName();
+        if (name.contains(QStringLiteral("ProjectExplorer")) ||
+            name.contains(QStringLiteral("EntityExplorer")) ||
+            name.contains(QStringLiteral("InformationExplorer"))) {
+          child->show();
+        }
+      }
+    }
+  } else {
+    // First launch: hide all docks, then show only the defaults.
+    for (auto *child : findChildren<QDockWidget *>()) {
+      child->hide();
+    }
+    for (auto *child : findChildren<QDockWidget *>()) {
+      auto name = child->objectName();
+      if (name.contains(QStringLiteral("ProjectExplorer")) ||
+          name.contains(QStringLiteral("EntityExplorer")) ||
+          name.contains(QStringLiteral("InformationExplorer"))) {
+        child->show();
+      }
+    }
+    // Maximize on first launch.
+    showMaximized();
+  }
+
+  // Load persisted sheets AFTER restoreState so the dock visibility
+  // from the saved layout is preserved.
+  for (const auto &plugin : d->plugins) {
+    if (auto *sheet = dynamic_cast<SpreadsheetExplorer *>(plugin.get())) {
+      sheet->LoadPersistedSheets();
+      break;
+    }
+  }
+
+  // Restore ADS central area state (tab order, active tab) after
+  // all code files have been reopened.
+  {
+    auto ads_state = d->config_manager.LoadHeaderState(
+        QStringLiteral("ads_central_state"));
+    if (!ads_state.isEmpty()) {
+      d->window_manager->RestoreCentralState(ads_state);
+    }
+  }
+
+  // Ensure visible docks have a reasonable minimum height.
+  // restoreState can leave dock areas with zero-height splitters.
+  for (auto *dock : findChildren<QDockWidget *>()) {
+    if (dock->isVisible() && dock->height() < 50) {
+      dock->setMinimumHeight(100);
+      // Reset after layout settles.
+      QTimer::singleShot(0, dock, [dock] () {
+        dock->setMinimumHeight(0);
+      });
+    }
   }
 }
 

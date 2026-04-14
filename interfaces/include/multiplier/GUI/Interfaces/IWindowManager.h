@@ -56,6 +56,9 @@ class IWindowManager : public QObject {
     //! from the `View` menu.
     bool delete_on_close{false};
 
+    //! Start the dock hidden (not shown on first launch).
+    bool start_hidden{false};
+
     //! Should the dock title change with the widget title?
     bool keep_title_up_to_date{true};
 
