@@ -29,6 +29,9 @@ add_library("mx_agent_manager"
 
   src/tools/SessionTools.h
   src/tools/SessionTools.cpp
+
+  src/tools/ObserverTools.h
+  src/tools/ObserverTools.cpp
 )
 
 target_link_libraries("mx_agent_manager"

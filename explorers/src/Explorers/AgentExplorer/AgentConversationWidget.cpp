@@ -92,7 +92,7 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
   main_layout->addLayout(input_layout);
 
   // Token counter.
-  d->token_label = new QLabel(tr("In: 0 / Out: 0"), this);
+  d->token_label = new QLabel(tr("Tokens: 0 in / 0 out ($0.00)"), this);
   d->token_label->setContentsMargins(8, 0, 8, 4);
   auto font = d->token_label->font();
   font.setPointSize(font.pointSize() - 1);
@@ -115,12 +115,20 @@ void AgentConversationWidget::addMessage(const AgentMessage &msg) {
 
 void AgentConversationWidget::updateTokens(int prompt_tokens,
                                             int completion_tokens) {
-  d->total_prompt_tokens += prompt_tokens;
-  d->total_completion_tokens += completion_tokens;
+  d->total_prompt_tokens = prompt_tokens;
+  d->total_completion_tokens = completion_tokens;
+
+  // Estimate cost using typical API pricing (per 1M tokens).
+  // Input: ~$3/M, Output: ~$15/M (approximate mid-range).
+  double cost_in = d->total_prompt_tokens * 3.0 / 1000000.0;
+  double cost_out = d->total_completion_tokens * 15.0 / 1000000.0;
+  double total_cost = cost_in + cost_out;
+
   d->token_label->setText(
-      tr("In: %L1 / Out: %L2")
+      tr("Tokens: %L1 in / %L2 out ($%3)")
           .arg(d->total_prompt_tokens)
-          .arg(d->total_completion_tokens));
+          .arg(d->total_completion_tokens)
+          .arg(total_cost, 0, 'f', 2));
 }
 
 void AgentConversationWidget::clear(void) {
@@ -134,7 +142,7 @@ void AgentConversationWidget::clear(void) {
   }
   d->total_prompt_tokens = 0;
   d->total_completion_tokens = 0;
-  d->token_label->setText(tr("In: 0 / Out: 0"));
+  d->token_label->setText(tr("Tokens: 0 in / 0 out ($0.00)"));
 }
 
 void AgentConversationWidget::onSendClicked(void) {

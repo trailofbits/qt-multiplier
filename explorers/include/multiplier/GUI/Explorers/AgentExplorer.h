@@ -32,12 +32,15 @@ class AgentExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void ConnectSignals(void);
   void RegisterTools(void);
   void LoadSession(int64_t session_id);
+  void StartObserver(void);
+  void StopObserver(void);
 
  private slots:
   void OnSendMessage(const QString &text);
   void OnNewSession(void);
   void OnPauseResume(void);
   void OnStop(void);
+  void OnToggleObserver(bool checked);
   void OnMessageAdded(int64_t session_id, const struct AgentMessage &msg);
   void OnTokenUsageUpdated(int64_t session_id, int prompt_tokens,
                            int completion_tokens);
@@ -51,6 +54,7 @@ class AgentExplorer Q_DECL_FINAL : public IMainWindowPlugin {
                          const QJsonObject &args);
   void OnToolCallCompleted(int64_t session_id, const QString &name,
                            const QJsonObject &result, int duration_ms);
+  void OnObserverTriggered(int64_t observer_session_id);
 };
 
 }  // namespace mx::gui

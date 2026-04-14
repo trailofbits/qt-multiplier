@@ -239,7 +239,16 @@ void AgentSession::runLoop(void) {
       QJsonObject result;
       auto *tool = m_tools->tool(call.name);
       if (tool) {
-        result = tool->execute(call.arguments);
+        try {
+          result = tool->execute(call.arguments);
+        } catch (const std::exception &e) {
+          result[QStringLiteral("error")] =
+              QStringLiteral("Tool execution failed: %1")
+                  .arg(QString::fromUtf8(e.what()));
+        } catch (...) {
+          result[QStringLiteral("error")] =
+              QStringLiteral("Tool execution failed with unknown error");
+        }
       } else {
         result[QStringLiteral("error")] =
             QStringLiteral("Unknown tool: %1").arg(call.name);

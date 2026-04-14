@@ -50,6 +50,20 @@ class AgentManager Q_DECL_FINAL : public QObject {
   // Tool registry access (for explorers to register tools).
   void registerTool(std::unique_ptr<AgentTool> tool);
 
+  // Observer mode.
+  int64_t createObserverSession(const QString &system_prompt,
+                                const QString &backend_name,
+                                int64_t primary_session_id);
+  void triggerObserver(int64_t observer_session_id);
+  int64_t primarySessionId(int64_t observer_session_id) const;
+
+  // Token accounting.
+  struct TokenSummary {
+    int total_prompt_tokens{0};
+    int total_completion_tokens{0};
+  };
+  TokenSummary totalTokens(void) const;
+
  signals:
   void messageAdded(int64_t session_id, const mx::gui::AgentMessage &msg);
   void toolCallStarted(int64_t session_id, const QString &name,
@@ -63,6 +77,7 @@ class AgentManager Q_DECL_FINAL : public QObject {
   void sessionError(int64_t session_id, const QString &error);
   void tokenUsageUpdated(int64_t session_id, int prompt_tokens,
                          int completion_tokens);
+  void observerTriggered(int64_t observer_session_id);
 
  private:
   std::unique_ptr<AgentManagerImpl> d;

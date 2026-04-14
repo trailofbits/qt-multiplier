@@ -55,9 +55,18 @@ struct AgentExplorer::PrivateData {
   QPushButton *new_session_btn{nullptr};
   QPushButton *pause_btn{nullptr};
   QPushButton *stop_btn{nullptr};
+  QPushButton *observer_btn{nullptr};
+  QLabel *observer_label{nullptr};
 
   int64_t current_session_id{-1};
   bool paused{false};
+
+  // Observer mode.
+  int64_t observer_session_id{-1};
+  int observer_tool_call_count{0};
+  int observer_trigger_interval{5};  // trigger every N primary tool calls
+  int observer_recommendation_count{0};
+  bool observer_enabled{false};
 
   inline PrivateData(ConfigManager &config_manager_, IWindowManager *manager_)
       : config_manager(config_manager_),
@@ -114,6 +123,20 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
 
   d->stop_btn = new QPushButton(tr("Stop"), d->main_dock);
   toolbar_layout->addWidget(d->stop_btn);
+
+  d->observer_btn = new QPushButton(tr("Observer"), d->main_dock);
+  d->observer_btn->setCheckable(true);
+  d->observer_btn->setToolTip(
+      tr("Enable observer mode: a secondary agent reviews the primary "
+         "agent's work periodically"));
+  toolbar_layout->addWidget(d->observer_btn);
+
+  d->observer_label = new QLabel(d->main_dock);
+  d->observer_label->setVisible(false);
+  auto obs_font = d->observer_label->font();
+  obs_font.setPointSize(obs_font.pointSize() - 1);
+  d->observer_label->setFont(obs_font);
+  toolbar_layout->addWidget(d->observer_label);
 
   toolbar_layout->addStretch();
   main_layout->addLayout(toolbar_layout);
@@ -206,6 +229,8 @@ void AgentExplorer::ConnectSignals(void) {
           this, &AgentExplorer::OnPauseResume);
   connect(d->stop_btn, &QPushButton::clicked,
           this, &AgentExplorer::OnStop);
+  connect(d->observer_btn, &QPushButton::toggled,
+          this, &AgentExplorer::OnToggleObserver);
 
   // Conversation send.
   connect(d->conversation, &AgentConversationWidget::sendMessageRequested,
@@ -224,6 +249,8 @@ void AgentExplorer::ConnectSignals(void) {
           this, &AgentExplorer::OnToolCallStarted);
   connect(d->agent_manager, &AgentManager::toolCallCompleted,
           this, &AgentExplorer::OnToolCallCompleted);
+  connect(d->agent_manager, &AgentManager::observerTriggered,
+          this, &AgentExplorer::OnObserverTriggered);
 
   // Session list.
   connect(d->session_list, &AgentSessionListWidget::sessionSelected,
@@ -239,7 +266,8 @@ void AgentExplorer::ConnectSignals(void) {
 }
 
 void AgentExplorer::OnNewSession(void) {
-  // Cancel any existing session.
+  // Cancel any existing session and observer.
+  StopObserver();
   if (d->current_session_id >= 0) {
     d->agent_manager->cancelSession(d->current_session_id);
   }
@@ -248,6 +276,7 @@ void AgentExplorer::OnNewSession(void) {
   d->tool_log->clear();
   d->paused = false;
   d->pause_btn->setText(tr("Pause"));
+  d->observer_tool_call_count = 0;
 
   // Apply current config.
   OnConfigChanged();
@@ -275,6 +304,13 @@ void AgentExplorer::OnSendMessage(const QString &text) {
   if (d->current_session_id < 0) {
     OnNewSession();
     if (d->current_session_id < 0) {
+      // Show error in conversation when no backend is configured.
+      AgentMessage err_msg;
+      err_msg.role = QStringLiteral("system");
+      err_msg.content = tr(
+          "No LLM backend is configured. Please open the Agent Config panel "
+          "and add a backend with valid credentials.");
+      d->conversation->addMessage(err_msg);
       return;
     }
   }
@@ -314,12 +350,14 @@ void AgentExplorer::OnStop(void) {
   if (d->current_session_id < 0) {
     return;
   }
+  StopObserver();
   d->agent_manager->cancelSession(d->current_session_id);
   d->config_manager.UpdateAgentSessionStatus(
       d->current_session_id, QStringLiteral("cancelled"));
   d->current_session_id = -1;
   d->paused = false;
   d->pause_btn->setText(tr("Pause"));
+  d->observer_tool_call_count = 0;
   d->session_list->refresh();
 }
 
@@ -430,10 +468,27 @@ void AgentExplorer::OnToolCallCompleted(int64_t session_id,
                                          const QString &name,
                                          const QJsonObject &result,
                                          int duration_ms) {
-  if (session_id != d->current_session_id) {
-    return;
+  if (session_id == d->current_session_id) {
+    d->tool_log->onToolCallCompleted(session_id, name, result, duration_ms);
+
+    // Track tool calls for observer triggering.
+    if (d->observer_enabled && d->observer_session_id >= 0) {
+      d->observer_tool_call_count++;
+      if (d->observer_tool_call_count >= d->observer_trigger_interval) {
+        d->observer_tool_call_count = 0;
+        d->agent_manager->triggerObserver(d->observer_session_id);
+      }
+    }
+  } else if (session_id == d->observer_session_id) {
+    // Observer completed a tool call -- check if it was a recommendation.
+    if (name == QStringLiteral("observer_recommendation") &&
+        !result.contains(QStringLiteral("error"))) {
+      d->observer_recommendation_count++;
+      d->observer_label->setText(
+          tr("Observer: %1 recommendations")
+              .arg(d->observer_recommendation_count));
+    }
   }
-  d->tool_log->onToolCallCompleted(session_id, name, result, duration_ms);
 }
 
 void AgentExplorer::LoadSession(int64_t session_id) {
@@ -454,6 +509,84 @@ void AgentExplorer::LoadSession(int64_t session_id) {
     msg.token_count = info.token_count;
     d->conversation->addMessage(msg);
   }
+}
+
+void AgentExplorer::OnToggleObserver(bool checked) {
+  if (checked) {
+    StartObserver();
+  } else {
+    StopObserver();
+  }
+}
+
+void AgentExplorer::StartObserver(void) {
+  if (d->current_session_id < 0) {
+    d->observer_btn->setChecked(false);
+    return;
+  }
+
+  if (d->observer_session_id >= 0) {
+    return;  // Already running.
+  }
+
+  static const QString kObserverSystemPrompt = QStringLiteral(
+      "You are an observer agent reviewing another AI agent's work. "
+      "Your job is to:\n"
+      "1. Analyze the primary agent's approach and progress\n"
+      "2. Identify gaps, missed opportunities, or potential issues\n"
+      "3. Suggest improvements or alternative approaches\n"
+      "4. Track whether the primary agent is staying focused on its goals\n\n"
+      "Use get_primary_session_context to see what the primary agent has done.\n"
+      "Use observer_recommendation to record your findings.\n\n"
+      "Be concise and actionable. Focus on what matters most.");
+
+  auto backend_name = d->llm_manager->activeBackendName();
+  d->observer_session_id = d->agent_manager->createObserverSession(
+      kObserverSystemPrompt, backend_name, d->current_session_id);
+
+  if (d->observer_session_id < 0) {
+    d->observer_btn->setChecked(false);
+    AgentMessage err_msg;
+    err_msg.role = QStringLiteral("system");
+    err_msg.content = tr("Failed to create observer session.");
+    d->conversation->addMessage(err_msg);
+    return;
+  }
+
+  d->observer_enabled = true;
+  d->observer_tool_call_count = 0;
+  d->observer_recommendation_count = 0;
+  d->observer_label->setText(tr("Observer: 0 recommendations"));
+  d->observer_label->setVisible(true);
+
+  AgentMessage sys_msg;
+  sys_msg.role = QStringLiteral("system");
+  sys_msg.content = tr("Observer mode enabled. The observer will review "
+                       "the primary agent every %1 tool calls.")
+                        .arg(d->observer_trigger_interval);
+  d->conversation->addMessage(sys_msg);
+}
+
+void AgentExplorer::StopObserver(void) {
+  if (d->observer_session_id >= 0) {
+    d->agent_manager->cancelSession(d->observer_session_id);
+    d->observer_session_id = -1;
+  }
+  d->observer_enabled = false;
+  d->observer_label->setVisible(false);
+  d->observer_btn->setChecked(false);
+}
+
+void AgentExplorer::OnObserverTriggered(int64_t observer_session_id) {
+  if (observer_session_id != d->observer_session_id) {
+    return;
+  }
+
+  AgentMessage sys_msg;
+  sys_msg.role = QStringLiteral("system");
+  sys_msg.content = tr("Observer triggered (review #%1).")
+                        .arg(d->observer_recommendation_count + 1);
+  d->conversation->addMessage(sys_msg);
 }
 
 }  // namespace mx::gui
