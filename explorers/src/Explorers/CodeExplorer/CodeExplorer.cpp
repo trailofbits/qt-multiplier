@@ -208,6 +208,31 @@ CodeExplorer::~CodeExplorer(void) {
         if (!item.canConvert<Location>()) return kInvalidEntityId;
         return EntityId(item.value<Location>().first).Pack();
       });
+
+  // Save the list of open entity IDs, their cursor locations, and
+  // which one is active.
+  // Format per entry: "entityId:scrollYScale:cursorXScale:cursorIndex"
+  QString ids;
+  RawEntityId active_id = kInvalidEntityId;
+  for (const auto &[id, pair] : d->opened_windows) {
+    if (pair.second) {
+      if (!ids.isEmpty()) ids += QLatin1Char(';');
+      auto loc = pair.second->LastLocation();
+      ids += QString::number(static_cast<qint64>(id))
+             + QLatin1Char(':')
+             + QString::number(loc.scroll_y.relative)
+             + QLatin1Char(':')
+             + QString::number(loc.cursor_index);
+      if (pair.second->isVisible()) {
+        active_id = id;
+      }
+    }
+  }
+  d->config_manager.SaveHeaderState(
+      QStringLiteral("code_explorer_open_files"), ids.toUtf8());
+  d->config_manager.SaveHeaderState(
+      QStringLiteral("code_explorer_active_file"),
+      QByteArray::number(static_cast<qint64>(active_id)));
 }
 
 CodeExplorer::CodeExplorer(ConfigManager &config_manager,
@@ -308,7 +333,75 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
                                 : std::optional<QString>(entry.label));
       d->history->CommitCurrentItemToHistory();
     }
+
+    RestoreOpenFiles(cm);
   });
+
+  // Also load for the initial index (SetIndex fires before constructor).
+  RestoreOpenFiles(config_manager);
+}
+
+void CodeExplorer::RestoreOpenFiles(const ConfigManager &cm) {
+  const auto &index = cm.Index();
+  auto saved = cm.LoadHeaderState(
+      QStringLiteral("code_explorer_open_files"));
+  if (saved.isEmpty()) return;
+
+  // Format: "eid:scrollYRel:cursorIdx;eid:scrollYRel:cursorIdx;..."
+  struct PendingRestore {
+    RawEntityId eid;
+    int scroll_y_relative;
+    int cursor_index;
+  };
+  QVector<PendingRestore> pending;
+
+  for (const auto &entry : QString::fromUtf8(saved)
+           .split(QLatin1Char(';'), Qt::SkipEmptyParts)) {
+    auto parts = entry.split(QLatin1Char(':'));
+    if (parts.isEmpty()) continue;
+
+    bool ok = false;
+    auto eid = static_cast<RawEntityId>(parts[0].toLongLong(&ok));
+    if (!ok || eid == kInvalidEntityId) continue;
+
+    PendingRestore pr;
+    pr.eid = eid;
+    pr.scroll_y_relative = (parts.size() > 1) ? parts[1].toInt() : -1;
+    pr.cursor_index = (parts.size() > 2) ? parts[2].toInt() : -1;
+    pending.push_back(pr);
+  }
+
+  for (const auto &pr : pending) {
+    VariantEntity entity = index.entity(EntityId(pr.eid));
+    if (std::holds_alternative<NotAnEntity>(entity)) continue;
+
+    OnOpenEntity(QVariant::fromValue(entity));
+
+    // Try to restore cursor position.
+    auto it = d->opened_windows.find(pr.eid);
+    if (it != d->opened_windows.end() && it->second.second) {
+      CodeWidget::OpaqueLocation loc;
+      loc.scroll_y.relative = pr.scroll_y_relative;
+      loc.cursor_index = pr.cursor_index;
+      loc.entity = entity;
+      it->second.second->TryGoToLocation(loc, false);
+    }
+  }
+
+  // Restore the active tab.
+  auto active_data = cm.LoadHeaderState(
+      QStringLiteral("code_explorer_active_file"));
+  if (!active_data.isEmpty()) {
+    bool ok = false;
+    auto active_eid = static_cast<RawEntityId>(
+        QString::fromUtf8(active_data).toLongLong(&ok));
+    if (ok && active_eid != kInvalidEntityId) {
+      auto it = d->opened_windows.find(active_eid);
+      if (it != d->opened_windows.end() && it->second.second) {
+        it->second.second->EmitRequestAttention();
+      }
+    }
+  }
 }
 
 void CodeExplorer::OnToggleBrowseMode(const QVariant &data) {
