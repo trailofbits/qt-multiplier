@@ -139,6 +139,7 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     QString name;
     QColor color;
     bool clickable{false};
+    int width{-1};  // -1 = default/auto, >0 = explicit pixel width.
   };
 
   struct SheetData {

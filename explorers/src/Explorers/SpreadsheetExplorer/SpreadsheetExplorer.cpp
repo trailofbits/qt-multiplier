@@ -148,6 +148,7 @@ static ConfigManager::SheetData SheetTabToData(const SheetTab &tab,
     ci.name = model->headerData(c, Qt::Horizontal).toString();
     ci.color = model->ColumnColor(c);
     ci.clickable = tab.view ? tab.view->IsColumnClickable(c) : false;
+    ci.width = tab.view ? tab.view->columnWidth(c) : -1;
     data.columns.push_back(ci);
   }
 
@@ -560,10 +561,13 @@ void SpreadsheetExplorer::OpenSheetFromData(
   view->SetConfigManager(&d->config_manager);
   view->setModel(filter_proxy);
 
-  // Restore clickable columns.
+  // Restore clickable columns and column widths.
   for (int c = 0; c < sheet.columns.size(); ++c) {
     if (sheet.columns[c].clickable) {
       view->SetColumnClickable(c, true);
+    }
+    if (sheet.columns[c].width > 0) {
+      view->setColumnWidth(c, sheet.columns[c].width);
     }
   }
 

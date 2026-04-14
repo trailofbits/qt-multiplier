@@ -93,11 +93,15 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  name TEXT NOT NULL,"
       "  color TEXT,"
       "  clickable INTEGER NOT NULL DEFAULT 0,"
+      "  col_width INTEGER NOT NULL DEFAULT -1,"
       "  PRIMARY KEY (sheet_id, col_index))"));
   // Migration.
   q.exec(QStringLiteral(
       "ALTER TABLE gui_sheet_columns ADD COLUMN "
       "clickable INTEGER NOT NULL DEFAULT 0"));
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_sheet_columns ADD COLUMN "
+      "col_width INTEGER NOT NULL DEFAULT -1"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_sheet_cells ("
       "  sheet_id INTEGER NOT NULL,"
@@ -593,8 +597,8 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
   // Save columns.
   q.prepare(QStringLiteral(
       "INSERT INTO gui_sheet_columns "
-      "(sheet_id, col_index, name, color, clickable) "
-      "VALUES (?, ?, ?, ?, ?)"));
+      "(sheet_id, col_index, name, color, clickable, col_width) "
+      "VALUES (?, ?, ?, ?, ?, ?)"));
   for (int i = 0; i < sheet.columns.size(); ++i) {
     q.addBindValue(sheet_id);
     q.addBindValue(i);
@@ -603,6 +607,7 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
                    ? sheet.columns[i].color.name(QColor::HexArgb)
                    : QString());
     q.addBindValue(sheet.columns[i].clickable ? 1 : 0);
+    q.addBindValue(sheet.columns[i].width);
     q.exec();
   }
 
@@ -657,7 +662,7 @@ QVector<ConfigManager::SheetData> ConfigManager::LoadOpenSheets(void) const {
     // Load columns.
     QSqlQuery cq(d->project_db);
     cq.prepare(QStringLiteral(
-        "SELECT col_index, name, color, clickable FROM gui_sheet_columns "
+        "SELECT col_index, name, color, clickable, col_width FROM gui_sheet_columns "
         "WHERE sheet_id = ? ORDER BY col_index"));
     cq.addBindValue(sheet.sheet_id);
     cq.exec();
@@ -667,6 +672,7 @@ QVector<ConfigManager::SheetData> ConfigManager::LoadOpenSheets(void) const {
       auto col_color_str = cq.value(2).toString();
       ci.color = col_color_str.isEmpty() ? QColor() : QColor(col_color_str);
       ci.clickable = cq.value(3).toInt() != 0;
+      ci.width = cq.value(4).toInt();
       sheet.columns.push_back(ci);
     }
 
@@ -781,7 +787,7 @@ ConfigManager::SheetData ConfigManager::LoadSheetById(int sheet_id) const {
   // Load columns.
   QSqlQuery cq(d->project_db);
   cq.prepare(QStringLiteral(
-      "SELECT col_index, name, color, clickable FROM gui_sheet_columns "
+      "SELECT col_index, name, color, clickable, col_width FROM gui_sheet_columns "
       "WHERE sheet_id = ? ORDER BY col_index"));
   cq.addBindValue(sheet_id);
   cq.exec();

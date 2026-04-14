@@ -247,6 +247,7 @@ void CodeSearchExplorer::CreateDockWidget(IWindowManager *manager) {
         for (int c = 0; c < cols; ++c) {
           ConfigManager::SheetColumnInfo ci;
           ci.name = model->headerData(c, Qt::Horizontal).toString();
+          ci.width = tab.table->columnWidth(c);
           sheet.columns.push_back(ci);
         }
 
