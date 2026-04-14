@@ -37,7 +37,7 @@ class GetAuditContextTool Q_DECL_FINAL : public AgentTool {
 };
 
 class SaveCheckpointTool Q_DECL_FINAL : public AgentTool {
-  SessionToolContext *m_ctx;
+  [[maybe_unused]] SessionToolContext *m_ctx;
  public:
   explicit SaveCheckpointTool(SessionToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;
@@ -47,7 +47,7 @@ class SaveCheckpointTool Q_DECL_FINAL : public AgentTool {
 };
 
 class LogObservationTool Q_DECL_FINAL : public AgentTool {
-  SessionToolContext *m_ctx;
+  [[maybe_unused]] SessionToolContext *m_ctx;
  public:
   explicit LogObservationTool(SessionToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;
@@ -57,7 +57,7 @@ class LogObservationTool Q_DECL_FINAL : public AgentTool {
 };
 
 class FinishTool Q_DECL_FINAL : public AgentTool {
-  SessionToolContext *m_ctx;
+  [[maybe_unused]] SessionToolContext *m_ctx;
  public:
   explicit FinishTool(SessionToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;
