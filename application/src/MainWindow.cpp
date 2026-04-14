@@ -86,6 +86,11 @@ void MainWindow::closeEvent(QCloseEvent *event) {
   // Save window layout while the window is still fully alive.
   d->config_manager.SaveWindowLayout(saveState(), saveGeometry());
 
+  // Save the ADS central area state (tab order, active tab, splitters).
+  d->config_manager.SaveHeaderState(
+      QStringLiteral("ads_central_state"),
+      d->window_manager->SaveCentralState());
+
   // Destroy plugins now (while ConfigManager is still alive) so their
   // destructors can safely save state to the database.
   d->plugins.clear();
@@ -335,6 +340,16 @@ void MainWindow::InitializeIndex(QApplication &application) {
     if (auto *sheet = dynamic_cast<SpreadsheetExplorer *>(plugin.get())) {
       sheet->LoadPersistedSheets();
       break;
+    }
+  }
+
+  // Restore ADS central area state (tab order, active tab) after
+  // all code files have been reopened.
+  {
+    auto ads_state = d->config_manager.LoadHeaderState(
+        QStringLiteral("ads_central_state"));
+    if (!ads_state.isEmpty()) {
+      d->window_manager->RestoreCentralState(ads_state);
     }
   }
 

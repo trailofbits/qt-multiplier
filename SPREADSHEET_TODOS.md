@@ -32,6 +32,10 @@
 ## Code search
 - [ ] Ctrl+Shift+F "find in file" — focus toolbar regex search with file-level filter (X button to clear, replaces on subsequent use)
 
+## Entity explorer
+- [ ] Search history (back/forward) — navigate to previous search result sets
+- [ ] Persist last search query across sessions
+
 ## Cleanup
 - [ ] Extract shared token painting utility (duplicated in SpreadsheetDelegate, ThemedItemDelegate, CodeWidget)
 - [ ] Remove debug stderr logging from SpreadsheetExplorer, SpreadsheetView, DocumentExplorer

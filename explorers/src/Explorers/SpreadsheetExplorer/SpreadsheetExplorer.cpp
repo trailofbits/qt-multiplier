@@ -241,7 +241,12 @@ void SpreadsheetExplorer::PrivateData::SaveAllSheets(void) const {
         QByteArray::number(tab_widget->currentIndex()));
   }
 
-  for (const auto &[widget, tab] : tabs) {
+  // Save sheets in tab order (left to right).
+  for (int i = 0; tab_widget && i < tab_widget->count(); ++i) {
+    auto *w = tab_widget->widget(i);
+    auto it = tabs.find(w);
+    if (it == tabs.end()) continue;
+    const auto &tab = it->second;
     auto data = SheetTabToData(tab, tab.container->windowTitle());
     // Open sheets: closed_at stays empty (NULL in DB).
     int new_id = config_manager.SaveSheet(data);
@@ -795,13 +800,17 @@ void SpreadsheetExplorer::OnOpenDocument(const QVariant &data) {
 }
 
 void SpreadsheetExplorer::SaveCurrentDocument(void) {
-  // Save all open document tabs.
+  // Save all open document tabs in tab order.
   QVector<int> open_ids;
-  for (auto &[widget, tab] : d->doc_tab_map) {
+  for (int i = 0; d->doc_tabs && i < d->doc_tabs->count(); ++i) {
+    auto *w = d->doc_tabs->widget(i);
+    auto it = d->doc_tab_map.find(w);
+    if (it == d->doc_tab_map.end()) continue;
+    auto &tab = it->second;
     if (tab.doc_id < 0 || !tab.editor) continue;
     d->config_manager.SaveDocumentContent(tab.doc_id,
                                           tab.editor->toHtml());
-    QString title = widget->windowTitle();
+    QString title = w->windowTitle();
     d->config_manager.SaveDocumentTitle(tab.doc_id, title);
     open_ids.push_back(tab.doc_id);
 

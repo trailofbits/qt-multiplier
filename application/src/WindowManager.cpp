@@ -358,6 +358,20 @@ QMainWindow *WindowManager::Window(void) const noexcept {
   return d->window;
 }
 
+QByteArray WindowManager::SaveCentralState(void) const {
+  if (d->central_widget) {
+    return d->central_widget->saveState();
+  }
+  return {};
+}
+
+bool WindowManager::RestoreCentralState(const QByteArray &state) {
+  if (d->central_widget && !state.isEmpty()) {
+    return d->central_widget->restoreState(state);
+  }
+  return false;
+}
+
 void WindowManager::RefreshDockStylesheet(const QColor &bg_color) {
   if (!d->central_widget) {
     return;

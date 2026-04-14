@@ -214,23 +214,30 @@ CodeExplorer::~CodeExplorer(void) {
         return EntityId(item.value<Location>().first).Pack();
       });
 
-  // Save the list of open entity IDs, their cursor locations, and
-  // which one is active.
-  // Format per entry: "entityId:scrollYScale:cursorXScale:cursorIndex"
-  QString ids;
-  RawEntityId active_id = kInvalidEntityId;
+  // Save open entity IDs with cursor info.
+  // The restore order determines tab order, so save in a
+  // deterministic order (sorted by entity ID).
+  std::vector<std::pair<RawEntityId, CodeWidget *>> sorted_windows;
   for (const auto &[id, pair] : d->opened_windows) {
     if (pair.second) {
-      if (!ids.isEmpty()) ids += QLatin1Char(';');
-      auto loc = pair.second->LastLocation();
-      ids += QString::number(static_cast<qint64>(id))
-             + QLatin1Char(':')
-             + QString::number(loc.scroll_y.relative)
-             + QLatin1Char(':')
-             + QString::number(loc.cursor_index);
-      if (pair.second->isVisible()) {
-        active_id = id;
-      }
+      sorted_windows.emplace_back(id, pair.second);
+    }
+  }
+  std::sort(sorted_windows.begin(), sorted_windows.end(),
+            [](const auto &a, const auto &b) { return a.first < b.first; });
+
+  QString ids;
+  RawEntityId active_id = kInvalidEntityId;
+  for (const auto &[id, widget] : sorted_windows) {
+    if (!ids.isEmpty()) ids += QLatin1Char(';');
+    auto loc = widget->LastLocation();
+    ids += QString::number(static_cast<qint64>(id))
+           + QLatin1Char(':')
+           + QString::number(loc.scroll_y.relative)
+           + QLatin1Char(':')
+           + QString::number(loc.cursor_index);
+    if (widget->isVisible()) {
+      active_id = id;
     }
   }
   d->config_manager.SaveHeaderState(
