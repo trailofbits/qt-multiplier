@@ -16,6 +16,7 @@ add_library("mx_explorers"
   include/multiplier/GUI/Explorers/ReferenceExplorer.h
   include/multiplier/GUI/Explorers/SpreadsheetExplorer.h
   include/multiplier/GUI/Explorers/DocumentExplorer.h
+  include/multiplier/GUI/Explorers/AgentExplorer.h
 
   include/multiplier/GUI/Interfaces/IInfoGenerator.h
   include/multiplier/GUI/Interfaces/IInformationExplorerPlugin.h
@@ -74,6 +75,8 @@ add_library("mx_explorers"
   src/Explorers/SpreadsheetExplorer/SpreadsheetExplorer.cpp
 
   src/Explorers/DocumentExplorer/DocumentExplorer.cpp
+
+  src/Explorers/AgentExplorer/AgentExplorer.cpp
 )
 
 if(MX_ENABLE_PYTHON_BINDINGS)
@@ -87,6 +90,7 @@ endif()
 target_link_libraries("mx_explorers"
   PRIVATE
     "mx_action_manager"
+    "mx_agent_manager"
     "mx_code_widget"
     "mx_config_manager"
     "mx_cxx_flags"
@@ -95,6 +99,7 @@ target_link_libraries("mx_explorers"
     "mx_line_edit_widget"
     "mx_spreadsheet_widget"
     "mx_media_manager"
+    "mx_llm_manager"
     "mx_search_widget"
     "mx_simple_text_input_dialog"
     "mx_theme_manager"

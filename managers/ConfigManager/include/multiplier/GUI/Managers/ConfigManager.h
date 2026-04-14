@@ -16,6 +16,7 @@
 #include <QPair>
 #include <QSet>
 #include <QString>
+#include <QVector>
 
 #include <unordered_map>
 
@@ -207,6 +208,77 @@ class ConfigManager Q_DECL_FINAL : public QObject {
       const QString &key = QStringLiteral("Main")) const;
   std::vector<NavigationEntry> LoadNavigationHistory(
       const QString &key = QStringLiteral("Main")) const;
+
+  //! Agent session persistence (per-project).
+  struct AgentSessionInfo {
+    int64_t session_id{-1};
+    QString name;
+    QString system_prompt;
+    QString backend;
+    QString model;
+    QString status;
+    QString created_at;
+    QString updated_at;
+    int total_prompt_tokens{0};
+    int total_completion_tokens{0};
+  };
+
+  int64_t CreateAgentSession(const QString &name,
+                             const QString &system_prompt,
+                             const QString &backend,
+                             const QString &model) const;
+  void UpdateAgentSessionStatus(int64_t session_id,
+                                const QString &status) const;
+  void UpdateAgentSessionTokens(int64_t session_id, int prompt_tokens,
+                                int completion_tokens) const;
+  QVector<AgentSessionInfo> LoadAgentSessions(void) const;
+  QString LoadAgentSessionSystemPrompt(int64_t session_id) const;
+  void DeleteAgentSession(int64_t session_id) const;
+
+  //! Agent message persistence (per-project).
+  struct AgentMessageInfo {
+    int64_t message_id{-1};
+    int64_t session_id{-1};
+    QString role;
+    QString content;
+    QString tool_name;
+    QString tool_call_id;
+    QString tool_args;
+    QString tool_result;
+    QString timestamp;
+    int token_count{0};
+  };
+
+  int64_t SaveAgentMessage(int64_t session_id, const QString &role,
+                           const QString &content,
+                           const QString &tool_name = {},
+                           const QString &tool_call_id = {},
+                           const QString &tool_args = {},
+                           const QString &tool_result = {},
+                           int token_count = 0) const;
+  QVector<AgentMessageInfo> LoadAgentMessages(int64_t session_id) const;
+
+  //! Agent checkpoint persistence (per-project).
+  struct CheckpointInfo {
+    int64_t checkpoint_id{-1};
+    int64_t session_id{-1};
+    QString summary;
+    QString created_at;
+  };
+  int64_t SaveAgentCheckpoint(int64_t session_id,
+                              const QString &summary) const;
+  QVector<CheckpointInfo> LoadAgentCheckpoints(int64_t session_id) const;
+
+  //! Agent observation persistence (per-project).
+  int64_t SaveAgentObservation(int64_t session_id,
+                               const QString &content) const;
+  QVector<QPair<QString, QString>> LoadAgentObservations(
+      int64_t session_id) const;
+
+  //! Document category support (per-project).
+  QVector<DocumentInfo> LoadDocumentsByCategory(
+      const QString &category) const;
+  void SetDocumentCategory(int doc_id, const QString &category) const;
 
  signals:
   void IndexChanged(const ConfigManager &config_manager);

@@ -135,6 +135,50 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "ALTER TABLE gui_documents ADD COLUMN updated_at TEXT"));
   q.exec(QStringLiteral(
       "ALTER TABLE gui_documents ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"));
+  // Migration: document categories.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_documents ADD COLUMN category TEXT DEFAULT 'note'"));
+
+  // Agent session tables.
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_agent_sessions ("
+      "  session_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  name TEXT NOT NULL,"
+      "  system_prompt TEXT,"
+      "  backend TEXT NOT NULL,"
+      "  model TEXT NOT NULL,"
+      "  status TEXT NOT NULL DEFAULT 'active',"
+      "  created_at TEXT NOT NULL,"
+      "  updated_at TEXT NOT NULL,"
+      "  total_prompt_tokens INTEGER DEFAULT 0,"
+      "  total_completion_tokens INTEGER DEFAULT 0)"));
+
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_agent_messages ("
+      "  message_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  session_id INTEGER NOT NULL,"
+      "  role TEXT NOT NULL,"
+      "  content TEXT,"
+      "  tool_name TEXT,"
+      "  tool_call_id TEXT,"
+      "  tool_args TEXT,"
+      "  tool_result TEXT,"
+      "  timestamp TEXT NOT NULL,"
+      "  token_count INTEGER DEFAULT 0)"));
+
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_agent_checkpoints ("
+      "  checkpoint_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  session_id INTEGER NOT NULL,"
+      "  summary TEXT NOT NULL,"
+      "  created_at TEXT NOT NULL)"));
+
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_agent_observations ("
+      "  observation_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  session_id INTEGER NOT NULL,"
+      "  content TEXT NOT NULL,"
+      "  created_at TEXT NOT NULL)"));
 
   return db;
 }
@@ -1042,6 +1086,293 @@ ConfigManager::LoadNavigationHistory(const QString &key) const {
     }
   }
   return result;
+}
+
+// --- Agent sessions ---
+
+int64_t ConfigManager::CreateAgentSession(
+    const QString &name, const QString &system_prompt,
+    const QString &backend, const QString &model) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_agent_sessions "
+      "(name, system_prompt, backend, model, status, created_at, updated_at) "
+      "VALUES (?, ?, ?, ?, 'active', ?, ?)"));
+  q.addBindValue(name);
+  q.addBindValue(system_prompt);
+  q.addBindValue(backend);
+  q.addBindValue(model);
+  q.addBindValue(now);
+  q.addBindValue(now);
+  if (!q.exec()) return -1;
+  auto id = q.lastInsertId();
+  return id.isValid() ? id.toLongLong() : -1;
+}
+
+void ConfigManager::UpdateAgentSessionStatus(int64_t session_id,
+                                             const QString &status) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_agent_sessions SET status = ?, updated_at = ? "
+      "WHERE session_id = ?"));
+  q.addBindValue(status);
+  q.addBindValue(now);
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+}
+
+void ConfigManager::UpdateAgentSessionTokens(
+    int64_t session_id, int prompt_tokens, int completion_tokens) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_agent_sessions SET "
+      "total_prompt_tokens = total_prompt_tokens + ?, "
+      "total_completion_tokens = total_completion_tokens + ?, "
+      "updated_at = ? WHERE session_id = ?"));
+  q.addBindValue(prompt_tokens);
+  q.addBindValue(completion_tokens);
+  q.addBindValue(now);
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+}
+
+QVector<ConfigManager::AgentSessionInfo>
+ConfigManager::LoadAgentSessions(void) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.exec(QStringLiteral(
+      "SELECT session_id, name, system_prompt, backend, model, status, "
+      "created_at, updated_at, total_prompt_tokens, total_completion_tokens "
+      "FROM gui_agent_sessions ORDER BY session_id DESC"));
+  QVector<AgentSessionInfo> result;
+  while (q.next()) {
+    AgentSessionInfo info;
+    info.session_id = q.value(0).toLongLong();
+    info.name = q.value(1).toString();
+    info.system_prompt = q.value(2).toString();
+    info.backend = q.value(3).toString();
+    info.model = q.value(4).toString();
+    info.status = q.value(5).toString();
+    info.created_at = q.value(6).toString();
+    info.updated_at = q.value(7).toString();
+    info.total_prompt_tokens = q.value(8).toInt();
+    info.total_completion_tokens = q.value(9).toInt();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+QString ConfigManager::LoadAgentSessionSystemPrompt(
+    int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT system_prompt FROM gui_agent_sessions WHERE session_id = ?"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  return q.next() ? q.value(0).toString() : QString();
+}
+
+void ConfigManager::DeleteAgentSession(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  d->project_db.transaction();
+  QSqlQuery q(d->project_db);
+  auto sid = static_cast<qlonglong>(session_id);
+
+  q.prepare(QStringLiteral(
+      "DELETE FROM gui_agent_messages WHERE session_id = ?"));
+  q.addBindValue(sid);
+  q.exec();
+
+  q.prepare(QStringLiteral(
+      "DELETE FROM gui_agent_checkpoints WHERE session_id = ?"));
+  q.addBindValue(sid);
+  q.exec();
+
+  q.prepare(QStringLiteral(
+      "DELETE FROM gui_agent_observations WHERE session_id = ?"));
+  q.addBindValue(sid);
+  q.exec();
+
+  q.prepare(QStringLiteral(
+      "DELETE FROM gui_agent_sessions WHERE session_id = ?"));
+  q.addBindValue(sid);
+  q.exec();
+
+  d->project_db.commit();
+}
+
+// --- Agent messages ---
+
+int64_t ConfigManager::SaveAgentMessage(
+    int64_t session_id, const QString &role, const QString &content,
+    const QString &tool_name, const QString &tool_call_id,
+    const QString &tool_args, const QString &tool_result,
+    int token_count) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_agent_messages "
+      "(session_id, role, content, tool_name, tool_call_id, "
+      "tool_args, tool_result, timestamp, token_count) "
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.addBindValue(role);
+  q.addBindValue(content);
+  q.addBindValue(tool_name.isEmpty() ? QVariant() : tool_name);
+  q.addBindValue(tool_call_id.isEmpty() ? QVariant() : tool_call_id);
+  q.addBindValue(tool_args.isEmpty() ? QVariant() : tool_args);
+  q.addBindValue(tool_result.isEmpty() ? QVariant() : tool_result);
+  q.addBindValue(now);
+  q.addBindValue(token_count);
+  if (!q.exec()) return -1;
+  auto id = q.lastInsertId();
+  return id.isValid() ? id.toLongLong() : -1;
+}
+
+QVector<ConfigManager::AgentMessageInfo>
+ConfigManager::LoadAgentMessages(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT message_id, session_id, role, content, tool_name, "
+      "tool_call_id, tool_args, tool_result, timestamp, token_count "
+      "FROM gui_agent_messages WHERE session_id = ? ORDER BY message_id"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<AgentMessageInfo> result;
+  while (q.next()) {
+    AgentMessageInfo info;
+    info.message_id = q.value(0).toLongLong();
+    info.session_id = q.value(1).toLongLong();
+    info.role = q.value(2).toString();
+    info.content = q.value(3).toString();
+    info.tool_name = q.value(4).toString();
+    info.tool_call_id = q.value(5).toString();
+    info.tool_args = q.value(6).toString();
+    info.tool_result = q.value(7).toString();
+    info.timestamp = q.value(8).toString();
+    info.token_count = q.value(9).toInt();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+// --- Agent checkpoints ---
+
+int64_t ConfigManager::SaveAgentCheckpoint(int64_t session_id,
+                                           const QString &summary) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_agent_checkpoints "
+      "(session_id, summary, created_at) VALUES (?, ?, ?)"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.addBindValue(summary);
+  q.addBindValue(now);
+  if (!q.exec()) return -1;
+  auto id = q.lastInsertId();
+  return id.isValid() ? id.toLongLong() : -1;
+}
+
+QVector<ConfigManager::CheckpointInfo>
+ConfigManager::LoadAgentCheckpoints(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT checkpoint_id, session_id, summary, created_at "
+      "FROM gui_agent_checkpoints WHERE session_id = ? "
+      "ORDER BY checkpoint_id"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<CheckpointInfo> result;
+  while (q.next()) {
+    CheckpointInfo info;
+    info.checkpoint_id = q.value(0).toLongLong();
+    info.session_id = q.value(1).toLongLong();
+    info.summary = q.value(2).toString();
+    info.created_at = q.value(3).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+// --- Agent observations ---
+
+int64_t ConfigManager::SaveAgentObservation(int64_t session_id,
+                                            const QString &content) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_agent_observations "
+      "(session_id, content, created_at) VALUES (?, ?, ?)"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.addBindValue(content);
+  q.addBindValue(now);
+  if (!q.exec()) return -1;
+  auto id = q.lastInsertId();
+  return id.isValid() ? id.toLongLong() : -1;
+}
+
+QVector<QPair<QString, QString>>
+ConfigManager::LoadAgentObservations(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT content, created_at FROM gui_agent_observations "
+      "WHERE session_id = ? ORDER BY observation_id"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<QPair<QString, QString>> result;
+  while (q.next()) {
+    result.push_back({q.value(0).toString(), q.value(1).toString()});
+  }
+  return result;
+}
+
+// --- Document categories ---
+
+QVector<ConfigManager::DocumentInfo>
+ConfigManager::LoadDocumentsByCategory(const QString &category) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT doc_id, title, description, created_at, updated_at "
+      "FROM gui_documents WHERE deleted = 0 AND category = ? "
+      "ORDER BY doc_id"));
+  q.addBindValue(category);
+  q.exec();
+  QVector<DocumentInfo> result;
+  while (q.next()) {
+    DocumentInfo info;
+    info.doc_id = q.value(0).toInt();
+    info.title = q.value(1).toString();
+    info.description = q.value(2).toString();
+    info.created_at = q.value(3).toString();
+    info.updated_at = q.value(4).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+void ConfigManager::SetDocumentCategory(int doc_id,
+                                        const QString &category) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_documents SET category = ? WHERE doc_id = ?"));
+  q.addBindValue(category);
+  q.addBindValue(doc_id);
+  q.exec();
 }
 
 }  // namespace mx::gui

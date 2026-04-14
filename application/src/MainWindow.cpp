@@ -8,6 +8,7 @@
 #include "WindowManager.h"
 
 #include <multiplier/Frontend/TokenTree.h>
+#include <multiplier/GUI/Explorers/AgentExplorer.h>
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
 #include <multiplier/GUI/Explorers/CodeSearchExplorer.h>
 #include <multiplier/GUI/Explorers/DocumentExplorer.h>
@@ -179,6 +180,8 @@ void MainWindow::InitializePlugins(void) {
 #ifdef MX_ENABLE_PYTHON
   d->plugins.emplace_back(new PythonConsoleExplorer(d->config_manager, wm));
 #endif
+
+  d->plugins.emplace_back(new AgentExplorer(d->config_manager, wm));
 
   for (const auto &plugin : d->plugins) {
     connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
