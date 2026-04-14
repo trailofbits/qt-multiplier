@@ -12,3 +12,7 @@ add_subdirectory("MediaManager")
 
 # Depends on the above
 add_subdirectory("ConfigManager")
+
+# LLM and agent infrastructure
+add_subdirectory("LLMManager")
+add_subdirectory("AgentManager")

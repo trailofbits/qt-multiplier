@@ -1,0 +1,88 @@
+// Copyright (c) 2024-present, Trail of Bits, Inc.
+// All rights reserved.
+//
+// This source code is licensed in accordance with the terms specified in
+// the LICENSE file found in the root directory of this source tree.
+
+#pragma once
+
+#include <multiplier/GUI/Interfaces/ILLMBackend.h>
+#include <multiplier/GUI/Managers/AgentMessage.h>
+
+#include <QAtomicInt>
+#include <QMutex>
+#include <QObject>
+#include <QVector>
+
+namespace mx::gui {
+
+class AgentToolRegistry;
+
+class AgentSession Q_DECL_FINAL : public QObject {
+  Q_OBJECT
+
+ public:
+  AgentSession(int64_t session_id, ILLMBackend *backend,
+               AgentToolRegistry *tools, const LLMConfig &config,
+               const QString &system_prompt, int max_iterations,
+               QObject *parent = nullptr);
+  ~AgentSession(void) override;
+
+  int64_t sessionId(void) const;
+  QVector<AgentMessage> messages(void) const;
+  bool isRunning(void) const;
+
+  // Start processing a user message. Runs the agentic loop in a thread.
+  void sendUserMessage(const QString &text);
+
+  void pause(void);
+  void resume(void);
+  void cancel(void);
+
+ signals:
+  void messageAdded(const mx::gui::AgentMessage &msg);
+  void toolCallStarted(const QString &name, const QJsonObject &args);
+  void toolCallCompleted(const QString &name, const QJsonObject &result,
+                         int duration_ms);
+  void sessionStarted(void);
+  void sessionPaused(void);
+  void sessionResumed(void);
+  void sessionCompleted(const QString &summary);
+  void sessionError(const QString &error);
+  void tokenUsageUpdated(int prompt_tokens, int completion_tokens);
+
+ private:
+  // The agentic loop, run on a worker thread.
+  void runLoop(void);
+
+  // Convert the message history to LLMMessages for the backend.
+  QVector<LLMMessage> buildMessages(void) const;
+
+  // Add a message to the history and emit the signal.
+  AgentMessage addMessage(const QString &role, const QString &content,
+                          const QString &tool_name = {},
+                          const QString &tool_call_id = {},
+                          const QJsonObject &tool_args = {},
+                          const QJsonObject &tool_result = {},
+                          int token_count = 0);
+
+  int64_t m_session_id;
+  ILLMBackend *m_backend;
+  AgentToolRegistry *m_tools;
+  LLMConfig m_config;
+  QString m_system_prompt;
+  int m_max_iterations;
+
+  mutable QMutex m_mutex;
+  QVector<AgentMessage> m_messages;
+  int64_t m_next_message_id{0};
+
+  QAtomicInt m_running{0};
+  QAtomicInt m_paused{0};
+  QAtomicInt m_cancelled{0};
+
+  int m_total_prompt_tokens{0};
+  int m_total_completion_tokens{0};
+};
+
+}  // namespace mx::gui
