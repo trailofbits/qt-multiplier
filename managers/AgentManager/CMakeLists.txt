@@ -20,6 +20,15 @@ add_library("mx_agent_manager"
 
   src/tools/SpreadsheetTools.h
   src/tools/SpreadsheetTools.cpp
+
+  src/tools/DocumentTools.h
+  src/tools/DocumentTools.cpp
+
+  src/tools/NavigationTools.h
+  src/tools/NavigationTools.cpp
+
+  src/tools/SessionTools.h
+  src/tools/SessionTools.cpp
 )
 
 target_link_libraries("mx_agent_manager"
@@ -32,6 +41,7 @@ target_link_libraries("mx_agent_manager"
     "mx_llm_manager"
     "mx_config_manager"
     "mx_spreadsheet_widget"
+    "mx_multiplier_library"
 )
 
 target_include_directories("mx_agent_manager" PRIVATE
