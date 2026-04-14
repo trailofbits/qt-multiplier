@@ -151,7 +151,7 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
     config.location = IWindowManager::DockLocation::Bottom;
     config.tabify = true;
     config.start_hidden = true;
-    config.app_menu_location = {tr("View"), tr("Agent")};
+    config.app_menu_location = {tr("Agent")};
     manager->AddDockWidget(d->main_dock, config);
   }
 
@@ -173,7 +173,7 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
     config.location = IWindowManager::DockLocation::Right;
     config.tabify = true;
     config.start_hidden = true;
-    config.app_menu_location = {tr("View"), tr("Agent")};
+    config.app_menu_location = {tr("Agent")};
     manager->AddDockWidget(d->config_dock, config);
   }
 
@@ -194,7 +194,7 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
     config.location = IWindowManager::DockLocation::Bottom;
     config.tabify = true;
     config.start_hidden = true;
-    config.app_menu_location = {tr("View"), tr("Agent")};
+    config.app_menu_location = {tr("Agent")};
     manager->AddDockWidget(d->tool_log_dock, config);
   }
 
@@ -216,7 +216,7 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
     config.location = IWindowManager::DockLocation::Left;
     config.tabify = true;
     config.start_hidden = true;
-    config.app_menu_location = {tr("View"), tr("Agent")};
+    config.app_menu_location = {tr("Agent")};
     manager->AddDockWidget(d->session_list_dock, config);
   }
 }
