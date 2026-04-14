@@ -18,6 +18,12 @@ application for binary analysis. The full architecture plan is in `AGENT_PLAN.md
 - Copyright: `// Copyright (c) 2024-present, Trail of Bits, Inc.`
 - Single-use widgets are **private** to their owning manager/explorer.
   Multi-use interfaces go in `interfaces/`.
+- **Async/threading**: Use QThreadPool for agent work. Never block the GUI thread.
+  Make ongoing tasks visible (status: running/queued/completed/cancelled) and cancellable.
+- **Token accounting**: Track tokens forensically. Per-session totals AND per-message
+  counts stored in the DB. Display running totals in the UI.
+- **Agent document edits bypass undo/redo**: Agent tool writes go directly to DB via
+  ConfigManager, NOT through the QUndoStack. Diff tracking for agent edits is future work.
 
 ## Architecture (already built)
 

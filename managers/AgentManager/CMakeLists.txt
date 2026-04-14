@@ -17,6 +17,9 @@ add_library("mx_agent_manager"
   src/AgentSession.cpp
   src/AgentSession.h
   src/AgentManager.cpp
+
+  src/tools/SpreadsheetTools.h
+  src/tools/SpreadsheetTools.cpp
 )
 
 target_link_libraries("mx_agent_manager"
@@ -27,6 +30,8 @@ target_link_libraries("mx_agent_manager"
     "mx_qt_library"
     "mx_interfaces"
     "mx_llm_manager"
+    "mx_config_manager"
+    "mx_spreadsheet_widget"
 )
 
 target_include_directories("mx_agent_manager" PRIVATE
