@@ -36,6 +36,9 @@ class CodePreviewWidget Q_DECL_FINAL : public IWindowWidget {
                     bool browse_mode, bool enable_history,
                     QWidget *parent = nullptr);
 
+  //! Save history to DB. Call before ConfigManager is destroyed.
+  void SaveHistory(void);
+
   //! Destructor
   virtual ~CodePreviewWidget(void);
 

@@ -44,6 +44,7 @@ struct CodePreviewWidget::PrivateData {
   // Widget keeping track of the history of the entity information browser. May
   // be `nullptr`.
   HistoryWidget * const history;
+  bool history_saved{false};
 
   // Used to pop out a copy of the current entity info into a pinned info
   // browser. May be `nullptr`.
@@ -80,14 +81,18 @@ const QString CodePreviewWidget::kModelId(
     "com.trailofbits.CodePreviewModel");
 
 CodePreviewWidget::~CodePreviewWidget(void) {
-  if (d->history) {
-    d->history->SaveToProject(
-        QStringLiteral("CodePreview"),
-        [] (const QVariant &item) -> RawEntityId {
-          if (!item.canConvert<VariantEntity>()) return kInvalidEntityId;
-          return EntityId(item.value<VariantEntity>()).Pack();
-        });
-  }
+  SaveHistory();
+}
+
+void CodePreviewWidget::SaveHistory(void) {
+  if (!d->history || d->history_saved) return;
+  d->history_saved = true;
+  d->history->SaveToProject(
+      QStringLiteral("CodePreview"),
+      [] (const QVariant &item) -> RawEntityId {
+        if (!item.canConvert<VariantEntity>()) return kInvalidEntityId;
+        return EntityId(item.value<VariantEntity>()).Pack();
+      });
 }
 
 CodePreviewWidget::CodePreviewWidget(

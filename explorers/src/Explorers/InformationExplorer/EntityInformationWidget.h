@@ -47,6 +47,9 @@ class EntityInformationWidget Q_DECL_FINAL : public IWindowWidget {
   //! Destructor
   virtual ~EntityInformationWidget(void);
 
+  //! Save history to DB. Call before ConfigManager is destroyed.
+  void SaveHistory(void);
+
   //! Requests the internal model to display the specified entity
   void DisplayEntity(
       VariantEntity entity, const FileLocationCache &file_location_cache,

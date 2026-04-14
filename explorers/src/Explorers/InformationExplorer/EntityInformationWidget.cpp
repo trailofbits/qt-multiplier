@@ -97,6 +97,7 @@ struct EntityInformationWidget::PrivateData {
   // Widget keeping track of the history of the entity information browser. May
   // be `nullptr`.
   HistoryWidget * const history;
+  bool history_saved{false};
 
   // Used to pop out a copy of the current entity info into a pinned info
   // browser. May be `nullptr`.
@@ -149,14 +150,18 @@ struct EntityInformationWidget::PrivateData {
 };
 
 EntityInformationWidget::~EntityInformationWidget(void) {
-  if (d->history) {
-    d->history->SaveToProject(
-        QStringLiteral("InfoExplorer"),
-        [] (const QVariant &item) -> RawEntityId {
-          if (!item.canConvert<VariantEntity>()) return kInvalidEntityId;
-          return EntityId(item.value<VariantEntity>()).Pack();
-        });
-  }
+  SaveHistory();
+}
+
+void EntityInformationWidget::SaveHistory(void) {
+  if (!d->history || d->history_saved) return;
+  d->history_saved = true;
+  d->history->SaveToProject(
+      QStringLiteral("InfoExplorer"),
+      [] (const QVariant &item) -> RawEntityId {
+        if (!item.canConvert<VariantEntity>()) return kInvalidEntityId;
+        return EntityId(item.value<VariantEntity>()).Pack();
+      });
 }
 
 EntityInformationWidget::EntityInformationWidget(

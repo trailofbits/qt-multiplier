@@ -202,6 +202,11 @@ struct CodeExplorer::PrivateData {
 };
 
 CodeExplorer::~CodeExplorer(void) {
+  // Save preview history while ConfigManager is alive.
+  if (d->preview) {
+    d->preview->SaveHistory();
+  }
+
   d->history->SaveToProject(
       QStringLiteral("CodeExplorer"),
       [] (const QVariant &item) -> RawEntityId {
