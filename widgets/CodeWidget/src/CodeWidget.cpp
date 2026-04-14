@@ -913,8 +913,10 @@ void CodeWidget::PrivateData::ImportNode(SceneBuilder &b, TokenTreeNode node) {
 void CodeWidget::PrivateData::ScrollBy(
     int horizontal_pixel_delta, int vertical_pixel_delta) {
 
-  auto c_width = static_cast<int>(foreground_canvas.width() / dpi_ratio);
-  auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
+  // Use the full document size for scroll clamping, not the
+  // viewport-sized canvas image.
+  auto c_width = canvas_rect.width();
+  auto c_height = canvas_rect.height();
 
   auto v_width = viewport.width();
   auto v_height = viewport.height();
@@ -1159,10 +1161,10 @@ QPointF CodeWidget::PrivateData::CursorPositionVariable(QPointF point) const {
 // Always have margin on both sides margin, and keep the cursor in-
 // bounds.
 QPointF CodeWidget::PrivateData::ClampCursorPosition(QPointF point) const {
-  qreal c_width = foreground_canvas.width() / dpi_ratio;
+  qreal c_width = canvas_rect.width();
   qreal v_width = viewport.width();
 
-  qreal c_height = foreground_canvas.height() / dpi_ratio;
+  qreal c_height = canvas_rect.height();
   qreal v_height = viewport.height();
   return QPointF(
       std::max(
@@ -1587,13 +1589,13 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   }
 
   // ---------------------------------------------------------------------------
-  // Check if we need to re-render the viewport (scrolled past buffer).
+  // Re-render if scrolled past the buffer.
   if (d->NeedsViewportRerender()) {
     d->RecomputeVisibleCanvas();
     d->RecomputeHighlights();
   }
 
-  // The rendered images are offset from the full document by rendered_y_offset.
+  // The fg/bg images are offset by rendered_y_offset.
   int draw_y = -(d->scroll_y - d->rendered_y_offset);
 
   // ---------------------------------------------------------------------------
@@ -1603,7 +1605,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   // ---------------------------------------------------------------------------
   // Draw the entity highlights.
   if (d->current_entity) {
-    blitter.drawImage(-d->scroll_x, -d->scroll_y, d->highlight_canvas);
+    blitter.drawImage(-d->scroll_x, draw_y, d->highlight_canvas);
   }
 
   // ---------------------------------------------------------------------------
@@ -1614,11 +1616,11 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   }
 
   // ---------------------------------------------------------------------------
-  // Draw the line numbers (still full-height for now).
+  // Draw the line numbers (still full-height).
   blitter.drawImage(-d->scroll_x, -d->scroll_y, d->line_number_canvas);
 
   // ---------------------------------------------------------------------------
-  // Paint the code.
+  // Paint the code (viewport-sized, offset by rendered_y_offset).
   blitter.drawImage(-d->scroll_x, draw_y, d->foreground_canvas);
 
   // ---------------------------------------------------------------------------
@@ -1956,27 +1958,39 @@ void CodeWidget::PrivateData::UpdateScrollbars(void) {
     return;
   }
 
-  qreal c_width = canvas_rect.width();
+  qreal c_width = canvas_rect.width() + right_margin;
   qreal c_height = canvas_rect.height();
 
   qreal v_width = viewport.width();
   qreal v_height = viewport.height();
 
-  if (0 < v_width && v_width < c_width) {
+  // Account for scrollbar sizes: if one scrollbar is visible, the other
+  // has less viewport space available.
+  bool need_h = (0 < v_width && v_width < c_width);
+  bool need_v = (0 < v_height && v_height < c_height);
+
+  if (need_v) {
+    v_width -= vertical_scrollbar->sizeHint().width();
+    need_h = (0 < v_width && v_width < c_width);
+  }
+  if (need_h) {
+    v_height -= horizontal_scrollbar->sizeHint().height();
+    need_v = (0 < v_height && v_height < c_height);
+  }
+
+  if (need_h) {
     horizontal_scrollbar->show();
     horizontal_scrollbar->setMinimum(0);
     horizontal_scrollbar->setMaximum(static_cast<int>(c_width - v_width));
-
   } else {
     horizontal_scrollbar->hide();
     horizontal_scrollbar->setMaximum(0);
   }
 
-  if (0 < v_height && v_height < c_height) {
+  if (need_v) {
     vertical_scrollbar->show();
     vertical_scrollbar->setMinimum(0);
     vertical_scrollbar->setMaximum(static_cast<int>(c_height - v_height));
-
   } else {
     vertical_scrollbar->hide();
     vertical_scrollbar->setMaximum(0);
@@ -2180,9 +2194,9 @@ void CodeWidget::PrivateData::ClampScrollXY(void) {
   auto v_width = viewport.width();
   auto v_height = viewport.height();
   if (v_width && v_height) {
-    auto c_width = static_cast<int>(foreground_canvas.width() / dpi_ratio);
-    auto c_height = static_cast<int>(foreground_canvas.height() / dpi_ratio);
-    
+    auto c_width = canvas_rect.width();
+    auto c_height = canvas_rect.height();
+
     scroll_y = std::max(0, scroll_y);
     if (c_height > v_height) {
       scroll_y = std::min(scroll_y, c_height - v_height);
@@ -2482,14 +2496,16 @@ void CodeWidget::PrivateData::RecomputeHighlights(void) {
 
   prev_highlighted_entity = current_entity;
 
+  // Use the same viewport-sized height as fg/bg.
+  int render_height = (rendered_last_line - rendered_first_line + 1)
+                      * line_height;
+  if (render_height <= 0) render_height = line_height;
+
   QImage bg(static_cast<int>(canvas_rect.width() * dpi_ratio),
-            static_cast<int>(canvas_rect.height() * dpi_ratio),
+            static_cast<int>(render_height * dpi_ratio),
             QImage::Format_ARGB32_Premultiplied);
 
   bg.setDevicePixelRatio(dpi_ratio);
-
-  // Fill the contents with transparent pixels, rather than leaving them
-  // undefined.
   bg.fill(0);
 
   if (!current_entity) {
@@ -2507,7 +2523,6 @@ void CodeWidget::PrivateData::RecomputeHighlights(void) {
   QColor highlight_color = theme->CurrentEntityBackgroundColor(
       token.related_entity());
 
-  // The theme doesn't want to highlight current entities.
   if (!highlight_color.isValid()) {
     highlight_canvas.swap(bg);
     return;
@@ -2516,6 +2531,7 @@ void CodeWidget::PrivateData::RecomputeHighlights(void) {
   QPainter fg_painter;
   QPainter bg_painter(&bg);
   InitializePainterOptions(bg_painter);
+  bg_painter.translate(0, -rendered_y_offset);
 
   auto re_end_it = scene.related_entity_ids.end();
   auto re_it = std::upper_bound(
@@ -2525,15 +2541,19 @@ void CodeWidget::PrivateData::RecomputeHighlights(void) {
   for (auto it = re_it; it != re_end_it && it->first == related_entity_id;
      ++it) {
     const Entity &e = scene.entities[it->second];
+
+    // Skip entities outside the rendered range.
+    if (e.logical_line_number < rendered_first_line + 1 ||
+        e.logical_line_number > rendered_last_line + 1) {
+      continue;
+    }
+
     const Token &t = scene.tokens[e.token_index];
     Data &data = scene.data[e.data_index_and_config >> kFormatShift];
     unsigned rect_config = e.data_index_and_config & kFormatMask;
 
     qreal e_x = e.x;
     qreal e_y = static_cast<qreal>(e.logical_line_number - 1) * line_height;
-
-    QRectF bounding_rect = data.bounding_rect[rect_config];
-    bounding_rect.moveTo(e_x, e_y);
 
     ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(t);
     cs.background_color = highlight_color;
@@ -2633,10 +2653,51 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
       font_metrics_bi.maxWidth() == font_metrics.maxWidth() &&
       font_metrics_bi.horizontalAdvance(".") == font_metrics_bi.maxWidth();
 
-  // Position pass: compute e.x for ALL entities (no painting).
-  // This is needed for click/selection even on off-screen entities.
+  // Determine which lines to render (viewport + buffer).
+  {
+    int first_visible = (line_height > 0) ? scroll_y / line_height : 0;
+    int viewport_lines = (viewport.height() > 0 && line_height > 0)
+        ? (viewport.height() / line_height) + 2 : 100;
+
+    rendered_first_line = std::max(0, first_visible - kRenderBufferLines);
+    rendered_last_line = std::min(scene.num_lines,
+        first_visible + viewport_lines + kRenderBufferLines);
+  }
+  rendered_y_offset = rendered_first_line * line_height;
+
+  int render_height = (rendered_last_line - rendered_first_line + 1)
+                      * line_height;
+  if (render_height <= 0) render_height = line_height;
+
+  // Allocate viewport-sized images (not full-document-sized).
+  QImage fg(static_cast<int>(canvas_rect.width() * dpi_ratio),
+            static_cast<int>(render_height * dpi_ratio),
+            QImage::Format_ARGB32_Premultiplied);
+  QImage bg(static_cast<int>(canvas_rect.width() * dpi_ratio),
+            static_cast<int>(render_height * dpi_ratio),
+            QImage::Format_ARGB32_Premultiplied);
+
+  fg.setDevicePixelRatio(dpi_ratio);
+  bg.setDevicePixelRatio(dpi_ratio);
+  fg.fill(0);
+  bg.fill(0);
+
+  QPainter fg_painter(&fg);
+  QPainter bg_painter(&bg);
+  InitializePainterOptions(fg_painter);
+  InitializePainterOptions(bg_painter);
+
+  // Translate painters so document-space Y maps into the viewport image.
+  fg_painter.translate(0, -rendered_y_offset);
+  bg_painter.translate(0, -rendered_y_offset);
+
+  // Single pass: compute positions AND paint visible entities.
+  // PaintToken advances x by the actual rendered width, which is
+  // essential for correct positioning of subsequent entities
+  // (especially with variable-width fonts).
   {
     qreal x = left_margin;
+    qreal y = 0;
     int logical_column_number = 1;
     int logical_line_number = 1;
 
@@ -2644,7 +2705,10 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
       Data &data = scene.data[e.data_index_and_config >> kFormatShift];
       const Token &token = scene.tokens[e.token_index];
 
+      Q_ASSERT(!data.text.isEmpty());
+
       while (logical_line_number < e.logical_line_number) {
+        y += line_height;
         x = left_margin;
         logical_line_number += 1;
         logical_column_number = 1;
@@ -2657,21 +2721,26 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
 
       e.x = x;
 
-      // Also compute rect_config from theme.
       ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
       unsigned rect_config = (cs.bold ? kBoldMask : 0u) |
                              (cs.italic ? kItalicMask : 0u);
-      e.data_index_and_config = (e.data_index_and_config & ~kFormatMask) |
-                                rect_config;
+      e.data_index_and_config =
+          (e.data_index_and_config & ~kFormatMask) | rect_config;
+
+      // Always call PaintToken to advance x correctly.
+      // The painter's clip rect (from the image size + translate)
+      // ensures off-screen draws are clipped away efficiently.
+      PaintToken(fg_painter, bg_painter, data, rect_config, cs, x, y);
 
       logical_column_number += static_cast<int>(data.text.size());
     }
   }
 
-  // Force a viewport render.
-  rendered_first_line = -1;
-  rendered_last_line = -1;
-  RecomputeVisibleCanvas();
+  fg_painter.end();
+  bg_painter.end();
+
+  foreground_canvas.swap(fg);
+  background_canvas.swap(bg);
 
   // TODO(pag): `scroll_x` and `scroll_y` probably don't make sense anymore.
   if (cursor) {
@@ -2697,22 +2766,28 @@ bool CodeWidget::PrivateData::NeedsViewportRerender(void) const {
 void CodeWidget::PrivateData::RecomputeVisibleCanvas(void) {
   if (line_height <= 0 || scene.entities.empty()) return;
 
+  // Invalidate cached bounding rects so they're recomputed with the
+  // new painter translate.
+  for (auto &data : scene.data) {
+    for (auto &valid : data.bounding_rect_valid) valid = false;
+  }
+
   // Determine visible line range with buffer.
   int first_visible = scroll_y / line_height;
-  int viewport_lines = (viewport.height() / line_height) + 2;
+  int viewport_lines = viewport.height() > 0
+      ? (viewport.height() / line_height) + 2 : 100;
 
-  int first_render = std::max(0, first_visible - kRenderBufferLines);
-  int last_render = std::min(scene.num_lines,
-                             first_visible + viewport_lines + kRenderBufferLines);
+  rendered_first_line = std::max(0, first_visible - kRenderBufferLines);
+  rendered_last_line = std::min(scene.num_lines,
+      first_visible + viewport_lines + kRenderBufferLines);
+  rendered_y_offset = rendered_first_line * line_height;
 
-  rendered_first_line = first_render;
-  rendered_last_line = last_render;
-  rendered_y_offset = first_render * line_height;
-
-  int render_height = (last_render - first_render) * line_height;
+  int render_height = (rendered_last_line - rendered_first_line + 1)
+                      * line_height;
+  if (render_height <= 0) render_height = line_height;
   int render_width = canvas_rect.width();
+  if (render_width <= 0) return;
 
-  // Allocate viewport-sized images.
   QImage fg(static_cast<int>(render_width * dpi_ratio),
             static_cast<int>(render_height * dpi_ratio),
             QImage::Format_ARGB32_Premultiplied);
@@ -2730,33 +2805,40 @@ void CodeWidget::PrivateData::RecomputeVisibleCanvas(void) {
   InitializePainterOptions(fg_painter);
   InitializePainterOptions(bg_painter);
 
-  // Find the first entity on the first rendered line.
-  unsigned start_entity = 0;
-  if (first_render > 0 &&
-      first_render <= static_cast<int>(scene.logical_line_index.size())) {
-    start_entity = scene.logical_line_index[
-        static_cast<size_t>(first_render - 1)];
-  }
+  // Translate so document-space Y maps into the viewport-sized image.
+  fg_painter.translate(0, -rendered_y_offset);
+  bg_painter.translate(0, -rendered_y_offset);
 
-  // Paint only entities in the visible range.
-  for (unsigned ei = start_entity; ei < scene.entities.size(); ++ei) {
-    Entity &e = scene.entities[ei];
-    if (e.logical_line_number > last_render) break;
+  // Re-paint visible entities. e.x and format config were already
+  // computed in the position pass from RecomputeCanvas.
+  qreal x = left_margin;
+  qreal y = 0;
+  int logical_column_number = 1;
+  int logical_line_number = 1;
 
+  for (Entity &e : scene.entities) {
     Data &data = scene.data[e.data_index_and_config >> kFormatShift];
     const Token &token = scene.tokens[e.token_index];
 
-    if (data.text.isEmpty()) continue;
+    while (logical_line_number < e.logical_line_number) {
+      y += line_height;
+      x = left_margin;
+      logical_line_number += 1;
+      logical_column_number = 1;
+    }
+    while (logical_column_number < e.logical_column_number) {
+      logical_column_number += 1;
+      x += space_width;
+    }
 
-    // Y position relative to the rendered region.
-    qreal y = static_cast<qreal>((e.logical_line_number - 1) * line_height)
-              - rendered_y_offset;
-    qreal x = e.x;  // Already computed in position pass.
+    if (e.logical_line_number >= rendered_first_line + 1 &&
+        e.logical_line_number <= rendered_last_line + 1) {
+      ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
+      unsigned rect_config = e.data_index_and_config & kFormatMask;
+      PaintToken(fg_painter, bg_painter, data, rect_config, cs, x, y);
+    }
 
-    ITheme::ColorAndStyle cs = theme->TokenColorAndStyle(token);
-    unsigned rect_config = e.data_index_and_config & kFormatMask;
-
-    PaintToken(fg_painter, bg_painter, data, rect_config, cs, x, y);
+    logical_column_number += static_cast<int>(data.text.size());
   }
 
   fg_painter.end();
@@ -2901,7 +2983,9 @@ void CodeWidget::PrivateData::PaintToken(
   // Draw it as one word.
   } else {
     if (!token_rect_valid) {
-      token_rect = valid_painter->boundingRect(canvas_rect, data.text, to);
+      // Use a large rect so translate doesn't clip the measurement.
+      token_rect = valid_painter->boundingRect(
+          QRectF(0, 0, 99999, 99999), data.text, to);
       token_rect_valid = true;
     }
 

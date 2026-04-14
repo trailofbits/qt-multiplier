@@ -1001,7 +1001,8 @@ QVector<int> ConfigManager::LoadOpenDocumentIds(void) const {
 
 void ConfigManager::SaveNavigationHistory(
     const std::vector<NavigationEntry> &entries, const QString &key) const {
-  if (!d || !d->project_db.isValid() || !d->project_db.isOpen()) return;
+  if (!d || d->shutting_down) return;
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral("DELETE FROM gui_history WHERE widget_key = ?"));
   q.addBindValue(key);

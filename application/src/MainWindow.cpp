@@ -85,6 +85,11 @@ MainWindow::~MainWindow(void) {
 void MainWindow::closeEvent(QCloseEvent *event) {
   // Save window layout while the window is still fully alive.
   d->config_manager.SaveWindowLayout(saveState(), saveGeometry());
+
+  // Destroy plugins now (while ConfigManager is still alive) so their
+  // destructors can safely save state to the database.
+  d->plugins.clear();
+
   QMainWindow::closeEvent(event);
 }
 
