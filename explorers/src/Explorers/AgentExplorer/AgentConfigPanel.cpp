@@ -22,6 +22,55 @@
 #include <multiplier/GUI/Managers/LLMManager.h>
 
 namespace mx::gui {
+namespace {
+
+static const QString kDefaultPromptTitle =
+    QStringLiteral("Default Agent System Prompt");
+
+static const QString kDefaultPromptContent = QStringLiteral(
+R"(You are an expert analyst working inside the Multiplier binary analysis IDE. You have access to tools for managing spreadsheets, documents, and navigating the codebase.
+
+## How to work
+
+1. **Use spreadsheets as task boards.** Create a sheet to track your work. Each row is a task. Use columns for: Description, Status, Priority, Notes. Use checkboxes for completion. Use row colors for priority (red=critical, orange=high, yellow=medium, green=done).
+
+2. **Use documents for findings.** Create documents to record detailed analysis, reasoning chains, and conclusions. Link documents to spreadsheet rows so findings are traceable to tasks.
+
+3. **Use the Python REPL** to run scripts that leverage the Multiplier API for programmatic analysis when tools alone are insufficient.
+
+4. **Navigate the codebase** using search_entities, get_definition, get_references, and list_files to understand code structure.
+
+5. **Save checkpoints** periodically so your progress is recoverable and observable.
+
+6. **Stay focused.** Update your task board as you work. Mark tasks done. Reprioritize as you learn more. If you discover new work, add it to the board.
+
+## Important guidelines
+
+- Be methodical. Enumerate candidates broadly, then investigate each one deeply.
+- Record your reasoning. Future analysis (by you or an observer) depends on understanding why decisions were made.
+- When you hit a dead end, record it and move on. Don't loop.
+- Use get_audit_context to orient yourself if you lose track of progress.)");
+
+// Find or create the default system prompt document.
+// Returns the document content.
+static QString ensureDefaultPromptDocument(ConfigManager &config) {
+  // Look for existing default prompt document.
+  auto prompts = config.LoadDocumentsByCategory(QStringLiteral("prompt"));
+  for (const auto &doc : prompts) {
+    if (doc.title == kDefaultPromptTitle) {
+      return config.LoadDocumentContent(doc.doc_id);
+    }
+  }
+
+  // Doesn't exist yet — create it.
+  auto doc_id = config.CreateDocument(kDefaultPromptContent, kDefaultPromptTitle);
+  if (doc_id >= 0) {
+    config.SetDocumentCategory(doc_id, QStringLiteral("prompt"));
+  }
+  return kDefaultPromptContent;
+}
+
+}  // namespace
 
 struct AgentConfigPanel::PrivateData {
   LLMManager &llm_manager;
@@ -36,6 +85,7 @@ struct AgentConfigPanel::PrivateData {
   QPushButton *load_prompt_button{nullptr};
   QSpinBox *max_iterations_spin{nullptr};
   QDoubleSpinBox *temperature_spin{nullptr};
+  int prompt_doc_id{-1};  // Document ID backing the system prompt.
 
   explicit PrivateData(LLMManager &lm, ConfigManager &cm)
       : llm_manager(lm), config_manager(cm) {}
@@ -93,11 +143,24 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   sep1->setFrameShadow(QFrame::Sunken);
   form->addRow(sep1);
 
-  // System prompt.
+  // System prompt — backed by a document.
   d->system_prompt_edit = new QPlainTextEdit(content);
-  d->system_prompt_edit->setPlaceholderText(
-      tr("You are an expert security auditor..."));
   d->system_prompt_edit->setMinimumHeight(100);
+
+  // Load the default prompt from the document store (creates it if needed).
+  auto default_prompt = ensureDefaultPromptDocument(d->config_manager);
+  d->system_prompt_edit->setPlainText(default_prompt);
+
+  // Track which document is backing the prompt.
+  auto prompts = d->config_manager.LoadDocumentsByCategory(
+      QStringLiteral("prompt"));
+  for (const auto &doc : prompts) {
+    if (doc.title == kDefaultPromptTitle) {
+      d->prompt_doc_id = doc.doc_id;
+      break;
+    }
+  }
+
   form->addRow(tr("System Prompt:"), d->system_prompt_edit);
 
   // Load from documents.
@@ -138,6 +201,14 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
           this, &AgentConfigPanel::onModelChanged);
   connect(d->load_prompt_button, &QPushButton::clicked,
           this, &AgentConfigPanel::onLoadPromptClicked);
+
+  // Save prompt edits back to the backing document.
+  connect(d->system_prompt_edit, &QPlainTextEdit::textChanged, this, [this] {
+    if (d->prompt_doc_id >= 0) {
+      d->config_manager.SaveDocumentContent(
+          d->prompt_doc_id, d->system_prompt_edit->toPlainText());
+    }
+  });
 
   connect(d->max_iterations_spin, QOverload<int>::of(&QSpinBox::valueChanged),
           this, [this] { emit configChanged(); });
@@ -224,6 +295,7 @@ void AgentConfigPanel::onLoadPromptClicked(void) {
     connect(action, &QAction::triggered, this, [this, doc_id = doc.doc_id] {
       auto content = d->config_manager.LoadDocumentContent(doc_id);
       if (!content.isEmpty()) {
+        d->prompt_doc_id = doc_id;
         d->system_prompt_edit->setPlainText(content);
       }
     });
