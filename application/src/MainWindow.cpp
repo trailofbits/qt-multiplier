@@ -200,6 +200,13 @@ void MainWindow::InitializePlugins(void) {
     if (name_explorer && code_explorer) {
       connect(name_explorer, &NameExplorer::RenameEntities,
               code_explorer, &CodeExplorer::OnRenameEntities);
+
+      // Push any renames loaded during NameExplorer construction
+      // (before this connection existed).
+      auto initial = name_explorer->currentRenames();
+      if (!initial.isEmpty()) {
+        code_explorer->OnRenameEntities(initial);
+      }
     }
   }
 

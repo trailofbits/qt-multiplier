@@ -29,6 +29,9 @@ class NameExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void ActOnContextMenu(IWindowManager *manager, QMenu *menu,
                         const QModelIndex &index) Q_DECL_FINAL;
 
+  // Return the current rename map (for initial sync after signal wiring).
+  QMap<mx::RawEntityId, QString> currentRenames(void) const;
+
  signals:
   void RenameEntities(const QMap<mx::RawEntityId, QString> &renames);
 

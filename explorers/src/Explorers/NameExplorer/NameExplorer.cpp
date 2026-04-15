@@ -232,6 +232,10 @@ NameExplorer::NameExplorer(ConfigManager &config_manager,
   OnIndexChanged(config_manager);
 }
 
+QMap<RawEntityId, QString> NameExplorer::currentRenames(void) const {
+  return d->model->buildRenameMap();
+}
+
 void NameExplorer::OnIndexChanged(const ConfigManager &config_manager) {
   d->model->clear();
 
