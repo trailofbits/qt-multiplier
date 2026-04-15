@@ -1321,7 +1321,11 @@ CodeWidget::CodeWidget(const ConfigManager &config_manager,
   d->browse_mode = browse_mode;
   d->tab_width = config_manager.TabWidth();
   connect(&config_manager, &ConfigManager::TabWidthChanged,
-          this, [this] (unsigned tw) { d->tab_width = tw; });
+          this, [this] (unsigned tw) {
+            d->tab_width = tw;
+            d->scene_changed = true;
+            update();
+          });
 
   d->vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
   d->vertical_scrollbar->setSingleStep(1);
