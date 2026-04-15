@@ -612,6 +612,16 @@ void SpreadsheetExplorer::OpenSheetFromData(
               QVariant::fromValue(entity));
         }
       }
+    } else if (raw.canConvert<LocationCell>()) {
+      auto lc = raw.value<LocationCell>();
+      if (lc.entity_id != 0) {
+        auto entity = d->config_manager.Index().entity(
+            EntityId(lc.entity_id));
+        if (!std::holds_alternative<NotAnEntity>(entity)) {
+          d->open_entity_trigger.Trigger(
+              QVariant::fromValue(entity));
+        }
+      }
     }
   });
 

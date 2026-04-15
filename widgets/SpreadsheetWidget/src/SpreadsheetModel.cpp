@@ -25,6 +25,22 @@ Q_DECLARE_METATYPE(mx::UserToken)
 
 namespace mx::gui {
 
+QString LocationCell::displayText(void) const {
+  // Show just the filename, not the full path.
+  auto name = file_path;
+  auto last_sep = name.lastIndexOf(QLatin1Char('/'));
+  if (last_sep >= 0) {
+    name = name.mid(last_sep + 1);
+  }
+  if (line > 0) {
+    if (column > 0) {
+      return QStringLiteral("%1:%2:%3").arg(name).arg(line).arg(column);
+    }
+    return QStringLiteral("%1:%2").arg(name).arg(line);
+  }
+  return name;
+}
+
 SpreadsheetModel::SpreadsheetModel(QObject *parent)
     : QAbstractTableModel(parent),
       m_undo_stack(new QUndoStack(this)) {}
@@ -581,6 +597,10 @@ QString SpreadsheetModel::display_text_for(const QVariant &value) {
     return result;
   }
 
+  if (value.canConvert<LocationCell>()) {
+    return value.value<LocationCell>().displayText();
+  }
+
   if (value.userType() == QMetaType::Bool) {
     return value.toBool() ? QStringLiteral("true")
                           : QStringLiteral("false");
@@ -643,6 +663,20 @@ QString SpreadsheetModel::value_to_json(const QVariant &value) {
   if (value.userType() == QMetaType::Bool) {
     return value.toBool() ? QStringLiteral("{\"t\":\"b\",\"v\":1}")
                           : QStringLiteral("{\"t\":\"b\",\"v\":0}");
+  }
+
+  if (value.canConvert<LocationCell>()) {
+    auto lc = value.value<LocationCell>();
+    QString escaped_path = lc.file_path;
+    escaped_path.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
+    escaped_path.replace(QLatin1Char('"'), QStringLiteral("\\\""));
+    auto opaque_b64 = QString::fromLatin1(lc.opaque_data.toBase64());
+    return QStringLiteral("{\"t\":\"loc\",\"e\":%1,\"p\":\"%2\",\"l\":%3,\"c\":%4,\"o\":\"%5\"}")
+        .arg(static_cast<qint64>(lc.entity_id))
+        .arg(escaped_path)
+        .arg(lc.line)
+        .arg(lc.column)
+        .arg(opaque_b64);
   }
 
   if (value.canConvert<DocumentCell>()) {
@@ -720,6 +754,18 @@ QVariant SpreadsheetModel::value_from_json(const QString &json,
 
   if (type == QLatin1String("s")) {
     return obj[QStringLiteral("v")].toString();
+  }
+
+  if (type == QLatin1String("loc")) {
+    LocationCell lc;
+    lc.entity_id = static_cast<uint64_t>(
+        obj[QStringLiteral("e")].toDouble());
+    lc.file_path = obj[QStringLiteral("p")].toString();
+    lc.line = static_cast<unsigned>(obj[QStringLiteral("l")].toInt());
+    lc.column = static_cast<unsigned>(obj[QStringLiteral("c")].toInt());
+    lc.opaque_data = QByteArray::fromBase64(
+        obj[QStringLiteral("o")].toString().toLatin1());
+    return QVariant::fromValue(lc);
   }
 
   if (type == QLatin1String("doc")) {
