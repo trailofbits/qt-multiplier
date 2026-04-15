@@ -91,6 +91,14 @@ class CodeWidget Q_DECL_FINAL : public IWindowWidget {
 
     // Returns `0` if not valid.
     unsigned Column(void) const;
+
+    // Serialize the numeric/scalar parts to a byte array for storage.
+    // The entity is stored as its packed ID; the token is not serialized.
+    QByteArray toByteArray(void) const;
+
+    // Deserialize from a byte array. The entity must be resolved from
+    // the Index using the stored entity ID.
+    static OpaqueLocation fromByteArray(const QByteArray &data);
   };
 
   enum LocationChangeReason {

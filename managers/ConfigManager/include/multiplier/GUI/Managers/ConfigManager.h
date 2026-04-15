@@ -133,6 +133,10 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   void SaveExpandedMacros(const QSet<mx::RawEntityId> &macros) const;
   QSet<mx::RawEntityId> LoadExpandedMacros(void) const;
 
+  //! Save/load renamed entities (per-project).
+  void SaveRenamedEntities(const QMap<mx::RawEntityId, QString> &renames) const;
+  QMap<mx::RawEntityId, QString> LoadRenamedEntities(void) const;
+
   //! Save/load entity highlight colors (per-project).
   using HighlightColorMap =
       std::unordered_map<mx::RawEntityId, std::pair<QColor, QColor>>;

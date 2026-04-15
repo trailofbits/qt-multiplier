@@ -580,7 +580,8 @@ void HistoryWidget::ForEachHistoryItem(const HistoryVisitor &visitor) const {
 }
 
 void HistoryWidget::SaveToProject(const QString &key,
-                                  const EntityExtractor &extractor) const {
+                                  const EntityExtractor &extractor,
+                                  const LocationExtractor &loc_extractor) const {
   d->config_manager.SaveNavigationHistory(
       [&] () -> std::vector<ConfigManager::NavigationEntry> {
         std::vector<ConfigManager::NavigationEntry> entries;
@@ -591,6 +592,11 @@ void HistoryWidget::SaveToProject(const QString &key,
           ConfigManager::NavigationEntry entry;
           entry.entity_id = eid;
           entry.label = item.name;
+          if (loc_extractor) {
+            auto loc = loc_extractor(item.item);
+            entry.line = loc.line;
+            entry.column = loc.column;
+          }
           entries.push_back(std::move(entry));
         }
         return entries;

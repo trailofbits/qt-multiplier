@@ -71,8 +71,17 @@ class HistoryWidget final : public QWidget {
   //! `entity_extractor` converts a history QVariant item to an entity ID.
   using EntityExtractor =
       std::function<mx::RawEntityId(const QVariant &item)>;
+
+  struct LocationInfo {
+    unsigned line{0};
+    unsigned column{0};
+  };
+  using LocationExtractor =
+      std::function<LocationInfo(const QVariant &item)>;
+
   void SaveToProject(const QString &key,
-                     const EntityExtractor &extractor) const;
+                     const EntityExtractor &extractor,
+                     const LocationExtractor &loc_extractor = {}) const;
 
   //! Load navigation history from project settings and populate.
   void LoadFromProject(const QString &key);

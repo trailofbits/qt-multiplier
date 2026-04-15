@@ -17,6 +17,7 @@
 # include <multiplier/GUI/Explorers/PythonConsoleExplorer.h>
 #endif
 #include <multiplier/GUI/Explorers/HighlightExplorer.h>
+#include <multiplier/GUI/Explorers/NameExplorer.h>
 #include <multiplier/GUI/Explorers/InformationExplorer.h>
 #include <multiplier/GUI/Explorers/ProjectExplorer.h>
 #include <multiplier/GUI/Explorers/ReferenceExplorer.h>
@@ -172,6 +173,7 @@ void MainWindow::InitializePlugins(void) {
   d->plugins.emplace_back(ref_explorer);
 
   d->plugins.emplace_back(new HighlightExplorer(d->config_manager, wm));
+  d->plugins.emplace_back(new NameExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new CodeExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new SpreadsheetExplorer(d->config_manager, wm));
   d->plugins.emplace_back(new DocumentExplorer(d->config_manager, wm));
@@ -182,6 +184,31 @@ void MainWindow::InitializePlugins(void) {
 #endif
 
   d->plugins.emplace_back(new AgentExplorer(d->config_manager, wm));
+
+  // Wire NameExplorer renames to CodeExplorer for forwarding to CodeWidgets.
+  {
+    NameExplorer *name_explorer = nullptr;
+    CodeExplorer *code_explorer = nullptr;
+    for (const auto &plugin : d->plugins) {
+      if (!name_explorer) {
+        name_explorer = dynamic_cast<NameExplorer *>(plugin.get());
+      }
+      if (!code_explorer) {
+        code_explorer = dynamic_cast<CodeExplorer *>(plugin.get());
+      }
+    }
+    if (name_explorer && code_explorer) {
+      connect(name_explorer, &NameExplorer::RenameEntities,
+              code_explorer, &CodeExplorer::OnRenameEntities);
+
+      // Push any renames loaded during NameExplorer construction
+      // (before this connection existed).
+      auto initial = name_explorer->currentRenames();
+      if (!initial.isEmpty()) {
+        code_explorer->OnRenameEntities(initial);
+      }
+    }
+  }
 
   for (const auto &plugin : d->plugins) {
     connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,

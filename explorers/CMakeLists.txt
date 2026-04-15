@@ -11,6 +11,7 @@ add_library("mx_explorers"
   include/multiplier/GUI/Explorers/CodeSearchExplorer.h
   include/multiplier/GUI/Explorers/EntityExplorer.h
   include/multiplier/GUI/Explorers/HighlightExplorer.h
+  include/multiplier/GUI/Explorers/NameExplorer.h
   include/multiplier/GUI/Explorers/InformationExplorer.h
   include/multiplier/GUI/Explorers/ProjectExplorer.h
   include/multiplier/GUI/Explorers/ReferenceExplorer.h
@@ -45,6 +46,12 @@ add_library("mx_explorers"
   src/Explorers/EntityExplorer/CategoryComboBox.cpp
   src/Explorers/EntityExplorer/CategoryComboBox.h
   src/Explorers/EntityExplorer/EntityExplorer.cpp
+
+  src/Explorers/NameExplorer/NameExplorer.cpp
+  src/Explorers/NameExplorer/NameRenamesModel.cpp
+  src/Explorers/NameExplorer/NameRenamesModel.h
+  src/Explorers/NameExplorer/RenameCommands.cpp
+  src/Explorers/NameExplorer/RenameCommands.h
 
   src/Explorers/HighlightExplorer/HighlightedItemsModel.cpp
   src/Explorers/HighlightExplorer/HighlightedItemsModel.h

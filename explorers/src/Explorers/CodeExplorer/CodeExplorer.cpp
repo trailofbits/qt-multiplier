@@ -212,6 +212,11 @@ CodeExplorer::~CodeExplorer(void) {
       [] (const QVariant &item) -> RawEntityId {
         if (!item.canConvert<Location>()) return kInvalidEntityId;
         return EntityId(item.value<Location>().first).Pack();
+      },
+      [] (const QVariant &item) -> HistoryWidget::LocationInfo {
+        if (!item.canConvert<Location>()) return {};
+        auto loc = item.value<Location>().second;
+        return {loc.Line(), loc.Column()};
       });
 
   // Save open entity IDs with cursor info.
@@ -339,6 +344,16 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
       if (std::holds_alternative<NotAnEntity>(entity)) continue;
 
       CodeWidget::OpaqueLocation loc;
+      // Restore at least the line number from the saved history entry.
+      if (entry.line > 0) {
+        auto line = static_cast<int>(entry.line);
+        loc.scroll_y.physical = line;
+        loc.scroll_y.relative = 0;
+        loc.cursor_y.physical = line;
+        loc.cursor_y.relative = 0;
+        loc.cursor_index = entry.column > 0
+            ? static_cast<int>(entry.column - 1) : -1;
+      }
       d->history->SetCurrentItem(
           QVariant::fromValue(Location(entity, loc)),
           entry.label.isEmpty() ? std::nullopt
@@ -586,6 +601,14 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
   connect(this, &CodeExplorer::ExpandMacros,
           code_widget, &CodeWidget::OnExpandMacros);
 
+  connect(this, &CodeExplorer::RenameEntities,
+          code_widget, &CodeWidget::OnRenameEntities);
+
+  // Apply any current renames to the new widget.
+  if (!d->scene_options.new_entity_names.isEmpty()) {
+    code_widget->OnRenameEntities(d->scene_options.new_entity_names);
+  }
+
   // Figure out the window title.
   if (file) {
     for (auto path : file->paths()) {
@@ -686,12 +709,25 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
     return;
   }
 
+  // Prefer the definition over a forward declaration.
+  if (std::holds_alternative<Decl>(entity)) {
+    auto decl = std::get<Decl>(entity);
+    if (auto def = decl.definition()) {
+      entity = def.value();
+    } else {
+      entity = decl.canonical_declaration();
+    }
+  }
+
   if (!d->preview) {
     d->preview = new CodePreviewWidget(
         d->config_manager, d->scene_options, d->browse_mode, true);
 
     connect(this, &CodeExplorer::ExpandMacros,
             d->preview, &CodePreviewWidget::OnExpandMacros);
+
+    connect(this, &CodeExplorer::RenameEntities,
+            d->preview, &CodePreviewWidget::OnRenameEntities);
 
     // When the user navigates the history, make sure that we change what the
     // view shows.
@@ -712,8 +748,13 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
 void CodeExplorer::OnGoToHistoricalItem(const QVariant &data) {
   auto [ent, loc] = data.value<Location>();
   OpenEntity(ent, false  /* don't add to history */);
-  d->CurrentOpenCodeWidget().second->TryGoToLocation(
-      loc, true  /* take focus */);
+
+  // Only restore the opaque location if it has valid position data.
+  // An empty location (from cross-session restore) would scroll to 0,0.
+  if (loc.scroll_y.physical >= 0 || loc.cursor_y.physical >= 0) {
+    d->CurrentOpenCodeWidget().second->TryGoToLocation(
+        loc, true  /* take focus */);
+  }
 }
 
 void CodeExplorer::OnHistoricalPreviewedEntitySelected(const QVariant &data) {
@@ -737,6 +778,9 @@ void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
 
   connect(this, &CodeExplorer::ExpandMacros,
           preview, &CodePreviewWidget::OnExpandMacros);
+
+  connect(this, &CodeExplorer::RenameEntities,
+          preview, &CodePreviewWidget::OnRenameEntities);
 
   if (auto name = NameOfEntityAsString(entity)) {
     preview->setWindowTitle(
@@ -776,6 +820,12 @@ void CodeExplorer::OnRenameEntity(QVector<RawEntityId> entity_ids,
                                   QString new_name) {
   (void) entity_ids;
   (void) new_name;
+}
+
+void CodeExplorer::OnRenameEntities(
+    const QMap<RawEntityId, QString> &new_entity_names) {
+  d->scene_options.new_entity_names = new_entity_names;
+  emit RenameEntities(new_entity_names);
 }
 
 }  // namespace mx::gui

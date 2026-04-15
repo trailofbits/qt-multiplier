@@ -6,7 +6,9 @@
 
 #pragma once
 
+#include <QMap>
 #include <QSet>
+#include <QString>
 #include <QVector>
 
 #include <multiplier/GUI/Interfaces/IMainWindowPlugin.h>
@@ -56,10 +58,16 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void OnHistoricalPreviewedEntitySelected(const QVariant &data);
   void OnToggleBrowseMode(const QVariant &data);
 
+ public slots:
+  void OnRenameEntities(const QMap<RawEntityId, QString> &new_entity_names);
+
  signals:
 
   // Invoked when the set of macros to be expanded changes.
   void ExpandMacros(const QSet<RawEntityId> &macros_to_expand);
+
+  // Invoked when the set of entities to be renamed changes.
+  void RenameEntities(const QMap<RawEntityId, QString> &new_entity_names);
 };
 
 }  // namespace mx::gui

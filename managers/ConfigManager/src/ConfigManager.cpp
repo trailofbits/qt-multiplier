@@ -63,6 +63,11 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  widget_key TEXT NOT NULL,"
       "  entity_id INTEGER NOT NULL,"
       "  label TEXT)"));
+  // Migrations for gui_history.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_history ADD COLUMN line INTEGER DEFAULT 0"));
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_history ADD COLUMN col INTEGER DEFAULT 0"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_header_states ("
       "  key TEXT PRIMARY KEY, state BLOB)"));
@@ -72,6 +77,9 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_highlight_colors ("
       "  entity_id INTEGER PRIMARY KEY, fg TEXT, bg TEXT)"));
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_renamed_entities ("
+      "  entity_id INTEGER PRIMARY KEY, new_name TEXT NOT NULL)"));
 
   // Spreadsheet persistence tables.
   q.exec(QStringLiteral(
@@ -565,6 +573,37 @@ QSet<RawEntityId> ConfigManager::LoadExpandedMacros(void) const {
   QSet<RawEntityId> result;
   while (q.next())
     result.insert(static_cast<RawEntityId>(q.value(0).toULongLong()));
+  return result;
+}
+
+// --- Renamed entities ---
+
+void ConfigManager::SaveRenamedEntities(
+    const QMap<RawEntityId, QString> &renames) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  d->project_db.transaction();
+  QSqlQuery q(d->project_db);
+  q.exec(QStringLiteral("DELETE FROM gui_renamed_entities"));
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_renamed_entities (entity_id, new_name) VALUES (?, ?)"));
+  for (auto it = renames.constBegin(); it != renames.constEnd(); ++it) {
+    q.addBindValue(static_cast<qint64>(it.key()));
+    q.addBindValue(it.value());
+    q.exec();
+  }
+  d->project_db.commit();
+}
+
+QMap<RawEntityId, QString> ConfigManager::LoadRenamedEntities(void) const {
+  if (!d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.exec(QStringLiteral(
+      "SELECT entity_id, new_name FROM gui_renamed_entities"));
+  QMap<RawEntityId, QString> result;
+  while (q.next()) {
+    auto id = static_cast<RawEntityId>(q.value(0).toULongLong());
+    result.insert(id, q.value(1).toString());
+  }
   return result;
 }
 
@@ -1075,11 +1114,14 @@ void ConfigManager::SaveNavigationHistory(
   q.exec();
 
   q.prepare(QStringLiteral(
-      "INSERT INTO gui_history (widget_key, entity_id, label) VALUES (?, ?, ?)"));
+      "INSERT INTO gui_history (widget_key, entity_id, label, line, col)"
+      " VALUES (?, ?, ?, ?, ?)"));
   for (const auto &e : entries) {
     q.addBindValue(key);
     q.addBindValue(qulonglong(e.entity_id));
     q.addBindValue(e.label);
+    q.addBindValue(e.line);
+    q.addBindValue(e.column);
     q.exec();
   }
 }
@@ -1089,7 +1131,7 @@ ConfigManager::LoadNavigationHistory(const QString &key) const {
   if (!d || !d->project_db.isValid() || !d->project_db.isOpen()) return {};
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
-      "SELECT entity_id, label FROM gui_history "
+      "SELECT entity_id, label, line, col FROM gui_history "
       "WHERE widget_key = ? ORDER BY id ASC"));
   q.addBindValue(key);
   std::vector<NavigationEntry> result;
@@ -1098,6 +1140,8 @@ ConfigManager::LoadNavigationHistory(const QString &key) const {
       NavigationEntry e;
       e.entity_id = static_cast<RawEntityId>(q.value(0).toULongLong());
       e.label = q.value(1).toString();
+      e.line = q.value(2).toUInt();
+      e.column = q.value(3).toUInt();
       result.push_back(std::move(e));
     }
   }
