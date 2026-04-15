@@ -19,13 +19,21 @@
 #include <multiplier/Index.h>
 
 #include <QAction>
+#include <QCursor>
+#include <QEvent>
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QMenu>
+#include <QMouseEvent>
+#include <QPushButton>
+#include <QScrollBar>
 #include <QTableView>
 #include <QUndoGroup>
 #include <QUndoStack>
 #include <QVBoxLayout>
+
+#include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Interfaces/ITheme.h>
 
 namespace mx::gui {
 
@@ -49,6 +57,14 @@ struct NameExplorer::PrivateData {
   QTableView *view{nullptr};
   NameRenamesModel *model{nullptr};
   QUndoStack *undo_stack{nullptr};
+
+  // Hover buttons (MacroExplorer pattern).
+  QPushButton *goto_btn{nullptr};
+  QPushButton *delete_btn{nullptr};
+  QIcon goto_icon;
+  QIcon delete_icon;
+  bool updating_buttons{false};
+  TriggerHandle goto_trigger;
 
   inline PrivateData(ConfigManager &config_manager_)
       : config_manager(config_manager_) {}
@@ -132,6 +148,73 @@ NameExplorer::NameExplorer(ConfigManager &config_manager,
                   d->model, entry));
             }
           });
+
+  // Hover buttons.
+  auto &media_manager = config_manager.MediaManager();
+
+  d->goto_btn = new QPushButton(QIcon(), "", d->dock);
+  d->goto_btn->setToolTip(tr("Go to Definition"));
+  d->goto_icon.addPixmap(
+      media_manager.Pixmap("com.trailofbits.icon.Activate"),
+      QIcon::Normal, QIcon::On);
+  d->goto_icon.addPixmap(
+      media_manager.Pixmap("com.trailofbits.icon.Activate",
+                           ITheme::IconStyle::DISABLED),
+      QIcon::Disabled, QIcon::On);
+  d->goto_btn->setIcon(d->goto_icon);
+
+  d->delete_btn = new QPushButton(QIcon(), "", d->dock);
+  d->delete_btn->setToolTip(tr("Remove Rename"));
+  d->delete_icon.addPixmap(
+      media_manager.Pixmap("com.trailofbits.icon.Close"),
+      QIcon::Normal, QIcon::On);
+  d->delete_icon.addPixmap(
+      media_manager.Pixmap("com.trailofbits.icon.Close",
+                           ITheme::IconStyle::DISABLED),
+      QIcon::Disabled, QIcon::On);
+  d->delete_btn->setIcon(d->delete_icon);
+
+  // Register a trigger for navigating to entity definitions.
+  d->goto_trigger = config_manager.ActionManager().Find(
+      "com.trailofbits.action.OpenEntityPreview");
+
+  connect(d->goto_btn, &QPushButton::pressed, this, [this] {
+    auto mouse_pos = d->view->viewport()->mapFromGlobal(QCursor::pos());
+    auto index = d->view->indexAt(mouse_pos);
+    if (!index.isValid()) return;
+    auto row = static_cast<unsigned>(index.row());
+    if (row >= d->model->entries().size()) return;
+
+    const auto &entry = d->model->entries()[row];
+    auto entity = d->config_manager.Index().entity(EntityId(entry.canonical_id));
+    if (!std::holds_alternative<NotAnEntity>(entity)) {
+      if (std::holds_alternative<Decl>(entity)) {
+        auto decl = std::get<Decl>(entity);
+        if (auto def = decl.definition()) {
+          entity = def.value();
+        }
+      }
+      d->goto_trigger.Trigger(QVariant::fromValue(entity));
+    }
+  });
+
+  connect(d->delete_btn, &QPushButton::pressed, this, [this] {
+    auto mouse_pos = d->view->viewport()->mapFromGlobal(QCursor::pos());
+    auto index = d->view->indexAt(mouse_pos);
+    if (!index.isValid()) return;
+    auto row = static_cast<unsigned>(index.row());
+    if (row >= d->model->entries().size()) return;
+
+    d->goto_btn->setVisible(false);
+    d->delete_btn->setVisible(false);
+    d->config_manager.UndoGroup().setActiveStack(d->undo_stack);
+    d->undo_stack->push(new RemoveRenameCommand(
+        d->model, d->model->entries()[row]));
+  });
+
+  d->view->installEventFilter(this);
+  d->view->viewport()->installEventFilter(this);
+  d->view->viewport()->setMouseTracking(true);
 
   auto dock_layout = new QVBoxLayout(d->dock);
   dock_layout->setContentsMargins(0, 0, 0, 0);
@@ -305,6 +388,75 @@ void NameExplorer::ActOnContextMenu(IWindowManager *, QMenu *menu,
             d->dock->show();
             d->dock->EmitRequestAttention();
           });
+}
+
+bool NameExplorer::eventFilter(QObject *obj, QEvent *event) {
+  if (obj == d->view) {
+    if (event->type() == QEvent::Wheel ||
+        event->type() == QEvent::Resize) {
+      UpdateItemButtons();
+    }
+  } else if (obj == d->view->viewport()) {
+    if (event->type() == QEvent::Leave ||
+        event->type() == QEvent::MouseMove) {
+      UpdateItemButtons();
+    }
+  }
+  return false;
+}
+
+void NameExplorer::UpdateItemButtons(void) {
+  if (d->updating_buttons) {
+    return;
+  }
+
+  d->updating_buttons = true;
+  d->goto_btn->setVisible(false);
+  d->delete_btn->setVisible(false);
+
+  auto mouse_pos = d->view->viewport()->mapFromGlobal(QCursor::pos());
+  auto index = d->view->indexAt(mouse_pos);
+  if (!index.isValid()) {
+    d->updating_buttons = false;
+    return;
+  }
+
+  d->goto_btn->setVisible(true);
+  d->delete_btn->setVisible(true);
+
+  static constexpr auto kNumButtons = 2u;
+  QPushButton *buttons[kNumButtons] = {d->goto_btn, d->delete_btn};
+
+  auto rect = d->view->visualRect(index);
+  auto button_margin = rect.height() / 6;
+  auto button_size = rect.height() - (button_margin * 2);
+  auto button_count = static_cast<int>(kNumButtons);
+  auto button_area_width =
+      (button_count * button_size) + (button_count * button_margin);
+
+  auto current_x =
+      d->view->pos().x() + d->view->width() - button_area_width;
+
+  if (d->view->verticalScrollBar()->isVisible()) {
+    current_x -= d->view->verticalScrollBar()->width();
+  }
+
+  auto current_y = rect.y() + (rect.height() / 2) - (button_size / 2);
+
+  auto pos = d->view->viewport()->mapToGlobal(QPoint(current_x, current_y));
+  pos = d->dock->mapFromGlobal(pos);
+
+  current_x = pos.x();
+  current_y = pos.y();
+
+  for (auto *button : buttons) {
+    button->resize(button_size, button_size);
+    button->move(current_x, current_y);
+    button->raise();
+    current_x += button_size + button_margin;
+  }
+
+  d->updating_buttons = false;
 }
 
 }  // namespace mx::gui

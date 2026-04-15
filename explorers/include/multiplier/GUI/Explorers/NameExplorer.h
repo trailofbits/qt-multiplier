@@ -32,11 +32,16 @@ class NameExplorer Q_DECL_FINAL : public IMainWindowPlugin {
  signals:
   void RenameEntities(const QMap<mx::RawEntityId, QString> &renames);
 
+ protected:
+  bool eventFilter(QObject *obj, QEvent *event) Q_DECL_OVERRIDE;
+
  private slots:
   void OnIndexChanged(const ConfigManager &config_manager);
   void OnDeleteSelected(void);
 
  private:
+  void UpdateItemButtons(void);
+
   struct PrivateData;
   std::unique_ptr<PrivateData> d;
 };
