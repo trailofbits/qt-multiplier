@@ -565,6 +565,8 @@ struct CodeWidget::PrivateData {
 
   // The previous highlighted entity.
   const Entity *prev_highlighted_entity{nullptr};
+  int prev_highlight_first_line{-1};
+  int prev_highlight_last_line{-1};
 
   TokenModel token_model;
 
@@ -1599,10 +1601,13 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   // ---------------------------------------------------------------------------
   // Re-render if scrolled past the buffer.
   if (d->NeedsViewportRerender()) {
-    d->canvas_changed = true;  // Force highlight recomputation.
     d->RecomputeVisibleCanvas();
-    d->RecomputeHighlights();
   }
+
+  // Always recompute highlights after viewport state is finalized.
+  // This must run after RecomputeCanvas and RecomputeVisibleCanvas so
+  // that rendered_first_line/rendered_last_line are up to date.
+  d->RecomputeHighlights();
 
   // The fg/bg images are offset by rendered_y_offset.
   int draw_y = -(d->scroll_y - d->rendered_y_offset);
@@ -2499,11 +2504,16 @@ void CodeWidget::PrivateData::RecomputeLineNumbers(void) {
 
 // Recompute the highlights.
 void CodeWidget::PrivateData::RecomputeHighlights(void) {
-  if (current_entity == prev_highlighted_entity && !canvas_changed) {
+  bool range_changed = (rendered_first_line != prev_highlight_first_line ||
+                        rendered_last_line != prev_highlight_last_line);
+  if (current_entity == prev_highlighted_entity && !range_changed &&
+      !canvas_changed) {
     return;
   }
 
   prev_highlighted_entity = current_entity;
+  prev_highlight_first_line = rendered_first_line;
+  prev_highlight_last_line = rendered_last_line;
 
   // Use the same viewport-sized height as fg/bg.
   int render_height = (rendered_last_line - rendered_first_line + 1)
@@ -2579,7 +2589,6 @@ void CodeWidget::PrivateData::RecomputeCanvas(void) {
   RecomputeScene();
 
   if (!canvas_changed) {
-    RecomputeHighlights();
     return;
   }
 
