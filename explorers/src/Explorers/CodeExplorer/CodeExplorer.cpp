@@ -212,6 +212,11 @@ CodeExplorer::~CodeExplorer(void) {
       [] (const QVariant &item) -> RawEntityId {
         if (!item.canConvert<Location>()) return kInvalidEntityId;
         return EntityId(item.value<Location>().first).Pack();
+      },
+      [] (const QVariant &item) -> HistoryWidget::LocationInfo {
+        if (!item.canConvert<Location>()) return {};
+        auto loc = item.value<Location>().second;
+        return {loc.Line(), loc.Column()};
       });
 
   // Save open entity IDs with cursor info.
@@ -339,6 +344,16 @@ CodeExplorer::CodeExplorer(ConfigManager &config_manager,
       if (std::holds_alternative<NotAnEntity>(entity)) continue;
 
       CodeWidget::OpaqueLocation loc;
+      // Restore at least the line number from the saved history entry.
+      if (entry.line > 0) {
+        auto line = static_cast<int>(entry.line);
+        loc.scroll_y.physical = line;
+        loc.scroll_y.relative = 0;
+        loc.cursor_y.physical = line;
+        loc.cursor_y.relative = 0;
+        loc.cursor_index = entry.column > 0
+            ? static_cast<int>(entry.column - 1) : -1;
+      }
       d->history->SetCurrentItem(
           QVariant::fromValue(Location(entity, loc)),
           entry.label.isEmpty() ? std::nullopt
@@ -733,8 +748,13 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
 void CodeExplorer::OnGoToHistoricalItem(const QVariant &data) {
   auto [ent, loc] = data.value<Location>();
   OpenEntity(ent, false  /* don't add to history */);
-  d->CurrentOpenCodeWidget().second->TryGoToLocation(
-      loc, true  /* take focus */);
+
+  // Only restore the opaque location if it has valid position data.
+  // An empty location (from cross-session restore) would scroll to 0,0.
+  if (loc.scroll_y.physical >= 0 || loc.cursor_y.physical >= 0) {
+    d->CurrentOpenCodeWidget().second->TryGoToLocation(
+        loc, true  /* take focus */);
+  }
 }
 
 void CodeExplorer::OnHistoricalPreviewedEntitySelected(const QVariant &data) {
