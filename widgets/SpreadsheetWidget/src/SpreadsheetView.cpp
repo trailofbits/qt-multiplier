@@ -13,6 +13,8 @@
 #include <QColorDialog>
 #include <QDataStream>
 #include <QHeaderView>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMouseEvent>
@@ -68,7 +70,10 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
   // Word wrap on for multiline cells.
   setWordWrap(true);
   setTextElideMode(Qt::ElideNone);
-  verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+  verticalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+  verticalHeader()->setDefaultSectionSize(
+      fontMetrics().height() + 8);  // Sensible default.
+  resizeRowsToContents();  // Initial fit.
 
   // Context menu on the corner button (select-all).
   if (auto *corner = findChild<QAbstractButton *>()) {
@@ -390,6 +395,30 @@ void SpreadsheetView::paste_at_selection(void) {
       }
       sm->set_cell_value(start_row, start_col,
                          QVariant::fromValue(dc));
+    }
+    return;
+  }
+
+  // Check for location reference paste (from CodeWidget "Copy Location").
+  if (mime->hasFormat(
+          QStringLiteral("application/x-multiplier-location"))) {
+    auto data = mime->data(
+        QStringLiteral("application/x-multiplier-location"));
+    auto doc = QJsonDocument::fromJson(data);
+    if (doc.isObject() && sm) {
+      auto obj = doc.object();
+      LocationCell lc;
+      lc.entity_id = static_cast<uint64_t>(
+          obj[QStringLiteral("e")].toDouble());
+      lc.file_path = obj[QStringLiteral("p")].toString();
+      lc.line = static_cast<unsigned>(
+          obj[QStringLiteral("l")].toInt());
+      lc.column = static_cast<unsigned>(
+          obj[QStringLiteral("c")].toInt());
+      lc.opaque_data = QByteArray::fromBase64(
+          obj[QStringLiteral("o")].toString().toLatin1());
+      sm->set_cell_value(start_row, start_col,
+                         QVariant::fromValue(lc));
     }
     return;
   }

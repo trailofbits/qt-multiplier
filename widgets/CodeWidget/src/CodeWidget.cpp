@@ -11,7 +11,10 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QDataStream>
 #include <QFontMetricsF>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMimeData>
 #include <QHBoxLayout>
 #include <QImage>
@@ -32,6 +35,7 @@
 
 #include <cmath>
 #include <multiplier/AST/AddrLabelExpr.h>
+#include <multiplier/Entity.h>
 #include <multiplier/AST/DeclRefExpr.h>
 #include <multiplier/AST/LabelStmt.h>
 #include <multiplier/AST/MemberExpr.h>
@@ -3536,6 +3540,71 @@ void CodeWidget::ActOnContextMenu(IWindowManager *, QMenu *menu,
                     d->CopySelectionToClipboard();
                   });
   }
+
+  // Copy Location: copies the current cursor position as "path:line:col"
+  // and as a LocationCell-compatible MIME for pasting into spreadsheets.
+  if (d->space_width > 0 && d->line_height > 0) {
+    auto loc = d->Location();
+    auto line = loc.Line();
+    if (line > 0) {
+      auto *copy_loc = new QAction(tr("Copy Location"), menu);
+      menu->addAction(copy_loc);
+      connect(copy_loc, &QAction::triggered, this, [loc] (void) {
+        auto location = loc;
+
+        // Resolve file path from the entity.
+        QString file_path;
+        auto eid = mx::EntityId(location.entity).Pack();
+        if (eid != mx::kInvalidEntityId) {
+          if (auto file = mx::File::containing(location.entity)) {
+            for (auto path : file->paths()) {
+              file_path = QString::fromStdString(path.generic_string());
+              break;
+            }
+          }
+        }
+
+        auto line_num = location.Line();
+        auto col_num = location.Column();
+
+        // Build display text.
+        QString display;
+        if (!file_path.isEmpty()) {
+          auto name = file_path;
+          auto sep = name.lastIndexOf(QLatin1Char('/'));
+          if (sep >= 0) name = name.mid(sep + 1);
+          display = col_num > 0
+              ? QStringLiteral("%1:%2:%3").arg(name).arg(line_num).arg(col_num)
+              : QStringLiteral("%1:%2").arg(name).arg(line_num);
+        } else {
+          display = QStringLiteral("line:%1").arg(line_num);
+        }
+
+        // Build MIME data with both plain text and LocationCell JSON.
+        auto *mime = new QMimeData;
+        mime->setText(display);
+
+        // Serialize as LocationCell JSON for spreadsheet paste.
+        auto opaque_data = location.toByteArray();
+        QJsonObject loc_json;
+        loc_json[QStringLiteral("t")] = QStringLiteral("loc");
+        loc_json[QStringLiteral("e")] =
+            static_cast<qint64>(eid);
+        loc_json[QStringLiteral("p")] = file_path;
+        loc_json[QStringLiteral("l")] =
+            static_cast<int>(line_num);
+        loc_json[QStringLiteral("c")] =
+            static_cast<int>(col_num);
+        loc_json[QStringLiteral("o")] =
+            QString::fromLatin1(opaque_data.toBase64());
+
+        mime->setData(QStringLiteral("application/x-multiplier-location"),
+                      QJsonDocument(loc_json).toJson(QJsonDocument::Compact));
+
+        qApp->clipboard()->setMimeData(mime);
+      });
+    }
+  }
 }
 
 void CodeWidget::OnToggleBrowseMode(const QVariant &toggled) {
@@ -3577,6 +3646,49 @@ unsigned CodeWidget::OpaqueLocation::Line(void) const {
 // Returns `0` if not valid.
 unsigned CodeWidget::OpaqueLocation::Column(void) const {
   return cursor_index >= 0 ? static_cast<unsigned>(cursor_index + 1) : 0u;
+}
+
+QByteArray CodeWidget::OpaqueLocation::toByteArray(void) const {
+  QByteArray data;
+  QDataStream stream(&data, QIODevice::WriteOnly);
+  stream.setVersion(QDataStream::Qt_6_0);
+
+  // Serialize entity as packed ID.
+  auto eid = mx::EntityId(entity).Pack();
+  stream << static_cast<quint64>(eid);
+
+  // Serialize the scroll/cursor positions.
+  stream << scroll_y.scale << scroll_y.relative << scroll_y.physical;
+  stream << current_y.scale << current_y.relative << current_y.physical;
+  stream << cursor_y.scale << cursor_y.relative << cursor_y.physical;
+  stream << scroll_y_offset_scale << scroll_x_scale
+         << cursor_x_scale << cursor_index;
+
+  return data;
+}
+
+CodeWidget::OpaqueLocation CodeWidget::OpaqueLocation::fromByteArray(
+    const QByteArray &data) {
+  OpaqueLocation loc;
+  if (data.isEmpty()) {
+    return loc;
+  }
+
+  QDataStream stream(data);
+  stream.setVersion(QDataStream::Qt_6_0);
+
+  quint64 eid{0};
+  stream >> eid;
+  // Entity must be resolved from the Index by the caller using eid.
+  // We can't do it here without an Index reference.
+
+  stream >> loc.scroll_y.scale >> loc.scroll_y.relative >> loc.scroll_y.physical;
+  stream >> loc.current_y.scale >> loc.current_y.relative >> loc.current_y.physical;
+  stream >> loc.cursor_y.scale >> loc.cursor_y.relative >> loc.cursor_y.physical;
+  stream >> loc.scroll_y_offset_scale >> loc.scroll_x_scale
+         >> loc.cursor_x_scale >> loc.cursor_index;
+
+  return loc;
 }
 
 }  // namespace mx::gui

@@ -686,6 +686,16 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
     return;
   }
 
+  // Prefer the definition over a forward declaration.
+  if (std::holds_alternative<Decl>(entity)) {
+    auto decl = std::get<Decl>(entity);
+    if (auto def = decl.definition()) {
+      entity = def.value();
+    } else {
+      entity = decl.canonical_declaration();
+    }
+  }
+
   if (!d->preview) {
     d->preview = new CodePreviewWidget(
         d->config_manager, d->scene_options, d->browse_mode, true);

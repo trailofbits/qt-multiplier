@@ -44,6 +44,23 @@ struct DocumentCell {
   QString title;     // Cached document title, shown in the cell.
 };
 
+// A cell that references a code location. Renders as "path:line:col"
+// and navigates to the exact location on click (in clickable columns).
+// Stores the full opaque location data for precise scroll/cursor restore.
+struct LocationCell {
+  uint64_t entity_id{0};    // Entity ID for navigation.
+  QString file_path;        // Display path.
+  unsigned line{0};
+  unsigned column{0};
+
+  // Serialized OpaqueLocation for precise navigation.
+  // This is a base64-encoded binary blob produced by CodeWidget.
+  QByteArray opaque_data;
+
+  // Render as "path:line:col".
+  QString displayText(void) const;
+};
+
 
 // Metadata for a single column.
 struct ColumnDefinition {
@@ -165,3 +182,4 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
 
 Q_DECLARE_METATYPE(mx::gui::FormulaCell)
 Q_DECLARE_METATYPE(mx::gui::DocumentCell)
+Q_DECLARE_METATYPE(mx::gui::LocationCell)
