@@ -586,6 +586,14 @@ void CodeExplorer::OpenEntity(const VariantEntity &entity,
   connect(this, &CodeExplorer::ExpandMacros,
           code_widget, &CodeWidget::OnExpandMacros);
 
+  connect(this, &CodeExplorer::RenameEntities,
+          code_widget, &CodeWidget::OnRenameEntities);
+
+  // Apply any current renames to the new widget.
+  if (!d->scene_options.new_entity_names.isEmpty()) {
+    code_widget->OnRenameEntities(d->scene_options.new_entity_names);
+  }
+
   // Figure out the window title.
   if (file) {
     for (auto path : file->paths()) {
@@ -703,6 +711,9 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
     connect(this, &CodeExplorer::ExpandMacros,
             d->preview, &CodePreviewWidget::OnExpandMacros);
 
+    connect(this, &CodeExplorer::RenameEntities,
+            d->preview, &CodePreviewWidget::OnRenameEntities);
+
     // When the user navigates the history, make sure that we change what the
     // view shows.
     connect(d->preview, &CodePreviewWidget::HistoricalEntitySelected,
@@ -748,6 +759,9 @@ void CodeExplorer::OnPinnedPreviewEntity(const QVariant &data) {
   connect(this, &CodeExplorer::ExpandMacros,
           preview, &CodePreviewWidget::OnExpandMacros);
 
+  connect(this, &CodeExplorer::RenameEntities,
+          preview, &CodePreviewWidget::OnRenameEntities);
+
   if (auto name = NameOfEntityAsString(entity)) {
     preview->setWindowTitle(
         tr("Preview of `%1`").arg(name.value()));
@@ -786,6 +800,12 @@ void CodeExplorer::OnRenameEntity(QVector<RawEntityId> entity_ids,
                                   QString new_name) {
   (void) entity_ids;
   (void) new_name;
+}
+
+void CodeExplorer::OnRenameEntities(
+    const QMap<RawEntityId, QString> &new_entity_names) {
+  d->scene_options.new_entity_names = new_entity_names;
+  emit RenameEntities(new_entity_names);
 }
 
 }  // namespace mx::gui

@@ -72,6 +72,9 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_highlight_colors ("
       "  entity_id INTEGER PRIMARY KEY, fg TEXT, bg TEXT)"));
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_renamed_entities ("
+      "  entity_id INTEGER PRIMARY KEY, new_name TEXT NOT NULL)"));
 
   // Spreadsheet persistence tables.
   q.exec(QStringLiteral(
@@ -565,6 +568,37 @@ QSet<RawEntityId> ConfigManager::LoadExpandedMacros(void) const {
   QSet<RawEntityId> result;
   while (q.next())
     result.insert(static_cast<RawEntityId>(q.value(0).toULongLong()));
+  return result;
+}
+
+// --- Renamed entities ---
+
+void ConfigManager::SaveRenamedEntities(
+    const QMap<RawEntityId, QString> &renames) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  d->project_db.transaction();
+  QSqlQuery q(d->project_db);
+  q.exec(QStringLiteral("DELETE FROM gui_renamed_entities"));
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_renamed_entities (entity_id, new_name) VALUES (?, ?)"));
+  for (auto it = renames.constBegin(); it != renames.constEnd(); ++it) {
+    q.addBindValue(static_cast<qint64>(it.key()));
+    q.addBindValue(it.value());
+    q.exec();
+  }
+  d->project_db.commit();
+}
+
+QMap<RawEntityId, QString> ConfigManager::LoadRenamedEntities(void) const {
+  if (!d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.exec(QStringLiteral(
+      "SELECT entity_id, new_name FROM gui_renamed_entities"));
+  QMap<RawEntityId, QString> result;
+  while (q.next()) {
+    auto id = static_cast<RawEntityId>(q.value(0).toULongLong());
+    result.insert(id, q.value(1).toString());
+  }
   return result;
 }
 

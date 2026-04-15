@@ -1599,6 +1599,7 @@ void CodeWidget::paintEvent(QPaintEvent *) {
   // ---------------------------------------------------------------------------
   // Re-render if scrolled past the buffer.
   if (d->NeedsViewportRerender()) {
+    d->canvas_changed = true;  // Force highlight recomputation.
     d->RecomputeVisibleCanvas();
     d->RecomputeHighlights();
   }
