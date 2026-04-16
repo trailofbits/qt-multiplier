@@ -31,9 +31,32 @@
 
 #include <multiplier/GUI/Interfaces/ITheme.h>
 #include <multiplier/GUI/Managers/AgentMessage.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
+#include <multiplier/GUI/Util.h>
+#include <multiplier/Index.h>
 
 namespace {
+
+// Resolve an entity ID from JSON into a human-readable name.
+// JSON uses double-precision floats, which cannot exactly represent all
+// uint64_t values.  Fall back to hex when no name is available.
+static QString resolveEntityName(const mx::gui::ConfigManager &config,
+                                 const QJsonValue &id_val) {
+  auto raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  if (raw_id == 0 || raw_id == mx::kInvalidEntityId) {
+    return QStringLiteral("(unknown)");
+  }
+
+  const auto &index = config.Index();
+  auto entity = index.entity(mx::EntityId(raw_id));
+
+  if (auto name = mx::gui::NameOfEntityAsString(entity)) {
+    return name.value();
+  }
+
+  return QStringLiteral("0x%1").arg(raw_id, 0, 16);
+}
 
 static QString toolResultSummary(const QString &tool_name,
                                  const QJsonObject &result) {
@@ -124,9 +147,6 @@ static void formatCallersTree(const QJsonArray &items, const QString &prefix,
     auto kind = obj[QStringLiteral("kind")].toString();
     auto file = obj[QStringLiteral("file")].toString();
     int line = obj[QStringLiteral("line")].toInt(-1);
-    auto eid = static_cast<int64_t>(
-        obj[QStringLiteral("entity_id")].toDouble());
-
     bool is_last = (i == items.size() - 1);
     auto connector = is_last ? QStringLiteral("\xe2\x94\x94\xe2\x94\x80 ")
                              : QStringLiteral("\xe2\x94\x9c\xe2\x94\x80 ");
@@ -141,14 +161,12 @@ static void formatCallersTree(const QJsonArray &items, const QString &prefix,
 
     QString entry;
     if (depth == 0) {
-      entry = QStringLiteral("%1 (%2:%3)%4")
+      entry = QStringLiteral("%1 (%2)%3")
                   .arg(name, kind)
-                  .arg(eid)
                   .arg(loc);
     } else {
-      entry = QStringLiteral("%1%2%3 (%4:%5)%6")
+      entry = QStringLiteral("%1%2%3 (%4)%5")
                   .arg(prefix, connector, name, kind)
-                  .arg(eid)
                   .arg(loc);
     }
     lines.append(entry);
@@ -191,15 +209,12 @@ static QString formatToolResult(const QString &tool_name,
   if (tool_name == QStringLiteral("search_entities")) {
     auto entities = result[QStringLiteral("entities")].toArray();
     QStringList lines;
-    lines.append(QStringLiteral("entity_id  | kind     | name"));
+    lines.append(QStringLiteral("kind     | name"));
     for (const auto &val : entities) {
       auto obj = val.toObject();
-      auto eid = static_cast<int64_t>(
-          obj[QStringLiteral("entity_id")].toDouble());
       auto kind = obj[QStringLiteral("kind")].toString();
       auto name = obj[QStringLiteral("name")].toString();
-      lines.append(QStringLiteral("%1 | %2 | %3")
-                       .arg(eid, -10)
+      lines.append(QStringLiteral("%1 | %2")
                        .arg(kind, -8)
                        .arg(name));
     }
@@ -349,7 +364,8 @@ static QString formatToolResult(const QString &tool_name,
 }
 
 static QString formatToolArgs(const QString &tool_name,
-                              const QJsonObject &args) {
+                              const QJsonObject &args,
+                              const mx::gui::ConfigManager &config) {
   if (args.isEmpty()) {
     return QStringLiteral("(no args)");
   }
@@ -388,10 +404,11 @@ static QString formatToolArgs(const QString &tool_name,
       tool_name == QStringLiteral("get_references") ||
       tool_name == QStringLiteral("get_callers") ||
       tool_name == QStringLiteral("get_callees")) {
-    auto eid = static_cast<int64_t>(
-        args[QStringLiteral("entity_id")].toDouble());
-    if (eid != 0) {
-      return QStringLiteral("entity_id: %1").arg(eid);
+    auto id_val = args[QStringLiteral("entity_id")];
+    auto raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+    if (raw_id != 0) {
+      auto name = resolveEntityName(config, id_val);
+      return QStringLiteral("entity: %1").arg(name);
     }
   }
   if (tool_name == QStringLiteral("finish")) {
@@ -456,6 +473,7 @@ static void applyCompactStyle(QAbstractItemView *view, int max_height) {
 
 // 1. list_files -> clickable file list
 static QWidget *createListFilesView(const QJsonObject &result,
+                                    const mx::gui::ConfigManager &config,
                                     QWidget *parent) {
   auto files = result[QStringLiteral("files")].toArray();
   if (files.isEmpty()) {
@@ -470,11 +488,13 @@ static QWidget *createListFilesView(const QJsonObject &result,
   for (qsizetype i = 0; i < limit; ++i) {
     auto obj = files[i].toObject();
     auto path = obj[QStringLiteral("path")].toString();
-    auto eid = static_cast<int64_t>(
-        obj[QStringLiteral("entity_id")].toDouble());
+    auto raw_id = static_cast<mx::RawEntityId>(
+        obj[QStringLiteral("entity_id")].toDouble(0));
     auto *item = new QListWidgetItem(path, list);
-    item->setData(Qt::UserRole, qlonglong(eid));
-    item->setToolTip(QStringLiteral("entity_id: %1").arg(eid));
+    item->setData(Qt::UserRole, qlonglong(raw_id));
+    auto resolved = resolveEntityName(config,
+                                      obj[QStringLiteral("entity_id")]);
+    item->setToolTip(resolved);
   }
   if (files.size() > 30) {
     auto *more = new QListWidgetItem(
@@ -489,15 +509,15 @@ static QWidget *createListFilesView(const QJsonObject &result,
 
 // 2. search_entities -> mini table
 static QWidget *createSearchEntitiesView(const QJsonObject &result,
+                                         const mx::gui::ConfigManager &config,
                                          QWidget *parent) {
   auto entities = result[QStringLiteral("entities")].toArray();
   if (entities.isEmpty()) {
     return nullptr;
   }
 
-  auto *table = new QTableWidget(static_cast<int>(entities.size()), 3, parent);
-  table->setHorizontalHeaderLabels({QStringLiteral("ID"),
-                                    QStringLiteral("Kind"),
+  auto *table = new QTableWidget(static_cast<int>(entities.size()), 2, parent);
+  table->setHorizontalHeaderLabels({QStringLiteral("Kind"),
                                     QStringLiteral("Name")});
   applyCompactStyle(table, 250);
   table->setAlternatingRowColors(true);
@@ -507,15 +527,20 @@ static QWidget *createSearchEntitiesView(const QJsonObject &result,
 
   for (qsizetype i = 0; i < entities.size(); ++i) {
     auto obj = entities[i].toObject();
-    auto eid = static_cast<int64_t>(
-        obj[QStringLiteral("entity_id")].toDouble());
     auto kind = obj[QStringLiteral("kind")].toString();
     auto name = obj[QStringLiteral("name")].toString();
 
+    // If the JSON name is empty, try to resolve from the index.
+    if (name.isEmpty()) {
+      name = resolveEntityName(config, obj[QStringLiteral("entity_id")]);
+    }
+
     auto row = static_cast<int>(i);
-    table->setItem(row, 0, new QTableWidgetItem(QString::number(eid)));
-    table->setItem(row, 1, new QTableWidgetItem(kind));
-    table->setItem(row, 2, new QTableWidgetItem(name));
+    auto *kind_item = new QTableWidgetItem(kind);
+    kind_item->setToolTip(
+        resolveEntityName(config, obj[QStringLiteral("entity_id")]));
+    table->setItem(row, 0, kind_item);
+    table->setItem(row, 1, new QTableWidgetItem(name));
   }
   table->resizeColumnsToContents();
   return table;
@@ -852,6 +877,7 @@ static QWidget *createSessionCostView(const QJsonObject &result,
 static QWidget *createToolResultWidget(const QString &tool_name,
                                        const QJsonObject &result,
                                        const QJsonObject &/*args*/,
+                                       const mx::gui::ConfigManager &config,
                                        QWidget *parent) {
   // Don't create widgets for error results.
   if (result.contains(QStringLiteral("error"))) {
@@ -859,10 +885,10 @@ static QWidget *createToolResultWidget(const QString &tool_name,
   }
 
   if (tool_name == QStringLiteral("list_files")) {
-    return createListFilesView(result, parent);
+    return createListFilesView(result, config, parent);
   }
   if (tool_name == QStringLiteral("search_entities")) {
-    return createSearchEntitiesView(result, parent);
+    return createSearchEntitiesView(result, config, parent);
   }
   if (tool_name == QStringLiteral("search_code")) {
     return createSearchCodeView(result, parent);
@@ -892,6 +918,7 @@ namespace mx::gui {
 
 struct AgentConversationWidget::PrivateData {
   ThemeManager &theme_manager;
+  ConfigManager &config_manager;
 
   QScrollArea *scroll_area{nullptr};
   QWidget *messages_container{nullptr};
@@ -926,8 +953,8 @@ struct AgentConversationWidget::PrivateData {
   int total_completion_tokens{0};
   bool enter_to_send{true};
 
-  explicit PrivateData(ThemeManager &tm)
-      : theme_manager(tm) {}
+  explicit PrivateData(ThemeManager &tm, ConfigManager &cm)
+      : theme_manager(tm), config_manager(cm) {}
 };
 
 AgentConversationWidget::~AgentConversationWidget(void) {}
@@ -937,9 +964,10 @@ void AgentConversationWidget::setEnterToSend(bool enabled) {
 }
 
 AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
+                                                  ConfigManager &config_manager,
                                                   QWidget *parent)
     : QWidget(parent),
-      d(new PrivateData(theme_manager)) {
+      d(new PrivateData(theme_manager, config_manager)) {
 
   auto *main_layout = new QVBoxLayout(this);
   main_layout->setContentsMargins(0, 0, 0, 0);
@@ -1236,14 +1264,14 @@ void AgentConversationWidget::addMessageBubble(
 
     // Show args if available.
     if (!tool_args.isEmpty()) {
-      auto args_text = formatToolArgs(tool_name, tool_args);
+      auto args_text = formatToolArgs(tool_name, tool_args, d->config_manager);
       auto *args_label = make_label(
           QStringLiteral("Args: ") + args_text, true);
       detail_layout->addWidget(args_label);
     }
 
     auto *interactive = createToolResultWidget(
-        tool_name, tool_result, tool_args, detail);
+        tool_name, tool_result, tool_args, d->config_manager, detail);
     if (interactive) {
       detail_layout->addWidget(interactive);
     } else {

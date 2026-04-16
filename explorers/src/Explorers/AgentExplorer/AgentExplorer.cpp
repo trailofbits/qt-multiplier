@@ -193,7 +193,9 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
   main_layout->addLayout(toolbar_layout);
 
   // Conversation widget.
-  d->conversation = new AgentConversationWidget(theme_manager, d->main_dock);
+  d->conversation = new AgentConversationWidget(theme_manager,
+                                                  d->config_manager,
+                                                  d->main_dock);
   main_layout->addWidget(d->conversation, 1);
 
   {

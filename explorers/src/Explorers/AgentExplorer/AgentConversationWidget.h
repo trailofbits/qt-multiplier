@@ -15,6 +15,7 @@
 namespace mx::gui {
 
 struct AgentMessage;
+class ConfigManager;
 class ThemeManager;
 
 class AgentConversationWidget Q_DECL_FINAL : public QWidget {
@@ -27,6 +28,7 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   virtual ~AgentConversationWidget(void);
 
   explicit AgentConversationWidget(ThemeManager &theme_manager,
+                                   ConfigManager &config_manager,
                                    QWidget *parent = nullptr);
 
   void setEnterToSend(bool enabled);
