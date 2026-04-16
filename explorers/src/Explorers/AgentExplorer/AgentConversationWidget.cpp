@@ -1269,6 +1269,13 @@ static bool renderAnnotatedContent(
         cb.type, cb.entity_id, cb.start_line, cb.end_line,
         config, frame);
     if (code_view) {
+      // Store metadata for theme-change re-rendering.
+      code_view->setProperty("mx_entity_id",
+                             QVariant::fromValue(cb.entity_id));
+      code_view->setProperty("mx_start_line", cb.start_line);
+      code_view->setProperty("mx_end_line", cb.end_line);
+      code_view->setProperty("mx_type", cb.type);
+
       QObject::connect(
           code_view, &QTextBrowser::anchorClicked, code_view,
           [on_link_activated](const QUrl &url) {
@@ -1379,6 +1386,15 @@ struct AgentConversationWidget::PrivateData {
   QMap<QString, QJsonObject> pending_tool_args;
   // Also store tool names for pending calls.
   QMap<QString, QString> pending_tool_names;
+
+  // Tracked annotated code views for theme-change re-rendering.
+  struct AnnotatedCodeRef {
+    QTextBrowser *browser{nullptr};
+    uint64_t entity_id{0};
+    int start_line{0};
+    int end_line{0};
+  };
+  QVector<AnnotatedCodeRef> annotated_code_views;
 
   bool auto_scroll{true};
   QPushButton *tail_btn{nullptr};
@@ -1647,6 +1663,27 @@ void AgentConversationWidget::onSendClicked(void) {
 
 void AgentConversationWidget::onThemeChanged(const ThemeManager &) {
   applyThemeColors();
+
+  // Re-render annotated code views with the new theme colors.
+  if (!d->messages_container) return;
+  auto browsers = d->messages_container->findChildren<QTextBrowser *>();
+  for (auto *browser : browsers) {
+    auto eid_var = browser->property("mx_entity_id");
+    if (!eid_var.isValid()) continue;
+
+    auto eid = eid_var.toULongLong();
+    auto start_line = browser->property("mx_start_line").toInt();
+    auto end_line = browser->property("mx_end_line").toInt();
+    auto type = browser->property("mx_type").toString();
+
+    auto *fresh = createAnnotatedCodeView(
+        type, eid, start_line, end_line, d->config_manager, browser->parentWidget());
+    if (fresh) {
+      // Replace the old browser's HTML with the fresh one.
+      browser->setHtml(fresh->toHtml());
+      fresh->deleteLater();
+    }
+  }
 }
 
 void AgentConversationWidget::addMessageBubble(
