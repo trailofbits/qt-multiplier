@@ -684,6 +684,12 @@ void AgentExplorer::OnToggleObserver(bool checked) {
   } else {
     StopObserver();
   }
+
+  bool enabled = d->observer_btn->isChecked();
+  d->observer_btn->setText(enabled ? tr("Observer: ON") : tr("Observer"));
+  d->observer_btn->setStyleSheet(enabled
+      ? QStringLiteral("QPushButton { font-weight: bold; }")
+      : QString());
 }
 
 void AgentExplorer::StartObserver(void) {
@@ -738,9 +744,9 @@ void AgentExplorer::StartObserver(void) {
 
   AgentMessage sys_msg;
   sys_msg.role = QStringLiteral("system");
-  sys_msg.content = tr("Observer mode enabled. The observer will review "
-                       "the primary agent every %1 tool calls.")
-                        .arg(d->observer_trigger_interval);
+  sys_msg.content = tr("Observer enabled: a secondary agent will periodically "
+                       "review your session and write recommendations to an "
+                       "'Observer Notes' document.");
   d->conversation->addMessage(sys_msg);
 }
 
@@ -752,6 +758,11 @@ void AgentExplorer::StopObserver(void) {
   d->observer_enabled = false;
   d->observer_label->setVisible(false);
   d->observer_btn->setChecked(false);
+
+  AgentMessage sys_msg;
+  sys_msg.role = QStringLiteral("system");
+  sys_msg.content = tr("Observer disabled.");
+  d->conversation->addMessage(sys_msg);
 }
 
 void AgentExplorer::OnObserverTriggered(int64_t observer_session_id) {

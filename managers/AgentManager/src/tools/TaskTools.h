@@ -15,6 +15,7 @@ namespace mx::gui {
 
 struct TaskToolContext {
   ConfigManager *config{nullptr};
+  int cached_task_sheet_id{-1};
 };
 
 // Register all task management tools with the given registry.

@@ -176,6 +176,9 @@ QJsonObject CreateSheetTool::parametersSchema(void) const {
       QStringLiteral("List of column names"));
   props[QStringLiteral("description")] = string_prop(
       QStringLiteral("Optional description of the sheet"));
+  props[QStringLiteral("role")] = string_prop(
+      QStringLiteral("Optional role tag for the sheet (e.g. \"task_list\", "
+                     "\"findings\"). Helps tools find sheets by purpose."));
   return make_schema(props, {QStringLiteral("name"),
                              QStringLiteral("columns")});
 }
@@ -199,6 +202,7 @@ QJsonObject CreateSheetTool::execute(const QJsonObject &args) {
   }
 
   sheet.description = args[QStringLiteral("description")].toString();
+  sheet.role = args[QStringLiteral("role")].toString();
 
   int id = -1;
   QMetaObject::invokeMethod(m_ctx->config, [&] {

@@ -100,7 +100,14 @@ static void ensure_cell(ConfigManager::SheetData &sheet, int row, int col) {
 }
 
 // Find or create the task_list sheet. Returns sheet_id.
-static int ensureTaskSheet(ConfigManager *config) {
+static int ensureTaskSheet(TaskToolContext *ctx) {
+  // Check cache first.
+  if (ctx->cached_task_sheet_id >= 0) {
+    return ctx->cached_task_sheet_id;
+  }
+
+  auto *config = ctx->config;
+
   // Look for an existing open sheet with role "task_list".
   QVector<ConfigManager::SheetData> sheets;
   QMetaObject::invokeMethod(config, [&] {
@@ -108,6 +115,15 @@ static int ensureTaskSheet(ConfigManager *config) {
   }, Qt::BlockingQueuedConnection);
   for (const auto &s : sheets) {
     if (s.role == QLatin1String("task_list")) {
+      ctx->cached_task_sheet_id = s.sheet_id;
+      return s.sheet_id;
+    }
+  }
+
+  // Fallback: search by name "Task Board".
+  for (const auto &s : sheets) {
+    if (s.name == QLatin1String("Task Board")) {
+      ctx->cached_task_sheet_id = s.sheet_id;
       return s.sheet_id;
     }
   }
@@ -130,6 +146,7 @@ static int ensureTaskSheet(ConfigManager *config) {
   }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
+  ctx->cached_task_sheet_id = id;
   return id;
 }
 
@@ -212,7 +229,7 @@ QJsonObject CreateTaskTool::execute(const QJsonObject &args) {
   QString entity = args[QStringLiteral("entity")].toString();
   QString notes = args[QStringLiteral("notes")].toString();
 
-  int sheet_id = ensureTaskSheet(m_ctx->config);
+  int sheet_id = ensureTaskSheet(m_ctx);
   if (sheet_id < 0) {
     return error_result(QStringLiteral("Failed to create/find task sheet"));
   }
@@ -291,7 +308,7 @@ QJsonObject UpdateTaskTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("task_id is required"));
   }
 
-  int sheet_id = ensureTaskSheet(m_ctx->config);
+  int sheet_id = ensureTaskSheet(m_ctx);
   if (sheet_id < 0) {
     return error_result(QStringLiteral("Failed to find task sheet"));
   }
@@ -384,7 +401,7 @@ QJsonObject ListTasksTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("No config manager"));
   }
 
-  int sheet_id = ensureTaskSheet(m_ctx->config);
+  int sheet_id = ensureTaskSheet(m_ctx);
   if (sheet_id < 0) {
     return error_result(QStringLiteral("Failed to find task sheet"));
   }
@@ -462,7 +479,7 @@ QJsonObject CompleteTaskTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("task_id is required"));
   }
 
-  int sheet_id = ensureTaskSheet(m_ctx->config);
+  int sheet_id = ensureTaskSheet(m_ctx);
   if (sheet_id < 0) {
     return error_result(QStringLiteral("Failed to find task sheet"));
   }
@@ -531,7 +548,7 @@ QJsonObject GetTaskBoardSummaryTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("No config manager"));
   }
 
-  int sheet_id = ensureTaskSheet(m_ctx->config);
+  int sheet_id = ensureTaskSheet(m_ctx);
   if (sheet_id < 0) {
     return error_result(QStringLiteral("Failed to find task sheet"));
   }
