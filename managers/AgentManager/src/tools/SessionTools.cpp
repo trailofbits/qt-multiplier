@@ -189,6 +189,78 @@ QJsonObject LogObservationTool::execute(const QJsonObject &args) {
 }
 
 // ===========================================================================
+// GetSessionCostTool
+// ===========================================================================
+
+QString GetSessionCostTool::name(void) const {
+  return QStringLiteral("get_session_cost");
+}
+
+QString GetSessionCostTool::description(void) const {
+  return QStringLiteral(
+      "Get a cost breakdown for the current session including total cost, "
+      "per-tool costs, and per-role costs.");
+}
+
+QJsonObject GetSessionCostTool::parametersSchema(void) const {
+  return make_schema({}, {});
+}
+
+QJsonObject GetSessionCostTool::execute(const QJsonObject &) {
+  auto session_id = m_ctx->current_session_id;
+  if (session_id < 0) {
+    return error_result(QStringLiteral("No active session"));
+  }
+
+  ConfigManager::CostSummary summary;
+  QVector<ConfigManager::ToolCostBreakdown> tool_breakdown;
+  QVector<ConfigManager::RoleCostBreakdown> role_breakdown;
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    summary = m_ctx->config->LoadCostSummary(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    tool_breakdown = m_ctx->config->LoadToolCostBreakdown(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    role_breakdown = m_ctx->config->LoadRoleCostBreakdown(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QJsonObject result;
+  result[QStringLiteral("total_cost_usd")] = summary.total_cost_usd;
+  result[QStringLiteral("total_input_tokens")] = summary.total_input_tokens;
+  result[QStringLiteral("total_output_tokens")] = summary.total_output_tokens;
+  result[QStringLiteral("llm_calls")] = summary.llm_call_count;
+  result[QStringLiteral("tool_calls")] = summary.tool_call_count;
+
+  QJsonArray by_tool;
+  for (const auto &t : tool_breakdown) {
+    QJsonObject obj;
+    obj[QStringLiteral("tool")] = t.tool_name;
+    obj[QStringLiteral("calls")] = t.call_count;
+    obj[QStringLiteral("cost_usd")] = t.total_cost_usd;
+    obj[QStringLiteral("avg_duration_ms")] = t.avg_duration_ms;
+    by_tool.append(obj);
+  }
+  result[QStringLiteral("by_tool")] = by_tool;
+
+  QJsonArray by_role;
+  for (const auto &r : role_breakdown) {
+    QJsonObject obj;
+    obj[QStringLiteral("role")] = r.node_type;
+    obj[QStringLiteral("model")] = r.model;
+    obj[QStringLiteral("calls")] = r.call_count;
+    obj[QStringLiteral("cost_usd")] = r.total_cost_usd;
+    by_role.append(obj);
+  }
+  result[QStringLiteral("by_role")] = by_role;
+
+  return result;
+}
+
+// ===========================================================================
 // FinishTool
 // ===========================================================================
 
@@ -265,6 +337,7 @@ void registerSessionTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<GetAuditContextTool>(ctx));
   registry.registerTool(std::make_unique<SaveCheckpointTool>(ctx));
   registry.registerTool(std::make_unique<LogObservationTool>(ctx));
+  registry.registerTool(std::make_unique<GetSessionCostTool>(ctx));
   registry.registerTool(std::make_unique<FinishTool>(ctx));
 }
 

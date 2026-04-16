@@ -458,8 +458,10 @@ void AgentExplorer::OnTokenUsageUpdated(int64_t session_id,
 
   // Show cumulative tokens across all related sessions.
   auto totals = d->agent_manager->totalTokens();
+  auto summary = d->config_manager.LoadCostSummary(d->current_session_id);
   d->conversation->updateTokens(totals.total_prompt_tokens,
-                                totals.total_completion_tokens);
+                                totals.total_completion_tokens,
+                                summary.total_cost_usd);
   d->config_manager.UpdateAgentSessionTokens(
       session_id, prompt_tokens, completion_tokens);
 }

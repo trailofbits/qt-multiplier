@@ -182,15 +182,22 @@ void AgentConversationWidget::addMessage(const AgentMessage &msg) {
 }
 
 void AgentConversationWidget::updateTokens(int prompt_tokens,
-                                            int completion_tokens) {
+                                            int completion_tokens,
+                                            double cost_usd) {
   d->total_prompt_tokens = prompt_tokens;
   d->total_completion_tokens = completion_tokens;
 
-  // Estimate cost using typical API pricing (per 1M tokens).
-  // Input: ~$3/M, Output: ~$15/M (approximate mid-range).
-  double cost_in = d->total_prompt_tokens * 3.0 / 1000000.0;
-  double cost_out = d->total_completion_tokens * 15.0 / 1000000.0;
-  double total_cost = cost_in + cost_out;
+  double total_cost;
+  if (cost_usd >= 0.0) {
+    // Use authoritative cost from the rates table.
+    total_cost = cost_usd;
+  } else {
+    // Estimate cost using typical API pricing (per 1M tokens).
+    // Input: ~$3/M, Output: ~$15/M (approximate mid-range).
+    double cost_in = d->total_prompt_tokens * 3.0 / 1000000.0;
+    double cost_out = d->total_completion_tokens * 15.0 / 1000000.0;
+    total_cost = cost_in + cost_out;
+  }
 
   d->token_label->setText(
       tr("Tokens: %L1 in / %L2 out ($%3)")

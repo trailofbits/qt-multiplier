@@ -61,6 +61,16 @@ class LogObservationTool Q_DECL_FINAL : public AgentTool {
   QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
 };
 
+class GetSessionCostTool Q_DECL_FINAL : public AgentTool {
+  SessionToolContext *m_ctx;
+ public:
+  explicit GetSessionCostTool(SessionToolContext *ctx) : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
 class FinishTool Q_DECL_FINAL : public AgentTool {
   SessionToolContext *m_ctx;
  public:

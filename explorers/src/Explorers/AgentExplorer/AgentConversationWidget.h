@@ -37,7 +37,8 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
 
  public slots:
   void addMessage(const AgentMessage &msg);
-  void updateTokens(int prompt_tokens, int completion_tokens);
+  void updateTokens(int prompt_tokens, int completion_tokens,
+                    double cost_usd = -1.0);
   void clear(void);
   void showSuggestion(const QString &suggestion,
                       const QStringList &alternatives = {});

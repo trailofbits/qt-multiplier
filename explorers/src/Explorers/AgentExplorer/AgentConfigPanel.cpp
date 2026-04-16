@@ -82,7 +82,7 @@ Keep your task board current. Create tasks before starting work. Update status a
 - **Document tools**: create_document, read_document, edit_document, list_documents, link_document_to_cell
 - **Navigation tools**: search_entities, get_definition, get_references (with kind filtering), get_callers, get_callees, list_files, get_database_path, search_code
 - **Python tools**: run_python (execute scripts using Multiplier Python bindings), create_script_file, get_python_api_reference
-- **Session tools**: get_audit_context, save_checkpoint, log_observation
+- **Session tools**: get_audit_context, save_checkpoint, log_observation, get_session_cost
 - **Completion**: finish (call when done with current work -- provide summary and next actions)
 
 ## Python Scripting
