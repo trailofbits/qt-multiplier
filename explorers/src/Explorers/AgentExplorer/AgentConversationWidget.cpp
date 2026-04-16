@@ -605,8 +605,16 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
   d->input_edit->installEventFilter(this);
 
   // Default suggestion.
-  showSuggestion(tr("List all source files and create a task board for "
-                    "auditing this codebase."));
+  showSuggestion(
+      tr("Search for attack surface entry points: functions that handle "
+         "user input, network data, file parsing, or IPC. Create a "
+         "findings sheet and an attack surface sheet to track results."),
+      {tr("Search for TODO, FIXME, HACK, and XXX comments in the codebase "
+          "to find developer-flagged areas of concern."),
+       tr("Identify the main entry points and trace data flow inward. "
+          "What are the first functions that touch untrusted input?"),
+       tr("List all files and create a task board for a systematic "
+          "audit of this codebase.")});
 
   applyThemeColors();
 }
