@@ -53,6 +53,7 @@ class SpreadsheetExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void OnOpenInSpreadsheet(const QVariant &data);
   void OnOpenDocument(const QVariant &data);
   void OnIndexChanged(const ConfigManager &config_manager);
+  void OnExternalSheetsChanged(void);
 };
 
 }  // namespace mx::gui

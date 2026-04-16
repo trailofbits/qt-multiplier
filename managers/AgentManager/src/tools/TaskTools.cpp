@@ -10,6 +10,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMetaObject>
 
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
@@ -120,7 +121,10 @@ static int ensureTaskSheet(ConfigManager *config) {
     sheet.columns.append(ci);
   }
 
-  return config->SaveSheet(sheet);
+  int id = config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
+  return id;
 }
 
 // Find the row index for a task ID in the sheet. Returns -1 if not found.
@@ -229,6 +233,8 @@ QJsonObject CreateTaskTool::execute(const QJsonObject &args) {
   }
 
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("task_id")] = task_id;
@@ -325,6 +331,8 @@ QJsonObject UpdateTaskTool::execute(const QJsonObject &args) {
   }
 
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;
@@ -465,6 +473,8 @@ QJsonObject CompleteTaskTool::execute(const QJsonObject &args) {
   }
 
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;

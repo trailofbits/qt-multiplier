@@ -329,6 +329,10 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
             this, &SpreadsheetExplorer::ShowReopenClosedSheetsMenu);
     file_menu->addAction(reopen_action);
   }
+
+  // Refresh when the agent modifies sheets externally.
+  connect(&config_manager, &ConfigManager::ExternalSheetsChanged,
+          this, &SpreadsheetExplorer::OnExternalSheetsChanged);
 }
 
 void SpreadsheetExplorer::LoadPersistedSheets(void) {
@@ -1294,6 +1298,59 @@ void SpreadsheetExplorer::ShowReopenClosedSheetsMenu(void) {
   }
 
   menu.exec(QCursor::pos());
+}
+
+void SpreadsheetExplorer::OnExternalSheetsChanged(void) {
+  // Collect IDs of sheets already open as tabs.
+  QSet<int> open_ids;
+  for (const auto &[widget, tab] : d->tabs) {
+    open_ids.insert(tab.sheet_id);
+  }
+
+  // Reload open sheet data from DB — open any new ones, refresh existing.
+  auto sheets = d->config_manager.LoadOpenSheets();
+  for (const auto &sheet : sheets) {
+    if (open_ids.contains(sheet.sheet_id)) {
+      // Already open — update the in-memory model so the user sees changes.
+      for (auto &[widget, tab] : d->tabs) {
+        if (tab.sheet_id != sheet.sheet_id) continue;
+        auto *model = tab.model;
+
+        // Re-apply cell data.
+        int num_rows = static_cast<int>(sheet.cells.size());
+        int num_cols = static_cast<int>(sheet.columns.size());
+
+        // Grow model if agent added rows/columns.
+        if (num_rows > model->rowCount()) {
+          model->insertRows(model->rowCount(),
+                            num_rows - model->rowCount());
+        }
+        if (num_cols > model->columnCount()) {
+          model->insertColumns(model->columnCount(),
+                               num_cols - model->columnCount());
+        }
+
+        for (int r = 0; r < num_rows; ++r) {
+          for (int c = 0; c < num_cols; ++c) {
+            if (c < sheet.cells[r].size() && !sheet.cells[r][c].isEmpty()) {
+              QVariant v = SpreadsheetModel::value_from_json(sheet.cells[r][c]);
+              model->setData(model->index(r, c), v,
+                             SpreadsheetRoles::RawValueRole);
+            }
+          }
+        }
+        break;
+      }
+    } else {
+      // New sheet — open it.
+      if (!d->dock) {
+        CreateDockWidget(d->manager);
+      }
+      OpenSheetFromData(sheet);
+      d->dock->show();
+      d->dock->EmitRequestAttention();
+    }
+  }
 }
 
 void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {

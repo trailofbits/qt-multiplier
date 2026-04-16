@@ -8,6 +8,7 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QMetaObject>
 
 namespace mx::gui {
 namespace {
@@ -98,6 +99,8 @@ QJsonObject CreateDocumentTool::execute(const QJsonObject &args) {
 
   // Store category in the description field for now.
   m_ctx->config->SaveDocumentDescription(doc_id, category);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalDocumentsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("doc_id")] = doc_id;
@@ -192,6 +195,9 @@ QJsonObject EditDocumentTool::execute(const QJsonObject &args) {
     m_ctx->config->SaveDocumentTitle(doc_id, new_title);
     ConfigManager::BumpDocumentTitleVersion();
   }
+
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalDocumentsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;
@@ -320,6 +326,8 @@ QJsonObject LinkDocumentToCellTool::execute(const QJsonObject &args) {
                .arg(escaped_title);
 
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;

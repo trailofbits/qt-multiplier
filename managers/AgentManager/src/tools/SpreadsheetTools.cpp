@@ -10,6 +10,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMetaObject>
 
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
@@ -200,6 +201,8 @@ QJsonObject CreateSheetTool::execute(const QJsonObject &args) {
   sheet.description = args[QStringLiteral("description")].toString();
 
   int id = m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("sheet_id")] = id;
@@ -378,6 +381,8 @@ QJsonObject WriteCellTool::execute(const QJsonObject &args) {
   ensure_cell(sheet, row, col);
   sheet.cells[row][col] = make_cell_json(value, type);
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;
@@ -522,6 +527,8 @@ QJsonObject AddRowTool::execute(const QJsonObject &args) {
   auto row_index = sheet.cells.size();
   sheet.cells.append(row);
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("row_index")] = static_cast<int>(row_index);
@@ -586,6 +593,8 @@ QJsonObject InsertRowTool::execute(const QJsonObject &args) {
   sheet.row_colors = new_colors;
 
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("row_index")] = row;
@@ -642,6 +651,8 @@ QJsonObject DeleteRowTool::execute(const QJsonObject &args) {
   sheet.row_colors = new_colors;
 
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;
@@ -690,6 +701,8 @@ QJsonObject AddColumnTool::execute(const QJsonObject &args) {
   }
 
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("column_index")] = static_cast<int>(col_index);
@@ -742,6 +755,8 @@ QJsonObject SetRowColorTool::execute(const QJsonObject &args) {
 
   sheet.row_colors[row] = color;
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;
@@ -781,6 +796,8 @@ QJsonObject ClearRowColorTool::execute(const QJsonObject &args) {
 
   sheet.row_colors.remove(row);
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;
@@ -832,6 +849,8 @@ QJsonObject SetCheckboxTool::execute(const QJsonObject &args) {
   ensure_cell(sheet, row, col);
   sheet.cells[row][col] = SpreadsheetModel::value_to_json(QVariant(checked));
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;
@@ -911,6 +930,8 @@ QJsonObject SortSheetTool::execute(const QJsonObject &args) {
   sheet.cells = sorted_cells;
   sheet.row_colors = sorted_colors;
   m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;

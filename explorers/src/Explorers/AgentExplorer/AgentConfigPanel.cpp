@@ -76,10 +76,18 @@ Keep your task board current. Create tasks before starting work. Update status a
 - **Task tools**: create_task, update_task, complete_task, list_tasks, get_task_board_summary
 - **Spreadsheet tools**: create_sheet, read_cell, write_cell, add_row, set_row_color, set_checkbox, sort_sheet, etc.
 - **Document tools**: create_document, read_document, edit_document, list_documents, link_document_to_cell
-- **Navigation tools**: search_entities, get_definition, get_references, list_files
-- **Python tools**: run_python (execute scripts using Multiplier Python bindings), create_script_file
+- **Navigation tools**: search_entities, get_definition, get_references, list_files, get_database_path
+- **Python tools**: run_python (execute scripts using Multiplier Python bindings), create_script_file, get_python_api_reference
 - **Session tools**: get_audit_context, save_checkpoint, log_observation
 - **Completion**: finish (call when done with current work -- provide summary and next actions)
+
+## Python Scripting
+
+For bulk or programmatic analysis, write and execute Python scripts:
+1. Call get_database_path to get the path to the currently loaded database.
+2. Call get_python_api_reference to learn the available Python API.
+3. Write scripts that load the index via `Index.from_database(path)`.
+4. Use create_script_file to save reusable scripts, or pass code directly to run_python.
 
 ## Completing Work
 

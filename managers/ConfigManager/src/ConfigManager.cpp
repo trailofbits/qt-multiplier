@@ -306,6 +306,18 @@ QUndoGroup &ConfigManager::UndoGroup(void) const noexcept {
   return d->undo_group;
 }
 
+QString ConfigManager::DatabasePath(void) const {
+  return d->db_path;
+}
+
+void ConfigManager::NotifyExternalSheetsChanged(void) {
+  emit ExternalSheetsChanged();
+}
+
+void ConfigManager::NotifyExternalDocumentsChanged(void) {
+  emit ExternalDocumentsChanged();
+}
+
 void ConfigManager::SetIndex(const class Index &index,
                              const QString &db_path) noexcept {
   if (!d->db_path.isEmpty()) SaveProjectSettings();

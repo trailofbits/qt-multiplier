@@ -65,4 +65,14 @@ class ListFilesTool Q_DECL_FINAL : public AgentTool {
   QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
 };
 
+class GetDatabasePathTool Q_DECL_FINAL : public AgentTool {
+  NavigationToolContext *m_ctx;
+ public:
+  explicit GetDatabasePathTool(NavigationToolContext *ctx) : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
 }  // namespace mx::gui

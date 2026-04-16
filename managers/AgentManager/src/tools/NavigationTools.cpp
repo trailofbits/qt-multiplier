@@ -402,6 +402,35 @@ QJsonObject ListFilesTool::execute(const QJsonObject &) {
 }
 
 // ===========================================================================
+// GetDatabasePathTool
+// ===========================================================================
+
+QString GetDatabasePathTool::name(void) const {
+  return QStringLiteral("get_database_path");
+}
+
+QString GetDatabasePathTool::description(void) const {
+  return QStringLiteral(
+      "Get the file path to the currently loaded multiplier database. "
+      "Use this in Python scripts with Index.from_database().");
+}
+
+QJsonObject GetDatabasePathTool::parametersSchema(void) const {
+  return make_schema({}, {});
+}
+
+QJsonObject GetDatabasePathTool::execute(const QJsonObject &) {
+  QString path = m_ctx->config->DatabasePath();
+  if (path.isEmpty()) {
+    return error_result(QStringLiteral("no database loaded"));
+  }
+
+  QJsonObject result;
+  result[QStringLiteral("path")] = path;
+  return result;
+}
+
+// ===========================================================================
 // Registration
 // ===========================================================================
 
@@ -411,6 +440,7 @@ void registerNavigationTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<GetDefinitionTool>(ctx));
   registry.registerTool(std::make_unique<GetReferencesTool>(ctx));
   registry.registerTool(std::make_unique<ListFilesTool>(ctx));
+  registry.registerTool(std::make_unique<GetDatabasePathTool>(ctx));
 }
 
 }  // namespace mx::gui

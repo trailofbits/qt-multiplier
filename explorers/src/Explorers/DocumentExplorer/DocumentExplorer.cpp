@@ -135,6 +135,11 @@ DocumentExplorer::DocumentExplorer(ConfigManager &config_manager,
   // Load documents when a project is opened.
   connect(&config_manager, &ConfigManager::IndexChanged,
           this, &DocumentExplorer::OnIndexChanged);
+
+  // Refresh when the agent modifies documents externally.
+  connect(&config_manager, &ConfigManager::ExternalDocumentsChanged,
+          this, &DocumentExplorer::Refresh);
+
   OnIndexChanged(config_manager);
 }
 

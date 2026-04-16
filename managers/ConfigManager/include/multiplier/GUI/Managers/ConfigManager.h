@@ -61,6 +61,9 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   //! to this group so that the global undo/redo toolbar buttons work.
   QUndoGroup &UndoGroup(void) const noexcept;
 
+  //! Get the file path to the currently loaded database.
+  QString DatabasePath(void) const;
+
   //! Get access to the current index.
   const class Index &Index(void) const noexcept;
 
@@ -289,10 +292,16 @@ class ConfigManager Q_DECL_FINAL : public QObject {
       const QString &category) const;
   void SetDocumentCategory(int doc_id, const QString &category) const;
 
+  //! Notify that sheets/documents were modified externally (e.g. by the agent).
+  void NotifyExternalSheetsChanged(void);
+  void NotifyExternalDocumentsChanged(void);
+
  signals:
   void IndexChanged(const ConfigManager &config_manager);
   void TabWidthChanged(unsigned tab_width);
   void UseTabStopsChanged(bool use_tab_stops);
+  void ExternalSheetsChanged(void);
+  void ExternalDocumentsChanged(void);
 
  private:
   static quint64 doc_title_version_;
