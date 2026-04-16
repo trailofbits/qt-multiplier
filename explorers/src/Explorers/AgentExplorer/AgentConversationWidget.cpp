@@ -54,12 +54,17 @@ struct AgentConversationWidget::PrivateData {
 
   int total_prompt_tokens{0};
   int total_completion_tokens{0};
+  bool enter_to_send{true};
 
   explicit PrivateData(ThemeManager &tm)
       : theme_manager(tm) {}
 };
 
 AgentConversationWidget::~AgentConversationWidget(void) {}
+
+void AgentConversationWidget::setEnterToSend(bool enabled) {
+  d->enter_to_send = enabled;
+}
 
 AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
                                                   QWidget *parent)
@@ -376,12 +381,15 @@ bool AgentConversationWidget::eventFilter(QObject *obj, QEvent *event) {
   if (obj == d->input_edit && event->type() == QEvent::KeyPress) {
     auto *key_event = static_cast<QKeyEvent *>(event);
 
-    // Enter sends message (Shift+Enter inserts newline).
-    if ((key_event->key() == Qt::Key_Return ||
-         key_event->key() == Qt::Key_Enter) &&
-        !(key_event->modifiers() & Qt::ShiftModifier)) {
-      onSendClicked();
-      return true;
+    // Enter/Shift+Enter behavior depends on enter_to_send setting.
+    if (key_event->key() == Qt::Key_Return ||
+        key_event->key() == Qt::Key_Enter) {
+      bool has_shift = key_event->modifiers() & Qt::ShiftModifier;
+      bool should_send = d->enter_to_send ? !has_shift : has_shift;
+      if (should_send) {
+        onSendClicked();
+        return true;
+      }
     }
 
     // Tab accepts suggestion.

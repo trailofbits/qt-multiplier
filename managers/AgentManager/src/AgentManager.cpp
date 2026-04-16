@@ -320,7 +320,7 @@ void AgentManager::registerTool(std::unique_ptr<AgentTool> tool) {
 
 int64_t AgentManager::createObserverSession(
     const QString &system_prompt, const QString &backend_name,
-    int64_t primary_session_id) {
+    int64_t primary_session_id, const QString &model_override) {
   auto *backend = backend_name.isEmpty()
                       ? d->llm_manager.activeBackend()
                       : d->llm_manager.backend(backend_name);
@@ -345,8 +345,13 @@ int64_t AgentManager::createObserverSession(
   auto *ctx_ptr = ctx.get();
   registerObserverTools(*registry, ctx_ptr);
 
+  auto observer_config = d->llm_config;
+  if (!model_override.isEmpty()) {
+    observer_config.model = model_override;
+  }
+
   auto session = std::make_unique<AgentSession>(
-      session_id, backend, registry.get(), d->llm_config, system_prompt,
+      session_id, backend, registry.get(), observer_config, system_prompt,
       d->max_iterations, this);
 
   // Forward session signals.

@@ -54,7 +54,8 @@ class AgentManager Q_DECL_FINAL : public QObject {
   // Observer mode.
   int64_t createObserverSession(const QString &system_prompt,
                                 const QString &backend_name,
-                                int64_t primary_session_id);
+                                int64_t primary_session_id,
+                                const QString &model_override = {});
   void triggerObserver(int64_t observer_session_id);
   int64_t primarySessionId(int64_t observer_session_id) const;
 

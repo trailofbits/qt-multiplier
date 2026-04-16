@@ -82,6 +82,10 @@ struct AgentExplorer::PrivateData {
   CodeExplorer *code_explorer{nullptr};
   QTimer *context_refresh_timer{nullptr};
 
+  QString recommender_model;
+  QString summarizer_model;
+  QString observer_model;
+
   int64_t current_session_id{-1};
   bool paused{false};
 
@@ -565,6 +569,14 @@ void AgentExplorer::OnConfigChanged(void) {
       d->llm_manager->activeBackendName(), QStringLiteral("model"));
   d->agent_manager->setLLMConfig(config);
   d->agent_manager->setMaxIterations(d->config_panel->maxIterations());
+
+  // Enter-to-send preference.
+  d->conversation->setEnterToSend(d->config_panel->enterToSend());
+
+  // Per-role model overrides.
+  d->recommender_model = d->config_panel->recommenderModel();
+  d->summarizer_model = d->config_panel->summarizerModel();
+  d->observer_model = d->config_panel->observerModel();
 }
 
 void AgentExplorer::OnToolCallStarted(int64_t session_id, const QString &name,
@@ -669,7 +681,8 @@ void AgentExplorer::StartObserver(void) {
 
   auto backend_name = d->llm_manager->activeBackendName();
   d->observer_session_id = d->agent_manager->createObserverSession(
-      kObserverSystemPrompt, backend_name, d->current_session_id);
+      kObserverSystemPrompt, backend_name, d->current_session_id,
+      d->observer_model);
 
   if (d->observer_session_id < 0) {
     d->observer_btn->setChecked(false);
@@ -774,11 +787,14 @@ Respond with ONLY a JSON object:
   user_msg.content = prompt_text;
   messages.append(user_msg);
 
+  auto primary_model = d->llm_manager->backendConfig(
+      d->llm_manager->activeBackendName(), QStringLiteral("model"));
+
   LLMConfig config;
   config.temperature = 0.2;
   config.max_tokens = 512;
-  config.model = d->llm_manager->backendConfig(
-      d->llm_manager->activeBackendName(), QStringLiteral("model"));
+  config.model = d->summarizer_model.isEmpty()
+      ? primary_model : d->summarizer_model;
 
   auto *thread = QThread::create([this, messages, config, backend] {
     auto response = backend->sendMessage(messages, {}, config);
@@ -906,11 +922,14 @@ Respond with ONLY a JSON object (no markdown, no explanation):
   user_msg.content = prompt_text;
   messages.append(user_msg);
 
+  auto primary_model = d->llm_manager->backendConfig(
+      d->llm_manager->activeBackendName(), QStringLiteral("model"));
+
   LLMConfig config;
   config.temperature = 0.3;
   config.max_tokens = 512;
-  config.model = d->llm_manager->backendConfig(
-      d->llm_manager->activeBackendName(), QStringLiteral("model"));
+  config.model = d->recommender_model.isEmpty()
+      ? primary_model : d->recommender_model;
 
   auto *thread = QThread::create([this, messages, config, backend] {
     auto response = backend->sendMessage(messages, {}, config);

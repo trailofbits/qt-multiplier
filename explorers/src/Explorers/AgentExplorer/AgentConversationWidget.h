@@ -29,6 +29,8 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   explicit AgentConversationWidget(ThemeManager &theme_manager,
                                    QWidget *parent = nullptr);
 
+  void setEnterToSend(bool enabled);
+
  signals:
   void sendMessageRequested(const QString &text);
   void suggestionAccepted(const QString &text);

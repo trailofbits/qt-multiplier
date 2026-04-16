@@ -32,6 +32,10 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   int maxIterations(void) const;
   double temperature(void) const;
   int suggestionMode(void) const;
+  bool enterToSend(void) const;
+  QString recommenderModel(void) const;
+  QString summarizerModel(void) const;
+  QString observerModel(void) const;
 
  signals:
   void configChanged(void);

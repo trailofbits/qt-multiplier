@@ -21,6 +21,7 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QTimer>
+#include <QGroupBox>
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QVBoxLayout>
@@ -165,6 +166,11 @@ struct AgentConfigPanel::PrivateData {
   QSpinBox *max_iterations_spin{nullptr};
   QDoubleSpinBox *temperature_spin{nullptr};
   QComboBox *suggestion_combo{nullptr};
+  QComboBox *enter_key_combo{nullptr};
+  QComboBox *recommender_model_combo{nullptr};
+  QComboBox *summarizer_model_combo{nullptr};
+  QComboBox *observer_model_combo{nullptr};
+  QGroupBox *model_roles_group{nullptr};
   QLineEdit *python_path_edit{nullptr};
   QPushButton *python_browse_btn{nullptr};
   QLabel *python_status_label{nullptr};
@@ -237,6 +243,56 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->model_combo->setEditable(true);
   form->addRow(tr("Model:"), d->model_combo);
 
+  // Model Roles (collapsible).
+  d->model_roles_group = new QGroupBox(tr("Model Roles"), content);
+  d->model_roles_group->setCheckable(true);
+  d->model_roles_group->setChecked(false);
+
+  auto *roles_form = new QFormLayout(d->model_roles_group);
+  roles_form->setContentsMargins(8, 8, 8, 8);
+  roles_form->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+
+  auto setup_role_combo = [&](QComboBox *&combo, const QString &label) {
+    combo = new QComboBox(d->model_roles_group);
+    combo->setEditable(true);
+    combo->addItem(tr("Same as primary"));
+    roles_form->addRow(label, combo);
+  };
+
+  setup_role_combo(d->recommender_model_combo, tr("Recommender:"));
+  setup_role_combo(d->summarizer_model_combo, tr("Code Summarizer:"));
+  setup_role_combo(d->observer_model_combo, tr("Observer:"));
+
+  // Hide content when collapsed.
+  connect(d->model_roles_group, &QGroupBox::toggled, this, [this](bool checked) {
+    auto *layout = d->model_roles_group->layout();
+    if (!layout) return;
+    for (int i = 0; i < layout->count(); ++i) {
+      auto *item = layout->itemAt(i);
+      if (item->widget()) {
+        item->widget()->setVisible(checked);
+      }
+    }
+    // Also hide labels in the QFormLayout.
+    auto *fl = qobject_cast<QFormLayout *>(layout);
+    if (fl) {
+      for (int i = 0; i < fl->rowCount(); ++i) {
+        auto *label_item = fl->itemAt(i, QFormLayout::LabelRole);
+        auto *field_item = fl->itemAt(i, QFormLayout::FieldRole);
+        if (label_item && label_item->widget()) {
+          label_item->widget()->setVisible(checked);
+        }
+        if (field_item && field_item->widget()) {
+          field_item->widget()->setVisible(checked);
+        }
+      }
+    }
+  });
+  // Start collapsed.
+  emit d->model_roles_group->toggled(false);
+
+  form->addRow(d->model_roles_group);
+
   // Separator.
   auto *sep1 = new QFrame(content);
   sep1->setFrameShape(QFrame::HLine);
@@ -295,6 +351,15 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
       {tr("Off"), tr("After each response")});
   d->suggestion_combo->setCurrentIndex(1);
   form->addRow(tr("Suggestions:"), d->suggestion_combo);
+
+  d->enter_key_combo = new QComboBox(content);
+  d->enter_key_combo->addItems(
+      {tr("Send message"), tr("New line")});
+  d->enter_key_combo->setCurrentIndex(0);
+  form->addRow(tr("Enter key:"), d->enter_key_combo);
+  form->addRow(makeHint(
+      tr("When \"New line\" is selected, use Shift+Enter to send."),
+      content));
 
   // Separator.
   auto *sep3 = new QFrame(content);
@@ -381,6 +446,39 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
             if (!d->restoring) showSaved();
             emit configChanged();
           });
+  connect(d->enter_key_combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+          this, [this] {
+            if (!d->restoring) showSaved();
+            emit configChanged();
+          });
+
+  auto role_combo_changed = [this] {
+    if (d->restoring) return;
+    auto name = d->llm_manager.activeBackendName();
+    if (!name.isEmpty()) {
+      d->llm_manager.setBackendConfig(
+          name, QStringLiteral("recommender_model"),
+          d->recommender_model_combo->currentIndex() == 0
+              ? QString() : d->recommender_model_combo->currentText());
+      d->llm_manager.setBackendConfig(
+          name, QStringLiteral("summarizer_model"),
+          d->summarizer_model_combo->currentIndex() == 0
+              ? QString() : d->summarizer_model_combo->currentText());
+      d->llm_manager.setBackendConfig(
+          name, QStringLiteral("observer_model"),
+          d->observer_model_combo->currentIndex() == 0
+              ? QString() : d->observer_model_combo->currentText());
+      d->llm_manager.saveConfig();
+    }
+    showSaved();
+    emit configChanged();
+  };
+  connect(d->recommender_model_combo, &QComboBox::currentTextChanged,
+          this, role_combo_changed);
+  connect(d->summarizer_model_combo, &QComboBox::currentTextChanged,
+          this, role_combo_changed);
+  connect(d->observer_model_combo, &QComboBox::currentTextChanged,
+          this, role_combo_changed);
 
   // ---- Restore saved state ----
   auto active = d->llm_manager.activeBackendName();
@@ -420,6 +518,28 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
     populateModels(d->backend_combo->currentText());
   }
 
+  // Restore per-role model settings.
+  auto active_name = d->llm_manager.activeBackendName();
+  if (!active_name.isEmpty()) {
+    auto restore_role = [&](QComboBox *combo, const QString &key) {
+      auto saved = d->llm_manager.backendConfig(active_name, key);
+      if (!saved.isEmpty()) {
+        auto idx = combo->findText(saved);
+        if (idx >= 0) {
+          combo->setCurrentIndex(idx);
+        } else {
+          combo->setEditText(saved);
+        }
+      }
+    };
+    restore_role(d->recommender_model_combo,
+                 QStringLiteral("recommender_model"));
+    restore_role(d->summarizer_model_combo,
+                 QStringLiteral("summarizer_model"));
+    restore_role(d->observer_model_combo,
+                 QStringLiteral("observer_model"));
+  }
+
   d->restoring = false;
 
   // Auto-verify Python on startup if a path is configured.
@@ -442,6 +562,31 @@ double AgentConfigPanel::temperature(void) const {
 
 int AgentConfigPanel::suggestionMode(void) const {
   return d->suggestion_combo->currentIndex();
+}
+
+bool AgentConfigPanel::enterToSend(void) const {
+  return d->enter_key_combo->currentIndex() == 0;
+}
+
+QString AgentConfigPanel::recommenderModel(void) const {
+  if (d->recommender_model_combo->currentIndex() == 0) {
+    return {};
+  }
+  return d->recommender_model_combo->currentText();
+}
+
+QString AgentConfigPanel::summarizerModel(void) const {
+  if (d->summarizer_model_combo->currentIndex() == 0) {
+    return {};
+  }
+  return d->summarizer_model_combo->currentText();
+}
+
+QString AgentConfigPanel::observerModel(void) const {
+  if (d->observer_model_combo->currentIndex() == 0) {
+    return {};
+  }
+  return d->observer_model_combo->currentText();
 }
 
 void AgentConfigPanel::showSaved(void) {
@@ -663,19 +808,40 @@ void AgentConfigPanel::maybeVerifyPython(void) {
 
 void AgentConfigPanel::populateModels(const QString &backend_type) {
   d->model_combo->clear();
+  QStringList presets;
   if (backend_type == QStringLiteral("claude")) {
-    d->model_combo->addItems(
-        {QStringLiteral("claude-sonnet-4-20250514"),
-         QStringLiteral("claude-opus-4-20250514")});
+    presets = {QStringLiteral("claude-sonnet-4-20250514"),
+               QStringLiteral("claude-opus-4-20250514")};
   } else if (backend_type == QStringLiteral("openai")) {
-    d->model_combo->addItems(
-        {QStringLiteral("gpt-4o"),
-         QStringLiteral("gpt-4o-mini"),
-         QStringLiteral("o3")});
+    presets = {QStringLiteral("gpt-4o"),
+               QStringLiteral("gpt-4o-mini"),
+               QStringLiteral("o3")};
   } else if (backend_type == QStringLiteral("bedrock")) {
-    d->model_combo->addItems(
-        {QStringLiteral("anthropic.claude-sonnet-4-20250514-v1:0")});
+    presets = {QStringLiteral("anthropic.claude-sonnet-4-20250514-v1:0")};
   }
+  d->model_combo->addItems(presets);
+
+  // Repopulate role combos with same presets.
+  auto repopulate_role = [&](QComboBox *combo) {
+    auto saved = combo->currentText();
+    auto was_same = (combo->currentIndex() == 0);
+    combo->clear();
+    combo->addItem(tr("Same as primary"));
+    combo->addItems(presets);
+    if (was_same || saved.isEmpty()) {
+      combo->setCurrentIndex(0);
+    } else {
+      auto idx = combo->findText(saved);
+      if (idx >= 0) {
+        combo->setCurrentIndex(idx);
+      } else {
+        combo->setEditText(saved);
+      }
+    }
+  };
+  repopulate_role(d->recommender_model_combo);
+  repopulate_role(d->summarizer_model_combo);
+  repopulate_role(d->observer_model_combo);
 }
 
 void AgentConfigPanel::ensureBackendExists(const QString &type) {
