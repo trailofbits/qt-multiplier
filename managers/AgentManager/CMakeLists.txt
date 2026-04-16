@@ -35,6 +35,9 @@ add_library("mx_agent_manager"
 
   src/tools/ObserverTools.h
   src/tools/ObserverTools.cpp
+
+  src/tools/PythonTools.h
+  src/tools/PythonTools.cpp
 )
 
 target_link_libraries("mx_agent_manager"

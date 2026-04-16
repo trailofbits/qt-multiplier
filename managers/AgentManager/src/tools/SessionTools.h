@@ -16,6 +16,7 @@ namespace mx::gui {
 
 struct SessionToolContext {
   ConfigManager *config{nullptr};
+  int64_t current_session_id{-1};  // Set by AgentManager per session.
 };
 
 // Register all session tools with the given registry.
@@ -37,7 +38,7 @@ class GetAuditContextTool Q_DECL_FINAL : public AgentTool {
 };
 
 class SaveCheckpointTool Q_DECL_FINAL : public AgentTool {
-  [[maybe_unused]] SessionToolContext *m_ctx;
+  SessionToolContext *m_ctx;
  public:
   explicit SaveCheckpointTool(SessionToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;
@@ -47,7 +48,7 @@ class SaveCheckpointTool Q_DECL_FINAL : public AgentTool {
 };
 
 class LogObservationTool Q_DECL_FINAL : public AgentTool {
-  [[maybe_unused]] SessionToolContext *m_ctx;
+  SessionToolContext *m_ctx;
  public:
   explicit LogObservationTool(SessionToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;

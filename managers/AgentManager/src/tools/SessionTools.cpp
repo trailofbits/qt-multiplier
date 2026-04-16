@@ -13,10 +13,6 @@
 namespace mx::gui {
 namespace {
 
-// In-memory checkpoint/observation storage. Persistence comes in Step 10.
-static int s_next_checkpoint_id = 1;
-static int s_next_observation_id = 1;
-
 static QJsonObject error_result(const QString &msg) {
   QJsonObject r;
   r[QStringLiteral("error")] = msg;
@@ -119,12 +115,18 @@ QJsonObject SaveCheckpointTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("summary is required"));
   }
 
-  // Placeholder: in-memory ID assignment. Full persistence comes in Step 10.
-  int checkpoint_id = s_next_checkpoint_id++;
+  auto session_id = m_ctx->current_session_id;
+  if (session_id < 0) {
+    return error_result(QStringLiteral("No active session"));
+  }
+
+  auto checkpoint_id =
+      m_ctx->config->SaveAgentCheckpoint(session_id, summary);
   QString created_at = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
 
   QJsonObject result;
-  result[QStringLiteral("checkpoint_id")] = checkpoint_id;
+  result[QStringLiteral("checkpoint_id")] =
+      static_cast<qint64>(checkpoint_id);
   result[QStringLiteral("created_at")] = created_at;
   result[QStringLiteral("summary")] = summary;
   return result;
@@ -157,12 +159,18 @@ QJsonObject LogObservationTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("content is required"));
   }
 
-  // Placeholder: in-memory ID assignment. Full persistence comes in Step 10.
-  int observation_id = s_next_observation_id++;
+  auto session_id = m_ctx->current_session_id;
+  if (session_id < 0) {
+    return error_result(QStringLiteral("No active session"));
+  }
+
+  auto observation_id =
+      m_ctx->config->SaveAgentObservation(session_id, content);
   QString timestamp = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
 
   QJsonObject result;
-  result[QStringLiteral("observation_id")] = observation_id;
+  result[QStringLiteral("observation_id")] =
+      static_cast<qint64>(observation_id);
   result[QStringLiteral("timestamp")] = timestamp;
   return result;
 }

@@ -18,6 +18,7 @@
 #include "tools/NavigationTools.h"
 #include "tools/SessionTools.h"
 #include "tools/ObserverTools.h"
+#include "tools/PythonTools.h"
 
 #include <unordered_map>
 
@@ -45,6 +46,7 @@ class AgentManagerImpl {
   std::unordered_map<int64_t, std::unique_ptr<ObserverToolContext>>
       observer_contexts;
   ConfigManager *config_manager{nullptr};
+  SessionToolContext *session_tool_ctx{nullptr};
 
   // Token tracking across all sessions.
   int accumulated_prompt_tokens{0};
@@ -115,6 +117,13 @@ int64_t AgentManager::createSession(const QString &name,
           });
 
   d->sessions[session_id] = std::move(session);
+
+  // Update session tool context so checkpoint/observation tools know the
+  // current session.
+  if (d->session_tool_ctx) {
+    d->session_tool_ctx->current_session_id = session_id;
+  }
+
   return session_id;
 }
 
@@ -194,6 +203,11 @@ void AgentManager::registerBuiltinTools(ConfigManager &config_manager) {
   auto *sess_ctx = new SessionToolContext;
   sess_ctx->config = &config_manager;
   registerSessionTools(d->tool_registry, sess_ctx);
+  d->session_tool_ctx = sess_ctx;
+
+  auto *py_ctx = new PythonToolContext;
+  py_ctx->config = &config_manager;
+  registerPythonTools(d->tool_registry, py_ctx);
 }
 
 void AgentManager::registerTool(std::unique_ptr<AgentTool> tool) {
