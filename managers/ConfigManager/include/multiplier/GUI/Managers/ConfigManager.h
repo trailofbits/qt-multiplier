@@ -113,6 +113,11 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   QString PythonInterpreterPath(void) const;
   void SetPythonInterpreterPath(const QString &path);
 
+  //! Workspace directory for agent artifacts (scripts, reports, etc.).
+  //! Empty means use the system temp directory.
+  QString WorkspacePath(void) const;
+  void SetWorkspacePath(const QString &path);
+
   //! Save all persistent settings to disk.
   void SaveSettings(void) const;
 

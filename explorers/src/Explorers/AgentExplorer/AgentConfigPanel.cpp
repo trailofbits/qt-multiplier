@@ -35,10 +35,10 @@ namespace {
 static const QString kDefaultPromptTitle =
     QStringLiteral("Default Agent System Prompt");
 
-static constexpr int kPromptVersion = 8;
+static constexpr int kPromptVersion = 9;
 
 static const QString kDefaultPromptContent = QString::fromUtf8(
-R"MX(<!-- prompt-version: 8 -->
+R"MX(<!-- prompt-version: 9 -->
 You are an expert analyst working inside the Multiplier code analysis IDE. You have access to tools for managing structured analysis, documents, and navigating an indexed codebase.
 
 ## Key Concept: Entity IDs
@@ -94,13 +94,22 @@ Sheets are for structured, scannable data. Documents are for prose:
 
 Documents support markdown format (the default for agent-created docs). Use standard markdown: headings, bold, code blocks, lists. The viewer renders markdown as rich text.
 
+## Workspace Directory
+
+A workspace directory stores scripts, reports, fuzzer harnesses, and other artifacts. Use get_workspace_path to find it. Save scripts and artifacts to the workspace directory, not temp files.
+
 ## Python Scripting
 
-The MULTIPLIER_DATABASE environment variable is automatically set to the current database path when running Python scripts. Use it in scripts:
+Environment variables available in Python scripts:
+- MULTIPLIER_DATABASE: path to the current database
+- MULTIPLIER_WORKSPACE: path to the workspace directory for saving artifacts
+
+Use them in scripts:
 
     import os
     from multiplier import Index
     idx = Index.in_memory_cache(Index.from_database(os.environ['MULTIPLIER_DATABASE']))
+    workspace = os.environ['MULTIPLIER_WORKSPACE']
 
 Always wrap Index.from_database() with Index.in_memory_cache() for better performance.
 
@@ -113,6 +122,7 @@ For the full API reference, call get_python_api_reference.
 - **Sheet data**: write_cell, write_location_cell, read_cell, add_row, read_row, set_row_color, set_checkbox, sort_sheet, read_sheet_range, get_sheet_as_markdown
 - **Documents**: create_document, edit_document, read_document, list_documents, link_document_to_cell
 - **Navigation**: search_entities, get_definition, get_references (with kind filter + pagination), get_callers, get_callees, search_code, list_files, get_database_path
+- **Workspace**: get_workspace_path
 - **Python**: run_python, create_script_file, get_python_api_reference
 - **Session**: get_audit_context, save_checkpoint, log_observation, get_session_cost, finish
 
@@ -197,6 +207,8 @@ struct AgentConfigPanel::PrivateData {
   QLabel *bedrock_region_label{nullptr};
   QLabel *api_key_label{nullptr};
   QWidget *api_key_row{nullptr};
+  QLineEdit *workspace_path_edit{nullptr};
+  QPushButton *workspace_browse_btn{nullptr};
   QLineEdit *python_path_edit{nullptr};
   QPushButton *python_browse_btn{nullptr};
   QLabel *python_status_label{nullptr};
@@ -420,6 +432,32 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   sep3->setFrameShadow(QFrame::Sunken);
   form->addRow(sep3);
 
+  // ---- Workspace ----
+  auto *workspace_row = new QWidget(content);
+  auto *workspace_layout = new QHBoxLayout(workspace_row);
+  workspace_layout->setContentsMargins(0, 0, 0, 0);
+  workspace_layout->setSpacing(4);
+
+  d->workspace_path_edit = new QLineEdit(workspace_row);
+  d->workspace_path_edit->setPlaceholderText(tr("System temp directory"));
+  d->workspace_path_edit->setText(d->config_manager.WorkspacePath());
+  workspace_layout->addWidget(d->workspace_path_edit, 1);
+
+  d->workspace_browse_btn = new QPushButton(tr("Browse..."), workspace_row);
+  workspace_layout->addWidget(d->workspace_browse_btn);
+
+  form->addRow(tr("Workspace:"), workspace_row);
+
+  form->addRow(makeHint(
+      tr("Scripts, reports, and other artifacts are saved here."),
+      content));
+
+  // Separator.
+  auto *sep4 = new QFrame(content);
+  sep4->setFrameShape(QFrame::HLine);
+  sep4->setFrameShadow(QFrame::Sunken);
+  form->addRow(sep4);
+
   // ---- Python ----
   auto *python_row = new QWidget(content);
   auto *python_layout = new QHBoxLayout(python_row);
@@ -498,6 +536,12 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
           this, &AgentConfigPanel::onModelChanged);
   connect(d->load_prompt_button, &QPushButton::clicked,
           this, &AgentConfigPanel::onLoadPromptClicked);
+  connect(d->workspace_browse_btn, &QPushButton::clicked,
+          this, &AgentConfigPanel::onBrowseWorkspaceClicked);
+  connect(d->workspace_path_edit, &QLineEdit::editingFinished, this, [this] {
+    d->config_manager.SetWorkspacePath(d->workspace_path_edit->text());
+    showSaved();
+  });
   connect(d->python_browse_btn, &QPushButton::clicked,
           this, &AgentConfigPanel::onBrowsePythonClicked);
   connect(d->python_path_edit, &QLineEdit::textChanged, this, [this] {
@@ -808,6 +852,22 @@ void AgentConfigPanel::onLoadPromptClicked(void) {
   }
   menu->popup(d->load_prompt_button->mapToGlobal(
       d->load_prompt_button->rect().bottomLeft()));
+}
+
+void AgentConfigPanel::onBrowseWorkspaceClicked(void) {
+  QFileDialog dialog(this, tr("Select Workspace Directory"),
+                     QDir::homePath());
+  dialog.setFileMode(QFileDialog::Directory);
+  dialog.setOption(QFileDialog::ShowDirsOnly, true);
+  dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+  dialog.setWindowModality(Qt::ApplicationModal);
+
+  if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+    auto path = dialog.selectedFiles().first();
+    d->workspace_path_edit->setText(path);
+    d->config_manager.SetWorkspacePath(path);
+    showSaved();
+  }
 }
 
 void AgentConfigPanel::onBrowsePythonClicked(void) {

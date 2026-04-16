@@ -46,6 +46,7 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   void onBaseUrlChanged(void);
   void onModelChanged(void);
   void onLoadPromptClicked(void);
+  void onBrowseWorkspaceClicked(void);
   void onBrowsePythonClicked(void);
 
  private:

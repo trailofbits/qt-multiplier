@@ -72,9 +72,17 @@ static void setup_venv_environment(QProcess &proc, const QString &interp) {
   }
 }
 
-static QString scripts_directory(void) {
-  auto base = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-  return base + QStringLiteral("/multiplier_scripts");
+static QString workspace_base(ConfigManager *config) {
+  auto ws = config->WorkspacePath();
+  if (!ws.isEmpty()) {
+    return ws;
+  }
+  return QStandardPaths::writableLocation(QStandardPaths::TempLocation)
+         + QStringLiteral("/multiplier_workspace");
+}
+
+static QString scripts_directory(ConfigManager *config) {
+  return workspace_base(config) + QStringLiteral("/scripts");
 }
 
 }  // namespace
@@ -133,15 +141,19 @@ QJsonObject RunPythonTool::execute(const QJsonObject &args) {
   QProcess proc;
   setup_venv_environment(proc, interp);
 
-  // Expose the current database path so scripts can open the index without
-  // calling get_database_path first.
-  auto db_path = m_ctx->config->DatabasePath();
-  if (!db_path.isEmpty()) {
+  // Expose the current database path and workspace directory so scripts can
+  // find them without calling tools first.
+  {
     auto env = proc.processEnvironment();
     if (env.isEmpty()) {
       env = QProcessEnvironment::systemEnvironment();
     }
-    env.insert(QStringLiteral("MULTIPLIER_DATABASE"), db_path);
+    auto db_path = m_ctx->config->DatabasePath();
+    if (!db_path.isEmpty()) {
+      env.insert(QStringLiteral("MULTIPLIER_DATABASE"), db_path);
+    }
+    env.insert(QStringLiteral("MULTIPLIER_WORKSPACE"),
+               workspace_base(m_ctx->config));
     proc.setProcessEnvironment(env);
   }
 
@@ -210,7 +222,7 @@ QJsonObject CreateScriptFileTool::execute(const QJsonObject &args) {
   }
 
   // Ensure the scripts directory exists.
-  QString dir_path = scripts_directory();
+  QString dir_path = scripts_directory(m_ctx->config);
   QDir dir(dir_path);
   if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
     return error_result(
@@ -229,6 +241,41 @@ QJsonObject CreateScriptFileTool::execute(const QJsonObject &args) {
   QJsonObject result;
   result[QStringLiteral("path")] = file_path;
   result[QStringLiteral("filename")] = filename;
+  return result;
+}
+
+// ===========================================================================
+// GetWorkspacePathTool
+// ===========================================================================
+
+QString GetWorkspacePathTool::name(void) const {
+  return QStringLiteral("get_workspace_path");
+}
+
+QString GetWorkspacePathTool::description(void) const {
+  return QStringLiteral(
+      "Get the configured workspace directory for saving artifacts like "
+      "scripts, reports, and fuzzer harnesses. Returns the temp directory "
+      "if no workspace is configured.");
+}
+
+QJsonObject GetWorkspacePathTool::parametersSchema(void) const {
+  return make_schema({}, {});
+}
+
+QJsonObject GetWorkspacePathTool::execute(const QJsonObject &) {
+  auto ws = workspace_base(m_ctx->config);
+
+  // Ensure the directory exists.
+  QDir dir(ws);
+  if (!dir.exists()) {
+    dir.mkpath(QStringLiteral("."));
+  }
+
+  QJsonObject result;
+  result[QStringLiteral("workspace_path")] = ws;
+  result[QStringLiteral("is_configured")] =
+      !m_ctx->config->WorkspacePath().isEmpty();
   return result;
 }
 
@@ -487,6 +534,7 @@ QJsonObject GetPythonApiReferenceTool::execute(const QJsonObject &) {
 void registerPythonTools(AgentToolRegistry &registry, PythonToolContext *ctx) {
   registry.registerTool(std::make_unique<RunPythonTool>(ctx));
   registry.registerTool(std::make_unique<CreateScriptFileTool>(ctx));
+  registry.registerTool(std::make_unique<GetWorkspacePathTool>(ctx));
   registry.registerTool(std::make_unique<GetPythonApiReferenceTool>(ctx));
 }
 

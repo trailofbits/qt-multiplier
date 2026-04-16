@@ -485,6 +485,14 @@ void ConfigManager::SetPythonInterpreterPath(const QString &path) {
   SetSetting(d->global_db, QStringLiteral("python_interpreter_path"), path);
 }
 
+QString ConfigManager::WorkspacePath(void) const {
+  return GetSetting(d->global_db, QStringLiteral("workspace_path"));
+}
+
+void ConfigManager::SetWorkspacePath(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("workspace_path"), path);
+}
+
 // --- Global settings ---
 
 void ConfigManager::SaveSettings(void) const {
