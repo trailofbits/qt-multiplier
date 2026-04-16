@@ -812,9 +812,11 @@ Respond with ONLY a JSON object:
     auto response = backend->sendMessage(messages, {}, config);
     auto duration_ms = static_cast<int>(timer.elapsed());
     if (summarizer_node_id >= 0) {
-      d->config_manager.CompleteCostNode(
-          summarizer_node_id, response.prompt_tokens,
-          response.completion_tokens, duration_ms);
+      QMetaObject::invokeMethod(&d->config_manager, [&] {
+        d->config_manager.CompleteCostNode(
+            summarizer_node_id, response.prompt_tokens,
+            response.completion_tokens, duration_ms);
+      }, Qt::BlockingQueuedConnection);
     }
     QMetaObject::invokeMethod(this, [this, response] {
       handleCodeSummaryResponse(response);
@@ -964,9 +966,11 @@ Respond with ONLY a JSON object (no markdown, no explanation):
     auto response = backend->sendMessage(messages, {}, config);
     auto duration_ms = static_cast<int>(timer.elapsed());
     if (recommender_node_id >= 0) {
-      d->config_manager.CompleteCostNode(
-          recommender_node_id, response.prompt_tokens,
-          response.completion_tokens, duration_ms);
+      QMetaObject::invokeMethod(&d->config_manager, [&] {
+        d->config_manager.CompleteCostNode(
+            recommender_node_id, response.prompt_tokens,
+            response.completion_tokens, duration_ms);
+      }, Qt::BlockingQueuedConnection);
     }
     QMetaObject::invokeMethod(this, [this, response] {
       handleRecommendationResponse(response);

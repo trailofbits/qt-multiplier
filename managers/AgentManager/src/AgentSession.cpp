@@ -213,11 +213,13 @@ void AgentSession::runLoop(void) {
     auto llm_messages = buildMessages();
     auto tool_defs = m_tools->allDefinitions();
 
-    // Create a cost node for this LLM call.
+    // Create a cost node for this LLM call (marshal to main thread).
     if (m_config_manager) {
-      m_current_llm_node_id = m_config_manager->CreateCostNode(
-          m_session_id, m_root_node_id, QStringLiteral("llm_call"),
-          {}, m_config.model);
+      QMetaObject::invokeMethod(m_config_manager, [&] {
+        m_current_llm_node_id = m_config_manager->CreateCostNode(
+            m_session_id, m_root_node_id, QStringLiteral("llm_call"),
+            {}, m_config.model);
+      }, Qt::BlockingQueuedConnection);
     }
 
     QElapsedTimer llm_timer;
@@ -230,9 +232,11 @@ void AgentSession::runLoop(void) {
     if (!response.error.isEmpty()) {
       // Complete the cost node even on error.
       if (m_config_manager && m_current_llm_node_id >= 0) {
-        m_config_manager->CompleteCostNode(
-            m_current_llm_node_id, response.prompt_tokens,
-            response.completion_tokens, llm_duration_ms);
+        QMetaObject::invokeMethod(m_config_manager, [&] {
+          m_config_manager->CompleteCostNode(
+              m_current_llm_node_id, response.prompt_tokens,
+              response.completion_tokens, llm_duration_ms);
+        }, Qt::BlockingQueuedConnection);
       }
       m_running.storeRelaxed(0);
       emit sessionError(response.error);
@@ -280,9 +284,11 @@ void AgentSession::runLoop(void) {
       // Create a cost node for this tool call.
       int64_t tool_node_id = -1;
       if (m_config_manager) {
-        tool_node_id = m_config_manager->CreateCostNode(
-            m_session_id, m_current_llm_node_id,
-            QStringLiteral("tool_call"), call.name);
+        QMetaObject::invokeMethod(m_config_manager, [&] {
+          tool_node_id = m_config_manager->CreateCostNode(
+              m_session_id, m_current_llm_node_id,
+              QStringLiteral("tool_call"), call.name);
+        }, Qt::BlockingQueuedConnection);
       }
 
       QElapsedTimer timer;
@@ -310,7 +316,9 @@ void AgentSession::runLoop(void) {
 
       // Complete the tool cost node.
       if (m_config_manager && tool_node_id >= 0) {
-        m_config_manager->CompleteCostNode(tool_node_id, 0, 0, duration_ms);
+        QMetaObject::invokeMethod(m_config_manager, [&] {
+          m_config_manager->CompleteCostNode(tool_node_id, 0, 0, duration_ms);
+        }, Qt::BlockingQueuedConnection);
       }
 
       emit toolCallCompleted(call.name, result, duration_ms);
