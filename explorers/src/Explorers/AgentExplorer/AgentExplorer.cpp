@@ -31,6 +31,8 @@
 #include <multiplier/GUI/Managers/LLMManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
 #include <multiplier/GUI/Explorers/CodeExplorer.h>
+#include <multiplier/AST/Decl.h>
+#include <multiplier/Index.h>
 
 #include "AgentConversationWidget.h"
 #include "AgentConfigPanel.h"
@@ -288,6 +290,25 @@ void AgentExplorer::ConnectSignals(void) {
   // Conversation send.
   connect(d->conversation, &AgentConversationWidget::sendMessageRequested,
           this, &AgentExplorer::OnSendMessage);
+
+  // Navigate to entities when user double-clicks in tool result views.
+  // Use the implicit preview action to open in the code preview widget.
+  auto navigate_trigger = d->config_manager.ActionManager().Find(
+      "com.trailofbits.action.OpenEntityPreview");
+  connect(d->conversation, &AgentConversationWidget::navigateToEntity,
+          this, [this, navigate_trigger](uint64_t entity_id) mutable {
+    auto vent = d->config_manager.Index().entity(
+        mx::EntityId(static_cast<mx::RawEntityId>(entity_id)));
+    if (!std::holds_alternative<mx::NotAnEntity>(vent)) {
+      if (std::holds_alternative<mx::Decl>(vent)) {
+        auto decl = std::get<mx::Decl>(vent);
+        if (auto def = decl.definition()) {
+          vent = def.value();
+        }
+      }
+      navigate_trigger.Trigger(QVariant::fromValue(vent));
+    }
+  });
 
   // AgentManager signals.
   connect(d->agent_manager, &AgentManager::messageAdded,

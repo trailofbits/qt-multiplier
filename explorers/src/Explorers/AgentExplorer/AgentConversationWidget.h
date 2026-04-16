@@ -36,6 +36,7 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
  signals:
   void sendMessageRequested(const QString &text);
   void suggestionAccepted(const QString &text);
+  void navigateToEntity(uint64_t entity_id);
 
  public slots:
   void addMessage(const AgentMessage &msg);

@@ -459,6 +459,9 @@ static QString formatToolArgs(const QString &tool_name,
   return parts.join(QStringLiteral(", "));
 }
 
+// Custom data role for storing entity IDs on list/table items.
+static constexpr int kEntityIdRole = Qt::UserRole + 10;
+
 // Helper: apply compact styling to a list/table/tree widget.
 static void applyCompactStyle(QAbstractItemView *view, int max_height) {
   auto f = view->font();
@@ -535,12 +538,21 @@ static QWidget *createSearchEntitiesView(const QJsonObject &result,
       name = resolveEntityName(config, obj[QStringLiteral("entity_id")]);
     }
 
+    auto eid_val = obj[QStringLiteral("entity_id")];
+    quint64 eid = eid_val.isString()
+        ? eid_val.toString().toULongLong()
+        : static_cast<quint64>(eid_val.toDouble(0));
+
     auto row = static_cast<int>(i);
     auto *kind_item = new QTableWidgetItem(kind);
-    kind_item->setToolTip(
-        resolveEntityName(config, obj[QStringLiteral("entity_id")]));
+    kind_item->setData(kEntityIdRole, QVariant::fromValue(eid));
+    kind_item->setToolTip(QStringLiteral("Double-click to open"));
     table->setItem(row, 0, kind_item);
-    table->setItem(row, 1, new QTableWidgetItem(name));
+
+    auto *name_item = new QTableWidgetItem(name);
+    name_item->setData(kEntityIdRole, QVariant::fromValue(eid));
+    name_item->setToolTip(QStringLiteral("Double-click to open"));
+    table->setItem(row, 1, name_item);
   }
   table->resizeColumnsToContents();
   return table;
@@ -565,6 +577,11 @@ static QWidget *createSearchCodeView(const QJsonObject &result,
     auto sep = file.lastIndexOf(QLatin1Char('/'));
     auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
 
+    auto eid_val = obj[QStringLiteral("entity_id")];
+    quint64 eid = eid_val.isString()
+        ? eid_val.toString().toULongLong()
+        : static_cast<quint64>(eid_val.toDouble(0));
+
     QString text;
     if (line_no >= 0) {
       text = QStringLiteral("%1:%2: %3")
@@ -576,6 +593,8 @@ static QWidget *createSearchCodeView(const QJsonObject &result,
     auto f = item->font();
     f.setFamily(QStringLiteral("monospace"));
     item->setFont(f);
+    item->setData(kEntityIdRole, QVariant::fromValue(eid));
+    item->setToolTip(QStringLiteral("Double-click to open"));
   }
   return list;
 }
@@ -1274,6 +1293,25 @@ void AgentConversationWidget::addMessageBubble(
         tool_name, tool_result, tool_args, d->config_manager, detail);
     if (interactive) {
       detail_layout->addWidget(interactive);
+
+      // Connect clickable views to navigate to entities on double-click.
+      if (auto *list = qobject_cast<QListWidget *>(interactive)) {
+        connect(list, &QListWidget::itemDoubleClicked, this,
+                [this](QListWidgetItem *item) {
+          auto eid = item->data(kEntityIdRole).toULongLong();
+          if (eid != 0) {
+            emit navigateToEntity(eid);
+          }
+        });
+      } else if (auto *table = qobject_cast<QTableWidget *>(interactive)) {
+        connect(table, &QTableWidget::itemDoubleClicked, this,
+                [this](QTableWidgetItem *item) {
+          auto eid = item->data(kEntityIdRole).toULongLong();
+          if (eid != 0) {
+            emit navigateToEntity(eid);
+          }
+        });
+      }
     } else {
       auto formatted = tool_result.isEmpty()
                            ? content.left(2000)
