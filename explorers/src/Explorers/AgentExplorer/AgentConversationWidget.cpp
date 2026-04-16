@@ -261,8 +261,10 @@ void AgentConversationWidget::addMessageBubble(
 
   if (role == QStringLiteral("user")) {
     frame->setStyleSheet(
-        QStringLiteral("QFrame { background-color: %1; border-radius: 8px; }")
-            .arg(d->user_bg.name()));
+        QStringLiteral("QFrame { background-color: rgba(%1,%2,%3,%4); "
+                       "border-radius: 8px; }")
+            .arg(d->user_bg.red()).arg(d->user_bg.green())
+            .arg(d->user_bg.blue()).arg(d->user_bg.alpha()));
     auto *label = make_label(content);
     label->setAlignment(Qt::AlignRight);
     frame_layout->addWidget(label);
@@ -275,8 +277,10 @@ void AgentConversationWidget::addMessageBubble(
 
   } else if (role == QStringLiteral("assistant")) {
     frame->setStyleSheet(
-        QStringLiteral("QFrame { background-color: %1; border-radius: 8px; }")
-            .arg(d->assistant_bg.name()));
+        QStringLiteral("QFrame { background-color: rgba(%1,%2,%3,%4); "
+                       "border-radius: 8px; }")
+            .arg(d->assistant_bg.red()).arg(d->assistant_bg.green())
+            .arg(d->assistant_bg.blue()).arg(d->assistant_bg.alpha()));
     auto *label = make_label(content);
     frame_layout->addWidget(label);
 
@@ -287,8 +291,10 @@ void AgentConversationWidget::addMessageBubble(
 
   } else if (role == QStringLiteral("tool_call")) {
     frame->setStyleSheet(
-        QStringLiteral("QFrame { background-color: %1; border-radius: 4px; }")
-            .arg(d->tool_bg.name()));
+        QStringLiteral("QFrame { background-color: rgba(%1,%2,%3,%4); "
+                       "border-radius: 4px; border: 1px solid palette(mid); }")
+            .arg(d->tool_bg.red()).arg(d->tool_bg.green())
+            .arg(d->tool_bg.blue()).arg(d->tool_bg.alpha()));
 
     // Collapsible header.
     auto *toggle_btn = new QPushButton(
@@ -322,8 +328,10 @@ void AgentConversationWidget::addMessageBubble(
 
   } else if (role == QStringLiteral("tool_result")) {
     frame->setStyleSheet(
-        QStringLiteral("QFrame { background-color: %1; border-radius: 4px; }")
-            .arg(d->tool_bg.name()));
+        QStringLiteral("QFrame { background-color: rgba(%1,%2,%3,%4); "
+                       "border-radius: 4px; border: 1px solid palette(mid); }")
+            .arg(d->tool_bg.red()).arg(d->tool_bg.green())
+            .arg(d->tool_bg.blue()).arg(d->tool_bg.alpha()));
 
     auto *toggle_btn = new QPushButton(
         QStringLiteral("Result: %1").arg(tool_name), frame);
@@ -447,21 +455,36 @@ void AgentConversationWidget::applyThemeColors(void) {
 
   auto palette = theme->Palette();
   auto text = palette.color(QPalette::Text);
+  auto base = palette.color(QPalette::Base);
   auto highlight = palette.color(QPalette::Highlight);
 
   d->text_fg = text;
   d->system_fg = palette.color(QPalette::PlaceholderText);
 
+  // Detect light vs dark theme by background luminance.
+  bool is_light = base.lightnessF() > 0.5;
+
   // User messages: accent-tinted.
   d->user_bg = highlight;
-  d->user_bg.setAlpha(60);
+  d->user_bg.setAlpha(is_light ? 30 : 60);
 
-  // Assistant messages: subtle contrast.
-  d->assistant_bg = text;
-  d->assistant_bg.setAlpha(20);
+  // Assistant messages: subtle contrast against the base.
+  if (is_light) {
+    // Light theme: slightly darker than background.
+    d->assistant_bg = QColor(0, 0, 0, 15);
+  } else {
+    // Dark theme: slightly lighter than background.
+    d->assistant_bg = QColor(255, 255, 255, 20);
+  }
 
-  // Tool calls/results.
+  // Tool calls/results: use alternateBase, ensure some contrast.
   d->tool_bg = palette.color(QPalette::AlternateBase);
+  if (is_light) {
+    // Ensure tool bg isn't pure white (invisible border).
+    if (d->tool_bg.lightnessF() > 0.95) {
+      d->tool_bg = QColor(0, 0, 0, 10);
+    }
+  }
 }
 
 }  // namespace mx::gui
