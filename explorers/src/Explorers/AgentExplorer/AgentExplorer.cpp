@@ -116,19 +116,26 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
   toolbar_layout->setContentsMargins(0, 0, 0, 0);
 
   d->new_session_btn = new QPushButton(tr("New Session"), d->main_dock);
+  d->new_session_btn->setToolTip(
+      tr("Start a fresh conversation with the configured LLM backend"));
   toolbar_layout->addWidget(d->new_session_btn);
 
   d->pause_btn = new QPushButton(tr("Pause"), d->main_dock);
+  d->pause_btn->setToolTip(
+      tr("Pause the agent's tool-calling loop (click again to resume)"));
   toolbar_layout->addWidget(d->pause_btn);
 
   d->stop_btn = new QPushButton(tr("Stop"), d->main_dock);
+  d->stop_btn->setToolTip(
+      tr("Cancel the current agent session"));
   toolbar_layout->addWidget(d->stop_btn);
 
   d->observer_btn = new QPushButton(tr("Observer"), d->main_dock);
   d->observer_btn->setCheckable(true);
   d->observer_btn->setToolTip(
-      tr("Enable observer mode: a secondary agent reviews the primary "
-         "agent's work periodically"));
+      tr("Enable a secondary agent that periodically reviews the primary "
+         "agent's work, identifies gaps, and writes recommendations "
+         "to an observer notes document"));
   toolbar_layout->addWidget(d->observer_btn);
 
   d->observer_label = new QLabel(d->main_dock);

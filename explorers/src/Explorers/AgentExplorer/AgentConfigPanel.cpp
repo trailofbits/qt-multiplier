@@ -180,7 +180,22 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->api_key_edit = new QLineEdit(content);
   d->api_key_edit->setEchoMode(QLineEdit::Password);
   d->api_key_edit->setPlaceholderText(tr("Enter API key..."));
-  form->addRow(tr("API Key:"), d->api_key_edit);
+  auto *api_key_row = new QWidget(content);
+  auto *api_key_layout = new QHBoxLayout(api_key_row);
+  api_key_layout->setContentsMargins(0, 0, 0, 0);
+  api_key_layout->setSpacing(4);
+  api_key_layout->addWidget(d->api_key_edit, 1);
+
+  auto *clear_keys_btn = new QPushButton(tr("Clear All"), api_key_row);
+  clear_keys_btn->setToolTip(tr("Remove all saved API keys from settings"));
+  api_key_layout->addWidget(clear_keys_btn);
+  connect(clear_keys_btn, &QPushButton::clicked, this, [this] {
+    d->llm_manager.clearAllApiKeys();
+    d->api_key_edit->clear();
+    showSaved();
+  });
+
+  form->addRow(tr("API Key:"), api_key_row);
 
   d->base_url_edit = new QLineEdit(content);
   d->base_url_edit->setPlaceholderText(tr("https://api.openai.com/v1"));
@@ -231,7 +246,7 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->max_iterations_spin->setRange(1, 200);
   d->max_iterations_spin->setValue(50);
   form->addRow(tr("Max iterations:"), d->max_iterations_spin);
-  form->addRow(QString(), makeHint(
+  form->addRow(makeHint(
       tr("Maximum tool-call rounds per message. The agent stops after "
          "this many LLM calls even if not finished."), content));
 
@@ -241,7 +256,7 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->temperature_spin->setValue(0.0);
   d->temperature_spin->setDecimals(1);
   form->addRow(tr("Temperature:"), d->temperature_spin);
-  form->addRow(QString(), makeHint(
+  form->addRow(makeHint(
       tr("0.0 = deterministic (best for analysis). Higher values "
          "increase randomness. Use 0.5-1.0 for brainstorming."),
       content));
@@ -272,7 +287,7 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->python_status_label->setWordWrap(true);
   form->addRow(QString(), d->python_status_label);
 
-  form->addRow(QString(), makeHint(
+  form->addRow(makeHint(
       tr("Path to a Python interpreter with multiplier bindings. "
          "Verified automatically."), content));
 
@@ -342,8 +357,7 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
     }
 
     // Restore saved API key and model.
-    auto saved_key = d->llm_manager.backendConfig(active,
-                         QStringLiteral("api_key"));
+    auto saved_key = d->llm_manager.apiKeyForType(type);
     if (!saved_key.isEmpty()) {
       d->api_key_edit->setText(saved_key);
     }
@@ -410,8 +424,7 @@ void AgentConfigPanel::onBackendTypeChanged(int index) {
   ensureBackendExists(type);
 
   // Restore saved config for this backend.
-  auto saved_key = d->llm_manager.backendConfig(type,
-                       QStringLiteral("api_key"));
+  auto saved_key = d->llm_manager.apiKeyForType(type);
   d->api_key_edit->setText(saved_key);
 
   auto saved_url = d->llm_manager.backendConfig(type,
@@ -435,12 +448,9 @@ void AgentConfigPanel::onBackendTypeChanged(int index) {
 }
 
 void AgentConfigPanel::onApiKeyChanged(void) {
-  auto name = d->llm_manager.activeBackendName();
-  if (!name.isEmpty()) {
-    d->llm_manager.setBackendConfig(
-        name, QStringLiteral("api_key"), d->api_key_edit->text());
-    d->llm_manager.saveConfig();
-  }
+  auto type = d->backend_combo->currentText();
+  d->llm_manager.setApiKeyForType(type, d->api_key_edit->text());
+  d->llm_manager.saveConfig();
   showSaved();
   emit configChanged();
 }
