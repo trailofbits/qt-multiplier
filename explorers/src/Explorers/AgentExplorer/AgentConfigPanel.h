@@ -48,6 +48,7 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   void ensureBackendExists(const QString &type);
   void showSaved(void);
   void maybeVerifyPython(void);
+  void setPythonStatus(int state);
 };
 
 }  // namespace mx::gui

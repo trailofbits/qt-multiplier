@@ -508,8 +508,32 @@ void AgentConfigPanel::onBrowsePythonClicked(void) {
   }
 }
 
+void AgentConfigPanel::setPythonStatus(int state) {
+  // 0 = neutral, 1 = checking, 2 = ok, 3 = error
+  switch (state) {
+    case 1:
+      d->python_path_edit->setStyleSheet(QStringLiteral(
+          "QLineEdit { background-color: palette(base); }"));
+      d->python_status_label->setText(tr("Checking..."));
+      d->python_status_label->setStyleSheet(
+          QStringLiteral("color: palette(mid);"));
+      break;
+    case 2:
+      d->python_path_edit->setStyleSheet(QStringLiteral(
+          "QLineEdit { background-color: rgba(0, 180, 0, 40); }"));
+      break;
+    case 3:
+      d->python_path_edit->setStyleSheet(QStringLiteral(
+          "QLineEdit { background-color: rgba(220, 0, 0, 40); }"));
+      break;
+    default:
+      d->python_path_edit->setStyleSheet({});
+      d->python_status_label->clear();
+      break;
+  }
+}
+
 void AgentConfigPanel::maybeVerifyPython(void) {
-  // Kill any in-progress verification.
   if (d->python_verify_proc) {
     d->python_verify_proc->kill();
     d->python_verify_proc->deleteLater();
@@ -521,40 +545,38 @@ void AgentConfigPanel::maybeVerifyPython(void) {
     path = QStringLiteral("python3");
   }
 
-  d->python_status_label->setText(QStringLiteral("\xe2\x8f\xb3 Checking..."));
-  d->python_status_label->setStyleSheet(
-      QStringLiteral("color: palette(mid);"));
+  setPythonStatus(1);
 
   auto *proc = new QProcess(this);
   d->python_verify_proc = proc;
   proc->setProgram(path);
   proc->setArguments({QStringLiteral("-c"),
-      QStringLiteral("import multiplier; print('OK:', multiplier.__file__)")});
+      QStringLiteral("import multiplier; print(multiplier.__file__)")});
 
   connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
           this, [this, proc](int exit_code, QProcess::ExitStatus) {
     if (d->python_verify_proc != proc) {
       proc->deleteLater();
-      return;  // Stale result from a previous check.
+      return;
     }
     d->python_verify_proc = nullptr;
 
     if (exit_code == 0) {
       auto output = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
-      d->python_status_label->setText(
-          QStringLiteral("\xe2\x9c\x93 ") + output);
+      setPythonStatus(2);
+      d->python_status_label->setText(output);
       d->python_status_label->setStyleSheet(
-          QStringLiteral("color: green;"));
+          QStringLiteral("color: palette(mid); font-style: italic;"));
     } else {
       auto err = QString::fromUtf8(proc->readAllStandardError()).trimmed();
       if (err.length() > 120) {
         err = err.left(120) + QStringLiteral("...");
       }
+      setPythonStatus(3);
       d->python_status_label->setText(
-          QStringLiteral("\xe2\x9c\x97 ") +
-          (err.isEmpty() ? tr("import multiplier failed") : err));
+          err.isEmpty() ? tr("import multiplier failed") : err);
       d->python_status_label->setStyleSheet(
-          QStringLiteral("color: red;"));
+          QStringLiteral("color: palette(mid); font-style: italic;"));
     }
     proc->deleteLater();
   });
@@ -566,10 +588,10 @@ void AgentConfigPanel::maybeVerifyPython(void) {
       return;
     }
     d->python_verify_proc = nullptr;
-    d->python_status_label->setText(
-        QStringLiteral("\xe2\x9c\x97 ") + tr("Interpreter not found"));
+    setPythonStatus(3);
+    d->python_status_label->setText(tr("Interpreter not found"));
     d->python_status_label->setStyleSheet(
-        QStringLiteral("color: red;"));
+        QStringLiteral("color: palette(mid); font-style: italic;"));
     proc->deleteLater();
   });
 
