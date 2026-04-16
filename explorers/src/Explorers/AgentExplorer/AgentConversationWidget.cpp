@@ -1426,10 +1426,10 @@ void AgentConversationWidget::addMessageBubble(
     label->setAlignment(Qt::AlignRight);
     frame_layout->addWidget(label);
 
-    // Right-align user messages.
+    // Right-align user messages (slight indent from left).
     auto *wrapper = new QHBoxLayout;
     wrapper->addStretch(1);
-    wrapper->addWidget(frame, 3);
+    wrapper->addWidget(frame, 5);
     d->messages_layout->addLayout(wrapper);
 
   } else if (role == QStringLiteral("assistant")) {
@@ -1457,10 +1457,7 @@ void AgentConversationWidget::addMessageBubble(
     });
     frame_layout->addWidget(label);
 
-    auto *wrapper = new QHBoxLayout;
-    wrapper->addWidget(frame, 3);
-    wrapper->addStretch(1);
-    d->messages_layout->addLayout(wrapper);
+    d->messages_layout->addWidget(frame);
 
   } else if (role == QStringLiteral("tool_result")) {
     frame->setStyleSheet(
@@ -1533,10 +1530,7 @@ void AgentConversationWidget::addMessageBubble(
     connect(toggle_btn, &QPushButton::clicked, detail,
             [detail] { detail->setVisible(!detail->isVisible()); });
 
-    auto *wrapper = new QHBoxLayout;
-    wrapper->addWidget(frame, 3);
-    wrapper->addStretch(1);
-    d->messages_layout->addLayout(wrapper);
+    d->messages_layout->addWidget(frame);
 
   } else {
     // System or unknown role -- centered, italic.
