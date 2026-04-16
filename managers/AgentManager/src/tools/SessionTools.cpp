@@ -192,8 +192,6 @@ QJsonObject LogObservationTool::execute(const QJsonObject &args) {
 // FinishTool
 // ===========================================================================
 
-SessionResult FinishTool::s_last_result;
-bool FinishTool::s_was_called = false;
 
 QString FinishTool::name(void) const {
   return QStringLiteral("finish");
@@ -250,24 +248,12 @@ QJsonObject FinishTool::execute(const QJsonObject &args) {
     }
   }
 
-  s_last_result = result;
-  s_was_called = true;
+  m_ctx->finish_result = result;
+  m_ctx->finish_called = true;
 
   QJsonObject r;
   r[QStringLiteral("acknowledged")] = true;
   return r;
-}
-
-SessionResult FinishTool::lastResult(void) {
-  return s_last_result;
-}
-
-bool FinishTool::wasCalledAndReset(void) {
-  if (s_was_called) {
-    s_was_called = false;
-    return true;
-  }
-  return false;
 }
 
 // ===========================================================================

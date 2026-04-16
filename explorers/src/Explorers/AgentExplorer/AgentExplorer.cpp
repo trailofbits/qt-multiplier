@@ -445,10 +445,16 @@ void AgentExplorer::OnMessageAdded(int64_t session_id,
 void AgentExplorer::OnTokenUsageUpdated(int64_t session_id,
                                          int prompt_tokens,
                                          int completion_tokens) {
-  if (session_id != d->current_session_id) {
+  // Track tokens for both primary and observer sessions.
+  if (session_id != d->current_session_id &&
+      session_id != d->observer_session_id) {
     return;
   }
-  d->conversation->updateTokens(prompt_tokens, completion_tokens);
+
+  // Show cumulative tokens across all related sessions.
+  auto totals = d->agent_manager->totalTokens();
+  d->conversation->updateTokens(totals.total_prompt_tokens,
+                                totals.total_completion_tokens);
   d->config_manager.UpdateAgentSessionTokens(
       session_id, prompt_tokens, completion_tokens);
 }

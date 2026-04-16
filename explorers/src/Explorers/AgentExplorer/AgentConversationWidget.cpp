@@ -375,6 +375,16 @@ void AgentConversationWidget::clearSuggestion(void) {
 bool AgentConversationWidget::eventFilter(QObject *obj, QEvent *event) {
   if (obj == d->input_edit && event->type() == QEvent::KeyPress) {
     auto *key_event = static_cast<QKeyEvent *>(event);
+
+    // Enter sends message (Shift+Enter inserts newline).
+    if ((key_event->key() == Qt::Key_Return ||
+         key_event->key() == Qt::Key_Enter) &&
+        !(key_event->modifiers() & Qt::ShiftModifier)) {
+      onSendClicked();
+      return true;
+    }
+
+    // Tab accepts suggestion.
     if (key_event->key() == Qt::Key_Tab &&
         d->suggestion_frame->isVisible() &&
         !d->current_suggestion.isEmpty()) {
@@ -387,6 +397,8 @@ bool AgentConversationWidget::eventFilter(QObject *obj, QEvent *event) {
       emit suggestionAccepted(suggestion);
       return true;
     }
+
+    // Typing dismisses suggestion.
     if (d->suggestion_frame->isVisible() &&
         d->input_edit->toPlainText().isEmpty() &&
         key_event->key() != Qt::Key_Tab &&

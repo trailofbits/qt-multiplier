@@ -7,7 +7,6 @@
 #include "AgentSession.h"
 #include "AgentTool.h"
 #include "AgentToolRegistry.h"
-#include "tools/SessionTools.h"
 
 #include <QElapsedTimer>
 #include <QJsonArray>
@@ -274,18 +273,31 @@ void AgentSession::runLoop(void) {
       addMessage(QStringLiteral("tool_result"), result_str,
                  call.name, call.id, {}, result, 0, duration_ms);
 
-      // Check if the finish tool was called.
+      // Check if the finish tool was called and capture its args.
       if (call.name == QStringLiteral("finish")) {
         finish_called = true;
+        m_pending_finish_result.summary =
+            call.arguments.value(QStringLiteral("summary")).toString();
+        m_pending_finish_result.status =
+            call.arguments.value(QStringLiteral("status")).toString(
+                QStringLiteral("completed"));
+        auto actions = call.arguments.value(
+            QStringLiteral("next_actions")).toArray();
+        for (const auto &a : actions) {
+          auto s = a.toString();
+          if (!s.isEmpty()) {
+            m_pending_finish_result.next_actions.append(s);
+          }
+        }
       }
     }
 
-    // If the finish tool was called, stop the loop and emit the result.
-    if (finish_called && FinishTool::wasCalledAndReset()) {
-      auto session_result = FinishTool::lastResult();
+    // If the finish tool was called, extract the result from the tool call
+    // args (which we already have) and stop the loop.
+    if (finish_called) {
       m_running.storeRelaxed(0);
-      emit sessionFinished(session_result);
-      emit sessionCompleted(session_result.summary);
+      emit sessionFinished(m_pending_finish_result);
+      emit sessionCompleted(m_pending_finish_result.summary);
       return;
     }
 

@@ -74,6 +74,7 @@ class AgentSession Q_DECL_FINAL : public QObject {
   int64_t m_session_id;
   ILLMBackend *m_backend;
   AgentToolRegistry *m_tools;
+  SessionResult m_pending_finish_result;
   LLMConfig m_config;
   QString m_system_prompt;
   int m_max_iterations;
