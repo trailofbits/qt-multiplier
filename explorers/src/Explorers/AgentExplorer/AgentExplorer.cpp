@@ -90,6 +90,9 @@ struct AgentExplorer::PrivateData {
   int64_t current_session_id{-1};
   bool paused{false};
 
+  // Last root node ID from the primary session, for trigger edges.
+  int64_t last_primary_root_node_id{-1};
+
   // Observer mode.
   int64_t observer_session_id{-1};
   int observer_tool_call_count{0};
@@ -378,6 +381,17 @@ void AgentExplorer::OnSendMessage(const QString &text) {
   // Send to agent. The AgentManager will emit messageAdded, which
   // triggers OnMessageAdded to display it in the conversation.
   d->agent_manager->sendMessage(d->current_session_id, text);
+
+  // Capture the root cost node for trigger edge tracking. The root node
+  // (user_message with no parent) is created synchronously in sendUserMessage
+  // before the worker thread starts.
+  auto cost_nodes = d->config_manager.LoadCostNodes(d->current_session_id);
+  for (const auto &node : cost_nodes) {
+    if (node.parent_node_id < 0 &&
+        node.node_type == QStringLiteral("user_message")) {
+      d->last_primary_root_node_id = node.node_id;
+    }
+  }
 }
 
 void AgentExplorer::OnPauseResume(void) {
@@ -799,12 +813,18 @@ Respond with ONLY a JSON object:
   config.model = d->summarizer_model.isEmpty()
       ? primary_model : d->summarizer_model;
 
-  // Create a cost node for the summarizer call.
+  // Create a cost node for the summarizer call and a trigger edge from
+  // the session's root node.
   int64_t summarizer_node_id = -1;
   if (d->current_session_id >= 0) {
     summarizer_node_id = d->config_manager.CreateCostNode(
         d->current_session_id, -1, QStringLiteral("summarizer"),
         {}, config.model);
+    if (summarizer_node_id >= 0 && d->last_primary_root_node_id >= 0) {
+      d->config_manager.CreateCostEdge(
+          d->last_primary_root_node_id, summarizer_node_id,
+          QStringLiteral("trigger"));
+    }
   }
 
   auto *thread = QThread::create(
@@ -953,12 +973,18 @@ Respond with ONLY a JSON object (no markdown, no explanation):
   config.model = d->recommender_model.isEmpty()
       ? primary_model : d->recommender_model;
 
-  // Create a cost node for the recommender call.
+  // Create a cost node for the recommender call and a trigger edge from
+  // the session's root node.
   int64_t recommender_node_id = -1;
   if (d->current_session_id >= 0) {
     recommender_node_id = d->config_manager.CreateCostNode(
         d->current_session_id, -1, QStringLiteral("recommender"),
         {}, config.model);
+    if (recommender_node_id >= 0 && d->last_primary_root_node_id >= 0) {
+      d->config_manager.CreateCostEdge(
+          d->last_primary_root_node_id, recommender_node_id,
+          QStringLiteral("trigger"));
+    }
   }
 
   auto *thread = QThread::create(

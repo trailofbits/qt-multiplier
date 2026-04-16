@@ -36,6 +36,10 @@ int64_t AgentSession::sessionId(void) const {
   return m_session_id;
 }
 
+int64_t AgentSession::rootNodeId(void) const {
+  return m_root_node_id;
+}
+
 QVector<AgentMessage> AgentSession::messages(void) const {
   QMutexLocker lock(&m_mutex);
   return m_messages;
@@ -219,6 +223,20 @@ void AgentSession::runLoop(void) {
         m_current_llm_node_id = m_config_manager->CreateCostNode(
             m_session_id, m_root_node_id, QStringLiteral("llm_call"),
             {}, m_config.model);
+
+        // Record a causal edge from root to this LLM call.
+        if (m_root_node_id >= 0 && m_current_llm_node_id >= 0) {
+          m_config_manager->CreateCostEdge(
+              m_root_node_id, m_current_llm_node_id,
+              QStringLiteral("causal"));
+        }
+
+        // Record context edges from pending tool nodes to this LLM call.
+        for (auto from_id : m_pending_context_nodes) {
+          m_config_manager->CreateCostEdge(
+              from_id, m_current_llm_node_id, QStringLiteral("context"));
+        }
+        m_pending_context_nodes.clear();
       }, Qt::BlockingQueuedConnection);
     }
 
@@ -288,7 +306,19 @@ void AgentSession::runLoop(void) {
           tool_node_id = m_config_manager->CreateCostNode(
               m_session_id, m_current_llm_node_id,
               QStringLiteral("tool_call"), call.name);
+
+          // Record a causal edge from the LLM call to this tool call.
+          if (m_current_llm_node_id >= 0 && tool_node_id >= 0) {
+            m_config_manager->CreateCostEdge(
+                m_current_llm_node_id, tool_node_id,
+                QStringLiteral("causal"));
+          }
         }, Qt::BlockingQueuedConnection);
+
+        // Map the tool_call_id to its cost node for context edge tracking.
+        if (tool_node_id >= 0 && !call.id.isEmpty()) {
+          m_tool_call_id_to_node[call.id] = tool_node_id;
+        }
       }
 
       QElapsedTimer timer;
@@ -319,6 +349,9 @@ void AgentSession::runLoop(void) {
         QMetaObject::invokeMethod(m_config_manager, [&] {
           m_config_manager->CompleteCostNode(tool_node_id, 0, 0, duration_ms);
         }, Qt::BlockingQueuedConnection);
+
+        // Track this tool node for context edges in the next LLM call.
+        m_pending_context_nodes.append(tool_node_id);
       }
 
       emit toolCallCompleted(call.name, result, duration_ms);

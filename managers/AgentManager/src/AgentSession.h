@@ -10,6 +10,7 @@
 #include <multiplier/GUI/Managers/AgentMessage.h>
 
 #include <QAtomicInt>
+#include <QMap>
 #include <QMutex>
 #include <QObject>
 #include <QVector>
@@ -31,6 +32,7 @@ class AgentSession Q_DECL_FINAL : public QObject {
   ~AgentSession(void) override;
 
   int64_t sessionId(void) const;
+  int64_t rootNodeId(void) const;
   QVector<AgentMessage> messages(void) const;
   bool isRunning(void) const;
 
@@ -96,6 +98,12 @@ class AgentSession Q_DECL_FINAL : public QObject {
   // Cost tracking node IDs.
   int64_t m_root_node_id{-1};
   int64_t m_current_llm_node_id{-1};
+
+  // Dependency edge tracking: tool_call_id string -> cost node_id.
+  QMap<QString, int64_t> m_tool_call_id_to_node;
+
+  // Tool nodes completed since the last LLM call, used for context edges.
+  QVector<int64_t> m_pending_context_nodes;
 };
 
 }  // namespace mx::gui

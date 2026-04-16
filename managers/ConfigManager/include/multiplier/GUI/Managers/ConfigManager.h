@@ -321,6 +321,24 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   };
   QVector<CostNodeInfo> LoadCostNodes(int64_t session_id) const;
 
+  //! Dependency edge tracking between cost nodes.
+  void CreateCostEdge(int64_t from_node_id, int64_t to_node_id,
+                      const QString &edge_type) const;
+
+  struct CostEdgeInfo {
+    int64_t edge_id{-1};
+    int64_t from_node_id{-1};
+    int64_t to_node_id{-1};
+    QString edge_type;
+  };
+  QVector<CostEdgeInfo> LoadCostEdges(int64_t session_id) const;
+
+  //! Load all upstream nodes that contributed to a given node (recursive).
+  QVector<CostNodeInfo> LoadUpstreamNodes(int64_t node_id) const;
+
+  //! Compute the true cost of a node including amortized sibling costs.
+  double ComputeTrueCost(int64_t node_id) const;
+
   struct CostSummary {
     double total_cost_usd{0.0};
     int total_input_tokens{0};

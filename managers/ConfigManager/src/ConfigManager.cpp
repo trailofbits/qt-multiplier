@@ -183,6 +183,14 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  output_per_million REAL NOT NULL,"
       "  updated_at TEXT NOT NULL)"));
 
+  // Cost dependency edges table.
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_cost_edges ("
+      "  edge_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  from_node_id INTEGER NOT NULL,"
+      "  to_node_id INTEGER NOT NULL,"
+      "  edge_type TEXT NOT NULL)"));
+
   // Seed known model rates.
   q.exec(QStringLiteral(
       "INSERT OR IGNORE INTO gui_cost_rates VALUES "
@@ -1326,6 +1334,16 @@ void ConfigManager::DeleteAgentSession(int64_t session_id) const {
   q.addBindValue(sid);
   q.exec();
 
+  // Delete cost edges that reference nodes in this session.
+  q.prepare(QStringLiteral(
+      "DELETE FROM gui_cost_edges WHERE from_node_id IN "
+      "(SELECT node_id FROM gui_cost_nodes WHERE session_id = ?) "
+      "OR to_node_id IN "
+      "(SELECT node_id FROM gui_cost_nodes WHERE session_id = ?)"));
+  q.addBindValue(sid);
+  q.addBindValue(sid);
+  q.exec();
+
   q.prepare(QStringLiteral(
       "DELETE FROM gui_cost_nodes WHERE session_id = ?"));
   q.addBindValue(sid);
@@ -1697,6 +1715,171 @@ ConfigManager::LoadRoleCostBreakdown(int64_t session_id) const {
     result.push_back(std::move(info));
   }
   return result;
+}
+
+// --- Cost edge tracking ---
+
+void ConfigManager::CreateCostEdge(int64_t from_node_id, int64_t to_node_id,
+                                   const QString &edge_type) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  if (from_node_id < 0 || to_node_id < 0) return;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_cost_edges (from_node_id, to_node_id, edge_type) "
+      "VALUES (?, ?, ?)"));
+  q.addBindValue(static_cast<qlonglong>(from_node_id));
+  q.addBindValue(static_cast<qlonglong>(to_node_id));
+  q.addBindValue(edge_type);
+  q.exec();
+}
+
+QVector<ConfigManager::CostEdgeInfo>
+ConfigManager::LoadCostEdges(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT e.edge_id, e.from_node_id, e.to_node_id, e.edge_type "
+      "FROM gui_cost_edges e "
+      "JOIN gui_cost_nodes n ON e.from_node_id = n.node_id "
+      "WHERE n.session_id = ? "
+      "ORDER BY e.edge_id"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<CostEdgeInfo> result;
+  while (q.next()) {
+    CostEdgeInfo info;
+    info.edge_id = q.value(0).toLongLong();
+    info.from_node_id = q.value(1).toLongLong();
+    info.to_node_id = q.value(2).toLongLong();
+    info.edge_type = q.value(3).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+QVector<ConfigManager::CostNodeInfo>
+ConfigManager::LoadUpstreamNodes(int64_t node_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+
+  // Walk up the parent chain from node_id to root via parent_node_id.
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "WITH RECURSIVE ancestors(nid) AS ("
+      "  SELECT ? "
+      "  UNION ALL "
+      "  SELECT n.parent_node_id FROM gui_cost_nodes n "
+      "  JOIN ancestors a ON n.node_id = a.nid "
+      "  WHERE n.parent_node_id IS NOT NULL"
+      ") "
+      "SELECT node_id, session_id, parent_node_id, node_type, tool_name, "
+      "model, input_tokens, output_tokens, duration_ms, cost_usd, "
+      "started_at, completed_at "
+      "FROM gui_cost_nodes WHERE node_id IN (SELECT nid FROM ancestors) "
+      "ORDER BY started_at"));
+  q.addBindValue(static_cast<qlonglong>(node_id));
+  q.exec();
+
+  QVector<CostNodeInfo> result;
+  while (q.next()) {
+    CostNodeInfo info;
+    info.node_id = q.value(0).toLongLong();
+    info.session_id = q.value(1).toLongLong();
+    info.parent_node_id = q.value(2).isNull() ? -1 : q.value(2).toLongLong();
+    info.node_type = q.value(3).toString();
+    info.tool_name = q.value(4).toString();
+    info.model = q.value(5).toString();
+    info.input_tokens = q.value(6).toInt();
+    info.output_tokens = q.value(7).toInt();
+    info.duration_ms = q.value(8).toInt();
+    info.cost_usd = q.value(9).toDouble();
+    info.started_at = q.value(10).toString();
+    info.completed_at = q.value(11).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+double ConfigManager::ComputeTrueCost(int64_t node_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return 0.0;
+  if (node_id < 0) return 0.0;
+
+  // Helper: compute subtree cost for a given node.
+  auto subtree_cost = [this](int64_t root_id) -> double {
+    QSqlQuery sq(d->project_db);
+    sq.prepare(QStringLiteral(
+        "WITH RECURSIVE subtree(nid) AS ("
+        "  SELECT ? "
+        "  UNION ALL "
+        "  SELECT n.node_id FROM gui_cost_nodes n "
+        "  JOIN subtree s ON n.parent_node_id = s.nid"
+        ") "
+        "SELECT COALESCE(SUM(cost_usd), 0) FROM gui_cost_nodes "
+        "WHERE node_id IN (SELECT nid FROM subtree)"));
+    sq.addBindValue(static_cast<qlonglong>(root_id));
+    if (sq.exec() && sq.next()) {
+      return sq.value(0).toDouble();
+    }
+    return 0.0;
+  };
+
+  // Trace path from node to root via parent_node_id.
+  QVector<int64_t> path;
+  {
+    int64_t cur = node_id;
+    while (cur >= 0) {
+      path.append(cur);
+      QSqlQuery pq(d->project_db);
+      pq.prepare(QStringLiteral(
+          "SELECT parent_node_id FROM gui_cost_nodes WHERE node_id = ?"));
+      pq.addBindValue(static_cast<qlonglong>(cur));
+      if (pq.exec() && pq.next() && !pq.value(0).isNull()) {
+        cur = pq.value(0).toLongLong();
+      } else {
+        break;
+      }
+    }
+  }
+
+  double cost = 0.0;
+  for (auto nid : path) {
+    // Add this node's direct cost.
+    QSqlQuery cq(d->project_db);
+    cq.prepare(QStringLiteral(
+        "SELECT cost_usd, parent_node_id FROM gui_cost_nodes "
+        "WHERE node_id = ?"));
+    cq.addBindValue(static_cast<qlonglong>(nid));
+    if (!cq.exec() || !cq.next()) continue;
+
+    cost += cq.value(0).toDouble();
+    auto parent_id = cq.value(1).isNull() ? -1 : cq.value(1).toLongLong();
+
+    if (parent_id < 0) continue;
+
+    // Find all siblings (children of the same parent, excluding this node).
+    QSqlQuery sq(d->project_db);
+    sq.prepare(QStringLiteral(
+        "SELECT node_id FROM gui_cost_nodes "
+        "WHERE parent_node_id = ? AND node_id != ?"));
+    sq.addBindValue(static_cast<qlonglong>(parent_id));
+    sq.addBindValue(static_cast<qlonglong>(nid));
+    if (!sq.exec()) continue;
+
+    QVector<int64_t> sibling_ids;
+    while (sq.next()) {
+      sibling_ids.append(sq.value(0).toLongLong());
+    }
+
+    if (sibling_ids.isEmpty()) continue;
+
+    // Amortize sibling subtree costs: each sibling's subtree cost is
+    // shared equally among all children at this level.
+    auto num_children = static_cast<double>(sibling_ids.size() + 1);
+    for (auto sib_id : sibling_ids) {
+      cost += subtree_cost(sib_id) / static_cast<double>(num_children);
+    }
+  }
+
+  return cost;
 }
 
 }  // namespace mx::gui

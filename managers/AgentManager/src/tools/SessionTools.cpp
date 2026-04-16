@@ -215,6 +215,7 @@ QJsonObject GetSessionCostTool::execute(const QJsonObject &) {
   ConfigManager::CostSummary summary;
   QVector<ConfigManager::ToolCostBreakdown> tool_breakdown;
   QVector<ConfigManager::RoleCostBreakdown> role_breakdown;
+  QVector<ConfigManager::CostEdgeInfo> edges;
 
   QMetaObject::invokeMethod(m_ctx->config, [&] {
     summary = m_ctx->config->LoadCostSummary(session_id);
@@ -226,6 +227,10 @@ QJsonObject GetSessionCostTool::execute(const QJsonObject &) {
 
   QMetaObject::invokeMethod(m_ctx->config, [&] {
     role_breakdown = m_ctx->config->LoadRoleCostBreakdown(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    edges = m_ctx->config->LoadCostEdges(session_id);
   }, Qt::BlockingQueuedConnection);
 
   QJsonObject result;
@@ -256,6 +261,23 @@ QJsonObject GetSessionCostTool::execute(const QJsonObject &) {
     by_role.append(obj);
   }
   result[QStringLiteral("by_role")] = by_role;
+
+  // Dependency edge summary.
+  int causal_count = 0;
+  int context_count = 0;
+  int trigger_count = 0;
+  for (const auto &e : edges) {
+    if (e.edge_type == QStringLiteral("causal")) ++causal_count;
+    else if (e.edge_type == QStringLiteral("context")) ++context_count;
+    else if (e.edge_type == QStringLiteral("trigger")) ++trigger_count;
+  }
+
+  QJsonObject edge_summary;
+  edge_summary[QStringLiteral("total_edges")] = edges.size();
+  edge_summary[QStringLiteral("causal_edges")] = causal_count;
+  edge_summary[QStringLiteral("context_edges")] = context_count;
+  edge_summary[QStringLiteral("trigger_edges")] = trigger_count;
+  result[QStringLiteral("dependency_edges")] = edge_summary;
 
   return result;
 }
