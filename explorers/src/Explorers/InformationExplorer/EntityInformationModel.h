@@ -78,6 +78,9 @@ class EntityInformationModel Q_DECL_FINAL : public IModel {
 
   void Clear(void);
 
+  void SetShowFullPaths(bool show);
+  bool GetShowFullPaths(void) const;
+
   inline static QString ConstantModelId(void) {
     return "com.trailofbits.explorer.InformationExplorer.EntityInformationModel";
   }
