@@ -8,16 +8,21 @@
 
 #include <QEvent>
 #include <QFrame>
+#include <QGridLayout>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QListWidget>
 #include <QMap>
 #include <QMenu>
 #include <QPlainTextEdit>
+#include <QTableWidget>
 #include <QTextCursor>
+#include <QTreeWidget>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -437,6 +442,450 @@ static QString formatToolArgs(const QString &tool_name,
   return parts.join(QStringLiteral(", "));
 }
 
+// Helper: apply compact styling to a list/table/tree widget.
+static void applyCompactStyle(QAbstractItemView *view, int max_height) {
+  auto f = view->font();
+  f.setPointSize(f.pointSize() - 1);
+  view->setFont(f);
+  view->setMaximumHeight(max_height);
+  view->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  view->setSelectionMode(QAbstractItemView::SingleSelection);
+  view->setFrameShape(QFrame::NoFrame);
+  view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+}
+
+// 1. list_files -> clickable file list
+static QWidget *createListFilesView(const QJsonObject &result,
+                                    QWidget *parent) {
+  auto files = result[QStringLiteral("files")].toArray();
+  if (files.isEmpty()) {
+    return nullptr;
+  }
+
+  auto *list = new QListWidget(parent);
+  applyCompactStyle(list, 200);
+  list->setSpacing(0);
+
+  auto limit = qMin(files.size(), qsizetype(30));
+  for (qsizetype i = 0; i < limit; ++i) {
+    auto obj = files[i].toObject();
+    auto path = obj[QStringLiteral("path")].toString();
+    auto eid = static_cast<int64_t>(
+        obj[QStringLiteral("entity_id")].toDouble());
+    auto *item = new QListWidgetItem(path, list);
+    item->setData(Qt::UserRole, qlonglong(eid));
+    item->setToolTip(QStringLiteral("entity_id: %1").arg(eid));
+  }
+  if (files.size() > 30) {
+    auto *more = new QListWidgetItem(
+        QStringLiteral("...and %1 more").arg(files.size() - 30), list);
+    more->setFlags(more->flags() & ~Qt::ItemIsSelectable);
+    auto f = more->font();
+    f.setItalic(true);
+    more->setFont(f);
+  }
+  return list;
+}
+
+// 2. search_entities -> mini table
+static QWidget *createSearchEntitiesView(const QJsonObject &result,
+                                         QWidget *parent) {
+  auto entities = result[QStringLiteral("entities")].toArray();
+  if (entities.isEmpty()) {
+    return nullptr;
+  }
+
+  auto *table = new QTableWidget(static_cast<int>(entities.size()), 3, parent);
+  table->setHorizontalHeaderLabels({QStringLiteral("ID"),
+                                    QStringLiteral("Kind"),
+                                    QStringLiteral("Name")});
+  applyCompactStyle(table, 250);
+  table->setAlternatingRowColors(true);
+  table->verticalHeader()->setVisible(false);
+  table->verticalHeader()->setDefaultSectionSize(20);
+  table->horizontalHeader()->setStretchLastSection(true);
+
+  for (qsizetype i = 0; i < entities.size(); ++i) {
+    auto obj = entities[i].toObject();
+    auto eid = static_cast<int64_t>(
+        obj[QStringLiteral("entity_id")].toDouble());
+    auto kind = obj[QStringLiteral("kind")].toString();
+    auto name = obj[QStringLiteral("name")].toString();
+
+    auto row = static_cast<int>(i);
+    table->setItem(row, 0, new QTableWidgetItem(QString::number(eid)));
+    table->setItem(row, 1, new QTableWidgetItem(kind));
+    table->setItem(row, 2, new QTableWidgetItem(name));
+  }
+  table->resizeColumnsToContents();
+  return table;
+}
+
+// 3. search_code -> mini grep results
+static QWidget *createSearchCodeView(const QJsonObject &result,
+                                     QWidget *parent) {
+  auto matches = result[QStringLiteral("matches")].toArray();
+  if (matches.isEmpty()) {
+    return nullptr;
+  }
+
+  auto *list = new QListWidget(parent);
+  applyCompactStyle(list, 250);
+
+  for (const auto &val : matches) {
+    auto obj = val.toObject();
+    auto file = obj[QStringLiteral("file")].toString();
+    int line_no = obj[QStringLiteral("line")].toInt(-1);
+    auto context = obj[QStringLiteral("context")].toString().trimmed();
+    auto sep = file.lastIndexOf(QLatin1Char('/'));
+    auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+
+    QString text;
+    if (line_no >= 0) {
+      text = QStringLiteral("%1:%2: %3")
+                 .arg(short_file).arg(line_no).arg(context);
+    } else {
+      text = QStringLiteral("%1: %2").arg(short_file, context);
+    }
+    auto *item = new QListWidgetItem(text, list);
+    auto f = item->font();
+    f.setFamily(QStringLiteral("monospace"));
+    item->setFont(f);
+  }
+  return list;
+}
+
+// 4. get_references -> color-coded reference list
+static QWidget *createReferencesView(const QJsonObject &result,
+                                     QWidget *parent) {
+  auto refs = result[QStringLiteral("references")].toArray();
+  if (refs.isEmpty()) {
+    return nullptr;
+  }
+
+  auto *list = new QListWidget(parent);
+  applyCompactStyle(list, 250);
+
+  for (const auto &val : refs) {
+    auto obj = val.toObject();
+    auto ref_kind = obj[QStringLiteral("ref_kind")].toString();
+    auto file = obj[QStringLiteral("file")].toString();
+    int line_no = obj[QStringLiteral("line")].toInt(-1);
+    auto context = obj[QStringLiteral("context")].toString().trimmed();
+    auto sep = file.lastIndexOf(QLatin1Char('/'));
+    auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+    QString loc = (line_no >= 0)
+                      ? QStringLiteral("%1:%2").arg(short_file).arg(line_no)
+                      : short_file;
+
+    auto text = QStringLiteral("[%1] %2 \xe2\x80\x94 %3")
+                    .arg(ref_kind, loc, context);
+    auto *item = new QListWidgetItem(text, list);
+
+    // Color-code by reference kind.
+    QColor color;
+    if (ref_kind == QStringLiteral("CALLS") ||
+        ref_kind == QStringLiteral("CALL")) {
+      color = QColor(0x3B, 0x82, 0xF6);  // blue
+    } else if (ref_kind == QStringLiteral("WRITES") ||
+               ref_kind == QStringLiteral("WRITE")) {
+      color = QColor(0xF9, 0x73, 0x16);  // orange
+    } else if (ref_kind == QStringLiteral("READS") ||
+               ref_kind == QStringLiteral("READ")) {
+      color = QColor(0x22, 0xC5, 0x5E);  // green
+    } else if (ref_kind == QStringLiteral("TAKES_ADDRESS") ||
+               ref_kind == QStringLiteral("ADDRESS_OF")) {
+      color = QColor(0xA8, 0x55, 0xF7);  // purple
+    } else {
+      color = QColor(0x9C, 0xA3, 0xAF);  // gray
+    }
+    item->setForeground(color);
+  }
+
+  bool has_more = result[QStringLiteral("has_more")].toBool();
+  if (has_more) {
+    int total = result[QStringLiteral("total_matched")].toInt();
+    auto *more = new QListWidgetItem(
+        QStringLiteral("... %1 total matches").arg(total), list);
+    more->setFlags(more->flags() & ~Qt::ItemIsSelectable);
+    auto f = more->font();
+    f.setItalic(true);
+    more->setFont(f);
+  }
+  return list;
+}
+
+// Helper: recursively populate a QTreeWidgetItem from caller/callee data.
+static void populateCallTree(QTreeWidgetItem *parent_item,
+                             const QJsonArray &items,
+                             const QString &child_key) {
+  for (const auto &val : items) {
+    auto obj = val.toObject();
+    auto name = obj[QStringLiteral("name")].toString();
+    auto kind = obj[QStringLiteral("kind")].toString();
+    auto file = obj[QStringLiteral("file")].toString();
+    int line = obj[QStringLiteral("line")].toInt(-1);
+
+    auto sep = file.lastIndexOf(QLatin1Char('/'));
+    auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+    QString loc;
+    if (!short_file.isEmpty()) {
+      loc = (line >= 0) ? QStringLiteral("%1:%2").arg(short_file).arg(line)
+                        : short_file;
+    }
+
+    auto display = QStringLiteral("%1 (%2)").arg(name, kind);
+    auto *child = new QTreeWidgetItem(parent_item, {display, loc});
+
+    if (obj.contains(child_key)) {
+      populateCallTree(child, obj[child_key].toArray(), child_key);
+    }
+  }
+}
+
+// 5. get_callers / get_callees -> mini tree
+static QWidget *createCallTreeView(const QJsonObject &result,
+                                   const QString &tool_name,
+                                   QWidget *parent) {
+  auto key = (tool_name == QStringLiteral("get_callers"))
+                 ? QStringLiteral("callers")
+                 : QStringLiteral("callees");
+  auto items = result[key].toArray();
+  if (items.isEmpty()) {
+    return nullptr;
+  }
+
+  auto *tree = new QTreeWidget(parent);
+  tree->setHeaderLabels({QStringLiteral("Name"), QStringLiteral("File:Line")});
+  applyCompactStyle(tree, 250);
+  tree->header()->setStretchLastSection(true);
+
+  for (const auto &val : items) {
+    auto obj = val.toObject();
+    auto name = obj[QStringLiteral("name")].toString();
+    auto kind = obj[QStringLiteral("kind")].toString();
+    auto file = obj[QStringLiteral("file")].toString();
+    int line = obj[QStringLiteral("line")].toInt(-1);
+
+    auto sep = file.lastIndexOf(QLatin1Char('/'));
+    auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+    QString loc;
+    if (!short_file.isEmpty()) {
+      loc = (line >= 0) ? QStringLiteral("%1:%2").arg(short_file).arg(line)
+                        : short_file;
+    }
+
+    auto display = QStringLiteral("%1 (%2)").arg(name, kind);
+    auto *root = new QTreeWidgetItem(tree, {display, loc});
+
+    if (obj.contains(key)) {
+      populateCallTree(root, obj[key].toArray(), key);
+    }
+  }
+  tree->expandAll();
+  tree->resizeColumnToContents(0);
+  return tree;
+}
+
+// 6. get_definition -> mini code view
+static QWidget *createDefinitionView(const QJsonObject &result,
+                                     QWidget *parent) {
+  auto code = result[QStringLiteral("code")].toString();
+  if (code.isEmpty()) {
+    return nullptr;
+  }
+
+  auto file = result[QStringLiteral("file")].toString();
+  int line = result[QStringLiteral("line")].toInt(-1);
+
+  QString header;
+  if (!file.isEmpty()) {
+    auto sep = file.lastIndexOf(QLatin1Char('/'));
+    auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+    header = (line >= 0)
+                 ? QStringLiteral("// %1:%2\n").arg(short_file).arg(line)
+                 : QStringLiteral("// %1\n").arg(short_file);
+  }
+
+  auto *edit = new QPlainTextEdit(parent);
+  edit->setReadOnly(true);
+  edit->setPlainText(header + code);
+  edit->setMaximumHeight(300);
+  edit->setFrameShape(QFrame::NoFrame);
+
+  auto f = edit->font();
+  f.setFamily(QStringLiteral("monospace"));
+  f.setPointSize(f.pointSize() - 1);
+  edit->setFont(f);
+  edit->setLineWrapMode(QPlainTextEdit::NoWrap);
+  return edit;
+}
+
+// 7. get_task_board_summary -> colored pill dashboard
+static QWidget *createTaskBoardView(const QJsonObject &result,
+                                    QWidget *parent) {
+  int total = result[QStringLiteral("total")].toInt();
+  if (total == 0) {
+    return nullptr;
+  }
+
+  auto *widget = new QWidget(parent);
+  auto *layout = new QHBoxLayout(widget);
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(4);
+
+  struct PillInfo {
+    QString key;
+    QString label;
+    QColor color;
+  };
+
+  PillInfo pills[] = {
+    {QStringLiteral("planned"), QStringLiteral("planned"),
+     QColor(0x9C, 0xA3, 0xAF)},
+    {QStringLiteral("in_progress"), QStringLiteral("in_progress"),
+     QColor(0x3B, 0x82, 0xF6)},
+    {QStringLiteral("blocked"), QStringLiteral("blocked"),
+     QColor(0xEF, 0x44, 0x44)},
+    {QStringLiteral("completed"), QStringLiteral("completed"),
+     QColor(0x22, 0xC5, 0x5E)},
+    {QStringLiteral("cancelled"), QStringLiteral("cancelled"),
+     QColor(0x78, 0x71, 0x6C)},
+  };
+
+  for (const auto &p : pills) {
+    int count = result[p.key].toInt();
+    if (count == 0) {
+      continue;
+    }
+    auto *pill = new QLabel(
+        QStringLiteral("%1 %2").arg(count).arg(p.label), widget);
+    pill->setContentsMargins(6, 2, 6, 2);
+    auto f = pill->font();
+    f.setPointSize(f.pointSize() - 1);
+    pill->setFont(f);
+    pill->setStyleSheet(
+        QStringLiteral("QLabel { background-color: rgba(%1,%2,%3,60); "
+                       "color: rgb(%1,%2,%3); border-radius: 8px; "
+                       "padding: 2px 6px; }")
+            .arg(p.color.red()).arg(p.color.green()).arg(p.color.blue()));
+    layout->addWidget(pill);
+  }
+  layout->addStretch();
+  return widget;
+}
+
+// 8. get_session_cost -> mini cost dashboard
+static QWidget *createSessionCostView(const QJsonObject &result,
+                                      QWidget *parent) {
+  double cost = result[QStringLiteral("total_cost_usd")].toDouble();
+
+  auto *widget = new QWidget(parent);
+  auto *grid = new QGridLayout(widget);
+  grid->setContentsMargins(0, 0, 0, 0);
+  grid->setSpacing(4);
+
+  // Total cost (large, bold).
+  auto *total_label = new QLabel(
+      QStringLiteral("Total: $%1").arg(cost, 0, 'f', 2), widget);
+  auto f = total_label->font();
+  f.setPointSize(f.pointSize() + 2);
+  f.setBold(true);
+  total_label->setFont(f);
+  grid->addWidget(total_label, 0, 0, 1, 2);
+
+  int llm_calls = result[QStringLiteral("llm_calls")].toInt();
+  int tool_calls = result[QStringLiteral("tool_calls")].toInt();
+  int in_tok = result[QStringLiteral("total_input_tokens")].toInt();
+  int out_tok = result[QStringLiteral("total_output_tokens")].toInt();
+
+  auto small_font = widget->font();
+  small_font.setPointSize(small_font.pointSize() - 1);
+
+  auto *calls_label = new QLabel(
+      QStringLiteral("LLM: %1 calls | Tools: %2 calls")
+          .arg(llm_calls).arg(tool_calls), widget);
+  calls_label->setFont(small_font);
+  grid->addWidget(calls_label, 1, 0, 1, 2);
+
+  auto *tokens_label = new QLabel(
+      QStringLiteral("Tokens: %L1 in / %L2 out").arg(in_tok).arg(out_tok),
+      widget);
+  tokens_label->setFont(small_font);
+  grid->addWidget(tokens_label, 2, 0, 1, 2);
+
+  // Top tools by cost.
+  auto by_tool = result[QStringLiteral("by_tool")].toArray();
+  if (!by_tool.isEmpty()) {
+    auto *tools_header = new QLabel(QStringLiteral("Top tools:"), widget);
+    auto hf = tools_header->font();
+    hf.setPointSize(hf.pointSize() - 1);
+    hf.setBold(true);
+    tools_header->setFont(hf);
+    grid->addWidget(tools_header, 3, 0, 1, 2);
+
+    int row = 4;
+    auto limit = qMin(by_tool.size(), qsizetype(5));
+    for (qsizetype i = 0; i < limit; ++i) {
+      auto obj = by_tool[i].toObject();
+      auto tool = obj[QStringLiteral("tool")].toString();
+      int calls = obj[QStringLiteral("calls")].toInt();
+      double tcost = obj[QStringLiteral("cost_usd")].toDouble();
+
+      auto *name_lbl = new QLabel(tool, widget);
+      name_lbl->setFont(small_font);
+      grid->addWidget(name_lbl, row, 0);
+
+      auto *cost_lbl = new QLabel(
+          QStringLiteral("%1 calls, $%2")
+              .arg(calls).arg(tcost, 0, 'f', 3), widget);
+      cost_lbl->setFont(small_font);
+      cost_lbl->setAlignment(Qt::AlignRight);
+      grid->addWidget(cost_lbl, row, 1);
+      ++row;
+    }
+  }
+  return widget;
+}
+
+// Dispatcher: returns an interactive widget for the tool result, or nullptr.
+static QWidget *createToolResultWidget(const QString &tool_name,
+                                       const QJsonObject &result,
+                                       const QJsonObject &/*args*/,
+                                       QWidget *parent) {
+  // Don't create widgets for error results.
+  if (result.contains(QStringLiteral("error"))) {
+    return nullptr;
+  }
+
+  if (tool_name == QStringLiteral("list_files")) {
+    return createListFilesView(result, parent);
+  }
+  if (tool_name == QStringLiteral("search_entities")) {
+    return createSearchEntitiesView(result, parent);
+  }
+  if (tool_name == QStringLiteral("search_code")) {
+    return createSearchCodeView(result, parent);
+  }
+  if (tool_name == QStringLiteral("get_references")) {
+    return createReferencesView(result, parent);
+  }
+  if (tool_name == QStringLiteral("get_callers") ||
+      tool_name == QStringLiteral("get_callees")) {
+    return createCallTreeView(result, tool_name, parent);
+  }
+  if (tool_name == QStringLiteral("get_definition")) {
+    return createDefinitionView(result, parent);
+  }
+  if (tool_name == QStringLiteral("get_task_board_summary")) {
+    return createTaskBoardView(result, parent);
+  }
+  if (tool_name == QStringLiteral("get_session_cost")) {
+    return createSessionCostView(result, parent);
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 namespace mx::gui {
@@ -793,11 +1242,17 @@ void AgentConversationWidget::addMessageBubble(
       detail_layout->addWidget(args_label);
     }
 
-    auto formatted = tool_result.isEmpty()
-                         ? content.left(2000)
-                         : formatToolResult(tool_name, tool_result);
-    auto *result_label = make_label(formatted.left(4000), true);
-    detail_layout->addWidget(result_label);
+    auto *interactive = createToolResultWidget(
+        tool_name, tool_result, tool_args, detail);
+    if (interactive) {
+      detail_layout->addWidget(interactive);
+    } else {
+      auto formatted = tool_result.isEmpty()
+                           ? content.left(2000)
+                           : formatToolResult(tool_name, tool_result);
+      auto *result_label = make_label(formatted.left(4000), true);
+      detail_layout->addWidget(result_label);
+    }
 
     frame_layout->addWidget(detail);
 
