@@ -344,7 +344,7 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
 
   // ---- Parameters ----
   d->max_iterations_spin = new QSpinBox(content);
-  d->max_iterations_spin->setRange(1, 200);
+  d->max_iterations_spin->setRange(1, 10000);
   d->max_iterations_spin->setValue(50);
   form->addRow(tr("Max tool-call rounds:"), d->max_iterations_spin);
   form->addRow(makeHint(
