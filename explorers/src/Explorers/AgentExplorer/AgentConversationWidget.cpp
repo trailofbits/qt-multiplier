@@ -9,6 +9,7 @@
 #include <QEvent>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QKeyEvent>
@@ -25,6 +26,417 @@
 #include <multiplier/GUI/Interfaces/ITheme.h>
 #include <multiplier/GUI/Managers/AgentMessage.h>
 #include <multiplier/GUI/Managers/ThemeManager.h>
+
+namespace {
+
+static QString toolResultSummary(const QString &tool_name,
+                                 const QJsonObject &result) {
+  if (result.contains(QStringLiteral("error"))) {
+    return QStringLiteral("Error: %1").arg(
+        result[QStringLiteral("error")].toString());
+  }
+
+  if (tool_name == QStringLiteral("list_files")) {
+    int count = result[QStringLiteral("count")].toInt();
+    return QStringLiteral("Files: %1 found").arg(count);
+  }
+  if (tool_name == QStringLiteral("search_entities")) {
+    int count = result[QStringLiteral("count")].toInt();
+    return QStringLiteral("Entities: %1 found").arg(count);
+  }
+  if (tool_name == QStringLiteral("search_code")) {
+    int count = result[QStringLiteral("count")].toInt();
+    return QStringLiteral("Code matches: %1 found").arg(count);
+  }
+  if (tool_name == QStringLiteral("get_references")) {
+    int count = result[QStringLiteral("count")].toInt();
+    bool has_more = result[QStringLiteral("has_more")].toBool();
+    return QStringLiteral("References: %1 found%2")
+        .arg(count)
+        .arg(has_more ? QStringLiteral(" (has_more: true)") : QString());
+  }
+  if (tool_name == QStringLiteral("get_callers")) {
+    int count = result[QStringLiteral("count")].toInt();
+    return QStringLiteral("Callers: %1 found").arg(count);
+  }
+  if (tool_name == QStringLiteral("get_callees")) {
+    int count = result[QStringLiteral("count")].toInt();
+    return QStringLiteral("Callees: %1 found").arg(count);
+  }
+  if (tool_name == QStringLiteral("get_definition")) {
+    auto file = result[QStringLiteral("file")].toString();
+    int line = result[QStringLiteral("line")].toInt(-1);
+    if (!file.isEmpty() && line >= 0) {
+      // Show just the filename, not the full path.
+      auto sep = file.lastIndexOf(QLatin1Char('/'));
+      auto short_name = (sep >= 0) ? file.mid(sep + 1) : file;
+      return QStringLiteral("Definition: %1:%2").arg(short_name).arg(line);
+    }
+    if (!file.isEmpty()) {
+      auto sep = file.lastIndexOf(QLatin1Char('/'));
+      return QStringLiteral("Definition: %1")
+          .arg((sep >= 0) ? file.mid(sep + 1) : file);
+    }
+    return QStringLiteral("Definition retrieved");
+  }
+  if (tool_name == QStringLiteral("create_task")) {
+    auto task_id = result[QStringLiteral("task_id")].toString();
+    return QStringLiteral("Task %1 created").arg(task_id);
+  }
+  if (tool_name == QStringLiteral("create_sheet")) {
+    int id = result[QStringLiteral("sheet_id")].toInt();
+    return QStringLiteral("Sheet created (id: %1)").arg(id);
+  }
+  if (tool_name == QStringLiteral("create_document")) {
+    auto title = result[QStringLiteral("title")].toString();
+    return QStringLiteral("Document '%1' created").arg(title);
+  }
+  if (tool_name == QStringLiteral("get_session_cost")) {
+    double cost = result[QStringLiteral("total_cost_usd")].toDouble();
+    int llm_calls = result[QStringLiteral("llm_calls")].toInt();
+    int tool_calls = result[QStringLiteral("tool_calls")].toInt();
+    return QStringLiteral("Cost: $%1 (%2 LLM calls, %3 tool calls)")
+        .arg(cost, 0, 'f', 2)
+        .arg(llm_calls)
+        .arg(tool_calls);
+  }
+  if (tool_name == QStringLiteral("finish")) {
+    return QStringLiteral("Finished: acknowledged");
+  }
+  if (tool_name == QStringLiteral("get_task_board_summary")) {
+    int total = result[QStringLiteral("total")].toInt();
+    return QStringLiteral("Task board: %1 tasks").arg(total);
+  }
+  return QStringLiteral("Result: %1").arg(tool_name);
+}
+
+static void formatCallersTree(const QJsonArray &items, const QString &prefix,
+                              QStringList &lines, int depth) {
+  for (qsizetype i = 0; i < items.size(); ++i) {
+    auto obj = items[i].toObject();
+    auto name = obj[QStringLiteral("name")].toString();
+    auto kind = obj[QStringLiteral("kind")].toString();
+    auto file = obj[QStringLiteral("file")].toString();
+    int line = obj[QStringLiteral("line")].toInt(-1);
+    auto eid = static_cast<int64_t>(
+        obj[QStringLiteral("entity_id")].toDouble());
+
+    bool is_last = (i == items.size() - 1);
+    auto connector = is_last ? QStringLiteral("\xe2\x94\x94\xe2\x94\x80 ")
+                             : QStringLiteral("\xe2\x94\x9c\xe2\x94\x80 ");
+
+    QString loc;
+    if (!file.isEmpty()) {
+      auto sep = file.lastIndexOf(QLatin1Char('/'));
+      auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+      loc = (line >= 0) ? QStringLiteral(" %1:%2").arg(short_file).arg(line)
+                        : QStringLiteral(" %1").arg(short_file);
+    }
+
+    QString entry;
+    if (depth == 0) {
+      entry = QStringLiteral("%1 (%2:%3)%4")
+                  .arg(name, kind)
+                  .arg(eid)
+                  .arg(loc);
+    } else {
+      entry = QStringLiteral("%1%2%3 (%4:%5)%6")
+                  .arg(prefix, connector, name, kind)
+                  .arg(eid)
+                  .arg(loc);
+    }
+    lines.append(entry);
+
+    // Recurse into sub-items (callers or callees).
+    auto child_prefix =
+        prefix + (is_last ? QStringLiteral("    ") : QStringLiteral("\xe2\x94\x82   "));
+    auto sub_key = obj.contains(QStringLiteral("callers"))
+                       ? QStringLiteral("callers")
+                       : QStringLiteral("callees");
+    if (obj.contains(sub_key)) {
+      formatCallersTree(obj[sub_key].toArray(), child_prefix, lines,
+                        depth + 1);
+    }
+  }
+}
+
+static QString formatToolResult(const QString &tool_name,
+                                const QJsonObject &result) {
+  if (result.contains(QStringLiteral("error"))) {
+    return QStringLiteral("Error: %1")
+        .arg(result[QStringLiteral("error")].toString());
+  }
+
+  if (tool_name == QStringLiteral("list_files")) {
+    auto files = result[QStringLiteral("files")].toArray();
+    QStringList lines;
+    auto limit = qMin(files.size(), qsizetype(20));
+    for (qsizetype i = 0; i < limit; ++i) {
+      auto obj = files[i].toObject();
+      lines.append(obj[QStringLiteral("path")].toString());
+    }
+    if (files.size() > 20) {
+      lines.append(
+          QStringLiteral("...and %1 more").arg(files.size() - 20));
+    }
+    return lines.join(QLatin1Char('\n'));
+  }
+
+  if (tool_name == QStringLiteral("search_entities")) {
+    auto entities = result[QStringLiteral("entities")].toArray();
+    QStringList lines;
+    lines.append(QStringLiteral("entity_id  | kind     | name"));
+    for (const auto &val : entities) {
+      auto obj = val.toObject();
+      auto eid = static_cast<int64_t>(
+          obj[QStringLiteral("entity_id")].toDouble());
+      auto kind = obj[QStringLiteral("kind")].toString();
+      auto name = obj[QStringLiteral("name")].toString();
+      lines.append(QStringLiteral("%1 | %2 | %3")
+                       .arg(eid, -10)
+                       .arg(kind, -8)
+                       .arg(name));
+    }
+    return lines.join(QLatin1Char('\n'));
+  }
+
+  if (tool_name == QStringLiteral("search_code")) {
+    auto matches = result[QStringLiteral("matches")].toArray();
+    QStringList lines;
+    for (const auto &val : matches) {
+      auto obj = val.toObject();
+      auto file = obj[QStringLiteral("file")].toString();
+      int line_no = obj[QStringLiteral("line")].toInt(-1);
+      auto context = obj[QStringLiteral("context")].toString().trimmed();
+      // Show just the filename.
+      auto sep = file.lastIndexOf(QLatin1Char('/'));
+      auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+      if (line_no >= 0) {
+        lines.append(QStringLiteral("%1:%2: %3")
+                         .arg(short_file)
+                         .arg(line_no)
+                         .arg(context));
+      } else {
+        lines.append(QStringLiteral("%1: %2").arg(short_file, context));
+      }
+    }
+    return lines.join(QLatin1Char('\n'));
+  }
+
+  if (tool_name == QStringLiteral("get_references")) {
+    auto refs = result[QStringLiteral("references")].toArray();
+    QStringList lines;
+    for (const auto &val : refs) {
+      auto obj = val.toObject();
+      auto ref_kind = obj[QStringLiteral("ref_kind")].toString();
+      auto file = obj[QStringLiteral("file")].toString();
+      int line_no = obj[QStringLiteral("line")].toInt(-1);
+      auto context = obj[QStringLiteral("context")].toString().trimmed();
+      auto sep = file.lastIndexOf(QLatin1Char('/'));
+      auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+      QString loc = (line_no >= 0)
+                        ? QStringLiteral("%1:%2").arg(short_file).arg(line_no)
+                        : short_file;
+      lines.append(
+          QStringLiteral("[%1] %2 \xe2\x80\x94 %3").arg(ref_kind, loc, context));
+    }
+    bool has_more = result[QStringLiteral("has_more")].toBool();
+    if (has_more) {
+      int total = result[QStringLiteral("total_matched")].toInt();
+      lines.append(QStringLiteral("... %1 total matches").arg(total));
+    }
+    return lines.join(QLatin1Char('\n'));
+  }
+
+  if (tool_name == QStringLiteral("get_callers") ||
+      tool_name == QStringLiteral("get_callees")) {
+    auto key = (tool_name == QStringLiteral("get_callers"))
+                   ? QStringLiteral("callers")
+                   : QStringLiteral("callees");
+    auto items = result[key].toArray();
+    QStringList lines;
+    formatCallersTree(items, QString(), lines, 0);
+    return lines.join(QLatin1Char('\n'));
+  }
+
+  if (tool_name == QStringLiteral("get_definition")) {
+    auto code = result[QStringLiteral("code")].toString();
+    auto file = result[QStringLiteral("file")].toString();
+    int line = result[QStringLiteral("line")].toInt(-1);
+    QString header;
+    if (!file.isEmpty()) {
+      auto sep = file.lastIndexOf(QLatin1Char('/'));
+      auto short_file = (sep >= 0) ? file.mid(sep + 1) : file;
+      header = (line >= 0) ? QStringLiteral("// %1:%2\n").arg(short_file).arg(line)
+                           : QStringLiteral("// %1\n").arg(short_file);
+    }
+    return header + code;
+  }
+
+  if (tool_name == QStringLiteral("get_task_board_summary")) {
+    int total = result[QStringLiteral("total")].toInt();
+    int planned = result[QStringLiteral("planned")].toInt();
+    int in_progress = result[QStringLiteral("in_progress")].toInt();
+    int blocked = result[QStringLiteral("blocked")].toInt();
+    int completed = result[QStringLiteral("completed")].toInt();
+    int cancelled = result[QStringLiteral("cancelled")].toInt();
+
+    QStringList lines;
+    lines.append(QStringLiteral("Tasks: %1 total | %2 planned | "
+                                "%3 in_progress | %4 blocked | "
+                                "%5 completed | %6 cancelled")
+                     .arg(total)
+                     .arg(planned)
+                     .arg(in_progress)
+                     .arg(blocked)
+                     .arg(completed)
+                     .arg(cancelled));
+
+    auto by_priority = result[QStringLiteral("by_priority")].toObject();
+    if (!by_priority.isEmpty()) {
+      QStringList priority_parts;
+      for (auto it = by_priority.begin(); it != by_priority.end(); ++it) {
+        priority_parts.append(
+            QStringLiteral("%1 %2").arg(it.value().toInt()).arg(it.key()));
+      }
+      lines.append(
+          QStringLiteral("By priority: %1").arg(priority_parts.join(QStringLiteral(" | "))));
+    }
+    return lines.join(QLatin1Char('\n'));
+  }
+
+  if (tool_name == QStringLiteral("get_session_cost")) {
+    double cost = result[QStringLiteral("total_cost_usd")].toDouble();
+    int in_tok = result[QStringLiteral("total_input_tokens")].toInt();
+    int out_tok = result[QStringLiteral("total_output_tokens")].toInt();
+    int llm_calls = result[QStringLiteral("llm_calls")].toInt();
+    int tool_calls = result[QStringLiteral("tool_calls")].toInt();
+
+    QStringList lines;
+    lines.append(QStringLiteral("Total cost: $%1").arg(cost, 0, 'f', 2));
+    lines.append(QStringLiteral("LLM calls: %1 | Tool calls: %2")
+                     .arg(llm_calls)
+                     .arg(tool_calls));
+    lines.append(QStringLiteral("Tokens: %L1 input | %L2 output")
+                     .arg(in_tok)
+                     .arg(out_tok));
+
+    auto by_tool = result[QStringLiteral("by_tool")].toArray();
+    if (!by_tool.isEmpty()) {
+      lines.append(QString());
+      lines.append(QStringLiteral("By tool:"));
+      for (const auto &val : by_tool) {
+        auto obj = val.toObject();
+        lines.append(QStringLiteral("  %1: %2 calls, $%3")
+                         .arg(obj[QStringLiteral("tool")].toString())
+                         .arg(obj[QStringLiteral("calls")].toInt())
+                         .arg(obj[QStringLiteral("cost_usd")].toDouble(),
+                              0, 'f', 3));
+      }
+    }
+    return lines.join(QLatin1Char('\n'));
+  }
+
+  // Default: pretty-print JSON.
+  return QString::fromUtf8(
+      QJsonDocument(result).toJson(QJsonDocument::Indented));
+}
+
+static QString formatToolArgs(const QString &tool_name,
+                              const QJsonObject &args) {
+  if (args.isEmpty()) {
+    return QStringLiteral("(no args)");
+  }
+
+  if (tool_name == QStringLiteral("list_files")) {
+    return QStringLiteral("(no args)");
+  }
+  if (tool_name == QStringLiteral("run_python") ||
+      tool_name == QStringLiteral("create_script_file")) {
+    auto code = args[QStringLiteral("code")].toString();
+    if (!code.isEmpty()) {
+      return code;
+    }
+  }
+  if (tool_name == QStringLiteral("search_entities")) {
+    QStringList parts;
+    auto query = args[QStringLiteral("query")].toString();
+    if (!query.isEmpty()) {
+      parts.append(QStringLiteral("query: '%1'").arg(query));
+    }
+    auto kind = args[QStringLiteral("kind")].toString();
+    if (!kind.isEmpty()) {
+      parts.append(QStringLiteral("kind: '%1'").arg(kind));
+    }
+    if (!parts.isEmpty()) {
+      return parts.join(QStringLiteral(", "));
+    }
+  }
+  if (tool_name == QStringLiteral("search_code")) {
+    auto pattern = args[QStringLiteral("pattern")].toString();
+    if (!pattern.isEmpty()) {
+      return QStringLiteral("pattern: '%1'").arg(pattern);
+    }
+  }
+  if (tool_name == QStringLiteral("get_definition") ||
+      tool_name == QStringLiteral("get_references") ||
+      tool_name == QStringLiteral("get_callers") ||
+      tool_name == QStringLiteral("get_callees")) {
+    auto eid = static_cast<int64_t>(
+        args[QStringLiteral("entity_id")].toDouble());
+    if (eid != 0) {
+      return QStringLiteral("entity_id: %1").arg(eid);
+    }
+  }
+  if (tool_name == QStringLiteral("finish")) {
+    auto summary = args[QStringLiteral("summary")].toString();
+    auto status = args[QStringLiteral("status")].toString(
+        QStringLiteral("completed"));
+    return QStringLiteral("status: %1, summary: '%2'")
+        .arg(status, summary.left(80));
+  }
+  if (tool_name == QStringLiteral("create_task")) {
+    auto desc = args[QStringLiteral("description")].toString();
+    return QStringLiteral("'%1'").arg(desc.left(60));
+  }
+  if (tool_name == QStringLiteral("create_sheet")) {
+    auto name = args[QStringLiteral("name")].toString();
+    return QStringLiteral("name: '%1'").arg(name);
+  }
+  if (tool_name == QStringLiteral("create_document")) {
+    auto title = args[QStringLiteral("title")].toString();
+    return QStringLiteral("title: '%1'").arg(title);
+  }
+
+  // Default: compact key=value pairs.
+  QStringList parts;
+  for (auto it = args.begin(); it != args.end(); ++it) {
+    auto val = it.value();
+    if (val.isString()) {
+      auto s = val.toString();
+      if (s.size() > 40) {
+        s = s.left(37) + QStringLiteral("...");
+      }
+      parts.append(QStringLiteral("%1: '%2'").arg(it.key(), s));
+    } else if (val.isDouble()) {
+      parts.append(QStringLiteral("%1: %2")
+                       .arg(it.key())
+                       .arg(val.toDouble()));
+    } else if (val.isBool()) {
+      parts.append(QStringLiteral("%1: %2")
+                       .arg(it.key(),
+                            val.toBool() ? QStringLiteral("true")
+                                         : QStringLiteral("false")));
+    }
+  }
+  if (parts.isEmpty()) {
+    return QString::fromUtf8(
+        QJsonDocument(args).toJson(QJsonDocument::Compact));
+  }
+  return parts.join(QStringLiteral(", "));
+}
+
+}  // namespace
 
 namespace mx::gui {
 
@@ -310,12 +722,9 @@ void AgentConversationWidget::addMessageBubble(
     auto *detail_layout = new QVBoxLayout(detail);
     detail_layout->setContentsMargins(4, 0, 4, 0);
 
-    if (!tool_args.isEmpty()) {
-      auto args_str = QString::fromUtf8(
-          QJsonDocument(tool_args).toJson(QJsonDocument::Indented));
-      auto *args_label = make_label(QStringLiteral("Args: ") + args_str, true);
-      detail_layout->addWidget(args_label);
-    }
+    auto args_text = formatToolArgs(tool_name, tool_args);
+    auto *args_label = make_label(args_text, true);
+    detail_layout->addWidget(args_label);
     frame_layout->addWidget(detail);
 
     connect(toggle_btn, &QPushButton::clicked, detail,
@@ -333,8 +742,8 @@ void AgentConversationWidget::addMessageBubble(
             .arg(d->tool_bg.red()).arg(d->tool_bg.green())
             .arg(d->tool_bg.blue()).arg(d->tool_bg.alpha()));
 
-    auto *toggle_btn = new QPushButton(
-        QStringLiteral("Result: %1").arg(tool_name), frame);
+    auto summary = toolResultSummary(tool_name, tool_result);
+    auto *toggle_btn = new QPushButton(summary, frame);
     toggle_btn->setFlat(true);
     toggle_btn->setStyleSheet(
         QStringLiteral("QPushButton { text-align: left; }"));
@@ -345,8 +754,10 @@ void AgentConversationWidget::addMessageBubble(
     auto *detail_layout = new QVBoxLayout(detail);
     detail_layout->setContentsMargins(4, 0, 4, 0);
 
-    auto result_str = content.left(2000);
-    auto *result_label = make_label(result_str, true);
+    auto formatted = tool_result.isEmpty()
+                         ? content.left(2000)
+                         : formatToolResult(tool_name, tool_result);
+    auto *result_label = make_label(formatted.left(4000), true);
     detail_layout->addWidget(result_label);
 
     frame_layout->addWidget(detail);
