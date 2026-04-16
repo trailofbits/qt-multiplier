@@ -17,6 +17,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QTimer>
 #include <QScrollArea>
 #include <QSpinBox>
@@ -137,9 +138,9 @@ struct AgentConfigPanel::PrivateData {
   QDoubleSpinBox *temperature_spin{nullptr};
   QLineEdit *python_path_edit{nullptr};
   QPushButton *python_browse_btn{nullptr};
-  QPushButton *python_verify_btn{nullptr};
   QLabel *python_status_label{nullptr};
   QLabel *save_indicator{nullptr};
+  QProcess *python_verify_proc{nullptr};
   int prompt_doc_id{-1};
   bool restoring{false};  // Suppress saves during initialization.
 
@@ -265,9 +266,6 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->python_browse_btn = new QPushButton(tr("Browse..."), python_row);
   python_layout->addWidget(d->python_browse_btn);
 
-  d->python_verify_btn = new QPushButton(tr("Verify"), python_row);
-  python_layout->addWidget(d->python_verify_btn);
-
   form->addRow(tr("Python:"), python_row);
 
   d->python_status_label = new QLabel(content);
@@ -275,8 +273,8 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   form->addRow(QString(), d->python_status_label);
 
   form->addRow(QString(), makeHint(
-      tr("Path to a Python interpreter that has the multiplier "
-         "bindings installed. Click Verify to check."), content));
+      tr("Path to a Python interpreter with multiplier bindings. "
+         "Verified automatically."), content));
 
   // ---- Save indicator ----
   d->save_indicator = new QLabel(content);
@@ -299,11 +297,19 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
           this, &AgentConfigPanel::onLoadPromptClicked);
   connect(d->python_browse_btn, &QPushButton::clicked,
           this, &AgentConfigPanel::onBrowsePythonClicked);
-  connect(d->python_verify_btn, &QPushButton::clicked,
-          this, &AgentConfigPanel::onVerifyPythonClicked);
+  connect(d->python_path_edit, &QLineEdit::textChanged, this, [this] {
+    auto text = d->python_path_edit->text();
+    // Auto-verify when the path looks like a python interpreter.
+    static QRegularExpression python_re(
+        QStringLiteral("python[0-9.]*$"));
+    if (python_re.match(text).hasMatch() || text.isEmpty()) {
+      maybeVerifyPython();
+    }
+  });
   connect(d->python_path_edit, &QLineEdit::editingFinished, this, [this] {
     d->config_manager.SetPythonInterpreterPath(d->python_path_edit->text());
     showSaved();
+    maybeVerifyPython();
   });
 
   connect(d->system_prompt_edit, &QPlainTextEdit::textChanged, this, [this] {
@@ -366,6 +372,11 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   }
 
   d->restoring = false;
+
+  // Auto-verify Python on startup if a path is configured.
+  if (!d->python_path_edit->text().isEmpty()) {
+    maybeVerifyPython();
+  }
 }
 
 QString AgentConfigPanel::systemPrompt(void) const {
@@ -493,47 +504,76 @@ void AgentConfigPanel::onBrowsePythonClicked(void) {
     d->python_path_edit->setText(path);
     d->config_manager.SetPythonInterpreterPath(path);
     showSaved();
+    maybeVerifyPython();
   }
 }
 
-void AgentConfigPanel::onVerifyPythonClicked(void) {
+void AgentConfigPanel::maybeVerifyPython(void) {
+  // Kill any in-progress verification.
+  if (d->python_verify_proc) {
+    d->python_verify_proc->kill();
+    d->python_verify_proc->deleteLater();
+    d->python_verify_proc = nullptr;
+  }
+
   auto path = d->python_path_edit->text();
   if (path.isEmpty()) {
     path = QStringLiteral("python3");
   }
 
-  d->python_status_label->setText(tr("Checking..."));
+  d->python_status_label->setText(QStringLiteral("\xe2\x8f\xb3 Checking..."));
   d->python_status_label->setStyleSheet(
       QStringLiteral("color: palette(mid);"));
 
-  QProcess proc;
-  proc.setProgram(path);
-  proc.setArguments({QStringLiteral("-c"),
+  auto *proc = new QProcess(this);
+  d->python_verify_proc = proc;
+  proc->setProgram(path);
+  proc->setArguments({QStringLiteral("-c"),
       QStringLiteral("import multiplier; print('OK:', multiplier.__file__)")});
-  proc.start();
 
-  if (!proc.waitForFinished(5000)) {
+  connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+          this, [this, proc](int exit_code, QProcess::ExitStatus) {
+    if (d->python_verify_proc != proc) {
+      proc->deleteLater();
+      return;  // Stale result from a previous check.
+    }
+    d->python_verify_proc = nullptr;
+
+    if (exit_code == 0) {
+      auto output = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+      d->python_status_label->setText(
+          QStringLiteral("\xe2\x9c\x93 ") + output);
+      d->python_status_label->setStyleSheet(
+          QStringLiteral("color: green;"));
+    } else {
+      auto err = QString::fromUtf8(proc->readAllStandardError()).trimmed();
+      if (err.length() > 120) {
+        err = err.left(120) + QStringLiteral("...");
+      }
+      d->python_status_label->setText(
+          QStringLiteral("\xe2\x9c\x97 ") +
+          (err.isEmpty() ? tr("import multiplier failed") : err));
+      d->python_status_label->setStyleSheet(
+          QStringLiteral("color: red;"));
+    }
+    proc->deleteLater();
+  });
+
+  connect(proc, &QProcess::errorOccurred, this,
+          [this, proc](QProcess::ProcessError) {
+    if (d->python_verify_proc != proc) {
+      proc->deleteLater();
+      return;
+    }
+    d->python_verify_proc = nullptr;
     d->python_status_label->setText(
-        tr("Failed: interpreter not found or timed out"));
+        QStringLiteral("\xe2\x9c\x97 ") + tr("Interpreter not found"));
     d->python_status_label->setStyleSheet(
         QStringLiteral("color: red;"));
-    return;
-  }
+    proc->deleteLater();
+  });
 
-  if (proc.exitCode() != 0) {
-    auto err = QString::fromUtf8(proc.readAllStandardError()).trimmed();
-    d->python_status_label->setText(
-        tr("Missing bindings: %1").arg(
-            err.isEmpty() ? tr("import multiplier failed") : err));
-    d->python_status_label->setStyleSheet(
-        QStringLiteral("color: red;"));
-    return;
-  }
-
-  auto output = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
-  d->python_status_label->setText(output);
-  d->python_status_label->setStyleSheet(
-      QStringLiteral("color: green;"));
+  proc->start();
 }
 
 void AgentConfigPanel::populateModels(const QString &backend_type) {

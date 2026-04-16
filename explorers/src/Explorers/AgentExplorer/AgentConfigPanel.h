@@ -42,12 +42,12 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   void onModelChanged(void);
   void onLoadPromptClicked(void);
   void onBrowsePythonClicked(void);
-  void onVerifyPythonClicked(void);
 
  private:
   void populateModels(const QString &backend_type);
   void ensureBackendExists(const QString &type);
   void showSaved(void);
+  void maybeVerifyPython(void);
 };
 
 }  // namespace mx::gui
