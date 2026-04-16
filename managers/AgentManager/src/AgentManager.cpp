@@ -78,7 +78,7 @@ int64_t AgentManager::createSession(const QString &name,
   auto session_id = d->next_session_id++;
   auto session = std::make_unique<AgentSession>(
       session_id, backend, &d->tool_registry, d->llm_config, system_prompt,
-      d->max_iterations, this);
+      d->max_iterations, d->config_manager, this);
 
   // Forward session signals.
   auto *s = session.get();
@@ -175,7 +175,7 @@ void AgentManager::resumeSession(int64_t session_id) {
 
   auto session = std::make_unique<AgentSession>(
       session_id, backend, &d->tool_registry, d->llm_config, system_prompt,
-      d->max_iterations, this);
+      d->max_iterations, d->config_manager, this);
 
   // Load persisted messages and populate the session history.
   auto db_messages = d->config_manager->LoadAgentMessages(session_id);
@@ -352,7 +352,7 @@ int64_t AgentManager::createObserverSession(
 
   auto session = std::make_unique<AgentSession>(
       session_id, backend, registry.get(), observer_config, system_prompt,
-      d->max_iterations, this);
+      d->max_iterations, d->config_manager, this);
 
   // Forward session signals.
   auto *s = session.get();

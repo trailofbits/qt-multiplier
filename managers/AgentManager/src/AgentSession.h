@@ -17,6 +17,7 @@
 namespace mx::gui {
 
 class AgentToolRegistry;
+class ConfigManager;
 
 class AgentSession Q_DECL_FINAL : public QObject {
   Q_OBJECT
@@ -25,6 +26,7 @@ class AgentSession Q_DECL_FINAL : public QObject {
   AgentSession(int64_t session_id, ILLMBackend *backend,
                AgentToolRegistry *tools, const LLMConfig &config,
                const QString &system_prompt, int max_iterations,
+               ConfigManager *config_manager = nullptr,
                QObject *parent = nullptr);
   ~AgentSession(void) override;
 
@@ -74,6 +76,7 @@ class AgentSession Q_DECL_FINAL : public QObject {
   int64_t m_session_id;
   ILLMBackend *m_backend;
   AgentToolRegistry *m_tools;
+  ConfigManager *m_config_manager{nullptr};
   SessionResult m_pending_finish_result;
   LLMConfig m_config;
   QString m_system_prompt;
@@ -89,6 +92,10 @@ class AgentSession Q_DECL_FINAL : public QObject {
 
   int m_total_prompt_tokens{0};
   int m_total_completion_tokens{0};
+
+  // Cost tracking node IDs.
+  int64_t m_root_node_id{-1};
+  int64_t m_current_llm_node_id{-1};
 };
 
 }  // namespace mx::gui

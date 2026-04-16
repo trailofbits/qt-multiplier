@@ -158,6 +158,48 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "ALTER TABLE gui_agent_sessions "
       "ADD COLUMN primary_session_id INTEGER DEFAULT -1"));
 
+  // Cost tracking tables.
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_cost_nodes ("
+      "  node_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  session_id INTEGER NOT NULL,"
+      "  parent_node_id INTEGER,"
+      "  node_type TEXT NOT NULL,"
+      "  tool_name TEXT,"
+      "  model TEXT,"
+      "  input_tokens INTEGER DEFAULT 0,"
+      "  output_tokens INTEGER DEFAULT 0,"
+      "  duration_ms INTEGER DEFAULT 0,"
+      "  cost_usd REAL DEFAULT 0.0,"
+      "  started_at TEXT NOT NULL,"
+      "  completed_at TEXT,"
+      "  message_id INTEGER,"
+      "  metadata TEXT)"));
+
+  q.exec(QStringLiteral(
+      "CREATE TABLE IF NOT EXISTS gui_cost_rates ("
+      "  model TEXT PRIMARY KEY,"
+      "  input_per_million REAL NOT NULL,"
+      "  output_per_million REAL NOT NULL,"
+      "  updated_at TEXT NOT NULL)"));
+
+  // Seed known model rates.
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('claude-sonnet-4-20250514', 3.0, 15.0, '2025-05-14')"));
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('claude-opus-4-20250514', 15.0, 75.0, '2025-05-14')"));
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('claude-haiku-4-5-20251001', 0.80, 4.0, '2025-10-01')"));
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('gpt-4o', 2.5, 10.0, '2025-01-01')"));
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('gpt-4o-mini', 0.15, 0.60, '2025-01-01')"));
+
   // Agent session tables.
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_agent_sessions ("
@@ -1285,6 +1327,11 @@ void ConfigManager::DeleteAgentSession(int64_t session_id) const {
   q.exec();
 
   q.prepare(QStringLiteral(
+      "DELETE FROM gui_cost_nodes WHERE session_id = ?"));
+  q.addBindValue(sid);
+  q.exec();
+
+  q.prepare(QStringLiteral(
       "DELETE FROM gui_agent_sessions WHERE session_id = ?"));
   q.addBindValue(sid);
   q.exec();
@@ -1460,6 +1507,196 @@ void ConfigManager::SetDocumentCategory(int doc_id,
   q.addBindValue(category);
   q.addBindValue(doc_id);
   q.exec();
+}
+
+// --- Cost tracking ---
+
+int64_t ConfigManager::CreateCostNode(
+    int64_t session_id, int64_t parent_node_id,
+    const QString &node_type, const QString &tool_name,
+    const QString &model) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_cost_nodes "
+      "(session_id, parent_node_id, node_type, tool_name, model, started_at) "
+      "VALUES (?, ?, ?, ?, ?, ?)"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.addBindValue(parent_node_id >= 0 ? QVariant(static_cast<qlonglong>(parent_node_id))
+                                     : QVariant());
+  q.addBindValue(node_type);
+  q.addBindValue(tool_name.isEmpty() ? QVariant() : tool_name);
+  q.addBindValue(model.isEmpty() ? QVariant() : model);
+  q.addBindValue(now);
+  if (!q.exec()) return -1;
+  auto id = q.lastInsertId();
+  return id.isValid() ? id.toLongLong() : -1;
+}
+
+void ConfigManager::CompleteCostNode(
+    int64_t node_id, int input_tokens, int output_tokens,
+    int duration_ms, const QString &metadata) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  if (node_id < 0) return;
+
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+
+  // Look up the model for this node to compute cost.
+  double cost_usd = 0.0;
+  QSqlQuery mq(d->project_db);
+  mq.prepare(QStringLiteral("SELECT model FROM gui_cost_nodes WHERE node_id = ?"));
+  mq.addBindValue(static_cast<qlonglong>(node_id));
+  if (mq.exec() && mq.next()) {
+    auto model = mq.value(0).toString();
+    if (!model.isEmpty()) {
+      double input_rate = LookupCostRate(model, true);
+      double output_rate = LookupCostRate(model, false);
+      cost_usd = (input_tokens * input_rate + output_tokens * output_rate)
+                 / 1000000.0;
+    }
+  }
+
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_cost_nodes SET "
+      "input_tokens = ?, output_tokens = ?, duration_ms = ?, "
+      "cost_usd = ?, completed_at = ?, metadata = ? "
+      "WHERE node_id = ?"));
+  q.addBindValue(input_tokens);
+  q.addBindValue(output_tokens);
+  q.addBindValue(duration_ms);
+  q.addBindValue(cost_usd);
+  q.addBindValue(now);
+  q.addBindValue(metadata.isEmpty() ? QVariant() : metadata);
+  q.addBindValue(static_cast<qlonglong>(node_id));
+  q.exec();
+}
+
+double ConfigManager::LookupCostRate(const QString &model,
+                                     bool is_input) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return 0.0;
+  QSqlQuery q(d->project_db);
+  auto col = is_input ? QStringLiteral("input_per_million")
+                      : QStringLiteral("output_per_million");
+  q.prepare(QStringLiteral("SELECT %1 FROM gui_cost_rates "
+                           "WHERE ? LIKE '%%' || model || '%%' "
+                           "ORDER BY length(model) DESC LIMIT 1").arg(col));
+  q.addBindValue(model);
+  if (q.exec() && q.next()) {
+    return q.value(0).toDouble();
+  }
+  return 0.0;
+}
+
+QVector<ConfigManager::CostNodeInfo>
+ConfigManager::LoadCostNodes(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT node_id, session_id, parent_node_id, node_type, tool_name, "
+      "model, input_tokens, output_tokens, duration_ms, cost_usd, "
+      "started_at, completed_at "
+      "FROM gui_cost_nodes WHERE session_id = ? ORDER BY started_at"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<CostNodeInfo> result;
+  while (q.next()) {
+    CostNodeInfo info;
+    info.node_id = q.value(0).toLongLong();
+    info.session_id = q.value(1).toLongLong();
+    info.parent_node_id = q.value(2).isNull() ? -1 : q.value(2).toLongLong();
+    info.node_type = q.value(3).toString();
+    info.tool_name = q.value(4).toString();
+    info.model = q.value(5).toString();
+    info.input_tokens = q.value(6).toInt();
+    info.output_tokens = q.value(7).toInt();
+    info.duration_ms = q.value(8).toInt();
+    info.cost_usd = q.value(9).toDouble();
+    info.started_at = q.value(10).toString();
+    info.completed_at = q.value(11).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+ConfigManager::CostSummary
+ConfigManager::LoadCostSummary(int64_t session_id) const {
+  CostSummary summary;
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return summary;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT COALESCE(SUM(cost_usd), 0), "
+      "COALESCE(SUM(input_tokens), 0), "
+      "COALESCE(SUM(output_tokens), 0), "
+      "COALESCE(SUM(duration_ms), 0), "
+      "COALESCE(SUM(CASE WHEN node_type = 'llm_call' THEN 1 ELSE 0 END), 0), "
+      "COALESCE(SUM(CASE WHEN node_type = 'tool_call' THEN 1 ELSE 0 END), 0) "
+      "FROM gui_cost_nodes WHERE session_id = ?"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  if (q.exec() && q.next()) {
+    summary.total_cost_usd = q.value(0).toDouble();
+    summary.total_input_tokens = q.value(1).toInt();
+    summary.total_output_tokens = q.value(2).toInt();
+    summary.total_duration_ms = q.value(3).toInt();
+    summary.llm_call_count = q.value(4).toInt();
+    summary.tool_call_count = q.value(5).toInt();
+  }
+  return summary;
+}
+
+QVector<ConfigManager::ToolCostBreakdown>
+ConfigManager::LoadToolCostBreakdown(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT tool_name, COUNT(*) as call_count, "
+      "COALESCE(SUM(cost_usd), 0), "
+      "COALESCE(SUM(duration_ms), 0), "
+      "COALESCE(AVG(duration_ms), 0) "
+      "FROM gui_cost_nodes "
+      "WHERE session_id = ? AND node_type = 'tool_call' AND tool_name IS NOT NULL "
+      "GROUP BY tool_name ORDER BY SUM(cost_usd) DESC"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<ToolCostBreakdown> result;
+  while (q.next()) {
+    ToolCostBreakdown info;
+    info.tool_name = q.value(0).toString();
+    info.call_count = q.value(1).toInt();
+    info.total_cost_usd = q.value(2).toDouble();
+    info.total_duration_ms = q.value(3).toInt();
+    info.avg_duration_ms = q.value(4).toInt();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+QVector<ConfigManager::RoleCostBreakdown>
+ConfigManager::LoadRoleCostBreakdown(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT node_type, model, COUNT(*) as call_count, "
+      "COALESCE(SUM(input_tokens), 0), "
+      "COALESCE(SUM(output_tokens), 0), "
+      "COALESCE(SUM(cost_usd), 0) "
+      "FROM gui_cost_nodes WHERE session_id = ? "
+      "GROUP BY node_type, model"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<RoleCostBreakdown> result;
+  while (q.next()) {
+    RoleCostBreakdown info;
+    info.node_type = q.value(0).toString();
+    info.model = q.value(1).toString();
+    info.call_count = q.value(2).toInt();
+    info.total_input_tokens = q.value(3).toInt();
+    info.total_output_tokens = q.value(4).toInt();
+    info.total_cost_usd = q.value(5).toDouble();
+    result.push_back(std::move(info));
+  }
+  return result;
 }
 
 }  // namespace mx::gui

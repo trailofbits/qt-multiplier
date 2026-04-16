@@ -8,6 +8,8 @@
 #include "AgentTool.h"
 #include "AgentToolRegistry.h"
 
+#include <multiplier/GUI/Managers/ConfigManager.h>
+
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -18,11 +20,12 @@ namespace mx::gui {
 AgentSession::AgentSession(int64_t session_id, ILLMBackend *backend,
                            AgentToolRegistry *tools, const LLMConfig &config,
                            const QString &system_prompt, int max_iterations,
-                           QObject *parent)
+                           ConfigManager *config_manager, QObject *parent)
     : QObject(parent),
       m_session_id(session_id),
       m_backend(backend),
       m_tools(tools),
+      m_config_manager(config_manager),
       m_config(config),
       m_system_prompt(system_prompt),
       m_max_iterations(max_iterations) {}
@@ -169,6 +172,12 @@ void AgentSession::sendUserMessage(const QString &text) {
 
   addMessage(QStringLiteral("user"), text);
 
+  // Create a root cost node for this user message.
+  if (m_config_manager) {
+    m_root_node_id = m_config_manager->CreateCostNode(
+        m_session_id, -1, QStringLiteral("user_message"));
+  }
+
   auto *thread = QThread::create([this] { runLoop(); });
   QObject::connect(thread, &QThread::finished, thread, &QThread::deleteLater);
   thread->start();
@@ -204,12 +213,37 @@ void AgentSession::runLoop(void) {
     auto llm_messages = buildMessages();
     auto tool_defs = m_tools->allDefinitions();
 
+    // Create a cost node for this LLM call.
+    if (m_config_manager) {
+      m_current_llm_node_id = m_config_manager->CreateCostNode(
+          m_session_id, m_root_node_id, QStringLiteral("llm_call"),
+          {}, m_config.model);
+    }
+
+    QElapsedTimer llm_timer;
+    llm_timer.start();
+
     auto response = m_backend->sendMessage(llm_messages, tool_defs, m_config);
 
+    auto llm_duration_ms = static_cast<int>(llm_timer.elapsed());
+
     if (!response.error.isEmpty()) {
+      // Complete the cost node even on error.
+      if (m_config_manager && m_current_llm_node_id >= 0) {
+        m_config_manager->CompleteCostNode(
+            m_current_llm_node_id, response.prompt_tokens,
+            response.completion_tokens, llm_duration_ms);
+      }
       m_running.storeRelaxed(0);
       emit sessionError(response.error);
       return;
+    }
+
+    // Complete the LLM cost node with tokens.
+    if (m_config_manager && m_current_llm_node_id >= 0) {
+      m_config_manager->CompleteCostNode(
+          m_current_llm_node_id, response.prompt_tokens,
+          response.completion_tokens, llm_duration_ms);
     }
 
     m_total_prompt_tokens += response.prompt_tokens;
@@ -243,6 +277,14 @@ void AgentSession::runLoop(void) {
                  call.name, call.id, call.arguments);
       emit toolCallStarted(call.name, call.arguments);
 
+      // Create a cost node for this tool call.
+      int64_t tool_node_id = -1;
+      if (m_config_manager) {
+        tool_node_id = m_config_manager->CreateCostNode(
+            m_session_id, m_current_llm_node_id,
+            QStringLiteral("tool_call"), call.name);
+      }
+
       QElapsedTimer timer;
       timer.start();
 
@@ -265,6 +307,12 @@ void AgentSession::runLoop(void) {
       }
 
       auto duration_ms = static_cast<int>(timer.elapsed());
+
+      // Complete the tool cost node.
+      if (m_config_manager && tool_node_id >= 0) {
+        m_config_manager->CompleteCostNode(tool_node_id, 0, 0, duration_ms);
+      }
+
       emit toolCallCompleted(call.name, result, duration_ms);
 
       // Record the tool result.

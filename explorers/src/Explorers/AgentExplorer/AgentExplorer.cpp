@@ -8,6 +8,7 @@
 
 #include <QAction>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -796,8 +797,25 @@ Respond with ONLY a JSON object:
   config.model = d->summarizer_model.isEmpty()
       ? primary_model : d->summarizer_model;
 
-  auto *thread = QThread::create([this, messages, config, backend] {
+  // Create a cost node for the summarizer call.
+  int64_t summarizer_node_id = -1;
+  if (d->current_session_id >= 0) {
+    summarizer_node_id = d->config_manager.CreateCostNode(
+        d->current_session_id, -1, QStringLiteral("summarizer"),
+        {}, config.model);
+  }
+
+  auto *thread = QThread::create(
+      [this, messages, config, backend, summarizer_node_id] {
+    QElapsedTimer timer;
+    timer.start();
     auto response = backend->sendMessage(messages, {}, config);
+    auto duration_ms = static_cast<int>(timer.elapsed());
+    if (summarizer_node_id >= 0) {
+      d->config_manager.CompleteCostNode(
+          summarizer_node_id, response.prompt_tokens,
+          response.completion_tokens, duration_ms);
+    }
     QMetaObject::invokeMethod(this, [this, response] {
       handleCodeSummaryResponse(response);
     }, Qt::QueuedConnection);
@@ -931,8 +949,25 @@ Respond with ONLY a JSON object (no markdown, no explanation):
   config.model = d->recommender_model.isEmpty()
       ? primary_model : d->recommender_model;
 
-  auto *thread = QThread::create([this, messages, config, backend] {
+  // Create a cost node for the recommender call.
+  int64_t recommender_node_id = -1;
+  if (d->current_session_id >= 0) {
+    recommender_node_id = d->config_manager.CreateCostNode(
+        d->current_session_id, -1, QStringLiteral("recommender"),
+        {}, config.model);
+  }
+
+  auto *thread = QThread::create(
+      [this, messages, config, backend, recommender_node_id] {
+    QElapsedTimer timer;
+    timer.start();
     auto response = backend->sendMessage(messages, {}, config);
+    auto duration_ms = static_cast<int>(timer.elapsed());
+    if (recommender_node_id >= 0) {
+      d->config_manager.CompleteCostNode(
+          recommender_node_id, response.prompt_tokens,
+          response.completion_tokens, duration_ms);
+    }
     QMetaObject::invokeMethod(this, [this, response] {
       handleRecommendationResponse(response);
     }, Qt::QueuedConnection);

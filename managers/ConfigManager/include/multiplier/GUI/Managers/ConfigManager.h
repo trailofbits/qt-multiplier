@@ -295,6 +295,61 @@ class ConfigManager Q_DECL_FINAL : public QObject {
       const QString &category) const;
   void SetDocumentCategory(int doc_id, const QString &category) const;
 
+  //! Cost tracking (per-project).
+  int64_t CreateCostNode(int64_t session_id, int64_t parent_node_id,
+                         const QString &node_type,
+                         const QString &tool_name = {},
+                         const QString &model = {}) const;
+  void CompleteCostNode(int64_t node_id, int input_tokens, int output_tokens,
+                        int duration_ms,
+                        const QString &metadata = {}) const;
+  double LookupCostRate(const QString &model, bool is_input) const;
+
+  struct CostNodeInfo {
+    int64_t node_id{-1};
+    int64_t session_id{-1};
+    int64_t parent_node_id{-1};
+    QString node_type;
+    QString tool_name;
+    QString model;
+    int input_tokens{0};
+    int output_tokens{0};
+    int duration_ms{0};
+    double cost_usd{0.0};
+    QString started_at;
+    QString completed_at;
+  };
+  QVector<CostNodeInfo> LoadCostNodes(int64_t session_id) const;
+
+  struct CostSummary {
+    double total_cost_usd{0.0};
+    int total_input_tokens{0};
+    int total_output_tokens{0};
+    int total_duration_ms{0};
+    int llm_call_count{0};
+    int tool_call_count{0};
+  };
+  CostSummary LoadCostSummary(int64_t session_id) const;
+
+  struct ToolCostBreakdown {
+    QString tool_name;
+    int call_count{0};
+    double total_cost_usd{0.0};
+    int total_duration_ms{0};
+    int avg_duration_ms{0};
+  };
+  QVector<ToolCostBreakdown> LoadToolCostBreakdown(int64_t session_id) const;
+
+  struct RoleCostBreakdown {
+    QString node_type;
+    QString model;
+    int call_count{0};
+    int total_input_tokens{0};
+    int total_output_tokens{0};
+    double total_cost_usd{0.0};
+  };
+  QVector<RoleCostBreakdown> LoadRoleCostBreakdown(int64_t session_id) const;
+
   //! Notify that sheets/documents were modified externally (e.g. by the agent).
   void NotifyExternalSheetsChanged(void);
   void NotifyExternalDocumentsChanged(void);
