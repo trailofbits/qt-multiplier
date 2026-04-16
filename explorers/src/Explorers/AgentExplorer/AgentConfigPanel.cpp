@@ -745,7 +745,11 @@ void AgentConfigPanel::maybeVerifyPython(void) {
   d->python_verify_proc = proc;
   proc->setProgram(path);
   proc->setArguments({QStringLiteral("-c"),
-      QStringLiteral("import multiplier; print(multiplier.__file__)")});
+      QStringLiteral(
+          "import importlib.util, sys; "
+          "spec = importlib.util.find_spec('multiplier'); "
+          "print(spec.origin if spec else 'NOT_FOUND'); "
+          "sys.exit(0 if spec else 1)")});
 
   // Set up venv environment. Try multiple strategies:
   // 1. Check for pyvenv.cfg in parent dir (standard venv layout: venv/bin/python)
