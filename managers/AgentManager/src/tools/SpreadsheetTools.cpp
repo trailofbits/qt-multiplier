@@ -200,7 +200,10 @@ QJsonObject CreateSheetTool::execute(const QJsonObject &args) {
 
   sheet.description = args[QStringLiteral("description")].toString();
 
-  int id = m_ctx->config->SaveSheet(sheet);
+  int id = -1;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    id = m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -226,7 +229,10 @@ QJsonObject ListSheetsTool::parametersSchema(void) const {
 }
 
 QJsonObject ListSheetsTool::execute(const QJsonObject &) {
-  auto sheets = m_ctx->config->LoadOpenSheets();
+  QVector<ConfigManager::SheetData> sheets;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheets = m_ctx->config->LoadOpenSheets();
+  }, Qt::BlockingQueuedConnection);
   QJsonArray arr;
   for (const auto &s : sheets) {
     QJsonObject entry;
@@ -266,7 +272,10 @@ QJsonObject GetSheetSummaryTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("sheet_id is required"));
   }
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -314,7 +323,10 @@ QJsonObject ReadCellTool::execute(const QJsonObject &args) {
   int row = args[QStringLiteral("row")].toInt(-1);
   int col = args[QStringLiteral("column")].toInt(-1);
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -370,7 +382,10 @@ QJsonObject WriteCellTool::execute(const QJsonObject &args) {
   QString type = args[QStringLiteral("type")].toString(
       QStringLiteral("string"));
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -380,7 +395,9 @@ QJsonObject WriteCellTool::execute(const QJsonObject &args) {
 
   ensure_cell(sheet, row, col);
   sheet.cells[row][col] = make_cell_json(value, type);
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -415,7 +432,10 @@ QJsonObject ReadRowTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -464,7 +484,10 @@ QJsonObject ReadColumnTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int col = args[QStringLiteral("column")].toInt(-1);
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -511,7 +534,10 @@ QJsonObject AddRowTool::parametersSchema(void) const {
 
 QJsonObject AddRowTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -526,7 +552,9 @@ QJsonObject AddRowTool::execute(const QJsonObject &args) {
 
   auto row_index = sheet.cells.size();
   sheet.cells.append(row);
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -563,7 +591,10 @@ QJsonObject InsertRowTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -592,7 +623,9 @@ QJsonObject InsertRowTool::execute(const QJsonObject &args) {
   }
   sheet.row_colors = new_colors;
 
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -627,7 +660,10 @@ QJsonObject DeleteRowTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -650,7 +686,9 @@ QJsonObject DeleteRowTool::execute(const QJsonObject &args) {
   }
   sheet.row_colors = new_colors;
 
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -685,7 +723,10 @@ QJsonObject AddColumnTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   QString col_name = args[QStringLiteral("name")].toString();
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -700,7 +741,9 @@ QJsonObject AddColumnTool::execute(const QJsonObject &args) {
     r.append(QString());
   }
 
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -740,7 +783,10 @@ QJsonObject SetRowColorTool::execute(const QJsonObject &args) {
   int row = args[QStringLiteral("row")].toInt(-1);
   QString color_str = args[QStringLiteral("color")].toString();
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -754,7 +800,9 @@ QJsonObject SetRowColorTool::execute(const QJsonObject &args) {
   }
 
   sheet.row_colors[row] = color;
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -789,13 +837,18 @@ QJsonObject ClearRowColorTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
 
   sheet.row_colors.remove(row);
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -838,7 +891,10 @@ QJsonObject SetCheckboxTool::execute(const QJsonObject &args) {
   int col = args[QStringLiteral("column")].toInt(-1);
   bool checked = args[QStringLiteral("checked")].toBool();
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -848,7 +904,9 @@ QJsonObject SetCheckboxTool::execute(const QJsonObject &args) {
 
   ensure_cell(sheet, row, col);
   sheet.cells[row][col] = SpreadsheetModel::value_to_json(QVariant(checked));
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -892,7 +950,10 @@ QJsonObject SortSheetTool::execute(const QJsonObject &args) {
   QString order = args[QStringLiteral("order")].toString(
       QStringLiteral("asc"));
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -929,7 +990,9 @@ QJsonObject SortSheetTool::execute(const QJsonObject &args) {
 
   sheet.cells = sorted_cells;
   sheet.row_colors = sorted_colors;
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -976,7 +1039,10 @@ QJsonObject ReadSheetRangeTool::execute(const QJsonObject &args) {
   int end_row = args[QStringLiteral("end_row")].toInt(-1);
   int end_col = args[QStringLiteral("end_col")].toInt(-1);
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -1019,7 +1085,10 @@ QJsonObject GetSheetAsMarkdownTool::parametersSchema(void) const {
 QJsonObject GetSheetAsMarkdownTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }

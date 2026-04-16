@@ -408,17 +408,36 @@ void AgentExplorer::OnStop(void) {
 
 void AgentExplorer::OnMessageAdded(int64_t session_id,
                                     const AgentMessage &msg) {
-  if (session_id != d->current_session_id) {
+  // Show in conversation only for the primary session.
+  if (session_id == d->current_session_id) {
+    d->conversation->addMessage(msg);
+  }
+
+  // Persist messages for both primary and observer sessions.
+  // Skip user messages for the primary session (already persisted in
+  // OnSendMessage). Observer user messages are synthetic triggers, persist them.
+  if (session_id != d->current_session_id &&
+      session_id != d->observer_session_id) {
     return;
   }
 
-  d->conversation->addMessage(msg);
-
-  // Persist assistant messages.
-  if (msg.role == QStringLiteral("assistant")) {
+  bool skip_user = (session_id == d->current_session_id &&
+                    msg.role == QStringLiteral("user"));
+  if (!skip_user) {
+    QString tool_args_str;
+    if (!msg.tool_args.isEmpty()) {
+      tool_args_str = QString::fromUtf8(
+          QJsonDocument(msg.tool_args).toJson(QJsonDocument::Compact));
+    }
+    QString tool_result_str;
+    if (!msg.tool_result.isEmpty()) {
+      tool_result_str = QString::fromUtf8(
+          QJsonDocument(msg.tool_result).toJson(QJsonDocument::Compact));
+    }
     d->config_manager.SaveAgentMessage(
         session_id, msg.role, msg.content,
-        msg.tool_name, msg.tool_call_id, {}, {},
+        msg.tool_name, msg.tool_call_id,
+        tool_args_str, tool_result_str,
         msg.token_count);
   }
 }
@@ -587,6 +606,14 @@ void AgentExplorer::LoadSession(int64_t session_id) {
     msg.tool_name = info.tool_name;
     msg.tool_call_id = info.tool_call_id;
     msg.token_count = info.token_count;
+    if (!info.tool_args.isEmpty()) {
+      msg.tool_args = QJsonDocument::fromJson(
+          info.tool_args.toUtf8()).object();
+    }
+    if (!info.tool_result.isEmpty()) {
+      msg.tool_result = QJsonDocument::fromJson(
+          info.tool_result.toUtf8()).object();
+    }
     d->conversation->addMessage(msg);
   }
 }
@@ -626,11 +653,20 @@ void AgentExplorer::StartObserver(void) {
 
   if (d->observer_session_id < 0) {
     d->observer_btn->setChecked(false);
-    AgentMessage err_msg;
-    err_msg.role = QStringLiteral("system");
-    err_msg.content = tr("Failed to create observer session.");
-    d->conversation->addMessage(err_msg);
+    AgentMessage obs_err;
+    obs_err.role = QStringLiteral("system");
+    obs_err.content = tr("Failed to create observer session.");
+    d->conversation->addMessage(obs_err);
     return;
+  }
+
+  // Persist the observer session.
+  {
+    auto *obs_backend = d->llm_manager->activeBackend();
+    QString obs_model = obs_backend ? obs_backend->name() : QString();
+    d->config_manager.CreateAgentSession(
+        tr("Observer"), kObserverSystemPrompt, backend_name, obs_model,
+        d->current_session_id);
   }
 
   d->observer_enabled = true;

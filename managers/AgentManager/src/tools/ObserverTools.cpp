@@ -12,6 +12,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMetaObject>
 
 namespace mx::gui {
 namespace {
@@ -113,7 +114,10 @@ QJsonObject GetPrimarySessionContextTool::execute(const QJsonObject &args) {
   QJsonArray sheets_arr;
   QJsonArray docs_arr;
   if (m_ctx->config) {
-    auto sheets = m_ctx->config->LoadOpenSheets();
+    QVector<ConfigManager::SheetData> sheets;
+    QMetaObject::invokeMethod(m_ctx->config, [&] {
+      sheets = m_ctx->config->LoadOpenSheets();
+    }, Qt::BlockingQueuedConnection);
     for (const auto &sheet : sheets) {
       QJsonObject obj;
       obj[QStringLiteral("sheet_id")] = sheet.sheet_id;
@@ -122,7 +126,10 @@ QJsonObject GetPrimarySessionContextTool::execute(const QJsonObject &args) {
       sheets_arr.append(obj);
     }
 
-    auto docs = m_ctx->config->LoadAllDocuments();
+    QVector<ConfigManager::DocumentInfo> docs;
+    QMetaObject::invokeMethod(m_ctx->config, [&] {
+      docs = m_ctx->config->LoadAllDocuments();
+    }, Qt::BlockingQueuedConnection);
     for (const auto &doc : docs) {
       QJsonObject obj;
       obj[QStringLiteral("doc_id")] = doc.doc_id;
@@ -196,25 +203,27 @@ QJsonObject ObserverRecommendationTool::execute(const QJsonObject &args) {
 
   int doc_id = -1;
   if (m_ctx && m_ctx->config) {
-    // Find or create the observer_notes document.
-    auto docs = m_ctx->config->LoadDocumentsByCategory(
-        QStringLiteral("observer_notes"));
-    if (!docs.isEmpty()) {
-      doc_id = docs.first().doc_id;
-      // Append to existing content.
-      auto existing = m_ctx->config->LoadDocumentContent(doc_id);
-      if (!existing.isEmpty()) {
-        existing += QStringLiteral("\n");
+    QMetaObject::invokeMethod(m_ctx->config, [&] {
+      // Find or create the observer_notes document.
+      auto docs = m_ctx->config->LoadDocumentsByCategory(
+          QStringLiteral("observer_notes"));
+      if (!docs.isEmpty()) {
+        doc_id = docs.first().doc_id;
+        // Append to existing content.
+        auto existing = m_ctx->config->LoadDocumentContent(doc_id);
+        if (!existing.isEmpty()) {
+          existing += QStringLiteral("\n");
+        }
+        existing += formatted;
+        m_ctx->config->SaveDocumentContent(doc_id, existing);
+      } else {
+        // Create a new observer notes document.
+        doc_id = m_ctx->config->CreateDocument(
+            formatted, QStringLiteral("Observer Notes"));
+        m_ctx->config->SetDocumentCategory(doc_id,
+                                           QStringLiteral("observer_notes"));
       }
-      existing += formatted;
-      m_ctx->config->SaveDocumentContent(doc_id, existing);
-    } else {
-      // Create a new observer notes document.
-      doc_id = m_ctx->config->CreateDocument(
-          formatted, QStringLiteral("Observer Notes"));
-      m_ctx->config->SetDocumentCategory(doc_id,
-                                         QStringLiteral("observer_notes"));
-    }
+    }, Qt::BlockingQueuedConnection);
   }
 
   int recommendation_id = s_next_recommendation_id++;

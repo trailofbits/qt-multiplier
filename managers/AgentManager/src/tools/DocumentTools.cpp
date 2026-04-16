@@ -92,13 +92,18 @@ QJsonObject CreateDocumentTool::execute(const QJsonObject &args) {
         QStringLiteral("invalid category: %1").arg(category));
   }
 
-  int doc_id = m_ctx->config->CreateDocument(content, title);
+  int doc_id = -1;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    doc_id = m_ctx->config->CreateDocument(content, title);
+  }, Qt::BlockingQueuedConnection);
   if (doc_id < 0) {
     return error_result(QStringLiteral("failed to create document"));
   }
 
   // Store category in the description field for now.
-  m_ctx->config->SaveDocumentDescription(doc_id, category);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveDocumentDescription(doc_id, category);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalDocumentsChanged, Qt::QueuedConnection);
 
@@ -133,8 +138,12 @@ QJsonObject ReadDocumentTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("doc_id is required"));
   }
 
-  QString title = m_ctx->config->LoadDocumentTitle(doc_id);
-  QString content = m_ctx->config->LoadDocumentContent(doc_id);
+  QString title;
+  QString content;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    title = m_ctx->config->LoadDocumentTitle(doc_id);
+    content = m_ctx->config->LoadDocumentContent(doc_id);
+  }, Qt::BlockingQueuedConnection);
 
   QJsonObject result;
   result[QStringLiteral("doc_id")] = doc_id;
@@ -183,16 +192,23 @@ QJsonObject EditDocumentTool::execute(const QJsonObject &args) {
   if (args.contains(QStringLiteral("content"))) {
     QString new_content = args[QStringLiteral("content")].toString();
     if (mode == QLatin1String("append")) {
-      QString existing = m_ctx->config->LoadDocumentContent(doc_id);
+      QString existing;
+      QMetaObject::invokeMethod(m_ctx->config, [&] {
+        existing = m_ctx->config->LoadDocumentContent(doc_id);
+      }, Qt::BlockingQueuedConnection);
       new_content = existing + new_content;
     }
-    m_ctx->config->SaveDocumentContent(doc_id, new_content);
+    QMetaObject::invokeMethod(m_ctx->config, [&] {
+      m_ctx->config->SaveDocumentContent(doc_id, new_content);
+    }, Qt::BlockingQueuedConnection);
   }
 
   // Edit title if provided. Write directly to DB, bypassing undo stack.
   if (args.contains(QStringLiteral("title"))) {
     QString new_title = args[QStringLiteral("title")].toString();
-    m_ctx->config->SaveDocumentTitle(doc_id, new_title);
+    QMetaObject::invokeMethod(m_ctx->config, [&] {
+      m_ctx->config->SaveDocumentTitle(doc_id, new_title);
+    }, Qt::BlockingQueuedConnection);
     ConfigManager::BumpDocumentTitleVersion();
   }
 
@@ -227,7 +243,10 @@ QJsonObject ListDocumentsTool::parametersSchema(void) const {
 QJsonObject ListDocumentsTool::execute(const QJsonObject &args) {
   QString category_filter = args[QStringLiteral("category")].toString();
 
-  auto docs = m_ctx->config->LoadAllDocuments();
+  QVector<ConfigManager::DocumentInfo> docs;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    docs = m_ctx->config->LoadAllDocuments();
+  }, Qt::BlockingQueuedConnection);
 
   QJsonArray arr;
   for (const auto &doc : docs) {
@@ -298,7 +317,10 @@ QJsonObject LinkDocumentToCellTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("doc_id is required"));
   }
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
@@ -316,7 +338,10 @@ QJsonObject LinkDocumentToCellTool::execute(const QJsonObject &args) {
   }
 
   // Load document title for the cell display cache.
-  QString title = m_ctx->config->LoadDocumentTitle(doc_id);
+  QString title;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    title = m_ctx->config->LoadDocumentTitle(doc_id);
+  }, Qt::BlockingQueuedConnection);
   QString escaped_title = title;
   escaped_title.replace(QLatin1Char('"'), QStringLiteral("\\\""));
 
@@ -325,7 +350,9 @@ QJsonObject LinkDocumentToCellTool::execute(const QJsonObject &args) {
                .arg(doc_id)
                .arg(escaped_title);
 
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -360,7 +387,10 @@ QJsonObject SearchDocumentsTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("query is required"));
   }
 
-  auto docs = m_ctx->config->LoadAllDocuments();
+  QVector<ConfigManager::DocumentInfo> docs;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    docs = m_ctx->config->LoadAllDocuments();
+  }, Qt::BlockingQueuedConnection);
 
   QJsonArray arr;
   for (const auto &doc : docs) {

@@ -102,7 +102,10 @@ static void ensure_cell(ConfigManager::SheetData &sheet, int row, int col) {
 // Find or create the task_list sheet. Returns sheet_id.
 static int ensureTaskSheet(ConfigManager *config) {
   // Look for an existing open sheet with role "task_list".
-  auto sheets = config->LoadOpenSheets();
+  QVector<ConfigManager::SheetData> sheets;
+  QMetaObject::invokeMethod(config, [&] {
+    sheets = config->LoadOpenSheets();
+  }, Qt::BlockingQueuedConnection);
   for (const auto &s : sheets) {
     if (s.role == QLatin1String("task_list")) {
       return s.sheet_id;
@@ -121,7 +124,10 @@ static int ensureTaskSheet(ConfigManager *config) {
     sheet.columns.append(ci);
   }
 
-  int id = config->SaveSheet(sheet);
+  int id = -1;
+  QMetaObject::invokeMethod(config, [&] {
+    id = config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
   return id;
@@ -211,7 +217,10 @@ QJsonObject CreateTaskTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("Failed to create/find task sheet"));
   }
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   QString task_id = nextTaskId(sheet);
   int row = static_cast<int>(sheet.cells.size());
 
@@ -232,7 +241,9 @@ QJsonObject CreateTaskTool::execute(const QJsonObject &args) {
     sheet.row_colors[row] = color;
   }
 
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -285,7 +296,10 @@ QJsonObject UpdateTaskTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("Failed to find task sheet"));
   }
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   int row = findTaskRow(sheet, task_id);
   if (row < 0) {
     return error_result(
@@ -330,7 +344,9 @@ QJsonObject UpdateTaskTool::execute(const QJsonObject &args) {
         make_string_cell(args[QStringLiteral("notes")].toString());
   }
 
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -373,7 +389,10 @@ QJsonObject ListTasksTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("Failed to find task sheet"));
   }
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   QString filter_status = args[QStringLiteral("status")].toString();
   QString filter_priority = args[QStringLiteral("priority")].toString();
 
@@ -448,7 +467,10 @@ QJsonObject CompleteTaskTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("Failed to find task sheet"));
   }
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
   int row = findTaskRow(sheet, task_id);
   if (row < 0) {
     return error_result(
@@ -472,7 +494,9 @@ QJsonObject CompleteTaskTool::execute(const QJsonObject &args) {
     sheet.cells[row][kColNotes] = make_string_cell(new_notes);
   }
 
-  m_ctx->config->SaveSheet(sheet);
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
   QMetaObject::invokeMethod(m_ctx->config,
       &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
 
@@ -512,7 +536,10 @@ QJsonObject GetTaskBoardSummaryTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("Failed to find task sheet"));
   }
 
-  auto sheet = m_ctx->config->LoadSheetById(sheet_id);
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
 
   int total = 0;
   int planned = 0;

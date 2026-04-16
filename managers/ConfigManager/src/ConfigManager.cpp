@@ -149,6 +149,11 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
   q.exec(QStringLiteral(
       "ALTER TABLE gui_documents ADD COLUMN category TEXT DEFAULT 'note'"));
 
+  // Migration: observer session tracking.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_agent_sessions "
+      "ADD COLUMN primary_session_id INTEGER DEFAULT -1"));
+
   // Agent session tables.
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_agent_sessions ("
@@ -1164,20 +1169,23 @@ ConfigManager::LoadNavigationHistory(const QString &key) const {
 
 int64_t ConfigManager::CreateAgentSession(
     const QString &name, const QString &system_prompt,
-    const QString &backend, const QString &model) const {
+    const QString &backend, const QString &model,
+    int64_t primary_session_id) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
   auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
       "INSERT INTO gui_agent_sessions "
-      "(name, system_prompt, backend, model, status, created_at, updated_at) "
-      "VALUES (?, ?, ?, ?, 'active', ?, ?)"));
+      "(name, system_prompt, backend, model, status, created_at, updated_at, "
+      "primary_session_id) "
+      "VALUES (?, ?, ?, ?, 'active', ?, ?, ?)"));
   q.addBindValue(name);
   q.addBindValue(system_prompt);
   q.addBindValue(backend);
   q.addBindValue(model);
   q.addBindValue(now);
   q.addBindValue(now);
+  q.addBindValue(static_cast<qlonglong>(primary_session_id));
   if (!q.exec()) return -1;
   auto id = q.lastInsertId();
   return id.isValid() ? id.toLongLong() : -1;

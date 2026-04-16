@@ -238,7 +238,8 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   int64_t CreateAgentSession(const QString &name,
                              const QString &system_prompt,
                              const QString &backend,
-                             const QString &model) const;
+                             const QString &model,
+                             int64_t primary_session_id = -1) const;
   void UpdateAgentSessionStatus(int64_t session_id,
                                 const QString &status) const;
   void UpdateAgentSessionTokens(int64_t session_id, int prompt_tokens,

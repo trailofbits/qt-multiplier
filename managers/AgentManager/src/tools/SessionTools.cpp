@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QMetaObject>
 
 namespace mx::gui {
 namespace {
@@ -60,7 +61,10 @@ QJsonObject GetAuditContextTool::parametersSchema(void) const {
 QJsonObject GetAuditContextTool::execute(const QJsonObject &) {
   // Sheets summary.
   QJsonArray sheets_arr;
-  auto sheets = m_ctx->config->LoadOpenSheets();
+  QVector<ConfigManager::SheetData> sheets;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheets = m_ctx->config->LoadOpenSheets();
+  }, Qt::BlockingQueuedConnection);
   for (const auto &sheet : sheets) {
     QJsonObject obj;
     obj[QStringLiteral("sheet_id")] = sheet.sheet_id;
@@ -72,7 +76,10 @@ QJsonObject GetAuditContextTool::execute(const QJsonObject &) {
 
   // Documents summary.
   QJsonArray docs_arr;
-  auto docs = m_ctx->config->LoadAllDocuments();
+  QVector<ConfigManager::DocumentInfo> docs;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    docs = m_ctx->config->LoadAllDocuments();
+  }, Qt::BlockingQueuedConnection);
   for (const auto &doc : docs) {
     QJsonObject obj;
     obj[QStringLiteral("doc_id")] = doc.doc_id;
@@ -120,8 +127,11 @@ QJsonObject SaveCheckpointTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("No active session"));
   }
 
-  auto checkpoint_id =
-      m_ctx->config->SaveAgentCheckpoint(session_id, summary);
+  int64_t checkpoint_id = -1;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    checkpoint_id =
+        m_ctx->config->SaveAgentCheckpoint(session_id, summary);
+  }, Qt::BlockingQueuedConnection);
   QString created_at = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
 
   QJsonObject result;
@@ -164,8 +174,11 @@ QJsonObject LogObservationTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("No active session"));
   }
 
-  auto observation_id =
-      m_ctx->config->SaveAgentObservation(session_id, content);
+  int64_t observation_id = -1;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    observation_id =
+        m_ctx->config->SaveAgentObservation(session_id, content);
+  }, Qt::BlockingQueuedConnection);
   QString timestamp = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
 
   QJsonObject result;
