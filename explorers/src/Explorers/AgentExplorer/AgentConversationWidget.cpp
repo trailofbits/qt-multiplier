@@ -970,18 +970,12 @@ static QString symbolizeIdentifiers(const QString &text,
 
   QHash<QString, uint64_t> cache;
   QVector<Candidate> candidates;
-  int lookups = 0;
-  static constexpr int kMaxLookups = 20;
 
   auto try_resolve = [&](const QString &name) -> uint64_t {
     auto it = cache.find(name);
     if (it != cache.end()) {
       return it.value();
     }
-    if (lookups >= kMaxLookups) {
-      return 0;
-    }
-    ++lookups;
 
     const auto &index = config.Index();
     uint64_t found_eid = 0;
