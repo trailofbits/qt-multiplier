@@ -10,10 +10,13 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QMetaObject>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QStandardPaths>
 #include <QTemporaryFile>
+
+#include <multiplier/GUI/Managers/ConfigManager.h>
 
 namespace mx::gui {
 namespace {
@@ -247,136 +250,233 @@ QJsonObject GetPythonApiReferenceTool::parametersSchema(void) const {
   return make_schema({}, {});
 }
 
+static const QString kApiRefTitle =
+    QStringLiteral("Multiplier Python API Reference");
+
+static const QString kApiRefContent = QString::fromUtf8(
+R"MX(# Multiplier Python Bindings
+
+Write Python scripts using the Multiplier binary analysis framework's Python bindings. Multiplier indexes C/C++ codebases into a database, and the Python API lets you query entities (functions, types, variables, macros), navigate the AST, extract source code, find references, and trace call graphs.
+
+## Opening the Database
+
+Always wrap with `in_memory_cache` for performance:
+
+```python
+import os
+import multiplier as mx
+
+db_path = os.environ['MULTIPLIER_DATABASE']
+index = mx.Index.in_memory_cache(mx.Index.from_database(db_path))
+```
+
+Never call `Index.from_database()` without wrapping it in `Index.in_memory_cache()`.
+
+## Iterating Entities
+
+Use `.IN(scope)` to iterate entities of a specific type:
+
+```python
+# All functions
+seen = set()
+for func in mx.ast.FunctionDecl.IN(index):
+    func = func.canonical_declaration
+    if func.id in seen or func.is_implicit:
+        continue
+    seen.add(func.id)
+    print(func.name)
+
+# All variables
+for var in mx.ast.VarDecl.IN(index):
+    print(var.name)
+
+# All macros
+for macro in mx.frontend.DefineMacroDirective.IN(index):
+    print(macro.name.data)
+
+# Functions in a specific file
+for func in mx.ast.FunctionDecl.IN(file_obj):
+    print(func.name)
+```
+
+Always deduplicate with `canonical_declaration` and a seen set.
+
+## Extracting Source Code
+
+Use Fragment and TokenTree for macro-aware source:
+
+```python
+fragment = mx.Fragment.containing(decl)
+if fragment:
+    tree = mx.frontend.TokenTree.create(fragment)
+    tokens = tree.serialize(mx.frontend.TokenTreeVisitor())
+    source = "".join(tok.data for tok in tokens)
+```
+
+For just the declaration's tokens: `"".join(tok.data for tok in decl.tokens)`
+
+## Token Properties
+
+```python
+for tok in decl.tokens:
+    tok.data           # The text
+    tok.kind           # TokenKind enum
+    tok.category       # TokenCategory
+    tok.related_entity # AST entity this token refers to
+
+    # File location
+    ft = tok.nearest_file_token
+    if ft:
+        flc = mx.frontend.FileLocationCache()
+        loc = ft.nearest_location(flc)  # (line, col)
+```
+
+## Finding References
+
+```python
+# Who references this entity?
+for ref in mx.Reference.to(decl):
+    brk = ref.builtin_reference_kind
+    if brk == mx.BuiltinReferenceKind.CALLS:
+        # This is a call site
+        caller = ref.context
+
+# What does this entity reference?
+for ref in mx.Reference.FROM(decl):
+    pass
+```
+
+## Call Graph
+
+```python
+# Callers (FunctionDecl-specific)
+for call_stmt in func.callers:
+    caller = next(iter(mx.ast.FunctionDecl.containing(call_stmt)), None)
+    if caller:
+        print(f"{caller.canonical_declaration.name} calls {func.name}")
+
+# Via references (more general)
+for ref in mx.Reference.to(func_decl):
+    if ref.builtin_reference_kind == mx.BuiltinReferenceKind.CALLS:
+        for caller in mx.ast.FunctionDecl.containing(ref.context):
+            print(f"Called by: {caller.canonical_declaration.name}")
+```
+
+## Type Conversions
+
+Use `.FROM()` for safe downcasting (returns None if wrong type):
+
+```python
+func = mx.ast.FunctionDecl.FROM(generic_decl)
+if func is not None:
+    print(f"Function: {func.name}")
+
+record = mx.ast.RecordDecl.FROM(decl)
+if record:
+    for field in record.fields:
+        print(f"  field: {field.name}")
+```
+
+## File and Location
+
+```python
+file = mx.frontend.File.containing(decl)
+if file:
+    for path in file.paths:
+        print(path)
+
+for file in index.files:
+    for path in file.paths:
+        print(path)
+```
+
+## Common Types
+
+- `mx.ast.FunctionDecl` - functions/methods
+- `mx.ast.VarDecl` - variables
+- `mx.ast.ParmVarDecl` - function parameters
+- `mx.ast.FieldDecl` - struct/class fields
+- `mx.ast.RecordDecl` / `mx.ast.CXXRecordDecl` - struct/class/union
+- `mx.ast.EnumDecl` / `mx.ast.EnumConstantDecl` - enums
+- `mx.ast.TypedefDecl` - typedefs
+- `mx.ast.NamedDecl` - base for named entities
+
+## Reference Kinds
+
+CALLS, USES_VALUE, USES_TYPE, WRITES_VALUE, UPDATES_VALUE, TAKES_ADDRESS, TAKES_VALUE, ACCESSES_VALUE, CASTS_WITH_TYPE, INCLUDES_FILE, EXPANSION_OF, EXTENDS, OVERRIDES, SPECIALIZES
+
+## Example: Find Functions Handling User Input
+
+```python
+import os, multiplier as mx
+
+index = mx.Index.in_memory_cache(
+    mx.Index.from_database(os.environ['MULTIPLIER_DATABASE']))
+flc = mx.frontend.FileLocationCache()
+
+input_funcs = {'read', 'recv', 'fgets', 'scanf', 'getline', 'fread'}
+seen = set()
+for func in mx.ast.FunctionDecl.IN(index):
+    func = func.canonical_declaration
+    if func.id in seen or func.is_implicit or func.name not in input_funcs:
+        continue
+    seen.add(func.id)
+    for ref in mx.Reference.to(func):
+        if ref.builtin_reference_kind != mx.BuiltinReferenceKind.CALLS:
+            continue
+        for caller in mx.ast.FunctionDecl.containing(ref.context):
+            caller = caller.canonical_declaration
+            file = mx.frontend.File.containing(caller)
+            path = next(iter(file.paths), "?") if file else "?"
+            print(f"{caller.name} calls {func.name} in {path}")
+```
+
+## Tips
+
+- Always `Index.in_memory_cache()`. Without it, every query hits disk.
+- Always `canonical_declaration` + seen set for deduplication.
+- Filter `is_implicit` to skip compiler-generated declarations.
+- Use `Fragment.containing()` + `TokenTree` for macro-aware source.
+- Wrap entity operations in try/except for safety.
+- `.IN()`, `.containing()`, `.callers` return generators — consume or list().)MX");
+
+// Find or create the API reference document.
+static QString ensureApiRefDocument(ConfigManager *config) {
+  QVector<ConfigManager::DocumentInfo> docs;
+  QMetaObject::invokeMethod(config, [&] {
+    docs = config->LoadDocumentsByCategory(QStringLiteral("reference"));
+  }, Qt::BlockingQueuedConnection);
+
+  for (const auto &doc : docs) {
+    if (doc.title == kApiRefTitle) {
+      QString content;
+      QMetaObject::invokeMethod(config, [&] {
+        content = config->LoadDocumentContent(doc.doc_id);
+      }, Qt::BlockingQueuedConnection);
+      return content;
+    }
+  }
+
+  // Create it.
+  int doc_id = -1;
+  QMetaObject::invokeMethod(config, [&] {
+    doc_id = config->CreateDocument(kApiRefContent, kApiRefTitle);
+    if (doc_id >= 0) {
+      config->SetDocumentCategory(doc_id, QStringLiteral("reference"));
+    }
+  }, Qt::BlockingQueuedConnection);
+  return kApiRefContent;
+}
+
 QJsonObject GetPythonApiReferenceTool::execute(const QJsonObject &) {
+  auto content = ensureApiRefDocument(m_ctx->config);
+
   QJsonObject result;
-
-  result[QStringLiteral("overview")] = QStringLiteral(
-      "The multiplier Python bindings provide programmatic access to the "
-      "indexed codebase.");
-
-  result[QStringLiteral("setup")] = QStringLiteral(
-      "import os\n"
-      "from multiplier import Index\n"
-      "db_path = os.environ['MULTIPLIER_DATABASE']\n"
-      "idx = Index.in_memory_cache(Index.from_database(db_path))");
-
+  result[QStringLiteral("reference")] = content;
   result[QStringLiteral("note")] = QStringLiteral(
-      "The MULTIPLIER_DATABASE environment variable is automatically set to "
-      "the current database path. Always wrap Index.from_database() with "
-      "Index.in_memory_cache() for better performance.");
-
-  // Common patterns.
-  QJsonArray patterns;
-
-  auto add_pattern = [&](const QString &name, const QString &code) {
-    QJsonObject p;
-    p[QStringLiteral("name")] = name;
-    p[QStringLiteral("code")] = code;
-    patterns.append(p);
-  };
-
-  add_pattern(
-      QStringLiteral("List all files"),
-      QStringLiteral("for path in idx.file_paths():\n    print(path)"));
-
-  add_pattern(
-      QStringLiteral("Search for entities by name"),
-      QStringLiteral(
-          "for entity in idx.query_entities('function_name'):\n"
-          "    print(type(entity).__name__, entity)"));
-
-  add_pattern(
-      QStringLiteral("Get a function's source code"),
-      QStringLiteral(
-          "from multiplier import Decl, NamedDecl\n"
-          "for entity in idx.query_entities('my_func'):\n"
-          "    if isinstance(entity, NamedDecl):\n"
-          "        decl = Decl.from_(entity)\n"
-          "        for tok in decl.tokens():\n"
-          "            print(tok.data(), end='')"));
-
-  add_pattern(
-      QStringLiteral("Find all references to an entity"),
-      QStringLiteral(
-          "from multiplier import Reference\n"
-          "entity = idx.entity(entity_id)\n"
-          "for ref in Reference.to(entity):\n"
-          "    ctx = ref.context()\n"
-          "    print(ctx)"));
-
-  add_pattern(
-      QStringLiteral("Get file containing an entity"),
-      QStringLiteral(
-          "from multiplier import File\n"
-          "f = File.containing(entity)\n"
-          "if f:\n"
-          "    for path in f.paths():\n"
-          "        print(path)"));
-
-  add_pattern(
-      QStringLiteral("Iterate all functions in the index"),
-      QStringLiteral(
-          "from multiplier import Decl, FunctionDecl\n"
-          "for decl in idx.declarations():\n"
-          "    if isinstance(decl, FunctionDecl):\n"
-          "        print(decl.name())"));
-
-  add_pattern(
-      QStringLiteral("Get callers of a function"),
-      QStringLiteral(
-          "from multiplier import Reference\n"
-          "for ref in Reference.to(func_decl):\n"
-          "    caller = ref.context()\n"
-          "    if isinstance(caller, Decl):\n"
-          "        print('Called from:', caller)"));
-
-  result[QStringLiteral("common_patterns")] = patterns;
-
-  // Key types.
-  QJsonArray types;
-  types.append(QStringLiteral(
-      "Index - The main entry point. Open with Index.from_database() or "
-      "Index.in_memory_cache()"));
-  types.append(QStringLiteral(
-      "File - A source file. Get via File.containing(entity) or iterate "
-      "idx.files()"));
-  types.append(QStringLiteral(
-      "Fragment - A code fragment (translation unit piece). Contains "
-      "declarations"));
-  types.append(QStringLiteral(
-      "Decl - A declaration (function, variable, type, etc.)"));
-  types.append(QStringLiteral(
-      "NamedDecl - A declaration with a name. Subclass of Decl"));
-  types.append(QStringLiteral("FunctionDecl - A function declaration"));
-  types.append(QStringLiteral(
-      "Token - A single token with data(), kind(), category(), "
-      "related_entity()"));
-  types.append(QStringLiteral(
-      "TokenRange - A range of tokens. Iterate with for tok in range"));
-  types.append(QStringLiteral(
-      "Reference - A reference from one entity to another. Find with "
-      "Reference.to(entity)"));
-  types.append(QStringLiteral(
-      "EntityId - Packed entity identifier. Get with entity.id().pack()"));
-  result[QStringLiteral("key_types")] = types;
-
-  // Tips.
-  QJsonArray tips;
-  tips.append(QStringLiteral(
-      "Always use Index.in_memory_cache() to wrap Index.from_database() for "
-      "better performance"));
-  tips.append(QStringLiteral(
-      "Entity IDs are stable within a database - use them for "
-      "cross-referencing"));
-  tips.append(QStringLiteral("Token.data() returns the raw text of a token"));
-  tips.append(QStringLiteral(
-      "Decl.canonical_declaration() returns the canonical version across "
-      "redeclarations"));
-  tips.append(QStringLiteral(
-      "Use Decl.definition() to prefer definitions over forward "
-      "declarations"));
-  result[QStringLiteral("tips")] = tips;
-
+      "This reference is also stored as a document titled '"
+      "Multiplier Python API Reference' (category: reference). "
+      "You can edit it with edit_document.");
   return result;
 }
 
