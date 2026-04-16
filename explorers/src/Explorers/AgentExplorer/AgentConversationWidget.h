@@ -43,6 +43,8 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   void showSuggestion(const QString &suggestion,
                       const QStringList &alternatives = {});
   void clearSuggestion(void);
+  void setStatus(const QString &text);
+  void clearStatus(void);
 
  private slots:
   void onSendClicked(void);

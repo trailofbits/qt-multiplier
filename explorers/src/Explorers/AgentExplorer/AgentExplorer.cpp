@@ -378,6 +378,9 @@ void AgentExplorer::OnSendMessage(const QString &text) {
   d->config_manager.SaveAgentMessage(
       d->current_session_id, QStringLiteral("user"), text);
 
+  // Show activity indicator.
+  d->conversation->setStatus(tr("Agent is thinking..."));
+
   // Send to agent. The AgentManager will emit messageAdded, which
   // triggers OnMessageAdded to display it in the conversation.
   d->agent_manager->sendMessage(d->current_session_id, text);
@@ -414,6 +417,7 @@ void AgentExplorer::OnStop(void) {
   if (d->current_session_id < 0) {
     return;
   }
+  d->conversation->clearStatus();
   StopObserver();
   d->agent_manager->cancelSession(d->current_session_id);
   d->config_manager.UpdateAgentSessionStatus(
@@ -430,6 +434,11 @@ void AgentExplorer::OnMessageAdded(int64_t session_id,
   // Show in conversation only for the primary session.
   if (session_id == d->current_session_id) {
     d->conversation->addMessage(msg);
+
+    // Clear status when the agent produces a text response.
+    if (msg.role == QStringLiteral("assistant")) {
+      d->conversation->clearStatus();
+    }
   }
 
   // Persist messages for both primary and observer sessions.
@@ -486,6 +495,8 @@ void AgentExplorer::OnSessionCompleted(int64_t session_id,
     return;
   }
 
+  d->conversation->clearStatus();
+
   AgentMessage msg;
   msg.role = QStringLiteral("system");
   msg.content = tr("Session completed. %1").arg(summary);
@@ -501,6 +512,8 @@ void AgentExplorer::OnSessionFinished(int64_t session_id,
   if (session_id != d->current_session_id) {
     return;
   }
+
+  d->conversation->clearStatus();
 
   // Show summary as a system message.
   AgentMessage summary_msg;
@@ -536,6 +549,8 @@ void AgentExplorer::OnSessionError(int64_t session_id,
   if (session_id != d->current_session_id) {
     return;
   }
+
+  d->conversation->clearStatus();
 
   AgentMessage msg;
   msg.role = QStringLiteral("system");
@@ -602,14 +617,9 @@ void AgentExplorer::OnToolCallStarted(int64_t session_id, const QString &name,
     return;
   }
   d->tool_log->onToolCallStarted(session_id, name, args);
-
-  // Also add to conversation as a collapsible tool_call message.
-  AgentMessage msg;
-  msg.session_id = session_id;
-  msg.role = QStringLiteral("tool_call");
-  msg.tool_name = name;
-  msg.tool_args = args;
-  d->conversation->addMessage(msg);
+  d->conversation->setStatus(tr("Calling: %1...").arg(name));
+  // The tool_call message is already emitted via messageAdded and handled
+  // in OnMessageAdded (stashed for later merging with tool_result).
 }
 
 void AgentExplorer::OnToolCallCompleted(int64_t session_id,
@@ -618,6 +628,7 @@ void AgentExplorer::OnToolCallCompleted(int64_t session_id,
                                          int duration_ms) {
   if (session_id == d->current_session_id) {
     d->tool_log->onToolCallCompleted(session_id, name, result, duration_ms);
+    d->conversation->setStatus(tr("Agent is thinking..."));
 
     // Track tool calls for observer triggering.
     if (d->observer_enabled && d->observer_session_id >= 0) {
@@ -848,7 +859,17 @@ Respond with ONLY a JSON object:
 }
 
 void AgentExplorer::handleCodeSummaryResponse(const LLMResponse &response) {
-  if (!response.error.isEmpty()) return;
+  if (!response.error.isEmpty()) {
+    AgentMessage err_msg;
+    err_msg.role = QStringLiteral("system");
+    err_msg.content = tr("Code summarizer error (model: %1): %2")
+        .arg(d->summarizer_model.isEmpty()
+                 ? QStringLiteral("default")
+                 : d->summarizer_model,
+             response.error);
+    d->conversation->addMessage(err_msg);
+    return;
+  }
 
   auto doc = QJsonDocument::fromJson(response.content.toUtf8());
   if (!doc.isObject()) return;
@@ -1010,6 +1031,14 @@ Respond with ONLY a JSON object (no markdown, no explanation):
 void AgentExplorer::handleRecommendationResponse(
     const LLMResponse &response) {
   if (!response.error.isEmpty()) {
+    AgentMessage err_msg;
+    err_msg.role = QStringLiteral("system");
+    err_msg.content = tr("Recommender error (model: %1): %2")
+        .arg(d->recommender_model.isEmpty()
+                 ? QStringLiteral("default")
+                 : d->recommender_model,
+             response.error);
+    d->conversation->addMessage(err_msg);
     return;
   }
 

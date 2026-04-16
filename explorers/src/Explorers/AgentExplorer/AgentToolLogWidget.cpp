@@ -63,13 +63,16 @@ void AgentToolLogWidget::onToolCallStarted(int64_t /*session_id*/,
   auto *status_item = new QStandardItem(QStringLiteral("running"));
   status_item->setForeground(QColor(0xF5, 0x9E, 0x0B));  // Amber.
 
-  auto row = d->model->rowCount();
-  d->model->appendRow({time_item, name_item, dur_item, status_item});
+  d->model->insertRow(0, {time_item, name_item, dur_item, status_item});
+  auto row = time_item->row();
 
-  // Add args as child row.
+  // Add args as child row (truncated).
   if (!args.isEmpty()) {
     auto args_str = QString::fromUtf8(
         QJsonDocument(args).toJson(QJsonDocument::Compact));
+    if (args_str.size() > 300) {
+      args_str = args_str.left(300) + QStringLiteral("...(truncated)");
+    }
     auto *args_item = new QStandardItem(
         QStringLiteral("Args: ") + args_str);
     time_item->appendRow({args_item, new QStandardItem,
@@ -93,11 +96,11 @@ void AgentToolLogWidget::onToolCallCompleted(int64_t /*session_id*/,
   }
 
   if (!time_item) {
-    // No matching start -- create a standalone row.
+    // No matching start -- create a standalone row at the top.
     auto time_str = QDateTime::currentDateTime().toString(
         QStringLiteral("HH:mm:ss"));
     time_item = new QStandardItem(time_str);
-    d->model->appendRow(
+    d->model->insertRow(0,
         {time_item, new QStandardItem(name),
          new QStandardItem, new QStandardItem});
   }
@@ -122,10 +125,13 @@ void AgentToolLogWidget::onToolCallCompleted(int64_t /*session_id*/,
     }
   }
 
-  // Add result as child row.
+  // Add result as child row (truncated).
   if (!result.isEmpty()) {
     auto result_str = QString::fromUtf8(
         QJsonDocument(result).toJson(QJsonDocument::Compact));
+    if (result_str.size() > 500) {
+      result_str = result_str.left(500) + QStringLiteral("...(truncated)");
+    }
     auto label = has_error ? QStringLiteral("Error: ") + result_str
                            : QStringLiteral("Result: ") + result_str;
     auto *result_item = new QStandardItem(label);

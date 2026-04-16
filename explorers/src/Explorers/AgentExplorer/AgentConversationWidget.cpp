@@ -14,6 +14,7 @@
 #include <QJsonObject>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QMap>
 #include <QMenu>
 #include <QPlainTextEdit>
 #include <QTextCursor>
@@ -464,6 +465,14 @@ struct AgentConversationWidget::PrivateData {
   QString current_suggestion;
   QStringList current_alternatives;
 
+  // Status indicator.
+  QLabel *status_label{nullptr};
+
+  // Pending tool args keyed by tool_call_id for merging tool_call + tool_result.
+  QMap<QString, QJsonObject> pending_tool_args;
+  // Also store tool names for pending calls.
+  QMap<QString, QString> pending_tool_names;
+
   int total_prompt_tokens{0};
   int total_completion_tokens{0};
   bool enter_to_send{true};
@@ -501,6 +510,20 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
 
   d->scroll_area->setWidget(d->messages_container);
   main_layout->addWidget(d->scroll_area, 1);
+
+  // Status indicator.
+  d->status_label = new QLabel(this);
+  d->status_label->setVisible(false);
+  d->status_label->setContentsMargins(12, 2, 12, 2);
+  {
+    auto sf = d->status_label->font();
+    sf.setItalic(true);
+    sf.setPointSize(sf.pointSize() - 1);
+    d->status_label->setFont(sf);
+  }
+  d->status_label->setStyleSheet(
+      QStringLiteral("color: palette(placeholderText);"));
+  main_layout->addWidget(d->status_label);
 
   // Suggestion box.
   d->suggestion_frame = new QFrame(this);
@@ -589,8 +612,29 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
 }
 
 void AgentConversationWidget::addMessage(const AgentMessage &msg) {
+  if (msg.role == QStringLiteral("tool_call")) {
+    // Don't render tool_call; stash args for when tool_result arrives.
+    if (!msg.tool_call_id.isEmpty()) {
+      d->pending_tool_args[msg.tool_call_id] = msg.tool_args;
+      d->pending_tool_names[msg.tool_call_id] = msg.tool_name;
+    }
+    return;
+  }
+
+  // For tool_result, look up the stashed args from the matching tool_call.
+  QJsonObject merged_args = msg.tool_args;
+  if (msg.role == QStringLiteral("tool_result") &&
+      !msg.tool_call_id.isEmpty()) {
+    auto it = d->pending_tool_args.find(msg.tool_call_id);
+    if (it != d->pending_tool_args.end()) {
+      merged_args = it.value();
+      d->pending_tool_args.erase(it);
+      d->pending_tool_names.remove(msg.tool_call_id);
+    }
+  }
+
   addMessageBubble(msg.role, msg.content, msg.tool_name,
-                   msg.tool_args, msg.tool_result);
+                   merged_args, msg.tool_result);
 }
 
 void AgentConversationWidget::updateTokens(int prompt_tokens,
@@ -630,6 +674,19 @@ void AgentConversationWidget::clear(void) {
   d->total_prompt_tokens = 0;
   d->total_completion_tokens = 0;
   d->token_label->setText(tr("Tokens: 0 in / 0 out ($0.00)"));
+  d->pending_tool_args.clear();
+  d->pending_tool_names.clear();
+  clearStatus();
+}
+
+void AgentConversationWidget::setStatus(const QString &text) {
+  d->status_label->setText(text);
+  d->status_label->setVisible(true);
+}
+
+void AgentConversationWidget::clearStatus(void) {
+  d->status_label->setVisible(false);
+  d->status_label->clear();
 }
 
 void AgentConversationWidget::onSendClicked(void) {
@@ -701,40 +758,6 @@ void AgentConversationWidget::addMessageBubble(
     wrapper->addStretch(1);
     d->messages_layout->addLayout(wrapper);
 
-  } else if (role == QStringLiteral("tool_call")) {
-    frame->setStyleSheet(
-        QStringLiteral("QFrame { background-color: rgba(%1,%2,%3,%4); "
-                       "border-radius: 4px; border: 1px solid palette(mid); }")
-            .arg(d->tool_bg.red()).arg(d->tool_bg.green())
-            .arg(d->tool_bg.blue()).arg(d->tool_bg.alpha()));
-
-    // Collapsible header.
-    auto *toggle_btn = new QPushButton(
-        QStringLiteral("Tool: %1").arg(tool_name), frame);
-    toggle_btn->setFlat(true);
-    toggle_btn->setStyleSheet(
-        QStringLiteral("QPushButton { text-align: left; font-weight: bold; }"));
-    frame_layout->addWidget(toggle_btn);
-
-    // Detail widget (collapsed by default).
-    auto *detail = new QWidget(frame);
-    detail->setVisible(false);
-    auto *detail_layout = new QVBoxLayout(detail);
-    detail_layout->setContentsMargins(4, 0, 4, 0);
-
-    auto args_text = formatToolArgs(tool_name, tool_args);
-    auto *args_label = make_label(args_text, true);
-    detail_layout->addWidget(args_label);
-    frame_layout->addWidget(detail);
-
-    connect(toggle_btn, &QPushButton::clicked, detail,
-            [detail] { detail->setVisible(!detail->isVisible()); });
-
-    auto *wrapper = new QHBoxLayout;
-    wrapper->addWidget(frame, 3);
-    wrapper->addStretch(1);
-    d->messages_layout->addLayout(wrapper);
-
   } else if (role == QStringLiteral("tool_result")) {
     frame->setStyleSheet(
         QStringLiteral("QFrame { background-color: rgba(%1,%2,%3,%4); "
@@ -753,6 +776,14 @@ void AgentConversationWidget::addMessageBubble(
     detail->setVisible(false);
     auto *detail_layout = new QVBoxLayout(detail);
     detail_layout->setContentsMargins(4, 0, 4, 0);
+
+    // Show args if available.
+    if (!tool_args.isEmpty()) {
+      auto args_text = formatToolArgs(tool_name, tool_args);
+      auto *args_label = make_label(
+          QStringLiteral("Args: ") + args_text, true);
+      detail_layout->addWidget(args_label);
+    }
 
     auto formatted = tool_result.isEmpty()
                          ? content.left(2000)
