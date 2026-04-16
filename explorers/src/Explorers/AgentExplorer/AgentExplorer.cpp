@@ -317,18 +317,12 @@ void AgentExplorer::OnSendMessage(const QString &text) {
     }
   }
 
-  // Show user message in conversation.
-  AgentMessage user_msg;
-  user_msg.role = QStringLiteral("user");
-  user_msg.content = text;
-  user_msg.timestamp = QDateTime::currentDateTime();
-  d->conversation->addMessage(user_msg);
-
-  // Persist.
+  // Persist user message.
   d->config_manager.SaveAgentMessage(
       d->current_session_id, QStringLiteral("user"), text);
 
-  // Send to agent.
+  // Send to agent. The AgentManager will emit messageAdded, which
+  // triggers OnMessageAdded to display it in the conversation.
   d->agent_manager->sendMessage(d->current_session_id, text);
 }
 

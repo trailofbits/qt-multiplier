@@ -15,7 +15,9 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QPlainTextEdit>
+#include <QProcess>
 #include <QPushButton>
+#include <QTimer>
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QVBoxLayout>
@@ -93,10 +95,7 @@ This ensures your work is properly recorded and the human knows what to do next.
 - When blocked, record it and move to the next task.
 - Use run_python for bulk analysis -- the Multiplier Python bindings give you full programmatic access to the index.)MX");
 
-// Find or create the default system prompt document.
-// Returns the document content.
 static QString ensureDefaultPromptDocument(ConfigManager &config) {
-  // Look for existing default prompt document.
   auto prompts = config.LoadDocumentsByCategory(QStringLiteral("prompt"));
   for (const auto &doc : prompts) {
     if (doc.title == kDefaultPromptTitle) {
@@ -104,12 +103,21 @@ static QString ensureDefaultPromptDocument(ConfigManager &config) {
     }
   }
 
-  // Doesn't exist yet — create it.
   auto doc_id = config.CreateDocument(kDefaultPromptContent, kDefaultPromptTitle);
   if (doc_id >= 0) {
     config.SetDocumentCategory(doc_id, QStringLiteral("prompt"));
   }
   return kDefaultPromptContent;
+}
+
+static QLabel *makeHint(const QString &text, QWidget *parent) {
+  auto *label = new QLabel(text, parent);
+  label->setWordWrap(true);
+  auto f = label->font();
+  f.setPointSize(f.pointSize() - 1);
+  label->setFont(f);
+  label->setStyleSheet(QStringLiteral("color: palette(mid);"));
+  return label;
 }
 
 }  // namespace
@@ -129,7 +137,11 @@ struct AgentConfigPanel::PrivateData {
   QDoubleSpinBox *temperature_spin{nullptr};
   QLineEdit *python_path_edit{nullptr};
   QPushButton *python_browse_btn{nullptr};
-  int prompt_doc_id{-1};  // Document ID backing the system prompt.
+  QPushButton *python_verify_btn{nullptr};
+  QLabel *python_status_label{nullptr};
+  QLabel *save_indicator{nullptr};
+  int prompt_doc_id{-1};
+  bool restoring{false};  // Suppress saves during initialization.
 
   explicit PrivateData(LLMManager &lm, ConfigManager &cm)
       : llm_manager(lm), config_manager(cm) {}
@@ -143,6 +155,8 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
     : QWidget(parent),
       d(new PrivateData(llm_manager, config_manager)) {
 
+  d->restoring = true;
+
   auto *outer_layout = new QVBoxLayout(this);
   outer_layout->setContentsMargins(0, 0, 0, 0);
 
@@ -153,21 +167,20 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   auto *content = new QWidget;
   auto *form = new QFormLayout(content);
   form->setContentsMargins(8, 8, 8, 8);
+  form->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
-  // Backend type.
+  // ---- LLM Backend ----
   d->backend_combo = new QComboBox(content);
   d->backend_combo->addItems(
       {QStringLiteral("claude"), QStringLiteral("openai"),
        QStringLiteral("bedrock"), QStringLiteral("vllm")});
   form->addRow(tr("Backend:"), d->backend_combo);
 
-  // API key.
   d->api_key_edit = new QLineEdit(content);
   d->api_key_edit->setEchoMode(QLineEdit::Password);
   d->api_key_edit->setPlaceholderText(tr("Enter API key..."));
   form->addRow(tr("API Key:"), d->api_key_edit);
 
-  // Base URL (only for openai/vllm).
   d->base_url_edit = new QLineEdit(content);
   d->base_url_edit->setPlaceholderText(tr("https://api.openai.com/v1"));
   d->base_url_label = new QLabel(tr("Base URL:"), content);
@@ -175,11 +188,9 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->base_url_edit->setVisible(false);
   d->base_url_label->setVisible(false);
 
-  // Model.
   d->model_combo = new QComboBox(content);
   d->model_combo->setEditable(true);
   form->addRow(tr("Model:"), d->model_combo);
-  populateModels(d->backend_combo->currentText());
 
   // Separator.
   auto *sep1 = new QFrame(content);
@@ -187,15 +198,13 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   sep1->setFrameShadow(QFrame::Sunken);
   form->addRow(sep1);
 
-  // System prompt — backed by a document.
+  // ---- System Prompt ----
   d->system_prompt_edit = new QPlainTextEdit(content);
   d->system_prompt_edit->setMinimumHeight(100);
 
-  // Load the default prompt from the document store (creates it if needed).
   auto default_prompt = ensureDefaultPromptDocument(d->config_manager);
   d->system_prompt_edit->setPlainText(default_prompt);
 
-  // Track which document is backing the prompt.
   auto prompts = d->config_manager.LoadDocumentsByCategory(
       QStringLiteral("prompt"));
   for (const auto &doc : prompts) {
@@ -207,7 +216,6 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
 
   form->addRow(tr("System Prompt:"), d->system_prompt_edit);
 
-  // Load from documents.
   d->load_prompt_button = new QPushButton(tr("Load from documents"), content);
   form->addRow(QString(), d->load_prompt_button);
 
@@ -217,19 +225,25 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   sep2->setFrameShadow(QFrame::Sunken);
   form->addRow(sep2);
 
-  // Max iterations.
+  // ---- Parameters ----
   d->max_iterations_spin = new QSpinBox(content);
   d->max_iterations_spin->setRange(1, 200);
   d->max_iterations_spin->setValue(50);
   form->addRow(tr("Max iterations:"), d->max_iterations_spin);
+  form->addRow(QString(), makeHint(
+      tr("Maximum tool-call rounds per message. The agent stops after "
+         "this many LLM calls even if not finished."), content));
 
-  // Temperature.
   d->temperature_spin = new QDoubleSpinBox(content);
   d->temperature_spin->setRange(0.0, 2.0);
   d->temperature_spin->setSingleStep(0.1);
   d->temperature_spin->setValue(0.0);
   d->temperature_spin->setDecimals(1);
   form->addRow(tr("Temperature:"), d->temperature_spin);
+  form->addRow(QString(), makeHint(
+      tr("0.0 = deterministic (best for analysis). Higher values "
+         "increase randomness. Use 0.5-1.0 for brainstorming."),
+      content));
 
   // Separator.
   auto *sep3 = new QFrame(content);
@@ -237,9 +251,7 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   sep3->setFrameShadow(QFrame::Sunken);
   form->addRow(sep3);
 
-  // Python interpreter path.
-  form->addRow(new QLabel(tr("Python"), content));
-
+  // ---- Python ----
   auto *python_row = new QWidget(content);
   auto *python_layout = new QHBoxLayout(python_row);
   python_layout->setContentsMargins(0, 0, 0, 0);
@@ -253,20 +265,28 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->python_browse_btn = new QPushButton(tr("Browse..."), python_row);
   python_layout->addWidget(d->python_browse_btn);
 
-  form->addRow(tr("Interpreter:"), python_row);
+  d->python_verify_btn = new QPushButton(tr("Verify"), python_row);
+  python_layout->addWidget(d->python_verify_btn);
 
-  auto *python_hint = new QLabel(
-      tr("Path to Python with multiplier bindings installed"), content);
-  auto hint_font = python_hint->font();
-  hint_font.setPointSize(hint_font.pointSize() - 1);
-  python_hint->setFont(hint_font);
-  python_hint->setWordWrap(true);
-  form->addRow(QString(), python_hint);
+  form->addRow(tr("Python:"), python_row);
+
+  d->python_status_label = new QLabel(content);
+  d->python_status_label->setWordWrap(true);
+  form->addRow(QString(), d->python_status_label);
+
+  form->addRow(QString(), makeHint(
+      tr("Path to a Python interpreter that has the multiplier "
+         "bindings installed. Click Verify to check."), content));
+
+  // ---- Save indicator ----
+  d->save_indicator = new QLabel(content);
+  d->save_indicator->setAlignment(Qt::AlignCenter);
+  form->addRow(d->save_indicator);
 
   scroll->setWidget(content);
   outer_layout->addWidget(scroll);
 
-  // Connections.
+  // ---- Connections ----
   connect(d->backend_combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
           this, &AgentConfigPanel::onBackendTypeChanged);
   connect(d->api_key_edit, &QLineEdit::editingFinished,
@@ -279,12 +299,15 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
           this, &AgentConfigPanel::onLoadPromptClicked);
   connect(d->python_browse_btn, &QPushButton::clicked,
           this, &AgentConfigPanel::onBrowsePythonClicked);
+  connect(d->python_verify_btn, &QPushButton::clicked,
+          this, &AgentConfigPanel::onVerifyPythonClicked);
   connect(d->python_path_edit, &QLineEdit::editingFinished, this, [this] {
     d->config_manager.SetPythonInterpreterPath(d->python_path_edit->text());
+    showSaved();
   });
 
-  // Save prompt edits back to the backing document.
   connect(d->system_prompt_edit, &QPlainTextEdit::textChanged, this, [this] {
+    if (d->restoring) return;
     if (d->prompt_doc_id >= 0) {
       d->config_manager.SaveDocumentContent(
           d->prompt_doc_id, d->system_prompt_edit->toPlainText());
@@ -292,12 +315,18 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   });
 
   connect(d->max_iterations_spin, QOverload<int>::of(&QSpinBox::valueChanged),
-          this, [this] { emit configChanged(); });
+          this, [this] {
+            if (!d->restoring) showSaved();
+            emit configChanged();
+          });
   connect(d->temperature_spin,
           QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-          this, [this] { emit configChanged(); });
+          this, [this] {
+            if (!d->restoring) showSaved();
+            emit configChanged();
+          });
 
-  // Initialize backend if one is already active.
+  // ---- Restore saved state ----
   auto active = d->llm_manager.activeBackendName();
   if (!active.isEmpty()) {
     auto type = d->llm_manager.backendType(active);
@@ -305,7 +334,38 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
     if (idx >= 0) {
       d->backend_combo->setCurrentIndex(idx);
     }
+
+    // Restore saved API key and model.
+    auto saved_key = d->llm_manager.backendConfig(active,
+                         QStringLiteral("api_key"));
+    if (!saved_key.isEmpty()) {
+      d->api_key_edit->setText(saved_key);
+    }
+
+    auto saved_model = d->llm_manager.backendConfig(active,
+                           QStringLiteral("model"));
+    if (!saved_model.isEmpty()) {
+      populateModels(type);
+      auto model_idx = d->model_combo->findText(saved_model);
+      if (model_idx >= 0) {
+        d->model_combo->setCurrentIndex(model_idx);
+      } else {
+        d->model_combo->setEditText(saved_model);
+      }
+    } else {
+      populateModels(type);
+    }
+
+    auto saved_url = d->llm_manager.backendConfig(active,
+                         QStringLiteral("base_url"));
+    if (!saved_url.isEmpty()) {
+      d->base_url_edit->setText(saved_url);
+    }
+  } else {
+    populateModels(d->backend_combo->currentText());
   }
+
+  d->restoring = false;
 }
 
 QString AgentConfigPanel::systemPrompt(void) const {
@@ -320,25 +380,57 @@ double AgentConfigPanel::temperature(void) const {
   return d->temperature_spin->value();
 }
 
+void AgentConfigPanel::showSaved(void) {
+  d->save_indicator->setText(tr("Settings saved."));
+  d->save_indicator->setStyleSheet(
+      QStringLiteral("color: palette(mid); font-style: italic;"));
+  QTimer::singleShot(2000, d->save_indicator, [label = d->save_indicator] {
+    label->clear();
+  });
+}
+
 void AgentConfigPanel::onBackendTypeChanged(int index) {
   auto type = d->backend_combo->itemText(index);
   bool show_url = (type == QStringLiteral("openai") ||
                    type == QStringLiteral("vllm"));
   d->base_url_edit->setVisible(show_url);
   d->base_url_label->setVisible(show_url);
-  populateModels(type);
+
   ensureBackendExists(type);
+
+  // Restore saved config for this backend.
+  auto saved_key = d->llm_manager.backendConfig(type,
+                       QStringLiteral("api_key"));
+  d->api_key_edit->setText(saved_key);
+
+  auto saved_url = d->llm_manager.backendConfig(type,
+                       QStringLiteral("base_url"));
+  d->base_url_edit->setText(saved_url);
+
+  auto saved_model = d->llm_manager.backendConfig(type,
+                         QStringLiteral("model"));
+  populateModels(type);
+  if (!saved_model.isEmpty()) {
+    auto model_idx = d->model_combo->findText(saved_model);
+    if (model_idx >= 0) {
+      d->model_combo->setCurrentIndex(model_idx);
+    } else {
+      d->model_combo->setEditText(saved_model);
+    }
+  }
+
+  if (!d->restoring) showSaved();
   emit configChanged();
 }
 
 void AgentConfigPanel::onApiKeyChanged(void) {
-  auto type = d->backend_combo->currentText();
   auto name = d->llm_manager.activeBackendName();
   if (!name.isEmpty()) {
     d->llm_manager.setBackendConfig(
         name, QStringLiteral("api_key"), d->api_key_edit->text());
     d->llm_manager.saveConfig();
   }
+  showSaved();
   emit configChanged();
 }
 
@@ -349,16 +441,19 @@ void AgentConfigPanel::onBaseUrlChanged(void) {
         name, QStringLiteral("base_url"), d->base_url_edit->text());
     d->llm_manager.saveConfig();
   }
+  showSaved();
   emit configChanged();
 }
 
 void AgentConfigPanel::onModelChanged(void) {
+  if (d->restoring) return;
   auto name = d->llm_manager.activeBackendName();
   if (!name.isEmpty()) {
     d->llm_manager.setBackendConfig(
         name, QStringLiteral("model"), d->model_combo->currentText());
     d->llm_manager.saveConfig();
   }
+  showSaved();
   emit configChanged();
 }
 
@@ -397,7 +492,48 @@ void AgentConfigPanel::onBrowsePythonClicked(void) {
     auto path = dialog.selectedFiles().first();
     d->python_path_edit->setText(path);
     d->config_manager.SetPythonInterpreterPath(path);
+    showSaved();
   }
+}
+
+void AgentConfigPanel::onVerifyPythonClicked(void) {
+  auto path = d->python_path_edit->text();
+  if (path.isEmpty()) {
+    path = QStringLiteral("python3");
+  }
+
+  d->python_status_label->setText(tr("Checking..."));
+  d->python_status_label->setStyleSheet(
+      QStringLiteral("color: palette(mid);"));
+
+  QProcess proc;
+  proc.setProgram(path);
+  proc.setArguments({QStringLiteral("-c"),
+      QStringLiteral("import multiplier; print('OK:', multiplier.__file__)")});
+  proc.start();
+
+  if (!proc.waitForFinished(5000)) {
+    d->python_status_label->setText(
+        tr("Failed: interpreter not found or timed out"));
+    d->python_status_label->setStyleSheet(
+        QStringLiteral("color: red;"));
+    return;
+  }
+
+  if (proc.exitCode() != 0) {
+    auto err = QString::fromUtf8(proc.readAllStandardError()).trimmed();
+    d->python_status_label->setText(
+        tr("Missing bindings: %1").arg(
+            err.isEmpty() ? tr("import multiplier failed") : err));
+    d->python_status_label->setStyleSheet(
+        QStringLiteral("color: red;"));
+    return;
+  }
+
+  auto output = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+  d->python_status_label->setText(output);
+  d->python_status_label->setStyleSheet(
+      QStringLiteral("color: green;"));
 }
 
 void AgentConfigPanel::populateModels(const QString &backend_type) {
@@ -415,11 +551,9 @@ void AgentConfigPanel::populateModels(const QString &backend_type) {
     d->model_combo->addItems(
         {QStringLiteral("anthropic.claude-sonnet-4-20250514-v1:0")});
   }
-  // vllm: leave empty, user types.
 }
 
 void AgentConfigPanel::ensureBackendExists(const QString &type) {
-  // Use the type name as the backend name for simplicity.
   auto names = d->llm_manager.backendNames();
   if (!names.contains(type)) {
     d->llm_manager.addBackend(type, type);
