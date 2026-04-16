@@ -367,7 +367,8 @@ QString ReadCellTool::name(void) const {
 }
 
 QString ReadCellTool::description(void) const {
-  return QStringLiteral("Read the value of a single cell.");
+  return QStringLiteral(
+      "Read the value of a single cell. Row 0 is the first data row.");
 }
 
 QJsonObject ReadCellTool::parametersSchema(void) const {
@@ -412,7 +413,8 @@ QString WriteCellTool::name(void) const {
 }
 
 QString WriteCellTool::description(void) const {
-  return QStringLiteral("Write a value to a single cell.");
+  return QStringLiteral(
+      "Write a value to a single cell. Row 0 is the first data row.");
 }
 
 QJsonObject WriteCellTool::parametersSchema(void) const {
@@ -491,7 +493,8 @@ QString ReadRowTool::name(void) const {
 }
 
 QString ReadRowTool::description(void) const {
-  return QStringLiteral("Read all cells in a row.");
+  return QStringLiteral(
+      "Read all cells in a row. Row 0 is the first data row.");
 }
 
 QJsonObject ReadRowTool::parametersSchema(void) const {
@@ -595,7 +598,9 @@ QString AddRowTool::name(void) const {
 }
 
 QString AddRowTool::description(void) const {
-  return QStringLiteral("Append a row to the end of the sheet.");
+  return QStringLiteral(
+      "Append a row to the end of the sheet. Returns the 0-based row_index "
+      "of the new row. Row 0 is the first data row.");
 }
 
 QJsonObject AddRowTool::parametersSchema(void) const {
@@ -1256,9 +1261,9 @@ QJsonObject WriteLocationCellTool::parametersSchema(void) const {
       QStringLiteral("Column index (0-based)"));
 
   QJsonObject eid_prop;
-  eid_prop[QStringLiteral("type")] = QStringLiteral("integer");
+  eid_prop[QStringLiteral("type")] = QStringLiteral("string");
   eid_prop[QStringLiteral("description")] =
-      QStringLiteral("Entity ID to navigate to on click");
+      QStringLiteral("Entity ID as a string to navigate to on click");
   props[QStringLiteral("entity_id")] = eid_prop;
 
   return make_schema(props, {QStringLiteral("sheet_id"),
@@ -1271,8 +1276,13 @@ QJsonObject WriteLocationCellTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
   int col = args[QStringLiteral("column")].toInt(-1);
-  auto entity_id = static_cast<mx::RawEntityId>(
-      args[QStringLiteral("entity_id")].toDouble(0));
+  auto eid_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId entity_id;
+  if (eid_val.isString()) {
+    entity_id = eid_val.toString().toULongLong();
+  } else {
+    entity_id = static_cast<mx::RawEntityId>(eid_val.toDouble(0));
+  }
 
   if (entity_id == 0) {
     return error_result(QStringLiteral("entity_id is required"));

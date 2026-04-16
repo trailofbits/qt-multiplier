@@ -151,7 +151,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
           QString::fromStdString(std::string(decl.name()));
       obj[QStringLiteral("kind")] = kind;
       obj[QStringLiteral("entity_id")] =
-          static_cast<qint64>(decl.id().Pack());
+          QString::number(static_cast<quint64>(decl.id().Pack()));
       arr.append(obj);
       ++count;
 
@@ -167,7 +167,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
           QString::fromStdString(std::string(macro.name().data()));
       obj[QStringLiteral("kind")] = QStringLiteral("macro");
       obj[QStringLiteral("entity_id")] =
-          static_cast<qint64>(macro.id().Pack());
+          QString::number(static_cast<quint64>(macro.id().Pack()));
       arr.append(obj);
       ++count;
 
@@ -183,7 +183,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
         obj[QStringLiteral("name")] = path;
         obj[QStringLiteral("kind")] = QStringLiteral("file");
         obj[QStringLiteral("entity_id")] =
-            static_cast<qint64>(file.id().Pack());
+            QString::number(static_cast<quint64>(file.id().Pack()));
         arr.append(obj);
         ++count;
       }
@@ -211,14 +211,19 @@ QString GetDefinitionTool::description(void) const {
 
 QJsonObject GetDefinitionTool::parametersSchema(void) const {
   QJsonObject props;
-  props[QStringLiteral("entity_id")] = int_prop(
-      QStringLiteral("Entity ID (from search_entities)"));
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string (from search_entities)"));
   return make_schema(props, {QStringLiteral("entity_id")});
 }
 
 QJsonObject GetDefinitionTool::execute(const QJsonObject &args) {
-  auto raw_id = static_cast<mx::RawEntityId>(
-      args[QStringLiteral("entity_id")].toDouble(0));
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
   if (raw_id == 0) {
     return error_result(QStringLiteral("entity_id is required"));
   }
@@ -308,8 +313,8 @@ QString GetReferencesTool::description(void) const {
 
 QJsonObject GetReferencesTool::parametersSchema(void) const {
   QJsonObject props;
-  props[QStringLiteral("entity_id")] = int_prop(
-      QStringLiteral("Entity ID (from search_entities)"));
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string (from search_entities)"));
   props[QStringLiteral("kind")] = string_prop(
       QStringLiteral("Filter by reference kind: calls, uses_value, uses_type, "
                      "writes, reads, takes_address, all (default: all)"));
@@ -322,8 +327,13 @@ QJsonObject GetReferencesTool::parametersSchema(void) const {
 }
 
 QJsonObject GetReferencesTool::execute(const QJsonObject &args) {
-  auto raw_id = static_cast<mx::RawEntityId>(
-      args[QStringLiteral("entity_id")].toDouble(0));
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
   if (raw_id == 0) {
     return error_result(QStringLiteral("entity_id is required"));
   }
@@ -474,8 +484,8 @@ QString GetCallersTool::description(void) const {
 
 QJsonObject GetCallersTool::parametersSchema(void) const {
   QJsonObject props;
-  props[QStringLiteral("entity_id")] = int_prop(
-      QStringLiteral("Entity ID of the function to find callers of"));
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string of the function to find callers of"));
   props[QStringLiteral("depth")] = int_prop(
       QStringLiteral("How many levels up to traverse (default 1)"));
   return make_schema(props, {QStringLiteral("entity_id")});
@@ -530,7 +540,7 @@ static QJsonArray collect_callers(
     }
 
     QJsonObject caller_obj;
-    caller_obj[QStringLiteral("entity_id")] = static_cast<qint64>(caller_id);
+    caller_obj[QStringLiteral("entity_id")] = QString::number(static_cast<quint64>(caller_id));
 
     if (auto name_str = NameOfEntityAsString(user)) {
       caller_obj[QStringLiteral("name")] = *name_str;
@@ -566,8 +576,13 @@ static QJsonArray collect_callers(
 }  // namespace
 
 QJsonObject GetCallersTool::execute(const QJsonObject &args) {
-  auto raw_id = static_cast<mx::RawEntityId>(
-      args[QStringLiteral("entity_id")].toDouble(0));
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
   if (raw_id == 0) {
     return error_result(QStringLiteral("entity_id is required"));
   }
@@ -617,8 +632,8 @@ QString GetCalleesTool::description(void) const {
 
 QJsonObject GetCalleesTool::parametersSchema(void) const {
   QJsonObject props;
-  props[QStringLiteral("entity_id")] = int_prop(
-      QStringLiteral("Entity ID of the function to find callees of"));
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string of the function to find callees of"));
   props[QStringLiteral("depth")] = int_prop(
       QStringLiteral("How many levels down to traverse (default 1)"));
   return make_schema(props, {QStringLiteral("entity_id")});
@@ -673,7 +688,7 @@ static QJsonArray collect_callees(
     }
 
     QJsonObject callee_obj;
-    callee_obj[QStringLiteral("entity_id")] = static_cast<qint64>(callee_id);
+    callee_obj[QStringLiteral("entity_id")] = QString::number(static_cast<quint64>(callee_id));
 
     if (auto name_str = NameOfEntityAsString(callee_vent)) {
       callee_obj[QStringLiteral("name")] = *name_str;
@@ -711,8 +726,13 @@ static QJsonArray collect_callees(
 }  // namespace
 
 QJsonObject GetCalleesTool::execute(const QJsonObject &args) {
-  auto raw_id = static_cast<mx::RawEntityId>(
-      args[QStringLiteral("entity_id")].toDouble(0));
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
   if (raw_id == 0) {
     return error_result(QStringLiteral("entity_id is required"));
   }
@@ -773,7 +793,7 @@ QJsonObject ListFilesTool::execute(const QJsonObject &) {
     obj[QStringLiteral("path")] =
         QString::fromStdString(path.generic_string());
     obj[QStringLiteral("file_id")] =
-        static_cast<qint64>(file_id.Pack());
+        QString::number(static_cast<quint64>(file_id.Pack()));
     arr.append(obj);
   }
 
@@ -952,7 +972,7 @@ QJsonObject SearchCodeTool::execute(const QJsonObject &args) {
       }
       obj[QStringLiteral("match")] = match_text;
       obj[QStringLiteral("context")] = context;
-      obj[QStringLiteral("entity_id")] = static_cast<qint64>(file_entity_id);
+      obj[QStringLiteral("entity_id")] = QString::number(static_cast<quint64>(file_entity_id));
       arr.append(obj);
       ++count;
     }

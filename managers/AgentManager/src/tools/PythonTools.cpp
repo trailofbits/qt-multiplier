@@ -129,6 +129,19 @@ QJsonObject RunPythonTool::execute(const QJsonObject &args) {
   // Run the interpreter.
   QProcess proc;
   setup_venv_environment(proc, interp);
+
+  // Expose the current database path so scripts can open the index without
+  // calling get_database_path first.
+  auto db_path = m_ctx->config->DatabasePath();
+  if (!db_path.isEmpty()) {
+    auto env = proc.processEnvironment();
+    if (env.isEmpty()) {
+      env = QProcessEnvironment::systemEnvironment();
+    }
+    env.insert(QStringLiteral("MULTIPLIER_DATABASE"), db_path);
+    proc.setProcessEnvironment(env);
+  }
+
   proc.setProgram(interp);
   proc.setArguments({tmp_file.fileName()});
   proc.start();
@@ -242,13 +255,15 @@ QJsonObject GetPythonApiReferenceTool::execute(const QJsonObject &) {
       "indexed codebase.");
 
   result[QStringLiteral("setup")] = QStringLiteral(
+      "import os\n"
       "from multiplier import Index\n"
-      "idx = Index.in_memory_cache(Index.from_database('/path/to/file.db'))");
+      "db_path = os.environ['MULTIPLIER_DATABASE']\n"
+      "idx = Index.in_memory_cache(Index.from_database(db_path))");
 
   result[QStringLiteral("note")] = QStringLiteral(
-      "The database path should match the currently loaded project. Use "
-      "search_entities or list_files to find entities, then use Python for "
-      "bulk analysis.");
+      "The MULTIPLIER_DATABASE environment variable is automatically set to "
+      "the current database path. Always wrap Index.from_database() with "
+      "Index.in_memory_cache() for better performance.");
 
   // Common patterns.
   QJsonArray patterns;
