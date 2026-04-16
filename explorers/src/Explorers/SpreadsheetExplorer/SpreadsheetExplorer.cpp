@@ -1330,14 +1330,21 @@ void SpreadsheetExplorer::OnExternalSheetsChanged(void) {
                                num_cols - model->columnCount());
         }
 
+        const auto &index = d->config_manager.Index();
         for (int r = 0; r < num_rows; ++r) {
           for (int c = 0; c < num_cols; ++c) {
             if (c < sheet.cells[r].size() && !sheet.cells[r][c].isEmpty()) {
-              QVariant v = SpreadsheetModel::value_from_json(sheet.cells[r][c]);
-              model->setData(model->index(r, c), v,
-                             SpreadsheetRoles::RawValueRole);
+              QVariant v = SpreadsheetModel::value_from_json(
+                  sheet.cells[r][c], &index);
+              model->set_cell_value_internal(r, c, v);
             }
           }
+        }
+
+        // Apply row colors from the sheet data.
+        for (auto it = sheet.row_colors.begin();
+             it != sheet.row_colors.end(); ++it) {
+          model->SetRowColor(it.key(), it.value());
         }
         break;
       }

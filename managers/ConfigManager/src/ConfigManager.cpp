@@ -62,12 +62,9 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
       "  widget_key TEXT NOT NULL,"
       "  entity_id INTEGER NOT NULL,"
-      "  label TEXT)"));
-  // Migrations for gui_history.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_history ADD COLUMN line INTEGER DEFAULT 0"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_history ADD COLUMN col INTEGER DEFAULT 0"));
+      "  label TEXT,"
+      "  line INTEGER DEFAULT 0,"
+      "  col INTEGER DEFAULT 0)"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_header_states ("
       "  key TEXT PRIMARY KEY, state BLOB)"));
@@ -88,14 +85,8 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  name TEXT NOT NULL,"
       "  description TEXT,"
       "  closed_at TEXT,"
-      "  column_order TEXT)"));
-  // Migration for existing DBs: add columns if missing.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheets ADD COLUMN description TEXT"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheets ADD COLUMN closed_at TEXT"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheets ADD COLUMN role TEXT DEFAULT 'general'"));
+      "  column_order TEXT,"
+      "  role TEXT DEFAULT 'general')"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_sheet_columns ("
       "  sheet_id INTEGER NOT NULL,"
@@ -105,13 +96,6 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  clickable INTEGER NOT NULL DEFAULT 0,"
       "  col_width INTEGER NOT NULL DEFAULT -1,"
       "  PRIMARY KEY (sheet_id, col_index))"));
-  // Migration.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheet_columns ADD COLUMN "
-      "clickable INTEGER NOT NULL DEFAULT 0"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheet_columns ADD COLUMN "
-      "col_width INTEGER NOT NULL DEFAULT -1"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_sheet_cells ("
       "  sheet_id INTEGER NOT NULL,"
@@ -135,28 +119,9 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  description TEXT,"
       "  created_at TEXT,"
       "  updated_at TEXT,"
-      "  deleted INTEGER NOT NULL DEFAULT 0)"));
-  // Migration for existing DBs.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN description TEXT"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN created_at TEXT"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN updated_at TEXT"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"));
-  // Migration: document categories.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN category TEXT DEFAULT 'note'"));
+      "  deleted INTEGER NOT NULL DEFAULT 0,"
+      "  category TEXT DEFAULT 'note')"));
 
-  // Migration: per-tool cost tracking.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_agent_messages ADD COLUMN duration_ms INTEGER DEFAULT 0"));
-
-  // Migration: observer session tracking.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_agent_sessions "
-      "ADD COLUMN primary_session_id INTEGER DEFAULT -1"));
 
   // Cost tracking tables.
   q.exec(QStringLiteral(
@@ -220,7 +185,8 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  created_at TEXT NOT NULL,"
       "  updated_at TEXT NOT NULL,"
       "  total_prompt_tokens INTEGER DEFAULT 0,"
-      "  total_completion_tokens INTEGER DEFAULT 0)"));
+      "  total_completion_tokens INTEGER DEFAULT 0,"
+      "  primary_session_id INTEGER DEFAULT -1)"));
 
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_agent_messages ("
@@ -233,7 +199,8 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  tool_args TEXT,"
       "  tool_result TEXT,"
       "  timestamp TEXT NOT NULL,"
-      "  token_count INTEGER DEFAULT 0)"));
+      "  token_count INTEGER DEFAULT 0,"
+      "  duration_ms INTEGER DEFAULT 0)"));
 
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_agent_checkpoints ("
