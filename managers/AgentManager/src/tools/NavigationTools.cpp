@@ -304,7 +304,10 @@ QJsonObject GetReferencesTool::parametersSchema(void) const {
       QStringLiteral("Filter by reference kind: calls, uses_value, uses_type, "
                      "writes, reads, takes_address, all (default: all)"));
   props[QStringLiteral("max_results")] = int_prop(
-      QStringLiteral("Maximum number of results (default: 100)"));
+      QStringLiteral("Maximum number of results to return (default: 100)"));
+  props[QStringLiteral("offset")] = int_prop(
+      QStringLiteral("Skip this many matching results before returning (default: 0). "
+                     "Use with max_results for pagination."));
   return make_schema(props, {QStringLiteral("entity_id")});
 }
 
@@ -331,6 +334,12 @@ QJsonObject GetReferencesTool::execute(const QJsonObject &args) {
       args[QStringLiteral("max_results")].toDouble(100));
   if (max_results <= 0) {
     max_results = 100;
+  }
+
+  int offset = static_cast<int>(
+      args[QStringLiteral("offset")].toDouble(0));
+  if (offset < 0) {
+    offset = 0;
   }
 
   // Build set of acceptable builtin reference kinds.
@@ -362,14 +371,25 @@ QJsonObject GetReferencesTool::execute(const QJsonObject &args) {
   };
 
   QJsonArray arr;
-  int count = 0;
+  int count = 0;      // Results returned.
+  int matched = 0;    // Total matching (including skipped).
+  bool has_more = false;
 
   for (mx::Reference ref : mx::Reference::to(vent)) {
-    if (count >= max_results) {
-      break;
+    if (!matches_kind(ref)) {
+      continue;
     }
 
-    if (!matches_kind(ref)) {
+    ++matched;
+
+    // Skip until we've passed the offset.
+    if (matched <= offset) {
+      continue;
+    }
+
+    if (count >= max_results) {
+      has_more = true;
+      // Keep counting total matches for the summary.
       continue;
     }
 
@@ -422,6 +442,9 @@ QJsonObject GetReferencesTool::execute(const QJsonObject &args) {
   QJsonObject result;
   result[QStringLiteral("references")] = arr;
   result[QStringLiteral("count")] = count;
+  result[QStringLiteral("total_matched")] = matched;
+  result[QStringLiteral("offset")] = offset;
+  result[QStringLiteral("has_more")] = has_more;
   return result;
 }
 
