@@ -39,7 +39,7 @@ static constexpr int kPromptVersion = 8;
 
 static const QString kDefaultPromptContent = QString::fromUtf8(
 R"MX(<!-- prompt-version: 8 -->
-You are an expert analyst working inside the Multiplier binary analysis IDE. You have access to tools for managing structured analysis, documents, and navigating an indexed codebase.
+You are an expert analyst working inside the Multiplier code analysis IDE. You have access to tools for managing structured analysis, documents, and navigating an indexed codebase.
 
 ## Key Concept: Entity IDs
 
@@ -225,9 +225,10 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
 
   // ---- LLM Backend ----
   d->backend_combo = new QComboBox(content);
-  d->backend_combo->addItems(
-      {QStringLiteral("claude"), QStringLiteral("openai"),
-       QStringLiteral("bedrock"), QStringLiteral("vllm")});
+  d->backend_combo->addItem(tr("Anthropic (Claude)"), QStringLiteral("claude"));
+  d->backend_combo->addItem(tr("AWS Bedrock"), QStringLiteral("bedrock"));
+  d->backend_combo->addItem(tr("OpenAI"), QStringLiteral("openai"));
+  d->backend_combo->addItem(tr("vLLM / Custom"), QStringLiteral("vllm"));
   form->addRow(tr("Backend:"), d->backend_combo);
 
   d->api_key_edit = new QLineEdit(content);
@@ -502,7 +503,7 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   auto active = d->llm_manager.activeBackendName();
   if (!active.isEmpty()) {
     auto type = d->llm_manager.backendType(active);
-    auto idx = d->backend_combo->findText(type);
+    auto idx = d->backend_combo->findData(type);
     if (idx >= 0) {
       d->backend_combo->setCurrentIndex(idx);
     }
@@ -533,7 +534,7 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
       d->base_url_edit->setText(saved_url);
     }
   } else {
-    populateModels(d->backend_combo->currentText());
+    populateModels(d->backend_combo->currentData().toString());
   }
 
   // Restore per-role model settings.
@@ -617,7 +618,7 @@ void AgentConfigPanel::showSaved(void) {
 }
 
 void AgentConfigPanel::onBackendTypeChanged(int index) {
-  auto type = d->backend_combo->itemText(index);
+  auto type = d->backend_combo->itemData(index).toString();
   bool show_url = (type == QStringLiteral("openai") ||
                    type == QStringLiteral("vllm"));
   d->base_url_edit->setVisible(show_url);
@@ -650,7 +651,7 @@ void AgentConfigPanel::onBackendTypeChanged(int index) {
 }
 
 void AgentConfigPanel::onApiKeyChanged(void) {
-  auto type = d->backend_combo->currentText();
+  auto type = d->backend_combo->currentData().toString();
   d->llm_manager.setApiKeyForType(type, d->api_key_edit->text());
   d->llm_manager.saveConfig();
   showSaved();
@@ -867,14 +868,17 @@ void AgentConfigPanel::populateModels(const QString &backend_type) {
   d->model_combo->clear();
   QStringList presets;
   if (backend_type == QStringLiteral("claude")) {
-    presets = {QStringLiteral("claude-sonnet-4-20250514"),
-               QStringLiteral("claude-opus-4-20250514")};
+    presets = {QStringLiteral("claude-opus-4-20250514"),
+               QStringLiteral("claude-sonnet-4-20250514"),
+               QStringLiteral("claude-haiku-4-5-20251001")};
   } else if (backend_type == QStringLiteral("openai")) {
     presets = {QStringLiteral("gpt-4o"),
                QStringLiteral("gpt-4o-mini"),
                QStringLiteral("o3")};
   } else if (backend_type == QStringLiteral("bedrock")) {
-    presets = {QStringLiteral("anthropic.claude-sonnet-4-20250514-v1:0")};
+    presets = {QStringLiteral("anthropic.claude-opus-4-20250514-v1:0"),
+               QStringLiteral("anthropic.claude-sonnet-4-20250514-v1:0"),
+               QStringLiteral("anthropic.claude-haiku-4-5-20251001-v1:0")};
   }
   d->model_combo->addItems(presets);
 
