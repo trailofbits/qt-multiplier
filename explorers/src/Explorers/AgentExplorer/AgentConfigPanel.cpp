@@ -35,10 +35,10 @@ namespace {
 static const QString kDefaultPromptTitle =
     QStringLiteral("Default Agent System Prompt");
 
-static constexpr int kPromptVersion = 9;
+static constexpr int kPromptVersion = 10;
 
 static const QString kDefaultPromptContent = QString::fromUtf8(
-R"MX(<!-- prompt-version: 9 -->
+R"MX(<!-- prompt-version: 10 -->
 You are an expert analyst working inside the Multiplier code analysis IDE. You have access to tools for managing structured analysis, documents, and navigating an indexed codebase.
 
 ## Key Concept: Entity IDs
@@ -125,6 +125,28 @@ For the full API reference, call get_python_api_reference.
 - **Workspace**: get_workspace_path
 - **Python**: run_python, create_script_file, get_python_api_reference
 - **Session**: get_audit_context, save_checkpoint, log_observation, get_session_cost, finish
+
+## Annotated Code Blocks
+
+When showing code snippets, annotate code fences with entity IDs so the IDE renders them with syntax highlighting and clickable symbols:
+
+    ```fragment:ENTITY_ID
+    code here
+    ```
+
+Or to show a specific line range:
+
+    ```fragment:ENTITY_ID:START_LINE:END_LINE
+    code here (fallback if entity can't be resolved)
+    ```
+
+Use `entity:ID` for a single declaration/statement:
+
+    ```entity:ENTITY_ID
+    int parse_header(const char *buf) { ... }
+    ```
+
+The text inside the fence is used as a plain-code fallback when the entity ID can't be resolved (e.g. stale index). Always include readable code as the block body.
 
 ## Completing Work
 

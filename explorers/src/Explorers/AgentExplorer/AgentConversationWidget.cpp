@@ -22,7 +22,9 @@
 #include <QPlainTextEdit>
 #include <QRegularExpression>
 #include <QTableWidget>
+#include <QTextBrowser>
 #include <QTextCursor>
+#include <QTextEdit>
 #include <QTreeWidget>
 #include <QPushButton>
 #include <QScrollArea>
@@ -30,6 +32,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include <multiplier/Frontend/TokenKind.h>
 #include <multiplier/GUI/Interfaces/ITheme.h>
 #include <multiplier/GUI/Managers/AgentMessage.h>
 #include <multiplier/GUI/Managers/ConfigManager.h>
@@ -1038,6 +1041,261 @@ static QString symbolizeIdentifiers(const QString &text,
   return result;
 }
 
+// Regular expression matching annotated code fences in assistant messages.
+// Formats:
+//   ```fragment:12345\n...\n```
+//   ```fragment:12345:10:25\n...\n```
+//   ```entity:12345\n...\n```
+static const QRegularExpression &annotatedCodeFenceRe(void) {
+  static const QRegularExpression re(QStringLiteral(
+      "```(?:fragment|entity):([0-9]+)(?::([0-9]+):([0-9]+))?\\n"
+      "([\\s\\S]*?)```"));
+  return re;
+}
+
+// Build syntax-highlighted HTML for a token range.  Clickable identifiers
+// become <a href="entity:ID"> links; other tokens get <span> with the
+// theme foreground color.  When `start_line`/`end_line` are non-zero only
+// lines in that 1-based range are emitted.
+static QString buildTokenHtml(const mx::TokenRange &tokens,
+                              const mx::gui::ITheme &theme,
+                              int start_line, int end_line) {
+  QString html;
+  int current_line = 1;
+  bool filtering = (start_line > 0 && end_line > 0);
+  auto in_range = [&]() {
+    return !filtering || (current_line >= start_line &&
+                          current_line <= end_line);
+  };
+
+  for (mx::Token tok : tokens) {
+    auto cs = theme.TokenColorAndStyle(tok);
+    if (!cs.foreground_color.isValid()) {
+      cs.foreground_color = theme.DefaultForegroundColor();
+    }
+
+    auto tok_data = tok.data();
+    QString text = QString::fromUtf8(
+        tok_data.data(), static_cast<qsizetype>(tok_data.size()));
+
+    // Handle newlines inside the token data — they advance current_line
+    // and we need to emit only the parts that fall inside the line range.
+    QStringList segments;
+    qsizetype seg_start = 0;
+    for (qsizetype i = 0; i < text.size(); ++i) {
+      if (text[i] == QLatin1Char('\n')) {
+        segments.append(text.mid(seg_start, i - seg_start + 1));
+        seg_start = i + 1;
+      }
+    }
+    if (seg_start < text.size()) {
+      segments.append(text.mid(seg_start));
+    }
+    if (segments.isEmpty()) {
+      segments.append(text);
+    }
+
+    auto related_eid = tok.related_entity_id().Pack();
+    bool is_ident = (tok.kind() == mx::TokenKind::IDENTIFIER);
+
+    for (const auto &seg : segments) {
+      if (in_range()) {
+        QString escaped = seg.toHtmlEscaped();
+        if (related_eid != mx::kInvalidEntityId && is_ident) {
+          html += QStringLiteral(
+              "<a href='entity:%1' style='color:%2; "
+              "text-decoration:none;'>%3</a>")
+              .arg(QString::number(static_cast<quint64>(related_eid)),
+                   cs.foreground_color.name(), escaped);
+        } else {
+          html += QStringLiteral("<span style='color:%1;'>%2</span>")
+              .arg(cs.foreground_color.name(), escaped);
+        }
+      }
+      if (seg.endsWith(QLatin1Char('\n'))) {
+        ++current_line;
+      }
+    }
+  }
+  return html;
+}
+
+// Create a read-only QTextBrowser showing syntax-highlighted tokens for an
+// annotated code block.  Returns nullptr if the entity cannot be resolved.
+static QTextBrowser *createAnnotatedCodeView(
+    const QString &type, uint64_t entity_id,
+    int start_line, int end_line,
+    const mx::gui::ConfigManager &config, QWidget *parent) {
+
+  const auto &index = config.Index();
+  auto entity = index.entity(mx::EntityId(entity_id));
+
+  if (std::holds_alternative<mx::NotAnEntity>(entity)) {
+    return nullptr;
+  }
+
+  // Get the token range for this entity.
+  mx::TokenRange tokens;
+  if (type == QStringLiteral("fragment")) {
+    if (auto frag = std::get_if<mx::Fragment>(&entity)) {
+      tokens = frag->parsed_tokens();
+    }
+  }
+  // For any entity type, fall back to the generic Tokens() helper.
+  if (tokens.empty()) {
+    tokens = mx::gui::Tokens(entity);
+  }
+  if (tokens.empty()) {
+    return nullptr;
+  }
+
+  auto theme = config.ThemeManager().Theme();
+  if (!theme) {
+    return nullptr;
+  }
+
+  auto token_html = buildTokenHtml(tokens, *theme, start_line, end_line);
+  if (token_html.isEmpty()) {
+    return nullptr;
+  }
+
+  auto bg = theme->DefaultBackgroundColor();
+  auto font = theme->Font();
+
+  QString full_html = QStringLiteral(
+      "<pre style='margin:0; padding:6px; background:%1; "
+      "font-family:%2; font-size:%3pt;'>%4</pre>")
+      .arg(bg.name(), font.family(),
+           QString::number(font.pointSize()), token_html);
+
+  auto *browser = new QTextBrowser(parent);
+  browser->setReadOnly(true);
+  browser->setOpenLinks(false);
+  browser->setHtml(full_html);
+  browser->setFrameShape(QFrame::NoFrame);
+
+  // Size to content, capped at 400px.
+  auto doc_size = browser->document()->size().toSize();
+  int h = qBound(30, doc_size.height() + 16, 400);
+  browser->setFixedHeight(h);
+
+  return browser;
+}
+
+// Check whether `content` contains any annotated code fences and, if so,
+// split it into alternating markdown text and syntax-highlighted code view
+// widgets inside `frame_layout`.  Returns true if annotated blocks were
+// found and rendered.
+static bool renderAnnotatedContent(
+    const QString &content,
+    QFrame *frame, QVBoxLayout *frame_layout,
+    mx::gui::ConfigManager &config,
+    std::function<void(const QString &)> on_link_activated) {
+
+  const auto &re = annotatedCodeFenceRe();
+  if (!re.match(content).hasMatch()) {
+    return false;
+  }
+
+  auto it = re.globalMatch(content);
+
+  // Collect matches with their positions.
+  struct CodeBlock {
+    int start;
+    int length;
+    QString type;         // "fragment" or "entity"
+    uint64_t entity_id;
+    int start_line;
+    int end_line;
+    QString fallback;     // raw text inside the fence
+  };
+  QVector<CodeBlock> blocks;
+
+  while (it.hasNext()) {
+    auto match = it.next();
+    CodeBlock cb;
+    cb.start = static_cast<int>(match.capturedStart());
+    cb.length = static_cast<int>(match.capturedLength());
+
+    // Detect whether the fence tag said "fragment" or "entity".
+    auto full_tag = match.captured(0);
+    if (full_tag.startsWith(QStringLiteral("```fragment:"))) {
+      cb.type = QStringLiteral("fragment");
+    } else {
+      cb.type = QStringLiteral("entity");
+    }
+
+    cb.entity_id = match.captured(1).toULongLong();
+    cb.start_line = match.captured(2).isEmpty() ? 0 : match.captured(2).toInt();
+    cb.end_line = match.captured(3).isEmpty() ? 0 : match.captured(3).toInt();
+    cb.fallback = match.captured(4);
+    blocks.append(cb);
+  }
+
+  if (blocks.isEmpty()) {
+    return false;
+  }
+
+  // Helper: create a QLabel for a markdown text chunk.
+  auto make_md_label = [&](const QString &md) -> QLabel * {
+    if (md.trimmed().isEmpty()) {
+      return nullptr;
+    }
+    auto symbolized = symbolizeIdentifiers(md, config);
+    auto *label = new QLabel(frame);
+    label->setWordWrap(true);
+    label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    label->setTextFormat(Qt::MarkdownText);
+    label->setText(symbolized);
+    label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    label->setOpenExternalLinks(false);
+    QObject::connect(label, &QLabel::linkActivated, on_link_activated);
+    return label;
+  };
+
+  int pos = 0;
+  for (const auto &cb : blocks) {
+    // Text chunk before this code block.
+    if (cb.start > pos) {
+      auto chunk = content.mid(pos, cb.start - pos);
+      if (auto *label = make_md_label(chunk)) {
+        frame_layout->addWidget(label);
+      }
+    }
+    pos = cb.start + cb.length;
+
+    // Try to create a syntax-highlighted view.
+    auto *code_view = createAnnotatedCodeView(
+        cb.type, cb.entity_id, cb.start_line, cb.end_line,
+        config, frame);
+    if (code_view) {
+      QObject::connect(
+          code_view, &QTextBrowser::anchorClicked, code_view,
+          [on_link_activated](const QUrl &url) {
+        on_link_activated(url.toString());
+      });
+      frame_layout->addWidget(code_view);
+    } else {
+      // Fallback: render the raw code as a plain code block.
+      auto fallback_md = QStringLiteral("```\n") + cb.fallback +
+                         QStringLiteral("```");
+      if (auto *label = make_md_label(fallback_md)) {
+        frame_layout->addWidget(label);
+      }
+    }
+  }
+
+  // Trailing text after the last code block.
+  if (pos < content.size()) {
+    auto tail = content.mid(pos);
+    if (auto *label = make_md_label(tail)) {
+      frame_layout->addWidget(label);
+    }
+  }
+
+  return true;
+}
+
 // Dispatcher: returns an interactive widget for the tool result, or nullptr.
 static QWidget *createToolResultWidget(const QString &tool_name,
                                        const QJsonObject &result,
@@ -1439,23 +1697,31 @@ void AgentConversationWidget::addMessageBubble(
             .arg(d->assistant_bg.red()).arg(d->assistant_bg.green())
             .arg(d->assistant_bg.blue()).arg(d->assistant_bg.alpha()));
 
-    // Symbolize identifiers before rendering as markdown.
-    auto symbolized = symbolizeIdentifiers(content, d->config_manager);
-
-    auto *label = new QLabel(frame);
-    label->setWordWrap(true);
-    label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    label->setTextFormat(Qt::MarkdownText);
-    label->setText(symbolized);
-    label->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    label->setOpenExternalLinks(false);
-    connect(label, &QLabel::linkActivated, this,
-            [this](const QString &link) {
+    auto link_handler = [this](const QString &link) {
       if (link.startsWith(QStringLiteral("entity:"))) {
         emit navigateToEntity(link.mid(7).toULongLong());
       }
-    });
-    frame_layout->addWidget(label);
+    };
+
+    // Try the annotated code block path first.  If the content has
+    // annotated fences (```fragment:ID or ```entity:ID) they are rendered
+    // as syntax-highlighted, clickable code views interleaved with the
+    // surrounding markdown.
+    if (!renderAnnotatedContent(content, frame, frame_layout,
+                                d->config_manager, link_handler)) {
+      // Normal path: single QLabel with symbolized markdown.
+      auto symbolized = symbolizeIdentifiers(content, d->config_manager);
+
+      auto *label = new QLabel(frame);
+      label->setWordWrap(true);
+      label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+      label->setTextFormat(Qt::MarkdownText);
+      label->setText(symbolized);
+      label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+      label->setOpenExternalLinks(false);
+      connect(label, &QLabel::linkActivated, this, link_handler);
+      frame_layout->addWidget(label);
+    }
 
     d->messages_layout->addWidget(frame);
 
