@@ -15,7 +15,9 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QPlainTextEdit>
+#include <QFileInfo>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QTimer>
@@ -573,6 +575,20 @@ void AgentConfigPanel::maybeVerifyPython(void) {
   proc->setProgram(path);
   proc->setArguments({QStringLiteral("-c"),
       QStringLiteral("import multiplier; print(multiplier.__file__)")});
+
+  // Set up venv environment if the interpreter lives in a venv-like path.
+  // E.g. /path/to/venv/bin/python3 → VIRTUAL_ENV=/path/to/venv
+  QFileInfo fi(path);
+  auto bin_dir = fi.absolutePath();
+  auto venv_dir = QFileInfo(bin_dir).absolutePath();
+  auto pyvenv_cfg = venv_dir + QStringLiteral("/pyvenv.cfg");
+  if (QFileInfo::exists(pyvenv_cfg)) {
+    auto env = QProcessEnvironment::systemEnvironment();
+    env.insert(QStringLiteral("VIRTUAL_ENV"), venv_dir);
+    env.insert(QStringLiteral("PATH"),
+               bin_dir + QStringLiteral(":") + env.value(QStringLiteral("PATH")));
+    proc->setProcessEnvironment(env);
+  }
 
   connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
           this, [this, proc](int exit_code, QProcess::ExitStatus) {
