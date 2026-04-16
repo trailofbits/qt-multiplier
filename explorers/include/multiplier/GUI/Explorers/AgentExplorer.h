@@ -13,6 +13,7 @@
 namespace mx::gui {
 
 struct SessionResult;
+class CodeExplorer;
 class ConfigManager;
 class IWindowManager;
 
@@ -28,6 +29,9 @@ class AgentExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   explicit AgentExplorer(ConfigManager &config_manager,
                          IWindowManager *parent = nullptr);
 
+  // Set the CodeExplorer used for code context tracking.
+  void setCodeExplorer(CodeExplorer *explorer);
+
  private:
   void CreateDockWidgets(IWindowManager *manager);
   void ConnectSignals(void);
@@ -37,6 +41,8 @@ class AgentExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void StopObserver(void);
   void requestRecommendation(void);
   void handleRecommendationResponse(const struct LLMResponse &response);
+  void summarizeViewedCode(void);
+  void handleCodeSummaryResponse(const struct LLMResponse &response);
 
  private slots:
   void OnSendMessage(const QString &text);

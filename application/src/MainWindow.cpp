@@ -208,6 +208,24 @@ void MainWindow::InitializePlugins(void) {
         code_explorer->OnRenameEntities(initial);
       }
     }
+
+    // Wire AgentExplorer to CodeExplorer for code context tracking.
+    AgentExplorer *agent_explorer = nullptr;
+    if (!code_explorer) {
+      for (const auto &plugin : d->plugins) {
+        if (!code_explorer) {
+          code_explorer = dynamic_cast<CodeExplorer *>(plugin.get());
+        }
+      }
+    }
+    for (const auto &plugin : d->plugins) {
+      if (!agent_explorer) {
+        agent_explorer = dynamic_cast<AgentExplorer *>(plugin.get());
+      }
+    }
+    if (agent_explorer && code_explorer) {
+      agent_explorer->setCodeExplorer(code_explorer);
+    }
   }
 
   for (const auto &plugin : d->plugins) {

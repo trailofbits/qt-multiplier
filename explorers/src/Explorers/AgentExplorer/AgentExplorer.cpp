@@ -15,6 +15,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QThread>
+#include <QTimer>
 #include <QToolBar>
 #include <QVBoxLayout>
 
@@ -27,6 +28,7 @@
 #include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/LLMManager.h>
 #include <multiplier/GUI/Managers/MediaManager.h>
+#include <multiplier/GUI/Explorers/CodeExplorer.h>
 
 #include "AgentConversationWidget.h"
 #include "AgentConfigPanel.h"
@@ -70,6 +72,16 @@ struct AgentExplorer::PrivateData {
   };
   RecommenderState recommender;
 
+  struct CodeContext {
+    QString code_summary;
+    QStringList observations;
+    QDateTime last_summarized;
+    int views_since_summary{0};
+  };
+  CodeContext code_context;
+  CodeExplorer *code_explorer{nullptr};
+  QTimer *context_refresh_timer{nullptr};
+
   int64_t current_session_id{-1};
   bool paused{false};
 
@@ -105,6 +117,16 @@ AgentExplorer::AgentExplorer(ConfigManager &config_manager,
 
   // Wire signals.
   ConnectSignals();
+
+  // Background code context refresh timer.
+  d->context_refresh_timer = new QTimer(this);
+  d->context_refresh_timer->setInterval(30000);
+  connect(d->context_refresh_timer, &QTimer::timeout, this, [this] {
+    if (d->code_explorer && d->code_context.views_since_summary >= 3) {
+      summarizeViewedCode();
+    }
+  });
+  d->context_refresh_timer->start();
 }
 
 void AgentExplorer::RegisterTools(void) {
@@ -647,6 +669,99 @@ void AgentExplorer::OnObserverTriggered(int64_t observer_session_id) {
   d->conversation->addMessage(sys_msg);
 }
 
+void AgentExplorer::setCodeExplorer(CodeExplorer *explorer) {
+  d->code_explorer = explorer;
+}
+
+void AgentExplorer::summarizeViewedCode(void) {
+  if (!d->code_explorer) return;
+
+  auto viewed = d->code_explorer->recentlyViewedCode(10);
+  if (viewed.isEmpty()) return;
+
+  auto *backend = d->llm_manager->activeBackend();
+  if (!backend) return;
+
+  // Build code snippets string.
+  QString code_snippets;
+  for (const auto &vc : viewed) {
+    code_snippets += QStringLiteral("--- %1 (%2) [%3] ---\n")
+        .arg(vc.label, vc.kind, vc.file_path);
+    if (!vc.code_snippet.isEmpty()) {
+      code_snippets += vc.code_snippet;
+      code_snippets += QStringLiteral("\n");
+    }
+    code_snippets += QStringLiteral("\n");
+  }
+
+  static const QString kCodeSummaryPrompt = QString::fromUtf8(
+      R"MX(You are a code analyst producing factual observations about recently viewed code.
+Describe what you see using neutral language. Do NOT judge whether code is
+"dangerous", "safe", "vulnerable", or "secure". Report contracts and behavior,
+not quality assessments.
+
+For each piece of code, note what it does, what it assumes about inputs,
+and any factual observations (e.g. "error path does not free buffer",
+"loop bound depends on unchecked caller value"). Use symbolic constants.
+
+Recently viewed code:
+%1
+
+Respond with ONLY a JSON object:
+{"code_summary":"2-4 sentence factual summary of what the analyst has been examining","observations":["factual observation 1","factual observation 2"]})MX");
+
+  auto prompt_text = kCodeSummaryPrompt.arg(code_snippets);
+
+  QVector<LLMMessage> messages;
+  LLMMessage user_msg;
+  user_msg.role = QStringLiteral("user");
+  user_msg.content = prompt_text;
+  messages.append(user_msg);
+
+  LLMConfig config;
+  config.temperature = 0.2;
+  config.max_tokens = 512;
+  config.model = d->llm_manager->backendConfig(
+      d->llm_manager->activeBackendName(), QStringLiteral("model"));
+
+  auto *thread = QThread::create([this, messages, config, backend] {
+    auto response = backend->sendMessage(messages, {}, config);
+    QMetaObject::invokeMethod(this, [this, response] {
+      handleCodeSummaryResponse(response);
+    }, Qt::QueuedConnection);
+  });
+  thread->start();
+}
+
+void AgentExplorer::handleCodeSummaryResponse(const LLMResponse &response) {
+  if (!response.error.isEmpty()) return;
+
+  auto doc = QJsonDocument::fromJson(response.content.toUtf8());
+  if (!doc.isObject()) return;
+
+  auto obj = doc.object();
+
+  auto summary = obj.value(QStringLiteral("code_summary")).toString();
+  if (!summary.isEmpty()) {
+    d->code_context.code_summary = summary;
+  }
+
+  QStringList observations;
+  auto obs_array = obj.value(QStringLiteral("observations")).toArray();
+  for (const auto &val : obs_array) {
+    auto s = val.toString();
+    if (!s.isEmpty()) {
+      observations.append(s);
+    }
+  }
+  if (!observations.isEmpty()) {
+    d->code_context.observations = observations;
+  }
+
+  d->code_context.last_summarized = QDateTime::currentDateTime();
+  d->code_context.views_since_summary = 0;
+}
+
 void AgentExplorer::requestRecommendation(void) {
   if (d->config_panel->suggestionMode() == 0) {
     return;
@@ -656,6 +771,9 @@ void AgentExplorer::requestRecommendation(void) {
   if (!backend) {
     return;
   }
+
+  // Bump view count for code context tracking.
+  d->code_context.views_since_summary++;
 
   // Gather last messages for context.
   auto all_msgs = d->agent_manager->sessionMessages(d->current_session_id);
@@ -692,6 +810,19 @@ void AgentExplorer::requestRecommendation(void) {
         QStringLiteral("Open sheets: %1").arg(sheet_summaries.join(QStringLiteral(", "))));
   }
 
+  // Append code context if available.
+  QString code_context_str;
+  if (!d->code_context.code_summary.isEmpty()) {
+    code_context_str = QStringLiteral("\nCode the analyst is examining:\n%1")
+        .arg(d->code_context.code_summary);
+    if (!d->code_context.observations.isEmpty()) {
+      code_context_str += QStringLiteral("\n\nSecurity-relevant observations:\n");
+      for (const auto &obs : d->code_context.observations) {
+        code_context_str += QStringLiteral("- %1\n").arg(obs);
+      }
+    }
+  }
+
   static const QString kRecommenderPrompt = QString::fromUtf8(
       R"MX(You are a research assistant helping guide an analyst's conversation with an AI agent in a binary analysis IDE.
 
@@ -703,14 +834,15 @@ Analysis context:
 
 Open questions:
 %3
-
+%4
 Respond with ONLY a JSON object (no markdown, no explanation):
 {"suggestion":"the single best next question to ask","alternatives":["other good question 1","other good question 2"],"context_summary":"2-3 sentence summary of where analysis stands","open_questions":["unresolved question 1","unresolved question 2"]})MX");
 
   auto prompt_text = kRecommenderPrompt
       .arg(recent_lines.join(QStringLiteral("\n")))
       .arg(context_summary)
-      .arg(open_questions_str);
+      .arg(open_questions_str)
+      .arg(code_context_str);
 
   QVector<LLMMessage> messages;
   LLMMessage user_msg;
