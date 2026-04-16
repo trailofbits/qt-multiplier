@@ -310,6 +310,14 @@ void AgentExplorer::ConnectSignals(void) {
     }
   });
 
+  // Open documents when user clicks a document link.
+  auto doc_trigger = d->config_manager.ActionManager().Find(
+      "com.trailofbits.action.OpenDocument");
+  connect(d->conversation, &AgentConversationWidget::openDocument,
+          this, [doc_trigger](int doc_id) mutable {
+    doc_trigger.Trigger(QVariant(doc_id));
+  });
+
   // AgentManager signals.
   connect(d->agent_manager, &AgentManager::messageAdded,
           this, &AgentExplorer::OnMessageAdded);

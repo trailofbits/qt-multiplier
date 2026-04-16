@@ -20,6 +20,7 @@
 #include <QMap>
 #include <QMenu>
 #include <QPlainTextEdit>
+#include <QRegularExpression>
 #include <QTableWidget>
 #include <QTextCursor>
 #include <QTreeWidget>
@@ -119,6 +120,17 @@ static QString toolResultSummary(const QString &tool_name,
   if (tool_name == QStringLiteral("create_document")) {
     auto title = result[QStringLiteral("title")].toString();
     return QStringLiteral("Document '%1' created").arg(title);
+  }
+  if (tool_name == QStringLiteral("create_findings_sheet")) {
+    int id = result[QStringLiteral("sheet_id")].toInt();
+    return QStringLiteral("Findings sheet created (id: %1)").arg(id);
+  }
+  if (tool_name == QStringLiteral("create_attack_surface_sheet")) {
+    int id = result[QStringLiteral("sheet_id")].toInt();
+    return QStringLiteral("Attack surface sheet created (id: %1)").arg(id);
+  }
+  if (tool_name == QStringLiteral("link_document_to_cell")) {
+    return QStringLiteral("Document linked to cell");
   }
   if (tool_name == QStringLiteral("get_session_cost")) {
     double cost = result[QStringLiteral("total_cost_usd")].toDouble();
@@ -892,10 +904,148 @@ static QWidget *createSessionCostView(const QJsonObject &result,
   return widget;
 }
 
+// 9. create_document -> clickable "Open document" button
+static QWidget *createDocumentButton(const QJsonObject &result,
+                                     QWidget *parent) {
+  int doc_id = result[QStringLiteral("doc_id")].toInt(-1);
+  if (doc_id < 0) {
+    return nullptr;
+  }
+  auto title = result[QStringLiteral("title")].toString();
+  auto *btn = new QPushButton(
+      QStringLiteral("Open: %1").arg(
+          title.isEmpty() ? QStringLiteral("Document %1").arg(doc_id) : title),
+      parent);
+  btn->setFlat(true);
+  btn->setCursor(Qt::PointingHandCursor);
+  btn->setStyleSheet(
+      QStringLiteral("QPushButton { text-align: left; color: palette(link); }"));
+  btn->setProperty("doc_id", doc_id);
+  return btn;
+}
+
+// 10. create_findings_sheet / create_attack_surface_sheet / create_sheet
+//     -> clickable "Open sheet" button
+static QWidget *createSheetButton(const QJsonObject &result,
+                                  const QJsonObject &args,
+                                  QWidget *parent) {
+  int sheet_id = result[QStringLiteral("sheet_id")].toInt(-1);
+  if (sheet_id < 0) {
+    return nullptr;
+  }
+  auto name = args[QStringLiteral("name")].toString();
+  auto *btn = new QPushButton(
+      QStringLiteral("Open: %1").arg(
+          name.isEmpty() ? QStringLiteral("Sheet %1").arg(sheet_id) : name),
+      parent);
+  btn->setFlat(true);
+  btn->setCursor(Qt::PointingHandCursor);
+  btn->setStyleSheet(
+      QStringLiteral("QPushButton { text-align: left; color: palette(link); }"));
+  btn->setProperty("sheet_id", sheet_id);
+  return btn;
+}
+
+// Scan text for C/C++ identifiers, resolve against the Index, and return
+// text with markdown links for recognized entities.
+static QString symbolizeIdentifiers(const QString &text,
+                                    const mx::gui::ConfigManager &config) {
+  if (text.isEmpty()) {
+    return text;
+  }
+
+  // Match function-call-like identifiers: word(
+  static const QRegularExpression func_re(
+      QStringLiteral("\\b([a-zA-Z_][a-zA-Z0-9_]{2,})\\s*\\("));
+  // Match snake_case identifiers (likely code symbols).
+  static const QRegularExpression snake_re(
+      QStringLiteral("\\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\\b"));
+
+  // Collect candidate identifiers with their positions.
+  struct Candidate {
+    int start;
+    int length;
+    QString name;
+  };
+
+  QHash<QString, uint64_t> cache;
+  QVector<Candidate> candidates;
+  int lookups = 0;
+  static constexpr int kMaxLookups = 20;
+
+  auto try_resolve = [&](const QString &name) -> uint64_t {
+    auto it = cache.find(name);
+    if (it != cache.end()) {
+      return it.value();
+    }
+    if (lookups >= kMaxLookups) {
+      return 0;
+    }
+    ++lookups;
+
+    const auto &index = config.Index();
+    uint64_t found_eid = 0;
+    for (auto entity : index.query_entities(name.toStdString())) {
+      if (std::holds_alternative<mx::NamedDecl>(entity)) {
+        auto decl = std::get<mx::NamedDecl>(entity);
+        found_eid = static_cast<uint64_t>(decl.id().Pack());
+        break;
+      }
+    }
+    cache.insert(name, found_eid);
+    return found_eid;
+  };
+
+  // Gather candidates from both regexes.
+  auto gather = [&](const QRegularExpression &re) {
+    auto it = re.globalMatch(text);
+    while (it.hasNext()) {
+      auto match = it.next();
+      auto name = match.captured(1);
+      candidates.append({static_cast<int>(match.capturedStart(1)),
+                         static_cast<int>(match.capturedLength(1)),
+                         name});
+    }
+  };
+
+  gather(func_re);
+  gather(snake_re);
+
+  if (candidates.isEmpty()) {
+    return text;
+  }
+
+  // Sort by position descending so we can replace from end to start.
+  std::sort(candidates.begin(), candidates.end(),
+            [](const Candidate &a, const Candidate &b) {
+    return a.start > b.start;
+  });
+
+  // Deduplicate overlapping ranges (keep the first occurrence at each pos).
+  QSet<int> seen_positions;
+  QString result = text;
+  for (const auto &c : candidates) {
+    if (seen_positions.contains(c.start)) {
+      continue;
+    }
+    seen_positions.insert(c.start);
+
+    auto eid = try_resolve(c.name);
+    if (eid == 0) {
+      continue;
+    }
+
+    // Replace with markdown link: [name](entity:EID)
+    auto link = QStringLiteral("[%1](entity:%2)").arg(c.name).arg(eid);
+    result.replace(c.start, c.length, link);
+  }
+  return result;
+}
+
 // Dispatcher: returns an interactive widget for the tool result, or nullptr.
 static QWidget *createToolResultWidget(const QString &tool_name,
                                        const QJsonObject &result,
-                                       const QJsonObject &/*args*/,
+                                       const QJsonObject &args,
                                        const mx::gui::ConfigManager &config,
                                        QWidget *parent) {
   // Don't create widgets for error results.
@@ -927,6 +1077,14 @@ static QWidget *createToolResultWidget(const QString &tool_name,
   }
   if (tool_name == QStringLiteral("get_session_cost")) {
     return createSessionCostView(result, parent);
+  }
+  if (tool_name == QStringLiteral("create_document")) {
+    return createDocumentButton(result, parent);
+  }
+  if (tool_name == QStringLiteral("create_sheet") ||
+      tool_name == QStringLiteral("create_findings_sheet") ||
+      tool_name == QStringLiteral("create_attack_surface_sheet")) {
+    return createSheetButton(result, args, parent);
   }
   return nullptr;
 }
@@ -1254,10 +1412,23 @@ void AgentConversationWidget::addMessageBubble(
                        "border-radius: 8px; }")
             .arg(d->assistant_bg.red()).arg(d->assistant_bg.green())
             .arg(d->assistant_bg.blue()).arg(d->assistant_bg.alpha()));
-    auto *label = make_label(content);
+
+    // Symbolize identifiers before rendering as markdown.
+    auto symbolized = symbolizeIdentifiers(content, d->config_manager);
+
+    auto *label = new QLabel(frame);
+    label->setWordWrap(true);
     label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     label->setTextFormat(Qt::MarkdownText);
-    label->setText(content);
+    label->setText(symbolized);
+    label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    label->setOpenExternalLinks(false);
+    connect(label, &QLabel::linkActivated, this,
+            [this](const QString &link) {
+      if (link.startsWith(QStringLiteral("entity:"))) {
+        emit navigateToEntity(link.mid(7).toULongLong());
+      }
+    });
     frame_layout->addWidget(label);
 
     auto *wrapper = new QHBoxLayout;
@@ -1314,6 +1485,15 @@ void AgentConversationWidget::addMessageBubble(
             emit navigateToEntity(eid);
           }
         });
+      } else if (auto *btn = qobject_cast<QPushButton *>(interactive)) {
+        auto doc_id = btn->property("doc_id");
+        if (doc_id.isValid()) {
+          connect(btn, &QPushButton::clicked, this,
+                  [this, did = doc_id.toInt()] {
+            emit openDocument(did);
+          });
+        }
+        // Sheet buttons don't emit a signal yet (future enhancement).
       }
     } else {
       auto formatted = tool_result.isEmpty()
