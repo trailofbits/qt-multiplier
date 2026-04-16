@@ -9,9 +9,12 @@
 #include <QAction>
 #include <QDateTime>
 #include <QHBoxLayout>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
 #include <QPushButton>
+#include <QThread>
 #include <QToolBar>
 #include <QVBoxLayout>
 
@@ -57,6 +60,15 @@ struct AgentExplorer::PrivateData {
   QPushButton *stop_btn{nullptr};
   QPushButton *observer_btn{nullptr};
   QLabel *observer_label{nullptr};
+
+  struct RecommenderState {
+    QString context_summary;
+    QStringList open_questions;
+    QString current_suggestion;
+    QStringList alternatives;
+    int suggestion_tokens{0};
+  };
+  RecommenderState recommender;
 
   int64_t current_session_id{-1};
   bool paused{false};
@@ -272,6 +284,14 @@ void AgentExplorer::ConnectSignals(void) {
   // Config changes.
   connect(d->config_panel, &AgentConfigPanel::configChanged,
           this, &AgentExplorer::OnConfigChanged);
+
+  // Recommender: fire after each session completion.
+  connect(d->agent_manager, &AgentManager::sessionCompleted,
+          this, [this](int64_t sid, const QString &) {
+            if (sid == d->current_session_id) {
+              requestRecommendation();
+            }
+          });
 }
 
 void AgentExplorer::OnNewSession(void) {
@@ -430,24 +450,11 @@ void AgentExplorer::OnSessionFinished(int64_t session_id,
   }
   d->conversation->addMessage(summary_msg);
 
-  // Show next actions as clickable suggestion buttons.
+  // Show next actions in the suggestion bar.
   if (!result.next_actions.isEmpty()) {
-    AgentMessage actions_msg;
-    actions_msg.role = QStringLiteral("system");
-    actions_msg.content = tr("Suggested next actions:");
-    d->conversation->addMessage(actions_msg);
-
-    for (const auto &action : result.next_actions) {
-      auto *btn = new QPushButton(action, d->conversation);
-      btn->setStyleSheet(
-          QStringLiteral("QPushButton { text-align: left; padding: 6px 12px; "
-                         "border: 1px solid palette(mid); border-radius: 4px; }"
-                         "QPushButton:hover { background: palette(midlight); }"));
-      btn->setCursor(Qt::PointingHandCursor);
-      connect(btn, &QPushButton::clicked, this,
-              [this, action] { OnSendMessage(action); });
-      d->conversation->layout()->addWidget(btn);
-    }
+    d->conversation->showSuggestion(
+        result.next_actions.first(),
+        result.next_actions.mid(1));
   }
 
   d->config_manager.UpdateAgentSessionStatus(
@@ -638,6 +645,143 @@ void AgentExplorer::OnObserverTriggered(int64_t observer_session_id) {
   sys_msg.content = tr("Observer triggered (review #%1).")
                         .arg(d->observer_recommendation_count + 1);
   d->conversation->addMessage(sys_msg);
+}
+
+void AgentExplorer::requestRecommendation(void) {
+  if (d->config_panel->suggestionMode() == 0) {
+    return;
+  }
+
+  auto *backend = d->llm_manager->activeBackend();
+  if (!backend) {
+    return;
+  }
+
+  // Gather last messages for context.
+  auto all_msgs = d->agent_manager->sessionMessages(d->current_session_id);
+  QStringList recent_lines;
+  qsizetype start = qMax(qsizetype{0}, all_msgs.size() - qsizetype{10});
+  for (qsizetype i = start; i < all_msgs.size(); ++i) {
+    const auto &m = all_msgs[i];
+    if (m.role == QStringLiteral("tool_call") ||
+        m.role == QStringLiteral("tool_result")) {
+      continue;
+    }
+    recent_lines.append(QStringLiteral("%1: %2").arg(m.role, m.content));
+  }
+
+  auto context_summary = d->recommender.context_summary;
+  auto open_questions_str = d->recommender.open_questions.join(
+      QStringLiteral("\n- "));
+  if (!open_questions_str.isEmpty()) {
+    open_questions_str.prepend(QStringLiteral("- "));
+  }
+
+  // Build task board summary.
+  auto open_sheets = d->config_manager.LoadOpenSheets();
+  QStringList sheet_summaries;
+  for (const auto &sheet : open_sheets) {
+    sheet_summaries.append(
+        QStringLiteral("%1 (%2 rows)").arg(sheet.name).arg(sheet.cells.size()));
+  }
+  if (!sheet_summaries.isEmpty()) {
+    if (!context_summary.isEmpty()) {
+      context_summary.append(QStringLiteral("\n"));
+    }
+    context_summary.append(
+        QStringLiteral("Open sheets: %1").arg(sheet_summaries.join(QStringLiteral(", "))));
+  }
+
+  static const QString kRecommenderPrompt = QString::fromUtf8(
+      R"MX(You are a research assistant helping guide an analyst's conversation with an AI agent in a binary analysis IDE.
+
+Recent conversation (last messages):
+%1
+
+Analysis context:
+%2
+
+Open questions:
+%3
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{"suggestion":"the single best next question to ask","alternatives":["other good question 1","other good question 2"],"context_summary":"2-3 sentence summary of where analysis stands","open_questions":["unresolved question 1","unresolved question 2"]})MX");
+
+  auto prompt_text = kRecommenderPrompt
+      .arg(recent_lines.join(QStringLiteral("\n")))
+      .arg(context_summary)
+      .arg(open_questions_str);
+
+  QVector<LLMMessage> messages;
+  LLMMessage user_msg;
+  user_msg.role = QStringLiteral("user");
+  user_msg.content = prompt_text;
+  messages.append(user_msg);
+
+  LLMConfig config;
+  config.temperature = 0.3;
+  config.max_tokens = 512;
+  config.model = d->llm_manager->backendConfig(
+      d->llm_manager->activeBackendName(), QStringLiteral("model"));
+
+  auto *thread = QThread::create([this, messages, config, backend] {
+    auto response = backend->sendMessage(messages, {}, config);
+    QMetaObject::invokeMethod(this, [this, response] {
+      handleRecommendationResponse(response);
+    }, Qt::QueuedConnection);
+  });
+  thread->start();
+}
+
+void AgentExplorer::handleRecommendationResponse(
+    const LLMResponse &response) {
+  if (!response.error.isEmpty()) {
+    return;
+  }
+
+  d->recommender.suggestion_tokens +=
+      response.prompt_tokens + response.completion_tokens;
+
+  auto doc = QJsonDocument::fromJson(response.content.toUtf8());
+  if (!doc.isObject()) {
+    return;
+  }
+
+  auto obj = doc.object();
+  auto suggestion = obj.value(QStringLiteral("suggestion")).toString();
+  if (suggestion.isEmpty()) {
+    return;
+  }
+
+  QStringList alternatives;
+  auto alt_array = obj.value(QStringLiteral("alternatives")).toArray();
+  for (const auto &val : alt_array) {
+    auto s = val.toString();
+    if (!s.isEmpty()) {
+      alternatives.append(s);
+    }
+  }
+
+  auto ctx = obj.value(QStringLiteral("context_summary")).toString();
+  if (!ctx.isEmpty()) {
+    d->recommender.context_summary = ctx;
+  }
+
+  QStringList questions;
+  auto q_array = obj.value(QStringLiteral("open_questions")).toArray();
+  for (const auto &val : q_array) {
+    auto s = val.toString();
+    if (!s.isEmpty()) {
+      questions.append(s);
+    }
+  }
+  if (!questions.isEmpty()) {
+    d->recommender.open_questions = questions;
+  }
+
+  d->recommender.current_suggestion = suggestion;
+  d->recommender.alternatives = alternatives;
+  d->conversation->showSuggestion(suggestion, alternatives);
 }
 
 }  // namespace mx::gui

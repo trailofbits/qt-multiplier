@@ -136,6 +136,7 @@ struct AgentConfigPanel::PrivateData {
   QPushButton *load_prompt_button{nullptr};
   QSpinBox *max_iterations_spin{nullptr};
   QDoubleSpinBox *temperature_spin{nullptr};
+  QComboBox *suggestion_combo{nullptr};
   QLineEdit *python_path_edit{nullptr};
   QPushButton *python_browse_btn{nullptr};
   QLabel *python_status_label{nullptr};
@@ -245,10 +246,10 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->max_iterations_spin = new QSpinBox(content);
   d->max_iterations_spin->setRange(1, 200);
   d->max_iterations_spin->setValue(50);
-  form->addRow(tr("Max iterations:"), d->max_iterations_spin);
+  form->addRow(tr("Max tool-call rounds:"), d->max_iterations_spin);
   form->addRow(makeHint(
-      tr("Maximum tool-call rounds per message. The agent stops after "
-         "this many LLM calls even if not finished."), content));
+      tr("Maximum LLM round-trips per message. Each round: the agent "
+         "calls tools, gets results, and decides what to do next."), content));
 
   d->temperature_spin = new QDoubleSpinBox(content);
   d->temperature_spin->setRange(0.0, 2.0);
@@ -260,6 +261,12 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
       tr("0.0 = deterministic (best for analysis). Higher values "
          "increase randomness. Use 0.5-1.0 for brainstorming."),
       content));
+
+  d->suggestion_combo = new QComboBox(content);
+  d->suggestion_combo->addItems(
+      {tr("Off"), tr("After each response")});
+  d->suggestion_combo->setCurrentIndex(1);
+  form->addRow(tr("Suggestions:"), d->suggestion_combo);
 
   // Separator.
   auto *sep3 = new QFrame(content);
@@ -403,6 +410,10 @@ int AgentConfigPanel::maxIterations(void) const {
 
 double AgentConfigPanel::temperature(void) const {
   return d->temperature_spin->value();
+}
+
+int AgentConfigPanel::suggestionMode(void) const {
+  return d->suggestion_combo->currentIndex();
 }
 
 void AgentConfigPanel::showSaved(void) {

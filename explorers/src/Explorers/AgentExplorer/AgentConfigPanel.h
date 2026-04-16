@@ -31,6 +31,7 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   QString systemPrompt(void) const;
   int maxIterations(void) const;
   double temperature(void) const;
+  int suggestionMode(void) const;
 
  signals:
   void configChanged(void);

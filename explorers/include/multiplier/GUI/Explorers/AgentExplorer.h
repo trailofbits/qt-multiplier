@@ -35,6 +35,8 @@ class AgentExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   void LoadSession(int64_t session_id);
   void StartObserver(void);
   void StopObserver(void);
+  void requestRecommendation(void);
+  void handleRecommendationResponse(const struct LLMResponse &response);
 
  private slots:
   void OnSendMessage(const QString &text);

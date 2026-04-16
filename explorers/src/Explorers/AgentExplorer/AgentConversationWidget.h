@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QJsonObject>
+#include <QStringList>
 #include <QWidget>
 
 #include <memory>
@@ -30,15 +31,22 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
 
  signals:
   void sendMessageRequested(const QString &text);
+  void suggestionAccepted(const QString &text);
 
  public slots:
   void addMessage(const AgentMessage &msg);
   void updateTokens(int prompt_tokens, int completion_tokens);
   void clear(void);
+  void showSuggestion(const QString &suggestion,
+                      const QStringList &alternatives = {});
+  void clearSuggestion(void);
 
  private slots:
   void onSendClicked(void);
   void onThemeChanged(const ThemeManager &tm);
+
+ protected:
+  bool eventFilter(QObject *obj, QEvent *event) override;
 
  private:
   void addMessageBubble(const QString &role, const QString &content,

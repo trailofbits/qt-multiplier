@@ -6,12 +6,16 @@
 
 #include "AgentConversationWidget.h"
 
+#include <QEvent>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QKeyEvent>
 #include <QLabel>
+#include <QMenu>
 #include <QPlainTextEdit>
+#include <QTextCursor>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -40,6 +44,13 @@ struct AgentConversationWidget::PrivateData {
   QColor system_fg;
   QColor tool_bg;
   QColor text_fg;
+
+  QFrame *suggestion_frame{nullptr};
+  QLabel *suggestion_text{nullptr};
+  QLabel *suggestion_hint{nullptr};
+  QPushButton *suggestion_more_btn{nullptr};
+  QString current_suggestion;
+  QStringList current_alternatives;
 
   int total_prompt_tokens{0};
   int total_completion_tokens{0};
@@ -74,6 +85,34 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
   d->scroll_area->setWidget(d->messages_container);
   main_layout->addWidget(d->scroll_area, 1);
 
+  // Suggestion box.
+  d->suggestion_frame = new QFrame(this);
+  d->suggestion_frame->setFrameShape(QFrame::StyledPanel);
+  d->suggestion_frame->setStyleSheet(
+      QStringLiteral("QFrame { background-color: palette(alternateBase); "
+                     "border: 1px solid palette(mid); border-radius: 4px; }"));
+  auto *sug_layout = new QHBoxLayout(d->suggestion_frame);
+  sug_layout->setContentsMargins(8, 6, 8, 6);
+
+  d->suggestion_text = new QLabel(d->suggestion_frame);
+  d->suggestion_text->setWordWrap(true);
+  sug_layout->addWidget(d->suggestion_text, 1);
+
+  d->suggestion_hint = new QLabel(tr("Tab to accept"), d->suggestion_frame);
+  auto hint_font = d->suggestion_hint->font();
+  hint_font.setPointSize(hint_font.pointSize() - 1);
+  d->suggestion_hint->setFont(hint_font);
+  d->suggestion_hint->setStyleSheet(
+      QStringLiteral("color: palette(mid);"));
+  sug_layout->addWidget(d->suggestion_hint);
+
+  d->suggestion_more_btn = new QPushButton(tr("more"), d->suggestion_frame);
+  d->suggestion_more_btn->setFlat(true);
+  sug_layout->addWidget(d->suggestion_more_btn);
+
+  d->suggestion_frame->setVisible(false);
+  main_layout->addWidget(d->suggestion_frame);
+
   // Input area.
   auto *input_layout = new QHBoxLayout;
   input_layout->setContentsMargins(4, 0, 4, 4);
@@ -104,6 +143,30 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
           this, &AgentConversationWidget::onSendClicked);
   connect(&theme_manager, &ThemeManager::ThemeChanged,
           this, &AgentConversationWidget::onThemeChanged);
+
+  // Suggestion more button.
+  connect(d->suggestion_more_btn, &QPushButton::clicked, this, [this] {
+    if (d->current_alternatives.isEmpty()) {
+      return;
+    }
+    auto *menu = new QMenu(this);
+    for (const auto &alt : d->current_alternatives) {
+      auto *action = menu->addAction(alt);
+      connect(action, &QAction::triggered, this, [this, alt] {
+        d->input_edit->setPlainText(alt);
+        clearSuggestion();
+      });
+    }
+    menu->popup(d->suggestion_more_btn->mapToGlobal(
+        d->suggestion_more_btn->rect().bottomLeft()));
+  });
+
+  // Event filter on input for Tab-to-accept.
+  d->input_edit->installEventFilter(this);
+
+  // Default suggestion.
+  showSuggestion(tr("List all source files and create a task board for "
+                    "auditing this codebase."));
 
   applyThemeColors();
 }
@@ -151,6 +214,7 @@ void AgentConversationWidget::onSendClicked(void) {
     return;
   }
   d->input_edit->clear();
+  clearSuggestion();
   emit sendMessageRequested(text);
 }
 
@@ -291,6 +355,49 @@ void AgentConversationWidget::addMessageBubble(
   }
 
   scrollToBottom();
+}
+
+void AgentConversationWidget::showSuggestion(
+    const QString &suggestion, const QStringList &alternatives) {
+  d->current_suggestion = suggestion;
+  d->current_alternatives = alternatives;
+  d->suggestion_text->setText(suggestion);
+  d->suggestion_more_btn->setVisible(!alternatives.isEmpty());
+  d->suggestion_frame->setVisible(true);
+}
+
+void AgentConversationWidget::clearSuggestion(void) {
+  d->current_suggestion.clear();
+  d->current_alternatives.clear();
+  d->suggestion_frame->setVisible(false);
+}
+
+bool AgentConversationWidget::eventFilter(QObject *obj, QEvent *event) {
+  if (obj == d->input_edit && event->type() == QEvent::KeyPress) {
+    auto *key_event = static_cast<QKeyEvent *>(event);
+    if (key_event->key() == Qt::Key_Tab &&
+        d->suggestion_frame->isVisible() &&
+        !d->current_suggestion.isEmpty()) {
+      d->input_edit->setPlainText(d->current_suggestion);
+      auto cursor = d->input_edit->textCursor();
+      cursor.movePosition(QTextCursor::End);
+      d->input_edit->setTextCursor(cursor);
+      auto suggestion = d->current_suggestion;
+      clearSuggestion();
+      emit suggestionAccepted(suggestion);
+      return true;
+    }
+    if (d->suggestion_frame->isVisible() &&
+        d->input_edit->toPlainText().isEmpty() &&
+        key_event->key() != Qt::Key_Tab &&
+        key_event->key() != Qt::Key_Shift &&
+        key_event->key() != Qt::Key_Control &&
+        key_event->key() != Qt::Key_Alt &&
+        key_event->key() != Qt::Key_Meta) {
+      clearSuggestion();
+    }
+  }
+  return QWidget::eventFilter(obj, event);
 }
 
 void AgentConversationWidget::scrollToBottom(void) {
