@@ -386,10 +386,15 @@ void AgentConfigPanel::onLoadPromptClicked(void) {
 }
 
 void AgentConfigPanel::onBrowsePythonClicked(void) {
-  auto path = QFileDialog::getOpenFileName(
-      this, tr("Select Python Interpreter"), QStringLiteral("/usr"),
-      tr("Executables (*)"));
-  if (!path.isEmpty()) {
+  QFileDialog dialog(this, tr("Select Python Interpreter"),
+                     QStringLiteral("/usr"));
+  dialog.setNameFilter(tr("All files (*)"));
+  dialog.setFileMode(QFileDialog::ExistingFile);
+  dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+  dialog.setWindowModality(Qt::ApplicationModal);
+
+  if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+    auto path = dialog.selectedFiles().first();
     d->python_path_edit->setText(path);
     d->config_manager.SetPythonInterpreterPath(path);
   }
