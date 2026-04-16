@@ -444,7 +444,7 @@ QJsonObject GetCallersTool::parametersSchema(void) const {
   props[QStringLiteral("entity_id")] = int_prop(
       QStringLiteral("Entity ID of the function to find callers of"));
   props[QStringLiteral("depth")] = int_prop(
-      QStringLiteral("How many levels up to traverse (default 1, max 5)"));
+      QStringLiteral("How many levels up to traverse (default 1)"));
   return make_schema(props, {QStringLiteral("entity_id")});
 }
 
@@ -541,7 +541,6 @@ QJsonObject GetCallersTool::execute(const QJsonObject &args) {
 
   int depth = static_cast<int>(args[QStringLiteral("depth")].toDouble(1));
   if (depth < 1) depth = 1;
-  if (depth > 5) depth = 5;
 
   const auto &index = m_ctx->config->Index();
   mx::VariantEntity vent = index.entity(mx::EntityId(raw_id));
@@ -588,7 +587,7 @@ QJsonObject GetCalleesTool::parametersSchema(void) const {
   props[QStringLiteral("entity_id")] = int_prop(
       QStringLiteral("Entity ID of the function to find callees of"));
   props[QStringLiteral("depth")] = int_prop(
-      QStringLiteral("How many levels down to traverse (default 1, max 5)"));
+      QStringLiteral("How many levels down to traverse (default 1)"));
   return make_schema(props, {QStringLiteral("entity_id")});
 }
 
@@ -687,7 +686,6 @@ QJsonObject GetCalleesTool::execute(const QJsonObject &args) {
 
   int depth = static_cast<int>(args[QStringLiteral("depth")].toDouble(1));
   if (depth < 1) depth = 1;
-  if (depth > 5) depth = 5;
 
   const auto &index = m_ctx->config->Index();
   mx::VariantEntity vent = index.entity(mx::EntityId(raw_id));
