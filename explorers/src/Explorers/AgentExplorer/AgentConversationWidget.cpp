@@ -925,25 +925,27 @@ static QWidget *createDocumentButton(const QJsonObject &result,
 }
 
 // 10. create_findings_sheet / create_attack_surface_sheet / create_sheet
-//     -> clickable "Open sheet" button
-static QWidget *createSheetButton(const QJsonObject &result,
-                                  const QJsonObject &args,
-                                  QWidget *parent) {
+//     -> informational label (sheets auto-open in the Sheets panel)
+static QWidget *createSheetLabel(const QJsonObject &result,
+                                 const QJsonObject &args,
+                                 QWidget *parent) {
   int sheet_id = result[QStringLiteral("sheet_id")].toInt(-1);
   if (sheet_id < 0) {
     return nullptr;
   }
   auto name = args[QStringLiteral("name")].toString();
-  auto *btn = new QPushButton(
-      QStringLiteral("Open: %1").arg(
-          name.isEmpty() ? QStringLiteral("Sheet %1").arg(sheet_id) : name),
+  auto display = name.isEmpty()
+                     ? QStringLiteral("Sheet %1").arg(sheet_id)
+                     : name;
+  auto *label = new QLabel(
+      QStringLiteral("%1 \xe2\x80\x94 visible in the Sheets panel").arg(display),
       parent);
-  btn->setFlat(true);
-  btn->setCursor(Qt::PointingHandCursor);
-  btn->setStyleSheet(
-      QStringLiteral("QPushButton { text-align: left; color: palette(link); }"));
-  btn->setProperty("sheet_id", sheet_id);
-  return btn;
+  auto f = label->font();
+  f.setItalic(true);
+  f.setPointSize(f.pointSize() - 1);
+  label->setFont(f);
+  label->setStyleSheet(QStringLiteral("color: palette(mid);"));
+  return label;
 }
 
 // Scan text for C/C++ identifiers, resolve against the Index, and return
@@ -1078,7 +1080,7 @@ static QWidget *createToolResultWidget(const QString &tool_name,
   if (tool_name == QStringLiteral("create_sheet") ||
       tool_name == QStringLiteral("create_findings_sheet") ||
       tool_name == QStringLiteral("create_attack_surface_sheet")) {
-    return createSheetButton(result, args, parent);
+    return createSheetLabel(result, args, parent);
   }
   return nullptr;
 }
@@ -1120,6 +1122,9 @@ struct AgentConversationWidget::PrivateData {
   // Also store tool names for pending calls.
   QMap<QString, QString> pending_tool_names;
 
+  bool auto_scroll{true};
+  QPushButton *tail_btn{nullptr};
+
   int total_prompt_tokens{0};
   int total_completion_tokens{0};
   bool enter_to_send{true};
@@ -1158,6 +1163,30 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
 
   d->scroll_area->setWidget(d->messages_container);
   main_layout->addWidget(d->scroll_area, 1);
+
+  // Floating "new messages" button overlaid on scroll area.
+  d->tail_btn = new QPushButton(
+      QStringLiteral("\xe2\x86\x93 New messages"), d->scroll_area);
+  d->tail_btn->setStyleSheet(
+      QStringLiteral("QPushButton { background: palette(highlight); "
+                     "color: palette(highlighted-text); border-radius: 4px; "
+                     "padding: 4px 8px; }"));
+  d->tail_btn->setVisible(false);
+  d->tail_btn->raise();
+
+  connect(d->tail_btn, &QPushButton::clicked, this, [this] {
+    d->auto_scroll = true;
+    d->tail_btn->setVisible(false);
+    auto *sb = d->scroll_area->verticalScrollBar();
+    sb->setValue(sb->maximum());
+  });
+
+  connect(d->scroll_area->verticalScrollBar(), &QScrollBar::valueChanged,
+          this, [this](int value) {
+    auto *sb = d->scroll_area->verticalScrollBar();
+    d->auto_scroll = (value >= sb->maximum() - 10);
+    d->tail_btn->setVisible(!d->auto_scroll);
+  });
 
   // Status indicator.
   d->status_label = new QLabel(this);
@@ -1249,8 +1278,9 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
         d->suggestion_more_btn->rect().bottomLeft()));
   });
 
-  // Event filter on input for Tab-to-accept.
+  // Event filter on input for Tab-to-accept and scroll area for resize.
   d->input_edit->installEventFilter(this);
+  d->scroll_area->installEventFilter(this);
 
   // Default suggestion.
   showSuggestion(
@@ -1332,6 +1362,8 @@ void AgentConversationWidget::clear(void) {
   d->token_label->setText(tr("Tokens: 0 in / 0 out ($0.00)"));
   d->pending_tool_args.clear();
   d->pending_tool_names.clear();
+  d->auto_scroll = true;
+  d->tail_btn->setVisible(false);
   clearStatus();
 }
 
@@ -1487,7 +1519,6 @@ void AgentConversationWidget::addMessageBubble(
             emit openDocument(did);
           });
         }
-        // Sheet buttons don't emit a signal yet (future enhancement).
       }
     } else {
       auto formatted = tool_result.isEmpty()
@@ -1541,6 +1572,13 @@ void AgentConversationWidget::clearSuggestion(void) {
 }
 
 bool AgentConversationWidget::eventFilter(QObject *obj, QEvent *event) {
+  if (obj == d->scroll_area && event->type() == QEvent::Resize) {
+    // Reposition floating tail button at bottom-right of scroll area.
+    auto w = d->tail_btn->sizeHint().width();
+    auto h = d->tail_btn->sizeHint().height();
+    auto sa = d->scroll_area->size();
+    d->tail_btn->move(sa.width() - w - 16, sa.height() - h - 12);
+  }
   if (obj == d->input_edit && event->type() == QEvent::KeyPress) {
     auto *key_event = static_cast<QKeyEvent *>(event);
 
@@ -1584,6 +1622,11 @@ bool AgentConversationWidget::eventFilter(QObject *obj, QEvent *event) {
 }
 
 void AgentConversationWidget::scrollToBottom(void) {
+  if (!d->auto_scroll) {
+    // Show the tail button to indicate new content below.
+    d->tail_btn->setVisible(true);
+    return;
+  }
   QTimer::singleShot(0, this, [this] {
     auto *bar = d->scroll_area->verticalScrollBar();
     bar->setValue(bar->maximum());

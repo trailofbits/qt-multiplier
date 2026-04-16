@@ -189,6 +189,14 @@ struct AgentConfigPanel::PrivateData {
   QComboBox *summarizer_model_combo{nullptr};
   QComboBox *observer_model_combo{nullptr};
   QGroupBox *model_roles_group{nullptr};
+  QLineEdit *bedrock_access_key{nullptr};
+  QLineEdit *bedrock_secret_key{nullptr};
+  QLineEdit *bedrock_region{nullptr};
+  QLabel *bedrock_access_label{nullptr};
+  QLabel *bedrock_secret_label{nullptr};
+  QLabel *bedrock_region_label{nullptr};
+  QLabel *api_key_label{nullptr};
+  QWidget *api_key_row{nullptr};
   QLineEdit *python_path_edit{nullptr};
   QPushButton *python_browse_btn{nullptr};
   QLabel *python_status_label{nullptr};
@@ -234,13 +242,13 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   d->api_key_edit = new QLineEdit(content);
   d->api_key_edit->setEchoMode(QLineEdit::Password);
   d->api_key_edit->setPlaceholderText(tr("Enter API key..."));
-  auto *api_key_row = new QWidget(content);
-  auto *api_key_layout = new QHBoxLayout(api_key_row);
+  d->api_key_row = new QWidget(content);
+  auto *api_key_layout = new QHBoxLayout(d->api_key_row);
   api_key_layout->setContentsMargins(0, 0, 0, 0);
   api_key_layout->setSpacing(4);
   api_key_layout->addWidget(d->api_key_edit, 1);
 
-  auto *clear_keys_btn = new QPushButton(tr("Clear All"), api_key_row);
+  auto *clear_keys_btn = new QPushButton(tr("Clear All"), d->api_key_row);
   clear_keys_btn->setToolTip(tr("Remove all saved API keys from settings"));
   api_key_layout->addWidget(clear_keys_btn);
   connect(clear_keys_btn, &QPushButton::clicked, this, [this] {
@@ -249,7 +257,33 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
     showSaved();
   });
 
-  form->addRow(tr("API Key:"), api_key_row);
+  d->api_key_label = new QLabel(tr("API Key:"), content);
+  form->addRow(d->api_key_label, d->api_key_row);
+
+  // Bedrock-specific credential fields (hidden by default).
+  d->bedrock_access_key = new QLineEdit(content);
+  d->bedrock_access_key->setEchoMode(QLineEdit::Password);
+  d->bedrock_access_key->setPlaceholderText(tr("AWS Access Key ID"));
+  d->bedrock_access_label = new QLabel(tr("Access Key:"), content);
+  form->addRow(d->bedrock_access_label, d->bedrock_access_key);
+
+  d->bedrock_secret_key = new QLineEdit(content);
+  d->bedrock_secret_key->setEchoMode(QLineEdit::Password);
+  d->bedrock_secret_key->setPlaceholderText(tr("AWS Secret Access Key"));
+  d->bedrock_secret_label = new QLabel(tr("Secret Key:"), content);
+  form->addRow(d->bedrock_secret_label, d->bedrock_secret_key);
+
+  d->bedrock_region = new QLineEdit(content);
+  d->bedrock_region->setPlaceholderText(tr("us-east-1"));
+  d->bedrock_region_label = new QLabel(tr("Region:"), content);
+  form->addRow(d->bedrock_region_label, d->bedrock_region);
+
+  d->bedrock_access_key->setVisible(false);
+  d->bedrock_secret_key->setVisible(false);
+  d->bedrock_region->setVisible(false);
+  d->bedrock_access_label->setVisible(false);
+  d->bedrock_secret_label->setVisible(false);
+  d->bedrock_region_label->setVisible(false);
 
   d->base_url_edit = new QLineEdit(content);
   d->base_url_edit->setPlaceholderText(tr("https://api.openai.com/v1"));
@@ -425,6 +459,41 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
           this, &AgentConfigPanel::onApiKeyChanged);
   connect(d->base_url_edit, &QLineEdit::editingFinished,
           this, &AgentConfigPanel::onBaseUrlChanged);
+
+  connect(d->bedrock_access_key, &QLineEdit::editingFinished, this, [this] {
+    auto name = d->llm_manager.activeBackendName();
+    if (!name.isEmpty()) {
+      d->llm_manager.setBackendConfig(
+          name, QStringLiteral("access_key_id"),
+          d->bedrock_access_key->text());
+      d->llm_manager.saveConfig();
+    }
+    showSaved();
+    emit configChanged();
+  });
+  connect(d->bedrock_secret_key, &QLineEdit::editingFinished, this, [this] {
+    auto name = d->llm_manager.activeBackendName();
+    if (!name.isEmpty()) {
+      d->llm_manager.setBackendConfig(
+          name, QStringLiteral("secret_access_key"),
+          d->bedrock_secret_key->text());
+      d->llm_manager.saveConfig();
+    }
+    showSaved();
+    emit configChanged();
+  });
+  connect(d->bedrock_region, &QLineEdit::editingFinished, this, [this] {
+    auto name = d->llm_manager.activeBackendName();
+    if (!name.isEmpty()) {
+      d->llm_manager.setBackendConfig(
+          name, QStringLiteral("region"),
+          d->bedrock_region->text());
+      d->llm_manager.saveConfig();
+    }
+    showSaved();
+    emit configChanged();
+  });
+
   connect(d->model_combo, &QComboBox::currentTextChanged,
           this, &AgentConfigPanel::onModelChanged);
   connect(d->load_prompt_button, &QPushButton::clicked,
@@ -533,6 +602,24 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
     if (!saved_url.isEmpty()) {
       d->base_url_edit->setText(saved_url);
     }
+
+    // Restore Bedrock fields if applicable.
+    if (type == QStringLiteral("bedrock")) {
+      d->api_key_label->setVisible(false);
+      d->api_key_row->setVisible(false);
+      d->bedrock_access_key->setVisible(true);
+      d->bedrock_secret_key->setVisible(true);
+      d->bedrock_region->setVisible(true);
+      d->bedrock_access_label->setVisible(true);
+      d->bedrock_secret_label->setVisible(true);
+      d->bedrock_region_label->setVisible(true);
+      d->bedrock_access_key->setText(
+          d->llm_manager.backendConfig(type, QStringLiteral("access_key_id")));
+      d->bedrock_secret_key->setText(
+          d->llm_manager.backendConfig(type, QStringLiteral("secret_access_key")));
+      d->bedrock_region->setText(
+          d->llm_manager.backendConfig(type, QStringLiteral("region")));
+    }
   } else {
     populateModels(d->backend_combo->currentData().toString());
   }
@@ -624,11 +711,30 @@ void AgentConfigPanel::onBackendTypeChanged(int index) {
   d->base_url_edit->setVisible(show_url);
   d->base_url_label->setVisible(show_url);
 
+  bool is_bedrock = (type == QStringLiteral("bedrock"));
+  d->api_key_label->setVisible(!is_bedrock);
+  d->api_key_row->setVisible(!is_bedrock);
+  d->bedrock_access_key->setVisible(is_bedrock);
+  d->bedrock_secret_key->setVisible(is_bedrock);
+  d->bedrock_region->setVisible(is_bedrock);
+  d->bedrock_access_label->setVisible(is_bedrock);
+  d->bedrock_secret_label->setVisible(is_bedrock);
+  d->bedrock_region_label->setVisible(is_bedrock);
+
   ensureBackendExists(type);
 
   // Restore saved config for this backend.
   auto saved_key = d->llm_manager.apiKeyForType(type);
   d->api_key_edit->setText(saved_key);
+
+  if (is_bedrock) {
+    d->bedrock_access_key->setText(
+        d->llm_manager.backendConfig(type, QStringLiteral("access_key_id")));
+    d->bedrock_secret_key->setText(
+        d->llm_manager.backendConfig(type, QStringLiteral("secret_access_key")));
+    d->bedrock_region->setText(
+        d->llm_manager.backendConfig(type, QStringLiteral("region")));
+  }
 
   auto saved_url = d->llm_manager.backendConfig(type,
                        QStringLiteral("base_url"));
