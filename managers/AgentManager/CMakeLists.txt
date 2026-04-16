@@ -51,6 +51,7 @@ target_link_libraries("mx_agent_manager"
     "mx_config_manager"
     "mx_spreadsheet_widget"
     "mx_multiplier_library"
+    "mx_util_component"
 )
 
 target_include_directories("mx_agent_manager" PRIVATE
