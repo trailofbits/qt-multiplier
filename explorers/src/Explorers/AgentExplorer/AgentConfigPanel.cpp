@@ -747,19 +747,43 @@ void AgentConfigPanel::maybeVerifyPython(void) {
   proc->setArguments({QStringLiteral("-c"),
       QStringLiteral("import multiplier; print(multiplier.__file__)")});
 
-  // Set up venv environment if the interpreter lives in a venv-like path.
-  // E.g. /path/to/venv/bin/python3 → VIRTUAL_ENV=/path/to/venv
+  // Set up venv environment. Try multiple strategies:
+  // 1. Check for pyvenv.cfg in parent dir (standard venv layout: venv/bin/python)
+  // 2. Check for pyvenv.cfg in grandparent dir
+  // 3. Check if VIRTUAL_ENV is already set in the system environment
   QFileInfo fi(path);
   auto bin_dir = fi.absolutePath();
+  auto env = QProcessEnvironment::systemEnvironment();
+
+  // Strategy 1: venv/bin/python → pyvenv.cfg at venv/
   auto venv_dir = QFileInfo(bin_dir).absolutePath();
   auto pyvenv_cfg = venv_dir + QStringLiteral("/pyvenv.cfg");
+
   if (QFileInfo::exists(pyvenv_cfg)) {
-    auto env = QProcessEnvironment::systemEnvironment();
     env.insert(QStringLiteral("VIRTUAL_ENV"), venv_dir);
     env.insert(QStringLiteral("PATH"),
                bin_dir + QStringLiteral(":") + env.value(QStringLiteral("PATH")));
-    proc->setProcessEnvironment(env);
+  } else {
+    // Strategy 2: maybe the path IS the venv dir and they pointed at the
+    // python inside it without the bin/ prefix. Or the binary is a symlink.
+    auto canonical = fi.canonicalFilePath();
+    if (!canonical.isEmpty()) {
+      QFileInfo cfi(canonical);
+      auto canon_bin = cfi.absolutePath();
+      auto canon_venv = QFileInfo(canon_bin).absolutePath();
+      auto canon_cfg = canon_venv + QStringLiteral("/pyvenv.cfg");
+      if (QFileInfo::exists(canon_cfg)) {
+        env.insert(QStringLiteral("VIRTUAL_ENV"), canon_venv);
+        env.insert(QStringLiteral("PATH"),
+                   canon_bin + QStringLiteral(":") +
+                       env.value(QStringLiteral("PATH")));
+      }
+    }
   }
+
+  // Always set PYTHONDONTWRITEBYTECODE to avoid permission issues.
+  env.insert(QStringLiteral("PYTHONDONTWRITEBYTECODE"), QStringLiteral("1"));
+  proc->setProcessEnvironment(env);
 
   connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
           this, [this, proc](int exit_code, QProcess::ExitStatus) {
@@ -777,12 +801,23 @@ void AgentConfigPanel::maybeVerifyPython(void) {
           QStringLiteral("color: palette(mid); font-style: italic;"));
     } else {
       auto err = QString::fromUtf8(proc->readAllStandardError()).trimmed();
-      if (err.length() > 120) {
-        err = err.left(120) + QStringLiteral("...");
+      auto out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+      // Show the most useful error info.
+      QString detail;
+      if (!err.isEmpty()) {
+        // Extract just the last line (usually the actual ImportError).
+        auto lines = err.split(QLatin1Char('\n'));
+        detail = lines.last().trimmed();
+        if (detail.length() > 150) {
+          detail = detail.left(150) + QStringLiteral("...");
+        }
+      } else if (!out.isEmpty()) {
+        detail = out;
+      } else {
+        detail = tr("import multiplier failed (exit code %1)").arg(exit_code);
       }
       setPythonStatus(3);
-      d->python_status_label->setText(
-          err.isEmpty() ? tr("import multiplier failed") : err);
+      d->python_status_label->setText(detail);
       d->python_status_label->setStyleSheet(
           QStringLiteral("color: palette(mid); font-style: italic;"));
     }
