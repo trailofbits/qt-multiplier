@@ -9,7 +9,10 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Frontend/Query.h>
 #include <multiplier/Index.h>
+#include <multiplier/Re2.h>
 #include <multiplier/Reference.h>
 #include <multiplier/GUI/Util.h>
 
@@ -34,6 +37,13 @@ static QJsonObject string_prop(const QString &desc) {
 static QJsonObject int_prop(const QString &desc) {
   QJsonObject p;
   p[QStringLiteral("type")] = QStringLiteral("integer");
+  p[QStringLiteral("description")] = desc;
+  return p;
+}
+
+static QJsonObject bool_prop(const QString &desc) {
+  QJsonObject p;
+  p[QStringLiteral("type")] = QStringLiteral("boolean");
   p[QStringLiteral("description")] = desc;
   return p;
 }
@@ -803,6 +813,161 @@ QJsonObject GetDatabasePathTool::execute(const QJsonObject &) {
 }
 
 // ===========================================================================
+// SearchCodeTool
+// ===========================================================================
+
+QString SearchCodeTool::name(void) const {
+  return QStringLiteral("search_code");
+}
+
+QString SearchCodeTool::description(void) const {
+  return QStringLiteral(
+      "Search all indexed source code for a regex pattern. Returns matching "
+      "lines with file, line number, and context.");
+}
+
+QJsonObject SearchCodeTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("pattern")] = string_prop(
+      QStringLiteral("Regex pattern to search for (RE2 syntax)"));
+  props[QStringLiteral("case_sensitive")] = bool_prop(
+      QStringLiteral("Whether the search is case sensitive (default: false)"));
+  props[QStringLiteral("max_results")] = int_prop(
+      QStringLiteral("Maximum number of results to return (default: 100)"));
+  props[QStringLiteral("offset")] = int_prop(
+      QStringLiteral("Skip this many matches before returning (default: 0). "
+                     "Use with max_results for pagination."));
+  return make_schema(props, {QStringLiteral("pattern")});
+}
+
+QJsonObject SearchCodeTool::execute(const QJsonObject &args) {
+  QString pattern_str = args[QStringLiteral("pattern")].toString();
+  if (pattern_str.isEmpty()) {
+    return error_result(QStringLiteral("pattern is required"));
+  }
+
+  bool case_sensitive = args[QStringLiteral("case_sensitive")].toBool(false);
+
+  int max_results = static_cast<int>(
+      args[QStringLiteral("max_results")].toDouble(100));
+  if (max_results <= 0) {
+    max_results = 100;
+  }
+
+  int offset = static_cast<int>(
+      args[QStringLiteral("offset")].toDouble(0));
+  if (offset < 0) {
+    offset = 0;
+  }
+
+  // Build the RE2 pattern. Prepend (?i) for case-insensitive matching.
+  std::string re2_pattern;
+  if (!case_sensitive) {
+    re2_pattern = "(?i)";
+  }
+  re2_pattern += pattern_str.toStdString();
+
+  mx::RegexQuery query(std::move(re2_pattern));
+  if (!query.is_valid()) {
+    return error_result(QStringLiteral("invalid regex pattern"));
+  }
+
+  const auto &index = m_ctx->config->Index();
+
+  QJsonArray arr;
+  int count = 0;
+  int total_matched = 0;
+  bool has_more = false;
+
+  for (mx::File file : index.files()) {
+    // Get a display path for the file.
+    QString file_path;
+    mx::RawEntityId file_entity_id = file.id().Pack();
+    for (auto path : file.paths()) {
+      file_path = QString::fromStdString(path.generic_string());
+      break;
+    }
+
+    for (mx::RegexQueryMatch match : query.match_fragments(file)) {
+      ++total_matched;
+
+      // Skip until we've passed the offset.
+      if (total_matched <= offset) {
+        continue;
+      }
+
+      if (count >= max_results) {
+        has_more = true;
+        continue;
+      }
+
+      std::string_view match_data = match.data();
+      QString match_text = QString::fromUtf8(
+          match_data.data(), static_cast<qsizetype>(match_data.size()));
+
+      // Get the line number from the first token of the match.
+      int line = -1;
+      for (mx::Token tok : match) {
+        mx::Token ft = tok.file_token();
+        if (!ft) {
+          ft = tok;
+        }
+        auto loc = ft.nearest_location(m_ctx->config->FileLocationCache());
+        if (loc) {
+          line = static_cast<int>(loc->first);
+        }
+        break;
+      }
+
+      // Build a context snippet: the full line(s) containing the match.
+      // The match data points into the file's token data, so we extract
+      // surrounding context by finding line boundaries.
+      QString context = match_text;
+      if (!match_data.empty()) {
+        // Walk backwards to find the line start.
+        const char *data_ptr = match_data.data();
+        const char *line_start = data_ptr;
+
+        // Walk forward to find the line end.
+        const char *line_end = data_ptr + match_data.size();
+
+        // Trim to just the first line of a multi-line match for context.
+        const char *first_newline = data_ptr;
+        while (first_newline < line_end && *first_newline != '\n') {
+          ++first_newline;
+        }
+
+        // Use the match text up to the first newline as context.
+        if (first_newline < line_end) {
+          context = QString::fromUtf8(
+              line_start,
+              static_cast<qsizetype>(first_newline - line_start));
+        }
+      }
+
+      QJsonObject obj;
+      obj[QStringLiteral("file")] = file_path;
+      if (line >= 0) {
+        obj[QStringLiteral("line")] = line;
+      }
+      obj[QStringLiteral("match")] = match_text;
+      obj[QStringLiteral("context")] = context;
+      obj[QStringLiteral("entity_id")] = static_cast<qint64>(file_entity_id);
+      arr.append(obj);
+      ++count;
+    }
+  }
+
+  QJsonObject result;
+  result[QStringLiteral("matches")] = arr;
+  result[QStringLiteral("count")] = count;
+  result[QStringLiteral("total_matched")] = total_matched;
+  result[QStringLiteral("offset")] = offset;
+  result[QStringLiteral("has_more")] = has_more;
+  return result;
+}
+
+// ===========================================================================
 // Registration
 // ===========================================================================
 
@@ -815,6 +980,7 @@ void registerNavigationTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<GetCalleesTool>(ctx));
   registry.registerTool(std::make_unique<ListFilesTool>(ctx));
   registry.registerTool(std::make_unique<GetDatabasePathTool>(ctx));
+  registry.registerTool(std::make_unique<SearchCodeTool>(ctx));
 }
 
 }  // namespace mx::gui
