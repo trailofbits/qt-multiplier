@@ -7,6 +7,7 @@
 #include <multiplier/GUI/Explorers/AgentExplorer.h>
 
 #include <QAction>
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QHBoxLayout>
@@ -78,6 +79,7 @@ struct AgentExplorer::PrivateData {
     QStringList observations;
     QDateTime last_summarized;
     int views_since_summary{0};
+    QString last_summarize_hash;
   };
   CodeContext code_context;
   CodeExplorer *code_explorer{nullptr};
@@ -801,6 +803,16 @@ void AgentExplorer::summarizeViewedCode(void) {
     }
     code_snippets += QStringLiteral("\n");
   }
+
+  // Skip if the viewed code hasn't changed since the last summarization.
+  auto snippets_hash = QString::fromLatin1(
+      QCryptographicHash::hash(code_snippets.toUtf8(),
+                               QCryptographicHash::Md5).toHex());
+  if (snippets_hash == d->code_context.last_summarize_hash) {
+    d->code_context.views_since_summary = 0;
+    return;
+  }
+  d->code_context.last_summarize_hash = snippets_hash;
 
   static const QString kCodeSummaryPrompt = QString::fromUtf8(
       R"MX(You are a code analyst producing factual observations about recently viewed code.

@@ -12,6 +12,9 @@
 #include <QJsonObject>
 #include <QMetaObject>
 
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Index.h>
+#include <multiplier/GUI/Util.h>
 #include <multiplier/GUI/Widgets/SpreadsheetModel.h>
 
 #include <algorithm>
@@ -154,6 +157,62 @@ static QJsonObject make_schema(const QJsonObject &properties,
   return schema;
 }
 
+// Build a LocationCell JSON string from an entity ID, resolving file path
+// and line via the index.
+static QString make_location_cell_json(ConfigManager *config,
+                                       mx::RawEntityId entity_id) {
+  const auto &index = config->Index();
+  mx::VariantEntity vent = index.entity(mx::EntityId(entity_id));
+
+  if (std::holds_alternative<mx::NotAnEntity>(vent)) {
+    return {};
+  }
+
+  LocationCell lc;
+  lc.entity_id = entity_id;
+
+  if (auto loc = LocationOfEntityEx(config->FileLocationCache(), vent)) {
+    lc.file_path = QString::fromStdString(loc->path.generic_string());
+    lc.line = loc->line;
+    lc.column = loc->column;
+  }
+
+  return SpreadsheetModel::value_to_json(QVariant::fromValue(lc));
+}
+
+// Try to interpret a string value as an entity reference.
+// Returns a non-empty LocationCell JSON if the value looks like an entity
+// reference ("entity:NNN" prefix or a pure number that resolves to a valid
+// entity). Returns empty string otherwise.
+static QString try_as_location_cell(ConfigManager *config,
+                                    const QString &value) {
+  bool is_entity_ref = false;
+  mx::RawEntityId eid = 0;
+
+  if (value.startsWith(QLatin1String("entity:"))) {
+    bool ok = false;
+    eid = static_cast<mx::RawEntityId>(
+        value.mid(7).toLongLong(&ok));
+    is_entity_ref = ok && eid != 0;
+  } else {
+    // Check if it's a pure number that resolves to a valid entity.
+    bool ok = false;
+    auto num = value.toLongLong(&ok);
+    if (ok && num > 0) {
+      eid = static_cast<mx::RawEntityId>(num);
+      const auto &index = config->Index();
+      mx::VariantEntity vent = index.entity(mx::EntityId(eid));
+      is_entity_ref = !std::holds_alternative<mx::NotAnEntity>(vent);
+    }
+  }
+
+  if (!is_entity_ref) {
+    return {};
+  }
+
+  return make_location_cell_json(config, eid);
+}
+
 }  // namespace
 
 // ===========================================================================
@@ -165,7 +224,9 @@ QString CreateSheetTool::name(void) const {
 }
 
 QString CreateSheetTool::description(void) const {
-  return QStringLiteral("Create a new spreadsheet with named columns.");
+  return QStringLiteral(
+      "Create a custom sheet. Prefer create_findings_sheet, "
+      "create_attack_surface_sheet, or create_task for structured data.");
 }
 
 QJsonObject CreateSheetTool::parametersSchema(void) const {
@@ -398,7 +459,18 @@ QJsonObject WriteCellTool::execute(const QJsonObject &args) {
   }
 
   ensure_cell(sheet, row, col);
-  sheet.cells[row][col] = make_cell_json(value, type);
+
+  // Auto-detect entity references and create LocationCells instead of plain
+  // strings when the value looks like an entity reference.
+  QString cell_json;
+  if (type == QLatin1String("string")) {
+    cell_json = try_as_location_cell(m_ctx->config, value);
+  }
+  if (cell_json.isEmpty()) {
+    cell_json = make_cell_json(value, type);
+  }
+
+  sheet.cells[row][col] = cell_json;
   QMetaObject::invokeMethod(m_ctx->config, [&] {
     m_ctx->config->SaveSheet(sheet);
   }, Qt::BlockingQueuedConnection);
@@ -1161,6 +1233,255 @@ QJsonObject GetSheetAsMarkdownTool::execute(const QJsonObject &args) {
 }
 
 // ===========================================================================
+// WriteLocationCellTool
+// ===========================================================================
+
+QString WriteLocationCellTool::name(void) const {
+  return QStringLiteral("write_location_cell");
+}
+
+QString WriteLocationCellTool::description(void) const {
+  return QStringLiteral(
+      "Write a clickable code location into a sheet cell. The cell will "
+      "display as 'file:line' and navigate to the entity on click.");
+}
+
+QJsonObject WriteLocationCellTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("sheet_id")] = int_prop(
+      QStringLiteral("ID of the sheet"));
+  props[QStringLiteral("row")] = int_prop(
+      QStringLiteral("Row index (0-based)"));
+  props[QStringLiteral("column")] = int_prop(
+      QStringLiteral("Column index (0-based)"));
+
+  QJsonObject eid_prop;
+  eid_prop[QStringLiteral("type")] = QStringLiteral("integer");
+  eid_prop[QStringLiteral("description")] =
+      QStringLiteral("Entity ID to navigate to on click");
+  props[QStringLiteral("entity_id")] = eid_prop;
+
+  return make_schema(props, {QStringLiteral("sheet_id"),
+                             QStringLiteral("row"),
+                             QStringLiteral("column"),
+                             QStringLiteral("entity_id")});
+}
+
+QJsonObject WriteLocationCellTool::execute(const QJsonObject &args) {
+  int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
+  int row = args[QStringLiteral("row")].toInt(-1);
+  int col = args[QStringLiteral("column")].toInt(-1);
+  auto entity_id = static_cast<mx::RawEntityId>(
+      args[QStringLiteral("entity_id")].toDouble(0));
+
+  if (entity_id == 0) {
+    return error_result(QStringLiteral("entity_id is required"));
+  }
+
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
+  if (sheet.sheet_id < 0) {
+    return error_result(QStringLiteral("sheet not found"));
+  }
+  if (col < 0 || col >= sheet.columns.size()) {
+    return error_result(QStringLiteral("column out of range"));
+  }
+
+  QString cell_json = make_location_cell_json(m_ctx->config, entity_id);
+  if (cell_json.isEmpty()) {
+    return error_result(QStringLiteral("entity not found for given entity_id"));
+  }
+
+  ensure_cell(sheet, row, col);
+  sheet.cells[row][col] = cell_json;
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
+
+  QJsonObject result;
+  result[QStringLiteral("success")] = true;
+  return result;
+}
+
+// ===========================================================================
+// CreateFindingsSheetTool
+// ===========================================================================
+
+QString CreateFindingsSheetTool::name(void) const {
+  return QStringLiteral("create_findings_sheet");
+}
+
+QString CreateFindingsSheetTool::description(void) const {
+  return QStringLiteral(
+      "Create a structured findings sheet for recording analysis results.");
+}
+
+QJsonObject CreateFindingsSheetTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("name")] = string_prop(
+      QStringLiteral("Name of the sheet (default: \"Findings\")"));
+  props[QStringLiteral("description")] = string_prop(
+      QStringLiteral("Optional description of the findings sheet"));
+  return make_schema(props, {});
+}
+
+QJsonObject CreateFindingsSheetTool::execute(const QJsonObject &args) {
+  ConfigManager::SheetData sheet;
+  sheet.name = args[QStringLiteral("name")].toString();
+  if (sheet.name.isEmpty()) {
+    sheet.name = QStringLiteral("Findings");
+  }
+  sheet.description = args[QStringLiteral("description")].toString();
+  sheet.role = QStringLiteral("findings");
+
+  // Location (clickable).
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Location");
+    ci.clickable = true;
+    sheet.columns.append(ci);
+  }
+  // Finding.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Finding");
+    sheet.columns.append(ci);
+  }
+  // Severity.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Severity");
+    sheet.columns.append(ci);
+  }
+  // Evidence (document link).
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Evidence");
+    sheet.columns.append(ci);
+  }
+  // Status.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Status");
+    sheet.columns.append(ci);
+  }
+  // Notes.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Notes");
+    sheet.columns.append(ci);
+  }
+
+  int id = -1;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    id = m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
+
+  QJsonObject result;
+  result[QStringLiteral("sheet_id")] = id;
+  result[QStringLiteral("columns")] = QJsonArray({
+      QStringLiteral("Location"),
+      QStringLiteral("Finding"),
+      QStringLiteral("Severity"),
+      QStringLiteral("Evidence"),
+      QStringLiteral("Status"),
+      QStringLiteral("Notes")});
+  return result;
+}
+
+// ===========================================================================
+// CreateAttackSurfaceSheetTool
+// ===========================================================================
+
+QString CreateAttackSurfaceSheetTool::name(void) const {
+  return QStringLiteral("create_attack_surface_sheet");
+}
+
+QString CreateAttackSurfaceSheetTool::description(void) const {
+  return QStringLiteral(
+      "Create a structured sheet for mapping attack surface entry points.");
+}
+
+QJsonObject CreateAttackSurfaceSheetTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("name")] = string_prop(
+      QStringLiteral("Name of the sheet (default: \"Attack Surface\")"));
+  return make_schema(props, {});
+}
+
+QJsonObject CreateAttackSurfaceSheetTool::execute(const QJsonObject &args) {
+  ConfigManager::SheetData sheet;
+  sheet.name = args[QStringLiteral("name")].toString();
+  if (sheet.name.isEmpty()) {
+    sheet.name = QStringLiteral("Attack Surface");
+  }
+  sheet.role = QStringLiteral("attack_surface");
+
+  // Entry Point (clickable location).
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Entry Point");
+    ci.clickable = true;
+    sheet.columns.append(ci);
+  }
+  // Type.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Type");
+    sheet.columns.append(ci);
+  }
+  // Data Format.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Data Format");
+    sheet.columns.append(ci);
+  }
+  // Validation.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Validation");
+    sheet.columns.append(ci);
+  }
+  // Priority.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Priority");
+    sheet.columns.append(ci);
+  }
+  // Notes.
+  {
+    ConfigManager::SheetColumnInfo ci;
+    ci.name = QStringLiteral("Notes");
+    sheet.columns.append(ci);
+  }
+
+  int id = -1;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    id = m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
+
+  QJsonObject result;
+  result[QStringLiteral("sheet_id")] = id;
+  result[QStringLiteral("columns")] = QJsonArray({
+      QStringLiteral("Entry Point"),
+      QStringLiteral("Type"),
+      QStringLiteral("Data Format"),
+      QStringLiteral("Validation"),
+      QStringLiteral("Priority"),
+      QStringLiteral("Notes")});
+  return result;
+}
+
+// ===========================================================================
 // Registration
 // ===========================================================================
 
@@ -1171,6 +1492,7 @@ void registerSpreadsheetTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<GetSheetSummaryTool>(ctx));
   registry.registerTool(std::make_unique<ReadCellTool>(ctx));
   registry.registerTool(std::make_unique<WriteCellTool>(ctx));
+  registry.registerTool(std::make_unique<WriteLocationCellTool>(ctx));
   registry.registerTool(std::make_unique<ReadRowTool>(ctx));
   registry.registerTool(std::make_unique<ReadColumnTool>(ctx));
   registry.registerTool(std::make_unique<AddRowTool>(ctx));
@@ -1183,6 +1505,8 @@ void registerSpreadsheetTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<SortSheetTool>(ctx));
   registry.registerTool(std::make_unique<ReadSheetRangeTool>(ctx));
   registry.registerTool(std::make_unique<GetSheetAsMarkdownTool>(ctx));
+  registry.registerTool(std::make_unique<CreateFindingsSheetTool>(ctx));
+  registry.registerTool(std::make_unique<CreateAttackSurfaceSheetTool>(ctx));
 }
 
 }  // namespace mx::gui
