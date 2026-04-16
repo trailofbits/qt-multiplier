@@ -43,6 +43,14 @@ bool AgentSession::isRunning(void) const {
   return m_running.loadRelaxed() != 0;
 }
 
+void AgentSession::loadMessages(const QVector<AgentMessage> &messages) {
+  QMutexLocker lock(&m_mutex);
+  m_messages = messages;
+  if (!m_messages.isEmpty()) {
+    m_next_message_id = m_messages.last().message_id + 1;
+  }
+}
+
 void AgentSession::pause(void) {
   m_paused.storeRelaxed(1);
   emit sessionPaused();
@@ -60,7 +68,7 @@ void AgentSession::cancel(void) {
 AgentMessage AgentSession::addMessage(
     const QString &role, const QString &content, const QString &tool_name,
     const QString &tool_call_id, const QJsonObject &tool_args,
-    const QJsonObject &tool_result, int token_count) {
+    const QJsonObject &tool_result, int token_count, int duration_ms) {
   AgentMessage msg;
   msg.session_id = m_session_id;
   msg.role = role;
@@ -71,6 +79,7 @@ AgentMessage AgentSession::addMessage(
   msg.tool_result = tool_result;
   msg.timestamp = QDateTime::currentDateTime();
   msg.token_count = token_count;
+  msg.duration_ms = duration_ms;
 
   {
     QMutexLocker lock(&m_mutex);
@@ -263,7 +272,7 @@ void AgentSession::runLoop(void) {
       auto result_str = QString::fromUtf8(
           QJsonDocument(result).toJson(QJsonDocument::Compact));
       addMessage(QStringLiteral("tool_result"), result_str,
-                 call.name, call.id, {}, result);
+                 call.name, call.id, {}, result, 0, duration_ms);
 
       // Check if the finish tool was called.
       if (call.name == QStringLiteral("finish")) {

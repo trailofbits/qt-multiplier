@@ -25,6 +25,7 @@ struct AgentMessage {
   QJsonObject tool_result;
   QDateTime timestamp;
   int token_count{0};
+  int duration_ms{0};
 };
 
 // Structured result from the finish tool.

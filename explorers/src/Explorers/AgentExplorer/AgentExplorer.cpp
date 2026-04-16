@@ -438,7 +438,7 @@ void AgentExplorer::OnMessageAdded(int64_t session_id,
         session_id, msg.role, msg.content,
         msg.tool_name, msg.tool_call_id,
         tool_args_str, tool_result_str,
-        msg.token_count);
+        msg.token_count, msg.duration_ms);
   }
 }
 
@@ -521,9 +521,23 @@ void AgentExplorer::OnSessionSelected(int64_t session_id) {
 }
 
 void AgentExplorer::OnSessionResumeRequested(int64_t session_id) {
+  // Stop any existing session and observer.
+  StopObserver();
+  if (d->current_session_id >= 0) {
+    d->agent_manager->cancelSession(d->current_session_id);
+  }
+
+  // Load conversation history into the UI.
+  LoadSession(session_id);
+
+  // Reconstruct the in-memory session from DB state.
   d->agent_manager->resumeSession(session_id);
+
   d->config_manager.UpdateAgentSessionStatus(
       session_id, QStringLiteral("active"));
+  d->paused = false;
+  d->pause_btn->setText(tr("Pause"));
+  d->observer_tool_call_count = 0;
   d->session_list->refresh();
 }
 

@@ -260,6 +260,7 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     QString tool_result;
     QString timestamp;
     int token_count{0};
+    int duration_ms{0};
   };
 
   int64_t SaveAgentMessage(int64_t session_id, const QString &role,
@@ -268,7 +269,8 @@ class ConfigManager Q_DECL_FINAL : public QObject {
                            const QString &tool_call_id = {},
                            const QString &tool_args = {},
                            const QString &tool_result = {},
-                           int token_count = 0) const;
+                           int token_count = 0,
+                           int duration_ms = 0) const;
   QVector<AgentMessageInfo> LoadAgentMessages(int64_t session_id) const;
 
   //! Agent checkpoint persistence (per-project).

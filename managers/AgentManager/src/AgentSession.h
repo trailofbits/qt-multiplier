@@ -32,6 +32,9 @@ class AgentSession Q_DECL_FINAL : public QObject {
   QVector<AgentMessage> messages(void) const;
   bool isRunning(void) const;
 
+  // Load messages from an external source (e.g. DB) to restore history.
+  void loadMessages(const QVector<AgentMessage> &messages);
+
   // Start processing a user message. Runs the agentic loop in a thread.
   void sendUserMessage(const QString &text);
 
@@ -65,7 +68,8 @@ class AgentSession Q_DECL_FINAL : public QObject {
                           const QString &tool_call_id = {},
                           const QJsonObject &tool_args = {},
                           const QJsonObject &tool_result = {},
-                          int token_count = 0);
+                          int token_count = 0,
+                          int duration_ms = 0);
 
   int64_t m_session_id;
   ILLMBackend *m_backend;

@@ -34,8 +34,11 @@ namespace {
 static const QString kDefaultPromptTitle =
     QStringLiteral("Default Agent System Prompt");
 
+static constexpr int kPromptVersion = 4;
+
 static const QString kDefaultPromptContent = QString::fromUtf8(
-R"MX(You are an expert analyst working inside the Multiplier binary analysis IDE. You have access to tools for managing tasks, spreadsheets, documents, running Python scripts, and navigating the codebase.
+R"MX(<!-- prompt-version: 4 -->
+You are an expert analyst working inside the Multiplier binary analysis IDE. You have access to tools for managing tasks, spreadsheets, documents, running Python scripts, and navigating the codebase.
 
 ## Entity References
 
@@ -106,11 +109,26 @@ This ensures your work is properly recorded and the human knows what to do next.
 - When blocked, record it and move to the next task.
 - Use run_python for bulk analysis -- the Multiplier Python bindings give you full programmatic access to the index.)MX");
 
+static int parsePromptVersion(const QString &content) {
+  // Look for <!-- prompt-version: N --> on the first line.
+  static QRegularExpression re(
+      QStringLiteral("<!--\\s*prompt-version:\\s*(\\d+)\\s*-->"));
+  auto match = re.match(content);
+  return match.hasMatch() ? match.captured(1).toInt() : 0;
+}
+
 static QString ensureDefaultPromptDocument(ConfigManager &config) {
   auto prompts = config.LoadDocumentsByCategory(QStringLiteral("prompt"));
   for (const auto &doc : prompts) {
     if (doc.title == kDefaultPromptTitle) {
-      return config.LoadDocumentContent(doc.doc_id);
+      auto existing = config.LoadDocumentContent(doc.doc_id);
+      auto version = parsePromptVersion(existing);
+      if (version < kPromptVersion) {
+        // Upgrade the default prompt to the latest version.
+        config.SaveDocumentContent(doc.doc_id, kDefaultPromptContent);
+        return kDefaultPromptContent;
+      }
+      return existing;
     }
   }
 

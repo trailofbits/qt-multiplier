@@ -149,6 +149,10 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
   q.exec(QStringLiteral(
       "ALTER TABLE gui_documents ADD COLUMN category TEXT DEFAULT 'note'"));
 
+  // Migration: per-tool cost tracking.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_agent_messages ADD COLUMN duration_ms INTEGER DEFAULT 0"));
+
   // Migration: observer session tracking.
   q.exec(QStringLiteral(
       "ALTER TABLE gui_agent_sessions "
@@ -1294,15 +1298,15 @@ int64_t ConfigManager::SaveAgentMessage(
     int64_t session_id, const QString &role, const QString &content,
     const QString &tool_name, const QString &tool_call_id,
     const QString &tool_args, const QString &tool_result,
-    int token_count) const {
+    int token_count, int duration_ms) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
   auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
       "INSERT INTO gui_agent_messages "
       "(session_id, role, content, tool_name, tool_call_id, "
-      "tool_args, tool_result, timestamp, token_count) "
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+      "tool_args, tool_result, timestamp, token_count, duration_ms) "
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
   q.addBindValue(static_cast<qlonglong>(session_id));
   q.addBindValue(role);
   q.addBindValue(content);
@@ -1312,6 +1316,7 @@ int64_t ConfigManager::SaveAgentMessage(
   q.addBindValue(tool_result.isEmpty() ? QVariant() : tool_result);
   q.addBindValue(now);
   q.addBindValue(token_count);
+  q.addBindValue(duration_ms);
   if (!q.exec()) return -1;
   auto id = q.lastInsertId();
   return id.isValid() ? id.toLongLong() : -1;
@@ -1323,7 +1328,8 @@ ConfigManager::LoadAgentMessages(int64_t session_id) const {
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
       "SELECT message_id, session_id, role, content, tool_name, "
-      "tool_call_id, tool_args, tool_result, timestamp, token_count "
+      "tool_call_id, tool_args, tool_result, timestamp, token_count, "
+      "duration_ms "
       "FROM gui_agent_messages WHERE session_id = ? ORDER BY message_id"));
   q.addBindValue(static_cast<qlonglong>(session_id));
   q.exec();
@@ -1340,6 +1346,7 @@ ConfigManager::LoadAgentMessages(int64_t session_id) const {
     info.tool_result = q.value(7).toString();
     info.timestamp = q.value(8).toString();
     info.token_count = q.value(9).toInt();
+    info.duration_ms = q.value(10).toInt();
     result.push_back(std::move(info));
   }
   return result;
