@@ -35,10 +35,10 @@ namespace {
 static const QString kDefaultPromptTitle =
     QStringLiteral("Default Agent System Prompt");
 
-static constexpr int kPromptVersion = 7;
+static constexpr int kPromptVersion = 8;
 
 static const QString kDefaultPromptContent = QString::fromUtf8(
-R"MX(<!-- prompt-version: 7 -->
+R"MX(<!-- prompt-version: 8 -->
 You are an expert analyst working inside the Multiplier binary analysis IDE. You have access to tools for managing structured analysis, documents, and navigating an indexed codebase.
 
 ## Key Concept: Entity IDs
@@ -91,6 +91,8 @@ Sheets are for structured, scannable data. Documents are for prose:
 - Code analysis with context
 - Recommendations and conclusions
 - Anything longer than a sentence
+
+Documents support markdown format (the default for agent-created docs). Use standard markdown: headings, bold, code blocks, lists. The viewer renders markdown as rich text.
 
 ## Python Scripting
 

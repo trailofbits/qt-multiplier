@@ -57,7 +57,8 @@ QString CreateDocumentTool::name(void) const {
 QString CreateDocumentTool::description(void) const {
   return QStringLiteral(
       "Create a new document. Categories: note (default), prompt, "
-      "report_template, skill_template, custom.");
+      "report_template, skill_template, custom. "
+      "Documents support markdown format for rich text rendering.");
 }
 
 QJsonObject CreateDocumentTool::parametersSchema(void) const {
@@ -69,6 +70,9 @@ QJsonObject CreateDocumentTool::parametersSchema(void) const {
   props[QStringLiteral("category")] = string_prop(
       QStringLiteral("Category: note, prompt, report_template, "
                       "skill_template, custom (default: note)"));
+  props[QStringLiteral("format")] = string_prop(
+      QStringLiteral("Document format: html, markdown, plaintext "
+                      "(default: markdown)"));
   return make_schema(props, {QStringLiteral("title")});
 }
 
@@ -81,6 +85,8 @@ QJsonObject CreateDocumentTool::execute(const QJsonObject &args) {
   QString content = args[QStringLiteral("content")].toString();
   QString category = args[QStringLiteral("category")].toString(
       QStringLiteral("note"));
+  QString format = args[QStringLiteral("format")].toString(
+      QStringLiteral("markdown"));
 
   // Validate category.
   static const QStringList kValidCategories = {
@@ -92,9 +98,18 @@ QJsonObject CreateDocumentTool::execute(const QJsonObject &args) {
         QStringLiteral("invalid category: %1").arg(category));
   }
 
+  // Validate format.
+  static const QStringList kValidFormats = {
+      QStringLiteral("html"), QStringLiteral("markdown"),
+      QStringLiteral("plaintext")};
+  if (!kValidFormats.contains(format)) {
+    return error_result(
+        QStringLiteral("invalid format: %1").arg(format));
+  }
+
   int doc_id = -1;
   QMetaObject::invokeMethod(m_ctx->config, [&] {
-    doc_id = m_ctx->config->CreateDocument(content, title);
+    doc_id = m_ctx->config->CreateDocument(content, title, format);
   }, Qt::BlockingQueuedConnection);
   if (doc_id < 0) {
     return error_result(QStringLiteral("failed to create document"));

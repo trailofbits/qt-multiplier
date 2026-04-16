@@ -1255,6 +1255,9 @@ void AgentConversationWidget::addMessageBubble(
             .arg(d->assistant_bg.red()).arg(d->assistant_bg.green())
             .arg(d->assistant_bg.blue()).arg(d->assistant_bg.alpha()));
     auto *label = make_label(content);
+    label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    label->setTextFormat(Qt::MarkdownText);
+    label->setText(content);
     frame_layout->addWidget(label);
 
     auto *wrapper = new QHBoxLayout;

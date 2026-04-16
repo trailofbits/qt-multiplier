@@ -180,9 +180,11 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   //! Document storage (per-project). Documents are stored by ID so
   //! multiple sheet cells can reference the same document.
   int CreateDocument(const QString &content = {},
-                     const QString &title = {}) const;
+                     const QString &title = {},
+                     const QString &format = QStringLiteral("html")) const;
   QString LoadDocumentContent(int doc_id) const;
   QString LoadDocumentTitle(int doc_id) const;
+  QString LoadDocumentFormat(int doc_id) const;
   void SaveDocumentContent(int doc_id, const QString &content) const;
   void SaveDocumentTitle(int doc_id, const QString &title) const;
 
@@ -195,6 +197,7 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     int doc_id{-1};
     QString title;
     QString description;
+    QString format;
     QString created_at;
     QString updated_at;
   };

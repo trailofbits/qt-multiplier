@@ -120,8 +120,12 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  created_at TEXT,"
       "  updated_at TEXT,"
       "  deleted INTEGER NOT NULL DEFAULT 0,"
-      "  category TEXT DEFAULT 'note')"));
+      "  category TEXT DEFAULT 'note',"
+      "  format TEXT DEFAULT 'html')"));
 
+  // Migration: add format column for existing databases.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_documents ADD COLUMN format TEXT DEFAULT 'html'"));
 
   // Cost tracking tables.
   q.exec(QStringLiteral(
@@ -994,15 +998,17 @@ ConfigManager::SheetData ConfigManager::LoadSheetById(int sheet_id) const {
 // --- Documents ---
 
 int ConfigManager::CreateDocument(const QString &content,
-                                  const QString &title) const {
+                                  const QString &title,
+                                  const QString &format) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
   auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
-      "INSERT INTO gui_documents (content, title, created_at, updated_at) "
-      "VALUES (?, ?, ?, ?)"));
+      "INSERT INTO gui_documents (content, title, format, created_at, updated_at) "
+      "VALUES (?, ?, ?, ?, ?)"));
   q.addBindValue(content.isNull() ? QStringLiteral("") : content);
   q.addBindValue(title);
+  q.addBindValue(format.isEmpty() ? QStringLiteral("html") : format);
   q.addBindValue(now);
   q.addBindValue(now);
   if (!q.exec()) return -1;
@@ -1028,6 +1034,20 @@ QString ConfigManager::LoadDocumentTitle(int doc_id) const {
   q.addBindValue(doc_id);
   q.exec();
   return q.next() ? q.value(0).toString() : QString();
+}
+
+QString ConfigManager::LoadDocumentFormat(int doc_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT format FROM gui_documents WHERE doc_id = ?"));
+  q.addBindValue(doc_id);
+  q.exec();
+  if (q.next()) {
+    auto fmt = q.value(0).toString();
+    return fmt.isEmpty() ? QStringLiteral("html") : fmt;
+  }
+  return QStringLiteral("html");
 }
 
 void ConfigManager::SaveDocumentContent(int doc_id,
@@ -1060,7 +1080,7 @@ ConfigManager::LoadAllDocuments(void) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
   QSqlQuery q(d->project_db);
   q.exec(QStringLiteral(
-      "SELECT doc_id, title, description, created_at, updated_at "
+      "SELECT doc_id, title, description, created_at, updated_at, format "
       "FROM gui_documents WHERE deleted = 0 ORDER BY doc_id"));
   QVector<DocumentInfo> result;
   while (q.next()) {
@@ -1070,6 +1090,8 @@ ConfigManager::LoadAllDocuments(void) const {
     info.description = q.value(2).toString();
     info.created_at = q.value(3).toString();
     info.updated_at = q.value(4).toString();
+    info.format = q.value(5).toString();
+    if (info.format.isEmpty()) info.format = QStringLiteral("html");
     result.push_back(std::move(info));
   }
   return result;

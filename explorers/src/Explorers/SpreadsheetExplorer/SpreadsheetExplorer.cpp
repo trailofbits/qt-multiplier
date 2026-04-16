@@ -118,6 +118,7 @@ struct SpreadsheetExplorer::PrivateData {
     SpreadsheetModel *cell_model{nullptr};  // If opened from a cell.
     int cell_row{-1};
     int cell_col{-1};
+    QString format{QStringLiteral("html")};
   };
   std::unordered_map<QWidget *, DocTab> doc_tab_map;
 
@@ -826,8 +827,16 @@ void SpreadsheetExplorer::SaveCurrentDocument(void) {
     if (it == d->doc_tab_map.end()) continue;
     auto &tab = it->second;
     if (tab.doc_id < 0 || !tab.editor) continue;
-    d->config_manager.SaveDocumentContent(tab.doc_id,
-                                          tab.editor->toHtml());
+    if (tab.format == QLatin1String("markdown")) {
+      d->config_manager.SaveDocumentContent(tab.doc_id,
+                                            tab.editor->toMarkdown());
+    } else if (tab.format == QLatin1String("plaintext")) {
+      d->config_manager.SaveDocumentContent(tab.doc_id,
+                                            tab.editor->toPlainText());
+    } else {
+      d->config_manager.SaveDocumentContent(tab.doc_id,
+                                            tab.editor->toHtml());
+    }
     QString title = w->windowTitle();
     d->config_manager.SaveDocumentTitle(tab.doc_id, title);
     open_ids.push_back(tab.doc_id);
@@ -892,8 +901,15 @@ void SpreadsheetExplorer::CreateDocumentDock(IWindowManager *manager) {
     if (it != d->doc_tab_map.end()) {
       auto &tab = it->second;
       if (tab.doc_id >= 0 && tab.editor) {
-        d->config_manager.SaveDocumentContent(
-            tab.doc_id, tab.editor->toHtml());
+        QString serialized;
+        if (tab.format == QLatin1String("markdown")) {
+          serialized = tab.editor->toMarkdown();
+        } else if (tab.format == QLatin1String("plaintext")) {
+          serialized = tab.editor->toPlainText();
+        } else {
+          serialized = tab.editor->toHtml();
+        }
+        d->config_manager.SaveDocumentContent(tab.doc_id, serialized);
       }
       d->doc_tab_map.erase(it);
     }
@@ -1143,7 +1159,14 @@ void SpreadsheetExplorer::OpenDocumentViewer(
   container->setLayout(tab_layout);
 
   QString content = d->config_manager.LoadDocumentContent(doc_id);
-  editor->setHtml(content);
+  QString doc_format = d->config_manager.LoadDocumentFormat(doc_id);
+  if (doc_format == QLatin1String("markdown")) {
+    editor->setMarkdown(content);
+  } else if (doc_format == QLatin1String("plaintext")) {
+    editor->setPlainText(content);
+  } else {
+    editor->setHtml(content);
+  }
 
   QString title = d->config_manager.LoadDocumentTitle(doc_id);
   if (title.isEmpty()) {
@@ -1158,6 +1181,7 @@ void SpreadsheetExplorer::OpenDocumentViewer(
   dt.cell_model = model;
   dt.cell_row = row;
   dt.cell_col = col;
+  dt.format = doc_format;
   d->doc_tab_map.emplace(container, dt);
 
   d->doc_tabs->AddTab(container);
