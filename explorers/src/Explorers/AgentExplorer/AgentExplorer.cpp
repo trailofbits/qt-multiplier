@@ -535,6 +535,12 @@ void AgentExplorer::ConnectSignals(void) {
           this, &AgentExplorer::OnMessageAdded);
   connect(d->agent_manager, &AgentManager::tokenUsageUpdated,
           this, &AgentExplorer::OnTokenUsageUpdated);
+  connect(d->agent_manager, &AgentManager::contextUsageUpdated,
+          this, [this](int64_t sid, int used, int max) {
+            if (sid == d->current_session_id) {
+              d->conversation->updateContextUsage(used, max);
+            }
+          });
   connect(d->agent_manager, &AgentManager::sessionCompleted,
           this, &AgentExplorer::OnSessionCompleted);
   connect(d->agent_manager, &AgentManager::sessionFinished,
@@ -619,9 +625,10 @@ void AgentExplorer::OnSendMessage(const QString &text) {
     }
   }
 
-  // Persist user message.
+  // Persist user message (root message, no parent).
   d->config_manager.SaveAgentMessage(
-      d->current_session_id, QStringLiteral("user"), text);
+      d->current_session_id, QStringLiteral("user"), text,
+      {}, {}, {}, {}, 0, 0, -1);
 
   // Show activity indicator.
   d->conversation->setStatus(tr("Agent is thinking..."));
@@ -711,7 +718,8 @@ void AgentExplorer::OnMessageAdded(int64_t session_id,
         session_id, msg.role, msg.content,
         msg.tool_name, msg.tool_call_id,
         tool_args_str, tool_result_str,
-        msg.token_count, msg.duration_ms);
+        msg.token_count, msg.duration_ms,
+        msg.parent_message_id);
   }
 }
 
@@ -931,6 +939,7 @@ void AgentExplorer::LoadSession(int64_t session_id) {
     msg.tool_name = info.tool_name;
     msg.tool_call_id = info.tool_call_id;
     msg.token_count = info.token_count;
+    msg.parent_message_id = info.parent_message_id;
     if (!info.tool_args.isEmpty()) {
       msg.tool_args = QJsonDocument::fromJson(
           info.tool_args.toUtf8()).object();

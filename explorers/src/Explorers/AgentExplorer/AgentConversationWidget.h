@@ -46,6 +46,7 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   void addMessage(const AgentMessage &msg);
   void updateTokens(int prompt_tokens, int completion_tokens,
                     double cost_usd = -1.0);
+  void updateContextUsage(int used_tokens, int max_tokens);
   void clear(void);
   void showSuggestion(const QString &suggestion,
                       const QStringList &alternatives = {});
@@ -66,7 +67,8 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   void addMessageBubble(const QString &role, const QString &content,
                         const QString &tool_name = {},
                         const QJsonObject &tool_args = {},
-                        const QJsonObject &tool_result = {});
+                        const QJsonObject &tool_result = {},
+                        int64_t parent_message_id = -1);
   void scrollToBottom(void);
   void applyThemeColors(void);
 };

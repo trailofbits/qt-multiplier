@@ -85,6 +85,8 @@ class AgentManager Q_DECL_FINAL : public QObject {
   void sessionError(int64_t session_id, const QString &error);
   void tokenUsageUpdated(int64_t session_id, int prompt_tokens,
                          int completion_tokens);
+  void contextUsageUpdated(int64_t session_id, int used_tokens,
+                           int max_tokens);
   void observerTriggered(int64_t observer_session_id);
 
  private:

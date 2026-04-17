@@ -119,6 +119,8 @@ int64_t AgentManager::createSession(const QString &name,
             d->accumulated_completion_tokens += completion;
             emit tokenUsageUpdated(session_id, prompt, completion);
           });
+  connect(s, &AgentSession::contextUsageUpdated, this,
+          &AgentManager::contextUsageUpdated);
 
   d->sessions[session_id] = std::move(session);
 
@@ -191,6 +193,7 @@ void AgentManager::resumeSession(int64_t session_id) {
     msg.tool_call_id = info.tool_call_id;
     msg.token_count = info.token_count;
     msg.duration_ms = info.duration_ms;
+    msg.parent_message_id = info.parent_message_id;
     if (!info.tool_args.isEmpty()) {
       msg.tool_args =
           QJsonDocument::fromJson(info.tool_args.toUtf8()).object();
@@ -242,6 +245,8 @@ void AgentManager::resumeSession(int64_t session_id) {
             d->accumulated_completion_tokens += completion;
             emit tokenUsageUpdated(session_id, prompt, completion);
           });
+  connect(s, &AgentSession::contextUsageUpdated, this,
+          &AgentManager::contextUsageUpdated);
 
   d->sessions[session_id] = std::move(session);
 
@@ -391,6 +396,8 @@ int64_t AgentManager::createObserverSession(
             d->accumulated_completion_tokens += completion;
             emit tokenUsageUpdated(session_id, prompt, completion);
           });
+  connect(s, &AgentSession::contextUsageUpdated, this,
+          &AgentManager::contextUsageUpdated);
 
   d->sessions[session_id] = std::move(session);
   d->observer_registries[session_id] = std::move(registry);

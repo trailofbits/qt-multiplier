@@ -71,10 +71,19 @@ void AgentSession::cancel(void) {
   m_cancelled.storeRelaxed(1);
 }
 
+int AgentSession::modelContextLimit(const QString &model) {
+  if (model.contains(QStringLiteral("claude"))) return 200000;
+  if (model.contains(QStringLiteral("gpt-4o-mini"))) return 128000;
+  if (model.contains(QStringLiteral("gpt-4o"))) return 128000;
+  if (model.contains(QStringLiteral("o3"))) return 200000;
+  return 100000;
+}
+
 AgentMessage AgentSession::addMessage(
     const QString &role, const QString &content, const QString &tool_name,
     const QString &tool_call_id, const QJsonObject &tool_args,
-    const QJsonObject &tool_result, int token_count, int duration_ms) {
+    const QJsonObject &tool_result, int token_count, int duration_ms,
+    int64_t parent_message_id) {
   AgentMessage msg;
   msg.session_id = m_session_id;
   msg.role = role;
@@ -86,6 +95,7 @@ AgentMessage AgentSession::addMessage(
   msg.timestamp = QDateTime::currentDateTime();
   msg.token_count = token_count;
   msg.duration_ms = duration_ms;
+  msg.parent_message_id = parent_message_id;
 
   {
     QMutexLocker lock(&m_mutex);
@@ -174,7 +184,9 @@ void AgentSession::sendUserMessage(const QString &text) {
     return;
   }
 
-  addMessage(QStringLiteral("user"), text);
+  auto user_msg = addMessage(QStringLiteral("user"), text);
+  m_user_msg_id = user_msg.message_id;
+  m_assistant_msg_id = -1;
 
   // Create a root cost node for this user message.
   if (m_config_manager) {
@@ -272,10 +284,17 @@ void AgentSession::runLoop(void) {
     m_total_completion_tokens += response.completion_tokens;
     emit tokenUsageUpdated(m_total_prompt_tokens, m_total_completion_tokens);
 
+    // Track context window usage.
+    m_last_prompt_tokens = response.prompt_tokens;
+    int max_tokens = modelContextLimit(m_config.model);
+    emit contextUsageUpdated(m_session_id, m_last_prompt_tokens, max_tokens);
+
     // If there is text content, add an assistant message.
     if (!response.content.isEmpty()) {
-      addMessage(QStringLiteral("assistant"), response.content,
-                 {}, {}, {}, {}, response.completion_tokens);
+      auto assistant_msg = addMessage(
+          QStringLiteral("assistant"), response.content,
+          {}, {}, {}, {}, response.completion_tokens, 0, m_user_msg_id);
+      m_assistant_msg_id = assistant_msg.message_id;
     }
 
     // If there are no tool calls, we are done.
@@ -294,9 +313,10 @@ void AgentSession::runLoop(void) {
         return;
       }
 
-      // Record the tool call.
-      addMessage(QStringLiteral("tool_call"), {},
-                 call.name, call.id, call.arguments);
+      // Record the tool call with provenance to the assistant message.
+      auto call_msg = addMessage(QStringLiteral("tool_call"), {},
+                                 call.name, call.id, call.arguments,
+                                 {}, 0, 0, m_assistant_msg_id);
       emit toolCallStarted(call.name, call.arguments);
 
       // Create a cost node for this tool call.
@@ -356,11 +376,12 @@ void AgentSession::runLoop(void) {
 
       emit toolCallCompleted(call.name, result, duration_ms);
 
-      // Record the tool result.
+      // Record the tool result with provenance to its tool_call message.
       auto result_str = QString::fromUtf8(
           QJsonDocument(result).toJson(QJsonDocument::Compact));
       addMessage(QStringLiteral("tool_result"), result_str,
-                 call.name, call.id, {}, result, 0, duration_ms);
+                 call.name, call.id, {}, result, 0, duration_ms,
+                 call_msg.message_id);
 
       // Check if the finish tool was called and capture its args.
       if (call.name == QStringLiteral("finish")) {

@@ -1708,6 +1708,7 @@ struct AgentConversationWidget::PrivateData {
   QPlainTextEdit *input_edit{nullptr};
   QPushButton *send_button{nullptr};
   QLabel *token_label{nullptr};
+  QLabel *context_label{nullptr};
 
   // Theme colors.
   QColor user_bg;
@@ -1886,6 +1887,12 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
   d->token_label->setFont(font);
   bottom_bar->addWidget(d->token_label, 1);
 
+  d->context_label = new QLabel(this);
+  d->context_label->setContentsMargins(0, 0, 8, 4);
+  d->context_label->setFont(font);
+  d->context_label->setVisible(false);
+  bottom_bar->addWidget(d->context_label);
+
   d->observer_filter_btn = new QPushButton(tr("Observer Only"), this);
   d->observer_filter_btn->setCheckable(true);
   d->observer_filter_btn->setChecked(false);
@@ -1981,7 +1988,7 @@ void AgentConversationWidget::addMessage(const AgentMessage &msg) {
   }
 
   addMessageBubble(msg.role, msg.content, msg.tool_name,
-                   merged_args, msg.tool_result);
+                   merged_args, msg.tool_result, msg.parent_message_id);
 }
 
 void AgentConversationWidget::updateTokens(int prompt_tokens,
@@ -2009,6 +2016,38 @@ void AgentConversationWidget::updateTokens(int prompt_tokens,
           .arg(total_cost, 0, 'f', 2));
 }
 
+void AgentConversationWidget::updateContextUsage(int used_tokens,
+                                                   int max_tokens) {
+  if (max_tokens <= 0) {
+    d->context_label->setVisible(false);
+    return;
+  }
+
+  int used_k = (used_tokens + 500) / 1000;
+  int max_k = (max_tokens + 500) / 1000;
+  int pct = static_cast<int>(100.0 * used_tokens / max_tokens);
+
+  d->context_label->setText(
+      tr("Context: %1K / %2K (%3%)")
+          .arg(used_k).arg(max_k).arg(pct));
+  d->context_label->setVisible(true);
+
+  if (pct > 95) {
+    d->context_label->setStyleSheet(
+        QStringLiteral("QLabel { color: #ef4444; font-weight: bold; }"));
+    d->context_label->setToolTip(
+        tr("Context window nearly full. Consider starting a new session."));
+  } else if (pct > 80) {
+    d->context_label->setStyleSheet(
+        QStringLiteral("QLabel { color: #f59e0b; }"));
+    d->context_label->setToolTip(
+        tr("Context window usage is high (%1%).").arg(pct));
+  } else {
+    d->context_label->setStyleSheet(QString());
+    d->context_label->setToolTip(QString());
+  }
+}
+
 void AgentConversationWidget::clear(void) {
   // Remove all message widgets (keep the stretch at index 0).
   while (d->messages_layout->count() > 1) {
@@ -2021,6 +2060,9 @@ void AgentConversationWidget::clear(void) {
   d->total_prompt_tokens = 0;
   d->total_completion_tokens = 0;
   d->token_label->setText(tr("Tokens: 0 in / 0 out ($0.00)"));
+  d->context_label->setVisible(false);
+  d->context_label->setStyleSheet(QString());
+  d->context_label->setToolTip(QString());
   d->pending_tool_args.clear();
   d->pending_tool_names.clear();
   d->message_frames.clear();
@@ -2076,7 +2118,8 @@ void AgentConversationWidget::onThemeChanged(const ThemeManager &) {
 
 void AgentConversationWidget::addMessageBubble(
     const QString &role, const QString &content, const QString &tool_name,
-    const QJsonObject &tool_args, const QJsonObject &tool_result) {
+    const QJsonObject &tool_args, const QJsonObject &tool_result,
+    int64_t parent_message_id) {
 
   // Close the tool batch when a non-tool message arrives.
   if (role != QStringLiteral("tool_result")) {
@@ -2168,6 +2211,12 @@ void AgentConversationWidget::addMessageBubble(
             .arg(d->tool_bg.red()).arg(d->tool_bg.green())
             .arg(d->tool_bg.blue()).arg(d->tool_bg.alpha());
     frame->setStyleSheet(tool_style);
+
+    // Set provenance tooltip if parent info is available.
+    if (parent_message_id >= 0) {
+      frame->setToolTip(
+          tr("Tool result for call #%1").arg(parent_message_id));
+    }
 
     // Simple creation results: show inline with clickable link, no collapsible.
     // These break the tool batch since they render differently.

@@ -58,6 +58,7 @@ class AgentSession Q_DECL_FINAL : public QObject {
   void sessionFinished(const mx::gui::SessionResult &result);
   void sessionError(const QString &error);
   void tokenUsageUpdated(int prompt_tokens, int completion_tokens);
+  void contextUsageUpdated(int64_t session_id, int used_tokens, int max_tokens);
 
  private:
   // The agentic loop, run on a worker thread.
@@ -73,7 +74,10 @@ class AgentSession Q_DECL_FINAL : public QObject {
                           const QJsonObject &tool_args = {},
                           const QJsonObject &tool_result = {},
                           int token_count = 0,
-                          int duration_ms = 0);
+                          int duration_ms = 0,
+                          int64_t parent_message_id = -1);
+
+  static int modelContextLimit(const QString &model);
 
   int64_t m_session_id;
   ILLMBackend *m_backend;
@@ -94,6 +98,11 @@ class AgentSession Q_DECL_FINAL : public QObject {
 
   int m_total_prompt_tokens{0};
   int m_total_completion_tokens{0};
+  int m_last_prompt_tokens{0};
+
+  // Provenance tracking: parent message IDs for the current agentic loop.
+  int64_t m_user_msg_id{-1};
+  int64_t m_assistant_msg_id{-1};
 
   // Cost tracking node IDs.
   int64_t m_root_node_id{-1};

@@ -26,6 +26,7 @@ struct AgentMessage {
   QDateTime timestamp;
   int token_count{0};
   int duration_ms{0};
+  int64_t parent_message_id{-1};
 };
 
 // Structured result from the finish tool.
