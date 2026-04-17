@@ -318,6 +318,10 @@ void AgentManager::registerTool(std::unique_ptr<AgentTool> tool) {
   d->tool_registry.registerTool(std::move(tool));
 }
 
+QVector<ToolDefinition> AgentManager::toolDefinitions(void) const {
+  return d->tool_registry.allDefinitions();
+}
+
 int64_t AgentManager::createObserverSession(
     const QString &system_prompt, const QString &backend_name,
     int64_t primary_session_id, const QString &model_override) {

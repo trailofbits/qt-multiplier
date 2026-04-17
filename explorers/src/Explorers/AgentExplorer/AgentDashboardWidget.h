@@ -27,6 +27,9 @@ class AgentDashboardWidget Q_DECL_FINAL : public QWidget {
 
   //! Reload all dashboard data for the given session.
   void refresh(int64_t session_id, ConfigManager &config);
+
+  //! Set tool descriptions (name → description) for tooltips.
+  void setToolDescriptions(const QHash<QString, QString> &descriptions);
 };
 
 // Custom widget: cumulative cost over time as a line chart.
@@ -56,6 +59,7 @@ class ToolBarsWidget Q_DECL_FINAL : public QWidget {
  public:
   struct ToolBar {
     QString name;
+    QString description;
     int calls{0};
     int avg_ms{0};
     double cost{0.0};
@@ -68,6 +72,7 @@ class ToolBarsWidget Q_DECL_FINAL : public QWidget {
 
  protected:
   void paintEvent(QPaintEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
 
  private:
   QVector<ToolBar> m_bars;

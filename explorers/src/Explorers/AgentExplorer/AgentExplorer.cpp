@@ -62,6 +62,7 @@ struct AgentExplorer::PrivateData {
   AgentToolLogWidget *tool_log{nullptr};
   AgentSessionListWidget *session_list{nullptr};
   AgentDashboardWidget *dashboard{nullptr};
+  QTimer *dashboard_refresh_timer{nullptr};
 
   // Toolbar buttons.
   QPushButton *new_session_btn{nullptr};
@@ -289,6 +290,16 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
   d->dashboard = new AgentDashboardWidget(d->dashboard_dock);
   dashboard_layout->addWidget(d->dashboard);
 
+  // Provide tool descriptions for dashboard tooltips.
+  {
+    QHash<QString, QString> tool_descs;
+    auto defs = d->agent_manager->toolDefinitions();
+    for (const auto &def : defs) {
+      tool_descs.insert(def.name, def.description);
+    }
+    d->dashboard->setToolDescriptions(tool_descs);
+  }
+
   {
     IWindowManager::DockConfig config;
     config.id = "com.trailofbits.dock.AgentDashboard";
@@ -301,6 +312,15 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
 }
 
 void AgentExplorer::ConnectSignals(void) {
+  // Debounced dashboard refresh: coalesces rapid tool calls into one update.
+  d->dashboard_refresh_timer = new QTimer(this);
+  d->dashboard_refresh_timer->setSingleShot(true);
+  d->dashboard_refresh_timer->setInterval(500);  // 500ms debounce.
+  connect(d->dashboard_refresh_timer, &QTimer::timeout, this, [this] {
+    if (d->current_session_id >= 0 && d->dashboard) {
+      d->dashboard->refresh(d->current_session_id, d->config_manager);
+    }
+  });
   // Toolbar.
   connect(d->new_session_btn, &QPushButton::clicked,
           this, &AgentExplorer::OnNewSession);
@@ -544,6 +564,9 @@ void AgentExplorer::OnTokenUsageUpdated(int64_t session_id,
                                 summary.total_cost_usd);
   d->config_manager.UpdateAgentSessionTokens(
       session_id, prompt_tokens, completion_tokens);
+
+  // Trigger debounced dashboard refresh on LLM call completion.
+  d->dashboard_refresh_timer->start();
 }
 
 void AgentExplorer::OnSessionCompleted(int64_t session_id,
@@ -707,6 +730,9 @@ void AgentExplorer::OnToolCallCompleted(int64_t session_id,
               .arg(d->observer_recommendation_count));
     }
   }
+
+  // Trigger debounced dashboard refresh on every tool call.
+  d->dashboard_refresh_timer->start();
 }
 
 void AgentExplorer::LoadSession(int64_t session_id) {

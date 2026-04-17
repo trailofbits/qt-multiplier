@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <multiplier/GUI/Interfaces/ILLMBackend.h>
 #include <multiplier/GUI/Managers/AgentMessage.h>
 
 #include <QObject>
@@ -50,6 +51,9 @@ class AgentManager Q_DECL_FINAL : public QObject {
 
   // Tool registry access (for explorers to register tools).
   void registerTool(std::unique_ptr<AgentTool> tool);
+
+  // Get all tool definitions (name + description + schema).
+  QVector<ToolDefinition> toolDefinitions(void) const;
 
   // Observer mode.
   int64_t createObserverSession(const QString &system_prompt,

@@ -96,9 +96,16 @@ struct AgentDashboardWidget::PrivateData {
   QLabel *tool_calls_val{nullptr};
   QLabel *duration_val{nullptr};
   QLabel *avg_cost_val{nullptr};
+
+  QHash<QString, QString> tool_descriptions;
 };
 
 AgentDashboardWidget::~AgentDashboardWidget(void) {}
+
+void AgentDashboardWidget::setToolDescriptions(
+    const QHash<QString, QString> &descriptions) {
+  d->tool_descriptions = descriptions;
+}
 
 AgentDashboardWidget::AgentDashboardWidget(QWidget *parent)
     : QWidget(parent),
@@ -277,6 +284,7 @@ void AgentDashboardWidget::refresh(int64_t session_id,
   for (const auto &ts : tool_stats) {
     ToolBarsWidget::ToolBar bar;
     bar.name = ts.tool_name;
+    bar.description = d->tool_descriptions.value(ts.tool_name);
     bar.calls = ts.call_count;
     bar.avg_ms = ts.avg_duration_ms;
     bar.cost = ts.total_cost_usd;
@@ -537,6 +545,7 @@ void CostTimelineWidget::leaveEvent(QEvent *) {
 ToolBarsWidget::ToolBarsWidget(QWidget *parent)
     : QWidget(parent) {
   setMinimumHeight(kBarRowHeight * 2);
+  setMouseTracking(true);
 }
 
 void ToolBarsWidget::set_data(const QVector<ToolBar> &bars) {
@@ -545,6 +554,19 @@ void ToolBarsWidget::set_data(const QVector<ToolBar> &bars) {
                             kBarRowHeight * static_cast<int>(m_bars.size())));
   updateGeometry();
   update();
+}
+
+void ToolBarsWidget::mouseMoveEvent(QMouseEvent *event) {
+  int row = event->pos().y() / kBarRowHeight;
+  if (row >= 0 && row < static_cast<int>(m_bars.size())) {
+    const auto &bar = m_bars[row];
+    auto tip = bar.description.isEmpty()
+        ? bar.name
+        : QStringLiteral("%1\n%2").arg(bar.name, bar.description);
+    QToolTip::showText(event->globalPosition().toPoint(), tip, this);
+  } else {
+    QToolTip::hideText();
+  }
 }
 
 QSize ToolBarsWidget::sizeHint(void) const {
