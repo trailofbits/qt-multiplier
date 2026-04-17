@@ -211,6 +211,7 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     QString title;
     QString description;
     QString format;
+    QString category;
     QString created_at;
     QString updated_at;
   };

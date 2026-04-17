@@ -1112,8 +1112,8 @@ ConfigManager::LoadAllDocuments(void) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
   QSqlQuery q(d->project_db);
   q.exec(QStringLiteral(
-      "SELECT doc_id, title, description, created_at, updated_at, format "
-      "FROM gui_documents WHERE deleted = 0 ORDER BY doc_id"));
+      "SELECT doc_id, title, description, created_at, updated_at, format, "
+      "category FROM gui_documents WHERE deleted = 0 ORDER BY doc_id"));
   QVector<DocumentInfo> result;
   while (q.next()) {
     DocumentInfo info;
@@ -1124,6 +1124,8 @@ ConfigManager::LoadAllDocuments(void) const {
     info.updated_at = q.value(4).toString();
     info.format = q.value(5).toString();
     if (info.format.isEmpty()) info.format = QStringLiteral("html");
+    info.category = q.value(6).toString();
+    if (info.category.isEmpty()) info.category = QStringLiteral("note");
     result.push_back(std::move(info));
   }
   return result;
@@ -1519,7 +1521,7 @@ ConfigManager::LoadDocumentsByCategory(const QString &category) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
-      "SELECT doc_id, title, description, created_at, updated_at "
+      "SELECT doc_id, title, description, created_at, updated_at, format "
       "FROM gui_documents WHERE deleted = 0 AND category = ? "
       "ORDER BY doc_id"));
   q.addBindValue(category);
@@ -1532,6 +1534,9 @@ ConfigManager::LoadDocumentsByCategory(const QString &category) const {
     info.description = q.value(2).toString();
     info.created_at = q.value(3).toString();
     info.updated_at = q.value(4).toString();
+    info.format = q.value(5).toString();
+    if (info.format.isEmpty()) info.format = QStringLiteral("html");
+    info.category = category;
     result.push_back(std::move(info));
   }
   return result;
