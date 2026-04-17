@@ -41,6 +41,11 @@
 #include "AgentToolLogWidget.h"
 #include "AgentSessionListWidget.h"
 
+// Must be at global scope — Q_INIT_RESOURCE can't be inside a namespace.
+static void initAgentResources(void) {
+  Q_INIT_RESOURCE(AgentResources);
+}
+
 namespace mx::gui {
 
 struct AgentExplorer::PrivateData {
@@ -125,6 +130,9 @@ AgentExplorer::AgentExplorer(ConfigManager &config_manager,
                              IWindowManager *parent)
     : IMainWindowPlugin(config_manager, parent),
       d(new PrivateData(config_manager, parent)) {
+
+  // Initialize Qt resources (must happen before loading resource files).
+  initAgentResources();
 
   // Ensure all resource-backed documents exist in the database.
   ensureAllResourceDocuments(config_manager, {

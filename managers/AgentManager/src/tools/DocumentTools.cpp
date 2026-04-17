@@ -304,19 +304,19 @@ QJsonObject LinkDocumentToCellTool::parametersSchema(void) const {
   props[QStringLiteral("row")] = int_prop(
       QStringLiteral("Row index (0-based)"));
   props[QStringLiteral("column")] = int_prop(
-      QStringLiteral("Column index (0-based)"));
+      QStringLiteral("Column index (0-based). Ignored if column_name given."));
+  props[QStringLiteral("column_name")] = string_prop(
+      QStringLiteral("Column name (case-insensitive). Takes precedence over column."));
   props[QStringLiteral("doc_id")] = int_prop(
       QStringLiteral("Document ID to link"));
   return make_schema(props, {QStringLiteral("sheet_id"),
                              QStringLiteral("row"),
-                             QStringLiteral("column"),
                              QStringLiteral("doc_id")});
 }
 
 QJsonObject LinkDocumentToCellTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
-  int col = args[QStringLiteral("column")].toInt(-1);
   int doc_id = args[QStringLiteral("doc_id")].toInt(-1);
 
   if (sheet_id < 0) {
@@ -324,9 +324,6 @@ QJsonObject LinkDocumentToCellTool::execute(const QJsonObject &args) {
   }
   if (row < 0) {
     return error_result(QStringLiteral("row is required"));
-  }
-  if (col < 0) {
-    return error_result(QStringLiteral("column is required"));
   }
   if (doc_id < 0) {
     return error_result(QStringLiteral("doc_id is required"));
@@ -338,6 +335,27 @@ QJsonObject LinkDocumentToCellTool::execute(const QJsonObject &args) {
   }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
+  }
+
+  // Resolve column: column_name takes precedence over numeric column.
+  int col = -1;
+  auto col_name = args[QStringLiteral("column_name")].toString();
+  if (!col_name.isEmpty()) {
+    for (int i = 0; i < sheet.columns.size(); ++i) {
+      if (sheet.columns[i].name.compare(col_name, Qt::CaseInsensitive) == 0) {
+        col = i;
+        break;
+      }
+    }
+    if (col < 0) {
+      return error_result(
+          QStringLiteral("column_name \"%1\" not found").arg(col_name));
+    }
+  } else {
+    col = args[QStringLiteral("column")].toInt(-1);
+  }
+  if (col < 0) {
+    return error_result(QStringLiteral("column or column_name is required"));
   }
   if (col >= sheet.columns.size()) {
     return error_result(QStringLiteral("column out of range"));

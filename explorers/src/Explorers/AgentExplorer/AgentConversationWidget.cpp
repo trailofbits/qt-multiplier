@@ -1044,9 +1044,9 @@ static QString symbolizeIdentifiers(const QString &text,
   // Match function-call-like identifiers: word(
   static const QRegularExpression func_re(
       QStringLiteral("\\b([a-zA-Z_][a-zA-Z0-9_]{2,})\\s*\\("));
-  // Match snake_case identifiers (likely code symbols).
+  // Match snake_case identifiers (likely code symbols), but not hyphenated words.
   static const QRegularExpression snake_re(
-      QStringLiteral("\\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\\b"));
+      QStringLiteral("(?<![\\w-])([a-z][a-z0-9]*(?:_[a-z0-9]+)+)(?![\\w-])"));
   // Match backtick-wrapped identifiers: `identifier`
   static const QRegularExpression backtick_re(
       QStringLiteral("`([a-zA-Z_][a-zA-Z0-9_]{1,})`"));
@@ -1058,6 +1058,19 @@ static QString symbolizeIdentifiers(const QString &text,
     QString name;
   };
 
+  // Common English words that should never be symbolized.
+  static const QSet<QString> kStopWords = {
+      QStringLiteral("the"), QStringLiteral("this"), QStringLiteral("that"),
+      QStringLiteral("with"), QStringLiteral("from"), QStringLiteral("into"),
+      QStringLiteral("have"), QStringLiteral("been"), QStringLiteral("will"),
+      QStringLiteral("each"), QStringLiteral("only"), QStringLiteral("also"),
+      QStringLiteral("when"), QStringLiteral("then"), QStringLiteral("term"),
+      QStringLiteral("file"), QStringLiteral("line"), QStringLiteral("code"),
+      QStringLiteral("data"), QStringLiteral("size"), QStringLiteral("type"),
+      QStringLiteral("name"), QStringLiteral("list"), QStringLiteral("next"),
+      QStringLiteral("done"), QStringLiteral("used"), QStringLiteral("call"),
+  };
+
   QHash<QString, uint64_t> cache;
   QVector<Candidate> candidates;
 
@@ -1067,11 +1080,21 @@ static QString symbolizeIdentifiers(const QString &text,
       return it.value();
     }
 
+    // Skip short identifiers and common English words.
+    if (name.size() < 4 || kStopWords.contains(name.toLower())) {
+      cache.insert(name, 0);
+      return 0;
+    }
+
     const auto &index = config.Index();
     uint64_t found_eid = 0;
     for (auto entity : index.query_entities(name.toStdString())) {
       if (std::holds_alternative<mx::NamedDecl>(entity)) {
         auto decl = std::get<mx::NamedDecl>(entity);
+        // Require an exact name match to avoid partial/substring hits.
+        if (decl.name() != name.toStdString()) {
+          continue;
+        }
         found_eid = static_cast<uint64_t>(decl.id().Pack());
         break;
       }
@@ -1473,6 +1496,10 @@ struct AgentConversationWidget::PrivateData {
   // Also store tool names for pending calls.
   QMap<QString, QString> pending_tool_names;
 
+  // Batch consecutive tool_result messages into a single frame.
+  QFrame *current_tool_batch{nullptr};
+  QVBoxLayout *tool_batch_layout{nullptr};
+
   // Tracked annotated code views for theme-change re-rendering.
   struct AnnotatedCodeRef {
     QTextBrowser *browser{nullptr};
@@ -1776,26 +1803,18 @@ void AgentConversationWidget::addMessageBubble(
     const QString &role, const QString &content, const QString &tool_name,
     const QJsonObject &tool_args, const QJsonObject &tool_result) {
 
+  // Close the tool batch when a non-tool message arrives.
+  if (role != QStringLiteral("tool_result")) {
+    d->current_tool_batch = nullptr;
+    d->tool_batch_layout = nullptr;
+  }
+
   auto *frame = new QFrame(d->messages_container);
   frame->setFrameShape(QFrame::StyledPanel);
   frame->setFrameShadow(QFrame::Plain);
   auto *frame_layout = new QVBoxLayout(frame);
   frame_layout->setContentsMargins(8, 6, 8, 6);
   frame_layout->setSpacing(4);
-
-  auto make_label = [&](const QString &text, bool mono = false) -> QLabel * {
-    auto *label = new QLabel(frame);
-    label->setTextFormat(Qt::PlainText);
-    label->setWordWrap(true);
-    label->setText(text);
-    if (mono) {
-      auto f = label->font();
-      f.setFamily(QStringLiteral("monospace"));
-      f.setPointSize(f.pointSize() - 1);
-      label->setFont(f);
-    }
-    return label;
-  };
 
   if (role == QStringLiteral("user")) {
     frame->setStyleSheet(
@@ -1861,19 +1880,24 @@ void AgentConversationWidget::addMessageBubble(
     d->messages_layout->addWidget(frame);
 
   } else if (role == QStringLiteral("tool_result")) {
-    frame->setStyleSheet(
-        QStringLiteral("QFrame { background-color: rgba(%1,%2,%3,%4); "
-                       "border-radius: 4px; border: 1px solid palette(mid); }")
+    auto tool_style = QStringLiteral(
+        "QFrame { background-color: rgba(%1,%2,%3,%4); "
+        "border-radius: 4px; border: 1px solid palette(mid); }")
             .arg(d->tool_bg.red()).arg(d->tool_bg.green())
-            .arg(d->tool_bg.blue()).arg(d->tool_bg.alpha()));
+            .arg(d->tool_bg.blue()).arg(d->tool_bg.alpha());
+    frame->setStyleSheet(tool_style);
 
     // Simple creation results: show inline with clickable link, no collapsible.
+    // These break the tool batch since they render differently.
     bool is_doc_create = (tool_name == QStringLiteral("create_document"));
     bool is_sheet_create = (tool_name == QStringLiteral("create_sheet") ||
                             tool_name == QStringLiteral("create_findings_sheet") ||
                             tool_name == QStringLiteral("create_attack_surface_sheet"));
 
     if (is_doc_create && !tool_result.isEmpty()) {
+      d->current_tool_batch = nullptr;
+      d->tool_batch_layout = nullptr;
+
       auto title = tool_result.value(QStringLiteral("title")).toString();
       auto doc_id = tool_result.value(QStringLiteral("doc_id")).toInt(-1);
       if (title.isEmpty()) title = QStringLiteral("Untitled");
@@ -1901,6 +1925,9 @@ void AgentConversationWidget::addMessageBubble(
     }
 
     if (is_sheet_create && !tool_result.isEmpty()) {
+      d->current_tool_batch = nullptr;
+      d->tool_batch_layout = nullptr;
+
       auto name = tool_result.value(QStringLiteral("name")).toString();
       if (name.isEmpty()) name = tool_result.value(QStringLiteral("sheet_name")).toString();
       if (name.isEmpty()) name = QStringLiteral("Sheet");
@@ -1917,14 +1944,32 @@ void AgentConversationWidget::addMessageBubble(
       return;
     }
 
+    // For standard tool results, batch consecutive ones into a single frame.
+    // Determine whether to reuse an existing batch or start a new one.
+    QFrame *batch_frame = frame;
+    QVBoxLayout *batch_layout = frame_layout;
+    bool reusing_batch = false;
+
+    if (d->current_tool_batch && d->tool_batch_layout) {
+      // Reuse the existing batch frame; discard the freshly created frame.
+      batch_frame = d->current_tool_batch;
+      batch_layout = d->tool_batch_layout;
+      frame->deleteLater();
+      reusing_batch = true;
+    } else {
+      // This frame becomes the new batch container.
+      d->current_tool_batch = frame;
+      d->tool_batch_layout = frame_layout;
+    }
+
     auto summary = toolResultSummary(tool_name, tool_result);
-    auto *toggle_btn = new QPushButton(summary, frame);
+    auto *toggle_btn = new QPushButton(summary, batch_frame);
     toggle_btn->setFlat(true);
     toggle_btn->setStyleSheet(
         QStringLiteral("QPushButton { text-align: left; }"));
-    frame_layout->addWidget(toggle_btn);
+    batch_layout->addWidget(toggle_btn);
 
-    auto *detail = new QWidget(frame);
+    auto *detail = new QWidget(batch_frame);
     detail->setVisible(false);
     auto *detail_layout = new QVBoxLayout(detail);
     detail_layout->setContentsMargins(4, 0, 4, 0);
@@ -1932,8 +1977,14 @@ void AgentConversationWidget::addMessageBubble(
     // Show args if available.
     if (!tool_args.isEmpty()) {
       auto args_text = formatToolArgs(tool_name, tool_args, d->config_manager);
-      auto *args_label = make_label(
-          QStringLiteral("Args: ") + args_text, true);
+      auto *args_label = new QLabel(batch_frame);
+      args_label->setTextFormat(Qt::PlainText);
+      args_label->setWordWrap(true);
+      args_label->setText(QStringLiteral("Args: ") + args_text);
+      auto af = args_label->font();
+      af.setFamily(QStringLiteral("monospace"));
+      af.setPointSize(af.pointSize() - 1);
+      args_label->setFont(af);
       detail_layout->addWidget(args_label);
     }
 
@@ -1972,16 +2023,25 @@ void AgentConversationWidget::addMessageBubble(
       auto formatted = tool_result.isEmpty()
                            ? content.left(2000)
                            : formatToolResult(tool_name, tool_result);
-      auto *result_label = make_label(formatted.left(4000), true);
+      auto *result_label = new QLabel(batch_frame);
+      result_label->setTextFormat(Qt::PlainText);
+      result_label->setWordWrap(true);
+      result_label->setText(formatted.left(4000));
+      auto rf = result_label->font();
+      rf.setFamily(QStringLiteral("monospace"));
+      rf.setPointSize(rf.pointSize() - 1);
+      result_label->setFont(rf);
       detail_layout->addWidget(result_label);
     }
 
-    frame_layout->addWidget(detail);
+    batch_layout->addWidget(detail);
 
     connect(toggle_btn, &QPushButton::clicked, detail,
             [detail] { detail->setVisible(!detail->isVisible()); });
 
-    d->messages_layout->addWidget(frame);
+    if (!reusing_batch) {
+      d->messages_layout->addWidget(frame);
+    }
 
   } else {
     // System or unknown role -- left-aligned, italic, symbolized.
@@ -2070,24 +2130,27 @@ void AgentConversationWidget::showObserverRecommendation(
   });
   layout->addWidget(body);
 
-  // Suggested prompt buttons.
+  // Suggested prompt buttons (stacked vertically for readability).
   if (!suggested_prompts.isEmpty()) {
-    auto *btn_layout = new QHBoxLayout;
-    btn_layout->setSpacing(6);
+    auto *btn_layout = new QVBoxLayout;
+    btn_layout->setSpacing(4);
     btn_layout->setContentsMargins(0, 4, 0, 0);
 
     for (const auto &prompt : suggested_prompts) {
-      auto display = prompt.length() > 80
-                         ? prompt.left(77) + QStringLiteral("...")
+      auto display = prompt.length() > 140
+                         ? prompt.left(137) + QStringLiteral("...")
                          : prompt;
       auto *btn = new QPushButton(display, frame);
       btn->setStyleSheet(
           QStringLiteral("QPushButton { background-color: rgba(139, 92, 246, 50); "
                          "border: 1px solid rgba(139, 92, 246, 80); "
-                         "border-radius: 4px; padding: 4px 8px; } "
+                         "border-radius: 4px; padding: 6px 10px; "
+                         "text-align: left; } "
                          "QPushButton:hover { background-color: rgba(139, 92, 246, 80); }"));
       btn->setCursor(Qt::PointingHandCursor);
       btn->setToolTip(prompt);
+      btn->setMinimumHeight(32);
+      btn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
       connect(btn, &QPushButton::clicked, this,
               [this, prompt] {
         d->input_edit->setPlainText(prompt);
@@ -2098,7 +2161,6 @@ void AgentConversationWidget::showObserverRecommendation(
       });
       btn_layout->addWidget(btn);
     }
-    btn_layout->addStretch();
     layout->addLayout(btn_layout);
   }
 
@@ -2185,10 +2247,17 @@ void AgentConversationWidget::applyThemeColors(void) {
   auto highlight = palette.color(QPalette::Highlight);
 
   d->text_fg = text;
-  d->system_fg = palette.color(QPalette::PlaceholderText);
 
   // Detect light vs dark theme by background luminance.
   bool is_light = base.lightnessF() > 0.5;
+
+  // System/checkpoint messages: use placeholder text but ensure adequate
+  // contrast on dark themes where placeholder can be too dim.
+  d->system_fg = palette.color(QPalette::PlaceholderText);
+  if (!is_light && d->system_fg.lightnessF() < 0.45) {
+    // Brighten to at least mid-lightness for readability.
+    d->system_fg = d->system_fg.lighter(160);
+  }
 
   // User messages: accent-tinted.
   d->user_bg = highlight;
