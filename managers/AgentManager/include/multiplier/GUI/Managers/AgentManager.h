@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <multiplier/GUI/Interfaces/ILLMBackend.h>
 #include <multiplier/GUI/Managers/AgentMessage.h>
 
 #include <QObject>
@@ -51,10 +52,14 @@ class AgentManager Q_DECL_FINAL : public QObject {
   // Tool registry access (for explorers to register tools).
   void registerTool(std::unique_ptr<AgentTool> tool);
 
+  // Get all tool definitions (name + description + schema).
+  QVector<ToolDefinition> toolDefinitions(void) const;
+
   // Observer mode.
   int64_t createObserverSession(const QString &system_prompt,
                                 const QString &backend_name,
-                                int64_t primary_session_id);
+                                int64_t primary_session_id,
+                                const QString &model_override = {});
   void triggerObserver(int64_t observer_session_id);
   int64_t primarySessionId(int64_t observer_session_id) const;
 
@@ -80,6 +85,8 @@ class AgentManager Q_DECL_FINAL : public QObject {
   void sessionError(int64_t session_id, const QString &error);
   void tokenUsageUpdated(int64_t session_id, int prompt_tokens,
                          int completion_tokens);
+  void contextUsageUpdated(int64_t session_id, int used_tokens,
+                           int max_tokens);
   void observerTriggered(int64_t observer_session_id);
 
  private:

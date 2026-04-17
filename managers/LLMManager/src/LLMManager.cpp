@@ -158,6 +158,54 @@ ILLMBackend *LLMManager::activeBackend(void) const {
   return backend(d->active_backend_name);
 }
 
+void LLMManager::setApiKeyForType(const QString &type, const QString &key) {
+  // Apply to all backends of this type.
+  for (auto &[name, entry] : d->backends) {
+    if (entry->type == type) {
+      entry->config[QStringLiteral("api_key")] = key;
+    }
+  }
+
+  // Store separately so it persists even for backends not yet created.
+  QSettings settings;
+  settings.beginGroup(QStringLiteral("LLMManager_ApiKeys"));
+  settings.setValue(type, key);
+  settings.endGroup();
+  settings.sync();
+}
+
+QString LLMManager::apiKeyForType(const QString &type) const {
+  // Check in-memory backends first.
+  for (const auto &[name, entry] : d->backends) {
+    if (entry->type == type) {
+      auto key = entry->config.value(QStringLiteral("api_key"));
+      if (!key.isEmpty()) return key;
+    }
+  }
+
+  // Fall back to stored per-type key.
+  QSettings settings;
+  settings.beginGroup(QStringLiteral("LLMManager_ApiKeys"));
+  auto key = settings.value(type).toString();
+  settings.endGroup();
+  return key;
+}
+
+void LLMManager::clearAllApiKeys(void) {
+  // Clear from all backends.
+  for (auto &[name, entry] : d->backends) {
+    entry->config.remove(QStringLiteral("api_key"));
+  }
+
+  // Clear stored per-type keys.
+  QSettings settings;
+  settings.remove(QStringLiteral("LLMManager_ApiKeys"));
+  settings.sync();
+
+  // Re-save backend configs without keys.
+  saveConfig();
+}
+
 void LLMManager::saveConfig(void) const {
   QSettings settings;
   settings.beginGroup(QStringLiteral("LLMManager"));
@@ -217,6 +265,19 @@ void LLMManager::loadConfig(void) {
   }
 
   settings.endGroup();
+
+  // Restore per-type API keys into any backend that doesn't have one.
+  QSettings key_settings;
+  key_settings.beginGroup(QStringLiteral("LLMManager_ApiKeys"));
+  for (auto &[name, entry] : d->backends) {
+    if (entry->config.value(QStringLiteral("api_key")).isEmpty()) {
+      auto type_key = key_settings.value(entry->type).toString();
+      if (!type_key.isEmpty()) {
+        entry->config[QStringLiteral("api_key")] = type_key;
+      }
+    }
+  }
+  key_settings.endGroup();
 }
 
 }  // namespace mx::gui

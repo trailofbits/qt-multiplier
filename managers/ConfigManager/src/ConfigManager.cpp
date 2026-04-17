@@ -62,12 +62,9 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
       "  widget_key TEXT NOT NULL,"
       "  entity_id INTEGER NOT NULL,"
-      "  label TEXT)"));
-  // Migrations for gui_history.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_history ADD COLUMN line INTEGER DEFAULT 0"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_history ADD COLUMN col INTEGER DEFAULT 0"));
+      "  label TEXT,"
+      "  line INTEGER DEFAULT 0,"
+      "  col INTEGER DEFAULT 0)"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_header_states ("
       "  key TEXT PRIMARY KEY, state BLOB)"));
@@ -88,14 +85,12 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  name TEXT NOT NULL,"
       "  description TEXT,"
       "  closed_at TEXT,"
-      "  column_order TEXT)"));
-  // Migration for existing DBs: add columns if missing.
+      "  column_order TEXT,"
+      "  role TEXT DEFAULT 'general',"
+      "  key_column INTEGER DEFAULT -1)"));
+  // Migration: add key_column if missing (existing databases).
   q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheets ADD COLUMN description TEXT"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheets ADD COLUMN closed_at TEXT"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheets ADD COLUMN role TEXT DEFAULT 'general'"));
+      "ALTER TABLE gui_sheets ADD COLUMN key_column INTEGER DEFAULT -1"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_sheet_columns ("
       "  sheet_id INTEGER NOT NULL,"
@@ -105,13 +100,6 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  clickable INTEGER NOT NULL DEFAULT 0,"
       "  col_width INTEGER NOT NULL DEFAULT -1,"
       "  PRIMARY KEY (sheet_id, col_index))"));
-  // Migration.
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheet_columns ADD COLUMN "
-      "clickable INTEGER NOT NULL DEFAULT 0"));
-  q.exec(QStringLiteral(
-      "ALTER TABLE gui_sheet_columns ADD COLUMN "
-      "col_width INTEGER NOT NULL DEFAULT -1"));
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_sheet_cells ("
       "  sheet_id INTEGER NOT NULL,"
@@ -135,19 +123,63 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  description TEXT,"
       "  created_at TEXT,"
       "  updated_at TEXT,"
-      "  deleted INTEGER NOT NULL DEFAULT 0)"));
-  // Migration for existing DBs.
+      "  deleted INTEGER NOT NULL DEFAULT 0,"
+      "  category TEXT DEFAULT 'note',"
+      "  format TEXT DEFAULT 'html')"));
+
+  // Migration: add format column for existing databases.
   q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN description TEXT"));
+      "ALTER TABLE gui_documents ADD COLUMN format TEXT DEFAULT 'html'"));
+
+  // Cost tracking tables.
   q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN created_at TEXT"));
+      "CREATE TABLE IF NOT EXISTS gui_cost_nodes ("
+      "  node_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  session_id INTEGER NOT NULL,"
+      "  parent_node_id INTEGER,"
+      "  node_type TEXT NOT NULL,"
+      "  tool_name TEXT,"
+      "  model TEXT,"
+      "  input_tokens INTEGER DEFAULT 0,"
+      "  output_tokens INTEGER DEFAULT 0,"
+      "  duration_ms INTEGER DEFAULT 0,"
+      "  cost_usd REAL DEFAULT 0.0,"
+      "  started_at TEXT NOT NULL,"
+      "  completed_at TEXT,"
+      "  message_id INTEGER,"
+      "  metadata TEXT)"));
+
   q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN updated_at TEXT"));
+      "CREATE TABLE IF NOT EXISTS gui_cost_rates ("
+      "  model TEXT PRIMARY KEY,"
+      "  input_per_million REAL NOT NULL,"
+      "  output_per_million REAL NOT NULL,"
+      "  updated_at TEXT NOT NULL)"));
+
+  // Cost dependency edges table.
   q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"));
-  // Migration: document categories.
+      "CREATE TABLE IF NOT EXISTS gui_cost_edges ("
+      "  edge_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "  from_node_id INTEGER NOT NULL,"
+      "  to_node_id INTEGER NOT NULL,"
+      "  edge_type TEXT NOT NULL)"));
+
+  // Seed known model rates.
   q.exec(QStringLiteral(
-      "ALTER TABLE gui_documents ADD COLUMN category TEXT DEFAULT 'note'"));
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('claude-sonnet-4-20250514', 3.0, 15.0, '2025-05-14')"));
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('claude-opus-4-20250514', 15.0, 75.0, '2025-05-14')"));
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('claude-haiku-4-5-20251001', 0.80, 4.0, '2025-10-01')"));
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('gpt-4o', 2.5, 10.0, '2025-01-01')"));
+  q.exec(QStringLiteral(
+      "INSERT OR IGNORE INTO gui_cost_rates VALUES "
+      "('gpt-4o-mini', 0.15, 0.60, '2025-01-01')"));
 
   // Agent session tables.
   q.exec(QStringLiteral(
@@ -161,7 +193,8 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  created_at TEXT NOT NULL,"
       "  updated_at TEXT NOT NULL,"
       "  total_prompt_tokens INTEGER DEFAULT 0,"
-      "  total_completion_tokens INTEGER DEFAULT 0)"));
+      "  total_completion_tokens INTEGER DEFAULT 0,"
+      "  primary_session_id INTEGER DEFAULT -1)"));
 
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_agent_messages ("
@@ -174,7 +207,14 @@ static QSqlDatabase OpenDb(const QString &path, const QString &conn_name) {
       "  tool_args TEXT,"
       "  tool_result TEXT,"
       "  timestamp TEXT NOT NULL,"
-      "  token_count INTEGER DEFAULT 0)"));
+      "  token_count INTEGER DEFAULT 0,"
+      "  duration_ms INTEGER DEFAULT 0,"
+      "  parent_message_id INTEGER DEFAULT -1)"));
+
+  // Migration: add parent_message_id column for existing databases.
+  q.exec(QStringLiteral(
+      "ALTER TABLE gui_agent_messages "
+      "ADD COLUMN parent_message_id INTEGER DEFAULT -1"));
 
   q.exec(QStringLiteral(
       "CREATE TABLE IF NOT EXISTS gui_agent_checkpoints ("
@@ -304,6 +344,18 @@ const class Index &ConfigManager::Index(void) const noexcept {
 
 QUndoGroup &ConfigManager::UndoGroup(void) const noexcept {
   return d->undo_group;
+}
+
+QString ConfigManager::DatabasePath(void) const {
+  return d->db_path;
+}
+
+void ConfigManager::NotifyExternalSheetsChanged(void) {
+  emit ExternalSheetsChanged();
+}
+
+void ConfigManager::NotifyExternalDocumentsChanged(void) {
+  emit ExternalDocumentsChanged();
 }
 
 void ConfigManager::SetIndex(const class Index &index,
@@ -441,6 +493,48 @@ QString ConfigManager::PythonInterpreterPath(void) const {
 
 void ConfigManager::SetPythonInterpreterPath(const QString &path) {
   SetSetting(d->global_db, QStringLiteral("python_interpreter_path"), path);
+}
+
+QString ConfigManager::WorkspacePath(void) const {
+  return GetSetting(d->global_db, QStringLiteral("workspace_path"));
+}
+
+void ConfigManager::SetWorkspacePath(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("workspace_path"), path);
+}
+
+QString ConfigManager::CCompilerPath(void) const {
+  return GetSetting(d->global_db, QStringLiteral("c_compiler_path"));
+}
+
+void ConfigManager::SetCCompilerPath(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("c_compiler_path"), path);
+}
+
+QString ConfigManager::CXXCompilerPath(void) const {
+  return GetSetting(d->global_db, QStringLiteral("cxx_compiler_path"));
+}
+
+void ConfigManager::SetCXXCompilerPath(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("cxx_compiler_path"), path);
+}
+
+QString ConfigManager::SDKRoot(void) const {
+  return GetSetting(d->global_db, QStringLiteral("sdk_root"));
+}
+
+void ConfigManager::SetSDKRoot(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("sdk_root"), path);
+}
+
+bool ConfigManager::DashboardCumulative(void) const {
+  return GetSetting(d->global_db, QStringLiteral("dashboard_cumulative"),
+                    QStringLiteral("1")) == QStringLiteral("1");
+}
+
+void ConfigManager::SetDashboardCumulative(bool cumulative) {
+  SetSetting(d->global_db, QStringLiteral("dashboard_cumulative"),
+             cumulative ? QStringLiteral("1") : QStringLiteral("0"));
 }
 
 // --- Global settings ---
@@ -653,8 +747,8 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
   if (sheet_id < 0) {
     // Insert new sheet.
     q.prepare(QStringLiteral(
-        "INSERT INTO gui_sheets (name, description, role, closed_at) "
-        "VALUES (?, ?, ?, ?)"));
+        "INSERT INTO gui_sheets (name, description, role, closed_at, key_column) "
+        "VALUES (?, ?, ?, ?, ?)"));
     q.addBindValue(sheet.name);
     q.addBindValue(sheet.description.isEmpty() ? QVariant()
                                                 : sheet.description);
@@ -662,13 +756,14 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
                                         : sheet.role);
     q.addBindValue(sheet.closed_at.isEmpty() ? QVariant()
                                               : sheet.closed_at);
+    q.addBindValue(sheet.key_column_index);
     q.exec();
     sheet_id = q.lastInsertId().toInt();
   } else {
     // Update existing sheet.
     q.prepare(QStringLiteral(
         "UPDATE gui_sheets SET name = ?, description = ?, role = ?, "
-        "closed_at = ? WHERE sheet_id = ?"));
+        "closed_at = ?, key_column = ? WHERE sheet_id = ?"));
     q.addBindValue(sheet.name);
     q.addBindValue(sheet.description.isEmpty() ? QVariant()
                                                 : sheet.description);
@@ -676,6 +771,7 @@ int ConfigManager::SaveSheet(const SheetData &sheet) const {
                                         : sheet.role);
     q.addBindValue(sheet.closed_at.isEmpty() ? QVariant()
                                               : sheet.closed_at);
+    q.addBindValue(sheet.key_column_index);
     q.addBindValue(sheet_id);
     q.exec();
 
@@ -747,7 +843,7 @@ QVector<ConfigManager::SheetData> ConfigManager::LoadOpenSheets(void) const {
 
   QSqlQuery q(d->project_db);
   q.exec(QStringLiteral(
-      "SELECT sheet_id, name, description, role FROM gui_sheets "
+      "SELECT sheet_id, name, description, role, key_column FROM gui_sheets "
       "WHERE closed_at IS NULL ORDER BY sheet_id"));
 
   while (q.next()) {
@@ -756,6 +852,7 @@ QVector<ConfigManager::SheetData> ConfigManager::LoadOpenSheets(void) const {
     sheet.name = q.value(1).toString();
     sheet.description = q.value(2).toString();
     sheet.role = q.value(3).toString();
+    sheet.key_column_index = q.value(4).isNull() ? -1 : q.value(4).toInt();
 
     // Load columns.
     QSqlQuery cq(d->project_db);
@@ -871,7 +968,7 @@ ConfigManager::SheetData ConfigManager::LoadSheetById(int sheet_id) const {
 
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
-      "SELECT sheet_id, name, description, role FROM gui_sheets "
+      "SELECT sheet_id, name, description, role, key_column FROM gui_sheets "
       "WHERE sheet_id = ?"));
   q.addBindValue(sheet_id);
   q.exec();
@@ -882,6 +979,7 @@ ConfigManager::SheetData ConfigManager::LoadSheetById(int sheet_id) const {
   sheet.name = q.value(1).toString();
   sheet.description = q.value(2).toString();
   sheet.role = q.value(3).toString();
+  sheet.key_column_index = q.value(4).isNull() ? -1 : q.value(4).toInt();
 
   // Load columns.
   QSqlQuery cq(d->project_db);
@@ -956,15 +1054,17 @@ ConfigManager::SheetData ConfigManager::LoadSheetById(int sheet_id) const {
 // --- Documents ---
 
 int ConfigManager::CreateDocument(const QString &content,
-                                  const QString &title) const {
+                                  const QString &title,
+                                  const QString &format) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
   auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
-      "INSERT INTO gui_documents (content, title, created_at, updated_at) "
-      "VALUES (?, ?, ?, ?)"));
+      "INSERT INTO gui_documents (content, title, format, created_at, updated_at) "
+      "VALUES (?, ?, ?, ?, ?)"));
   q.addBindValue(content.isNull() ? QStringLiteral("") : content);
   q.addBindValue(title);
+  q.addBindValue(format.isEmpty() ? QStringLiteral("html") : format);
   q.addBindValue(now);
   q.addBindValue(now);
   if (!q.exec()) return -1;
@@ -990,6 +1090,20 @@ QString ConfigManager::LoadDocumentTitle(int doc_id) const {
   q.addBindValue(doc_id);
   q.exec();
   return q.next() ? q.value(0).toString() : QString();
+}
+
+QString ConfigManager::LoadDocumentFormat(int doc_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT format FROM gui_documents WHERE doc_id = ?"));
+  q.addBindValue(doc_id);
+  q.exec();
+  if (q.next()) {
+    auto fmt = q.value(0).toString();
+    return fmt.isEmpty() ? QStringLiteral("html") : fmt;
+  }
+  return QStringLiteral("html");
 }
 
 void ConfigManager::SaveDocumentContent(int doc_id,
@@ -1022,8 +1136,8 @@ ConfigManager::LoadAllDocuments(void) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
   QSqlQuery q(d->project_db);
   q.exec(QStringLiteral(
-      "SELECT doc_id, title, description, created_at, updated_at "
-      "FROM gui_documents WHERE deleted = 0 ORDER BY doc_id"));
+      "SELECT doc_id, title, description, created_at, updated_at, format, "
+      "category FROM gui_documents WHERE deleted = 0 ORDER BY doc_id"));
   QVector<DocumentInfo> result;
   while (q.next()) {
     DocumentInfo info;
@@ -1032,6 +1146,10 @@ ConfigManager::LoadAllDocuments(void) const {
     info.description = q.value(2).toString();
     info.created_at = q.value(3).toString();
     info.updated_at = q.value(4).toString();
+    info.format = q.value(5).toString();
+    if (info.format.isEmpty()) info.format = QStringLiteral("html");
+    info.category = q.value(6).toString();
+    if (info.category.isEmpty()) info.category = QStringLiteral("note");
     result.push_back(std::move(info));
   }
   return result;
@@ -1152,20 +1270,23 @@ ConfigManager::LoadNavigationHistory(const QString &key) const {
 
 int64_t ConfigManager::CreateAgentSession(
     const QString &name, const QString &system_prompt,
-    const QString &backend, const QString &model) const {
+    const QString &backend, const QString &model,
+    int64_t primary_session_id) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
   auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
       "INSERT INTO gui_agent_sessions "
-      "(name, system_prompt, backend, model, status, created_at, updated_at) "
-      "VALUES (?, ?, ?, ?, 'active', ?, ?)"));
+      "(name, system_prompt, backend, model, status, created_at, updated_at, "
+      "primary_session_id) "
+      "VALUES (?, ?, ?, ?, 'active', ?, ?, ?)"));
   q.addBindValue(name);
   q.addBindValue(system_prompt);
   q.addBindValue(backend);
   q.addBindValue(model);
   q.addBindValue(now);
   q.addBindValue(now);
+  q.addBindValue(static_cast<qlonglong>(primary_session_id));
   if (!q.exec()) return -1;
   auto id = q.lastInsertId();
   return id.isValid() ? id.toLongLong() : -1;
@@ -1260,6 +1381,21 @@ void ConfigManager::DeleteAgentSession(int64_t session_id) const {
   q.addBindValue(sid);
   q.exec();
 
+  // Delete cost edges that reference nodes in this session.
+  q.prepare(QStringLiteral(
+      "DELETE FROM gui_cost_edges WHERE from_node_id IN "
+      "(SELECT node_id FROM gui_cost_nodes WHERE session_id = ?) "
+      "OR to_node_id IN "
+      "(SELECT node_id FROM gui_cost_nodes WHERE session_id = ?)"));
+  q.addBindValue(sid);
+  q.addBindValue(sid);
+  q.exec();
+
+  q.prepare(QStringLiteral(
+      "DELETE FROM gui_cost_nodes WHERE session_id = ?"));
+  q.addBindValue(sid);
+  q.exec();
+
   q.prepare(QStringLiteral(
       "DELETE FROM gui_agent_sessions WHERE session_id = ?"));
   q.addBindValue(sid);
@@ -1274,15 +1410,16 @@ int64_t ConfigManager::SaveAgentMessage(
     int64_t session_id, const QString &role, const QString &content,
     const QString &tool_name, const QString &tool_call_id,
     const QString &tool_args, const QString &tool_result,
-    int token_count) const {
+    int token_count, int duration_ms, int64_t parent_message_id) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
   auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
       "INSERT INTO gui_agent_messages "
       "(session_id, role, content, tool_name, tool_call_id, "
-      "tool_args, tool_result, timestamp, token_count) "
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+      "tool_args, tool_result, timestamp, token_count, duration_ms, "
+      "parent_message_id) "
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
   q.addBindValue(static_cast<qlonglong>(session_id));
   q.addBindValue(role);
   q.addBindValue(content);
@@ -1292,6 +1429,8 @@ int64_t ConfigManager::SaveAgentMessage(
   q.addBindValue(tool_result.isEmpty() ? QVariant() : tool_result);
   q.addBindValue(now);
   q.addBindValue(token_count);
+  q.addBindValue(duration_ms);
+  q.addBindValue(static_cast<qlonglong>(parent_message_id));
   if (!q.exec()) return -1;
   auto id = q.lastInsertId();
   return id.isValid() ? id.toLongLong() : -1;
@@ -1303,7 +1442,8 @@ ConfigManager::LoadAgentMessages(int64_t session_id) const {
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
       "SELECT message_id, session_id, role, content, tool_name, "
-      "tool_call_id, tool_args, tool_result, timestamp, token_count "
+      "tool_call_id, tool_args, tool_result, timestamp, token_count, "
+      "duration_ms, parent_message_id "
       "FROM gui_agent_messages WHERE session_id = ? ORDER BY message_id"));
   q.addBindValue(static_cast<qlonglong>(session_id));
   q.exec();
@@ -1320,6 +1460,8 @@ ConfigManager::LoadAgentMessages(int64_t session_id) const {
     info.tool_result = q.value(7).toString();
     info.timestamp = q.value(8).toString();
     info.token_count = q.value(9).toInt();
+    info.duration_ms = q.value(10).toInt();
+    info.parent_message_id = q.value(11).toLongLong();
     result.push_back(std::move(info));
   }
   return result;
@@ -1406,7 +1548,7 @@ ConfigManager::LoadDocumentsByCategory(const QString &category) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
   QSqlQuery q(d->project_db);
   q.prepare(QStringLiteral(
-      "SELECT doc_id, title, description, created_at, updated_at "
+      "SELECT doc_id, title, description, created_at, updated_at, format "
       "FROM gui_documents WHERE deleted = 0 AND category = ? "
       "ORDER BY doc_id"));
   q.addBindValue(category);
@@ -1419,6 +1561,9 @@ ConfigManager::LoadDocumentsByCategory(const QString &category) const {
     info.description = q.value(2).toString();
     info.created_at = q.value(3).toString();
     info.updated_at = q.value(4).toString();
+    info.format = q.value(5).toString();
+    if (info.format.isEmpty()) info.format = QStringLiteral("html");
+    info.category = category;
     result.push_back(std::move(info));
   }
   return result;
@@ -1433,6 +1578,393 @@ void ConfigManager::SetDocumentCategory(int doc_id,
   q.addBindValue(category);
   q.addBindValue(doc_id);
   q.exec();
+}
+
+// --- Cost tracking ---
+
+int64_t ConfigManager::CreateCostNode(
+    int64_t session_id, int64_t parent_node_id,
+    const QString &node_type, const QString &tool_name,
+    const QString &model) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return -1;
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_cost_nodes "
+      "(session_id, parent_node_id, node_type, tool_name, model, started_at) "
+      "VALUES (?, ?, ?, ?, ?, ?)"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.addBindValue(parent_node_id >= 0 ? QVariant(static_cast<qlonglong>(parent_node_id))
+                                     : QVariant());
+  q.addBindValue(node_type);
+  q.addBindValue(tool_name.isEmpty() ? QVariant() : tool_name);
+  q.addBindValue(model.isEmpty() ? QVariant() : model);
+  q.addBindValue(now);
+  if (!q.exec()) return -1;
+  auto id = q.lastInsertId();
+  return id.isValid() ? id.toLongLong() : -1;
+}
+
+void ConfigManager::CompleteCostNode(
+    int64_t node_id, int input_tokens, int output_tokens,
+    int duration_ms, const QString &metadata) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  if (node_id < 0) return;
+
+  auto now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+
+  // Look up the model for this node to compute cost.
+  double cost_usd = 0.0;
+  QSqlQuery mq(d->project_db);
+  mq.prepare(QStringLiteral("SELECT model FROM gui_cost_nodes WHERE node_id = ?"));
+  mq.addBindValue(static_cast<qlonglong>(node_id));
+  if (mq.exec() && mq.next()) {
+    auto model = mq.value(0).toString();
+    if (!model.isEmpty()) {
+      double input_rate = LookupCostRate(model, true);
+      double output_rate = LookupCostRate(model, false);
+      cost_usd = (input_tokens * input_rate + output_tokens * output_rate)
+                 / 1000000.0;
+    }
+  }
+
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "UPDATE gui_cost_nodes SET "
+      "input_tokens = ?, output_tokens = ?, duration_ms = ?, "
+      "cost_usd = ?, completed_at = ?, metadata = ? "
+      "WHERE node_id = ?"));
+  q.addBindValue(input_tokens);
+  q.addBindValue(output_tokens);
+  q.addBindValue(duration_ms);
+  q.addBindValue(cost_usd);
+  q.addBindValue(now);
+  q.addBindValue(metadata.isEmpty() ? QVariant() : metadata);
+  q.addBindValue(static_cast<qlonglong>(node_id));
+  q.exec();
+}
+
+double ConfigManager::LookupCostRate(const QString &model,
+                                     bool is_input) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return 0.0;
+  QSqlQuery q(d->project_db);
+  auto col = is_input ? QStringLiteral("input_per_million")
+                      : QStringLiteral("output_per_million");
+  q.prepare(QStringLiteral("SELECT %1 FROM gui_cost_rates "
+                           "WHERE ? LIKE '%%' || model || '%%' "
+                           "ORDER BY length(model) DESC LIMIT 1").arg(col));
+  q.addBindValue(model);
+  if (q.exec() && q.next()) {
+    return q.value(0).toDouble();
+  }
+  return 0.0;
+}
+
+QVector<ConfigManager::CostNodeInfo>
+ConfigManager::LoadCostNodes(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT node_id, session_id, parent_node_id, node_type, tool_name, "
+      "model, input_tokens, output_tokens, duration_ms, cost_usd, "
+      "started_at, completed_at "
+      "FROM gui_cost_nodes WHERE session_id = ? ORDER BY started_at"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<CostNodeInfo> result;
+  while (q.next()) {
+    CostNodeInfo info;
+    info.node_id = q.value(0).toLongLong();
+    info.session_id = q.value(1).toLongLong();
+    info.parent_node_id = q.value(2).isNull() ? -1 : q.value(2).toLongLong();
+    info.node_type = q.value(3).toString();
+    info.tool_name = q.value(4).toString();
+    info.model = q.value(5).toString();
+    info.input_tokens = q.value(6).toInt();
+    info.output_tokens = q.value(7).toInt();
+    info.duration_ms = q.value(8).toInt();
+    info.cost_usd = q.value(9).toDouble();
+    info.started_at = q.value(10).toString();
+    info.completed_at = q.value(11).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+ConfigManager::CostSummary
+ConfigManager::LoadCostSummary(int64_t session_id) const {
+  CostSummary summary;
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return summary;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT COALESCE(SUM(cost_usd), 0), "
+      "COALESCE(SUM(input_tokens), 0), "
+      "COALESCE(SUM(output_tokens), 0), "
+      "COALESCE(SUM(duration_ms), 0), "
+      "COALESCE(SUM(CASE WHEN node_type = 'llm_call' THEN 1 ELSE 0 END), 0), "
+      "COALESCE(SUM(CASE WHEN node_type = 'tool_call' THEN 1 ELSE 0 END), 0) "
+      "FROM gui_cost_nodes WHERE session_id = ?"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  if (q.exec() && q.next()) {
+    summary.total_cost_usd = q.value(0).toDouble();
+    summary.total_input_tokens = q.value(1).toInt();
+    summary.total_output_tokens = q.value(2).toInt();
+    summary.total_duration_ms = q.value(3).toInt();
+    summary.llm_call_count = q.value(4).toInt();
+    summary.tool_call_count = q.value(5).toInt();
+  }
+  return summary;
+}
+
+QVector<ConfigManager::ToolCostBreakdown>
+ConfigManager::LoadToolCostBreakdown(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT tool_name, COUNT(*) as call_count, "
+      "COALESCE(SUM(cost_usd), 0), "
+      "COALESCE(SUM(duration_ms), 0), "
+      "COALESCE(AVG(duration_ms), 0) "
+      "FROM gui_cost_nodes "
+      "WHERE session_id = ? AND node_type = 'tool_call' AND tool_name IS NOT NULL "
+      "GROUP BY tool_name ORDER BY SUM(cost_usd) DESC"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<ToolCostBreakdown> result;
+  while (q.next()) {
+    ToolCostBreakdown info;
+    info.tool_name = q.value(0).toString();
+    info.call_count = q.value(1).toInt();
+    info.total_cost_usd = q.value(2).toDouble();
+    info.total_duration_ms = q.value(3).toInt();
+    info.avg_duration_ms = q.value(4).toInt();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+QVector<ConfigManager::ToolStatistics>
+ConfigManager::LoadToolStatistics(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT tool_name, COUNT(*) as calls, "
+      "COALESCE(SUM(duration_ms), 0), "
+      "COALESCE(MIN(duration_ms), 0), "
+      "COALESCE(MAX(duration_ms), 0), "
+      "COALESCE(AVG(duration_ms), 0), "
+      "COALESCE(SUM(cost_usd), 0) "
+      "FROM gui_cost_nodes "
+      "WHERE session_id = ? AND node_type = 'tool_call' "
+      "AND tool_name IS NOT NULL "
+      "GROUP BY tool_name ORDER BY calls DESC"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<ToolStatistics> result;
+  while (q.next()) {
+    ToolStatistics info;
+    info.tool_name = q.value(0).toString();
+    info.call_count = q.value(1).toInt();
+    info.total_duration_ms = q.value(2).toInt();
+    info.min_duration_ms = q.value(3).toInt();
+    info.max_duration_ms = q.value(4).toInt();
+    info.avg_duration_ms = q.value(5).toInt();
+    info.total_cost_usd = q.value(6).toDouble();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+QVector<ConfigManager::RoleCostBreakdown>
+ConfigManager::LoadRoleCostBreakdown(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT node_type, model, COUNT(*) as call_count, "
+      "COALESCE(SUM(input_tokens), 0), "
+      "COALESCE(SUM(output_tokens), 0), "
+      "COALESCE(SUM(cost_usd), 0) "
+      "FROM gui_cost_nodes WHERE session_id = ? "
+      "GROUP BY node_type, model"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<RoleCostBreakdown> result;
+  while (q.next()) {
+    RoleCostBreakdown info;
+    info.node_type = q.value(0).toString();
+    info.model = q.value(1).toString();
+    info.call_count = q.value(2).toInt();
+    info.total_input_tokens = q.value(3).toInt();
+    info.total_output_tokens = q.value(4).toInt();
+    info.total_cost_usd = q.value(5).toDouble();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+// --- Cost edge tracking ---
+
+void ConfigManager::CreateCostEdge(int64_t from_node_id, int64_t to_node_id,
+                                   const QString &edge_type) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return;
+  if (from_node_id < 0 || to_node_id < 0) return;
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "INSERT INTO gui_cost_edges (from_node_id, to_node_id, edge_type) "
+      "VALUES (?, ?, ?)"));
+  q.addBindValue(static_cast<qlonglong>(from_node_id));
+  q.addBindValue(static_cast<qlonglong>(to_node_id));
+  q.addBindValue(edge_type);
+  q.exec();
+}
+
+QVector<ConfigManager::CostEdgeInfo>
+ConfigManager::LoadCostEdges(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT e.edge_id, e.from_node_id, e.to_node_id, e.edge_type "
+      "FROM gui_cost_edges e "
+      "JOIN gui_cost_nodes n ON e.from_node_id = n.node_id "
+      "WHERE n.session_id = ? "
+      "ORDER BY e.edge_id"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<CostEdgeInfo> result;
+  while (q.next()) {
+    CostEdgeInfo info;
+    info.edge_id = q.value(0).toLongLong();
+    info.from_node_id = q.value(1).toLongLong();
+    info.to_node_id = q.value(2).toLongLong();
+    info.edge_type = q.value(3).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+QVector<ConfigManager::CostNodeInfo>
+ConfigManager::LoadUpstreamNodes(int64_t node_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+
+  // Walk up the parent chain from node_id to root via parent_node_id.
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "WITH RECURSIVE ancestors(nid) AS ("
+      "  SELECT ? "
+      "  UNION ALL "
+      "  SELECT n.parent_node_id FROM gui_cost_nodes n "
+      "  JOIN ancestors a ON n.node_id = a.nid "
+      "  WHERE n.parent_node_id IS NOT NULL"
+      ") "
+      "SELECT node_id, session_id, parent_node_id, node_type, tool_name, "
+      "model, input_tokens, output_tokens, duration_ms, cost_usd, "
+      "started_at, completed_at "
+      "FROM gui_cost_nodes WHERE node_id IN (SELECT nid FROM ancestors) "
+      "ORDER BY started_at"));
+  q.addBindValue(static_cast<qlonglong>(node_id));
+  q.exec();
+
+  QVector<CostNodeInfo> result;
+  while (q.next()) {
+    CostNodeInfo info;
+    info.node_id = q.value(0).toLongLong();
+    info.session_id = q.value(1).toLongLong();
+    info.parent_node_id = q.value(2).isNull() ? -1 : q.value(2).toLongLong();
+    info.node_type = q.value(3).toString();
+    info.tool_name = q.value(4).toString();
+    info.model = q.value(5).toString();
+    info.input_tokens = q.value(6).toInt();
+    info.output_tokens = q.value(7).toInt();
+    info.duration_ms = q.value(8).toInt();
+    info.cost_usd = q.value(9).toDouble();
+    info.started_at = q.value(10).toString();
+    info.completed_at = q.value(11).toString();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+double ConfigManager::ComputeTrueCost(int64_t node_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return 0.0;
+  if (node_id < 0) return 0.0;
+
+  // Helper: compute subtree cost for a given node.
+  auto subtree_cost = [this](int64_t root_id) -> double {
+    QSqlQuery sq(d->project_db);
+    sq.prepare(QStringLiteral(
+        "WITH RECURSIVE subtree(nid) AS ("
+        "  SELECT ? "
+        "  UNION ALL "
+        "  SELECT n.node_id FROM gui_cost_nodes n "
+        "  JOIN subtree s ON n.parent_node_id = s.nid"
+        ") "
+        "SELECT COALESCE(SUM(cost_usd), 0) FROM gui_cost_nodes "
+        "WHERE node_id IN (SELECT nid FROM subtree)"));
+    sq.addBindValue(static_cast<qlonglong>(root_id));
+    if (sq.exec() && sq.next()) {
+      return sq.value(0).toDouble();
+    }
+    return 0.0;
+  };
+
+  // Trace path from node to root via parent_node_id.
+  QVector<int64_t> path;
+  {
+    int64_t cur = node_id;
+    while (cur >= 0) {
+      path.append(cur);
+      QSqlQuery pq(d->project_db);
+      pq.prepare(QStringLiteral(
+          "SELECT parent_node_id FROM gui_cost_nodes WHERE node_id = ?"));
+      pq.addBindValue(static_cast<qlonglong>(cur));
+      if (pq.exec() && pq.next() && !pq.value(0).isNull()) {
+        cur = pq.value(0).toLongLong();
+      } else {
+        break;
+      }
+    }
+  }
+
+  double cost = 0.0;
+  for (auto nid : path) {
+    // Add this node's direct cost.
+    QSqlQuery cq(d->project_db);
+    cq.prepare(QStringLiteral(
+        "SELECT cost_usd, parent_node_id FROM gui_cost_nodes "
+        "WHERE node_id = ?"));
+    cq.addBindValue(static_cast<qlonglong>(nid));
+    if (!cq.exec() || !cq.next()) continue;
+
+    cost += cq.value(0).toDouble();
+    auto parent_id = cq.value(1).isNull() ? -1 : cq.value(1).toLongLong();
+
+    if (parent_id < 0) continue;
+
+    // Find all siblings (children of the same parent, excluding this node).
+    QSqlQuery sq(d->project_db);
+    sq.prepare(QStringLiteral(
+        "SELECT node_id FROM gui_cost_nodes "
+        "WHERE parent_node_id = ? AND node_id != ?"));
+    sq.addBindValue(static_cast<qlonglong>(parent_id));
+    sq.addBindValue(static_cast<qlonglong>(nid));
+    if (!sq.exec()) continue;
+
+    QVector<int64_t> sibling_ids;
+    while (sq.next()) {
+      sibling_ids.append(sq.value(0).toLongLong());
+    }
+
+    if (sibling_ids.isEmpty()) continue;
+
+    // Amortize sibling subtree costs: each sibling's subtree cost is
+    // shared equally among all children at this level.
+    auto num_children = static_cast<double>(sibling_ids.size() + 1);
+    for (auto sib_id : sibling_ids) {
+      cost += subtree_cost(sib_id) / static_cast<double>(num_children);
+    }
+  }
+
+  return cost;
 }
 
 }  // namespace mx::gui

@@ -5,6 +5,7 @@
 // the LICENSE file found in the root directory of this source tree.
 
 #include <multiplier/GUI/Managers/AgentManager.h>
+#include <multiplier/GUI/Managers/ConfigManager.h>
 #include <multiplier/GUI/Managers/LLMManager.h>
 
 #include "AgentSession.h"
@@ -18,6 +19,10 @@
 #include "tools/NavigationTools.h"
 #include "tools/SessionTools.h"
 #include "tools/ObserverTools.h"
+#include "tools/PythonTools.h"
+
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include <unordered_map>
 
@@ -45,6 +50,7 @@ class AgentManagerImpl {
   std::unordered_map<int64_t, std::unique_ptr<ObserverToolContext>>
       observer_contexts;
   ConfigManager *config_manager{nullptr};
+  SessionToolContext *session_tool_ctx{nullptr};
 
   // Token tracking across all sessions.
   int accumulated_prompt_tokens{0};
@@ -72,7 +78,7 @@ int64_t AgentManager::createSession(const QString &name,
   auto session_id = d->next_session_id++;
   auto session = std::make_unique<AgentSession>(
       session_id, backend, &d->tool_registry, d->llm_config, system_prompt,
-      d->max_iterations, this);
+      d->max_iterations, d->config_manager, this);
 
   // Forward session signals.
   auto *s = session.get();
@@ -113,8 +119,17 @@ int64_t AgentManager::createSession(const QString &name,
             d->accumulated_completion_tokens += completion;
             emit tokenUsageUpdated(session_id, prompt, completion);
           });
+  connect(s, &AgentSession::contextUsageUpdated, this,
+          &AgentManager::contextUsageUpdated);
 
   d->sessions[session_id] = std::move(session);
+
+  // Update session tool context so checkpoint/observation tools know the
+  // current session.
+  if (d->session_tool_ctx) {
+    d->session_tool_ctx->current_session_id = session_id;
+  }
+
   return session_id;
 }
 
@@ -133,10 +148,113 @@ void AgentManager::pauseSession(int64_t session_id) {
 }
 
 void AgentManager::resumeSession(int64_t session_id) {
+  // If the session is already in memory, just unpause it.
   auto it = d->sessions.find(session_id);
   if (it != d->sessions.end()) {
     it->second->resume();
+    return;
   }
+
+  // Reconstruct the session from the DB.
+  if (!d->config_manager) {
+    return;
+  }
+
+  auto system_prompt =
+      d->config_manager->LoadAgentSessionSystemPrompt(session_id);
+
+  auto *backend = d->llm_manager.activeBackend();
+  if (!backend) {
+    return;
+  }
+
+  // Assign a new in-memory session id that won't collide.
+  // We keep the DB session_id for message loading but map it to the
+  // in-memory key space.
+  if (session_id >= d->next_session_id) {
+    d->next_session_id = session_id + 1;
+  }
+
+  auto session = std::make_unique<AgentSession>(
+      session_id, backend, &d->tool_registry, d->llm_config, system_prompt,
+      d->max_iterations, d->config_manager, this);
+
+  // Load persisted messages and populate the session history.
+  auto db_messages = d->config_manager->LoadAgentMessages(session_id);
+  QVector<AgentMessage> messages;
+  messages.reserve(db_messages.size());
+  for (const auto &info : db_messages) {
+    AgentMessage msg;
+    msg.message_id = info.message_id;
+    msg.session_id = info.session_id;
+    msg.role = info.role;
+    msg.content = info.content;
+    msg.tool_name = info.tool_name;
+    msg.tool_call_id = info.tool_call_id;
+    msg.token_count = info.token_count;
+    msg.duration_ms = info.duration_ms;
+    msg.parent_message_id = info.parent_message_id;
+    if (!info.tool_args.isEmpty()) {
+      msg.tool_args =
+          QJsonDocument::fromJson(info.tool_args.toUtf8()).object();
+    }
+    if (!info.tool_result.isEmpty()) {
+      msg.tool_result =
+          QJsonDocument::fromJson(info.tool_result.toUtf8()).object();
+    }
+    messages.append(std::move(msg));
+  }
+  session->loadMessages(messages);
+
+  // Forward session signals (same wiring as createSession).
+  auto *s = session.get();
+  connect(s, &AgentSession::messageAdded, this,
+          [this, session_id](const AgentMessage &msg) {
+            emit messageAdded(session_id, msg);
+          });
+  connect(s, &AgentSession::toolCallStarted, this,
+          [this, session_id](const QString &name, const QJsonObject &args) {
+            emit toolCallStarted(session_id, name, args);
+          });
+  connect(s, &AgentSession::toolCallCompleted, this,
+          [this, session_id](const QString &name, const QJsonObject &result,
+                             int duration_ms) {
+            emit toolCallCompleted(session_id, name, result, duration_ms);
+          });
+  connect(s, &AgentSession::sessionStarted, this,
+          [this, session_id] { emit sessionStarted(session_id); });
+  connect(s, &AgentSession::sessionPaused, this,
+          [this, session_id] { emit sessionPaused(session_id); });
+  connect(s, &AgentSession::sessionResumed, this,
+          [this, session_id] { emit sessionResumed(session_id); });
+  connect(s, &AgentSession::sessionCompleted, this,
+          [this, session_id](const QString &summary) {
+            emit sessionCompleted(session_id, summary);
+          });
+  connect(s, &AgentSession::sessionFinished, this,
+          [this, session_id](const SessionResult &result) {
+            emit sessionFinished(session_id, result);
+          });
+  connect(s, &AgentSession::sessionError, this,
+          [this, session_id](const QString &error) {
+            emit sessionError(session_id, error);
+          });
+  connect(s, &AgentSession::tokenUsageUpdated, this,
+          [this, session_id](int prompt, int completion) {
+            d->accumulated_prompt_tokens += prompt;
+            d->accumulated_completion_tokens += completion;
+            emit tokenUsageUpdated(session_id, prompt, completion);
+          });
+  connect(s, &AgentSession::contextUsageUpdated, this,
+          &AgentManager::contextUsageUpdated);
+
+  d->sessions[session_id] = std::move(session);
+
+  if (d->session_tool_ctx) {
+    d->session_tool_ctx->current_session_id = session_id;
+  }
+
+  emit sessionResumed(session_id);
 }
 
 void AgentManager::cancelSession(int64_t session_id) {
@@ -194,15 +312,24 @@ void AgentManager::registerBuiltinTools(ConfigManager &config_manager) {
   auto *sess_ctx = new SessionToolContext;
   sess_ctx->config = &config_manager;
   registerSessionTools(d->tool_registry, sess_ctx);
+  d->session_tool_ctx = sess_ctx;
+
+  auto *py_ctx = new PythonToolContext;
+  py_ctx->config = &config_manager;
+  registerPythonTools(d->tool_registry, py_ctx);
 }
 
 void AgentManager::registerTool(std::unique_ptr<AgentTool> tool) {
   d->tool_registry.registerTool(std::move(tool));
 }
 
+QVector<ToolDefinition> AgentManager::toolDefinitions(void) const {
+  return d->tool_registry.allDefinitions();
+}
+
 int64_t AgentManager::createObserverSession(
     const QString &system_prompt, const QString &backend_name,
-    int64_t primary_session_id) {
+    int64_t primary_session_id, const QString &model_override) {
   auto *backend = backend_name.isEmpty()
                       ? d->llm_manager.activeBackend()
                       : d->llm_manager.backend(backend_name);
@@ -227,9 +354,14 @@ int64_t AgentManager::createObserverSession(
   auto *ctx_ptr = ctx.get();
   registerObserverTools(*registry, ctx_ptr);
 
+  auto observer_config = d->llm_config;
+  if (!model_override.isEmpty()) {
+    observer_config.model = model_override;
+  }
+
   auto session = std::make_unique<AgentSession>(
-      session_id, backend, registry.get(), d->llm_config, system_prompt,
-      d->max_iterations, this);
+      session_id, backend, registry.get(), observer_config, system_prompt,
+      d->max_iterations, d->config_manager, this);
 
   // Forward session signals.
   auto *s = session.get();
@@ -264,6 +396,8 @@ int64_t AgentManager::createObserverSession(
             d->accumulated_completion_tokens += completion;
             emit tokenUsageUpdated(session_id, prompt, completion);
           });
+  connect(s, &AgentSession::contextUsageUpdated, this,
+          &AgentManager::contextUsageUpdated);
 
   d->sessions[session_id] = std::move(session);
   d->observer_registries[session_id] = std::move(registry);

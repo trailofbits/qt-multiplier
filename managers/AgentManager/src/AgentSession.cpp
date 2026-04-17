@@ -7,7 +7,8 @@
 #include "AgentSession.h"
 #include "AgentTool.h"
 #include "AgentToolRegistry.h"
-#include "tools/SessionTools.h"
+
+#include <multiplier/GUI/Managers/ConfigManager.h>
 
 #include <QElapsedTimer>
 #include <QJsonArray>
@@ -19,11 +20,12 @@ namespace mx::gui {
 AgentSession::AgentSession(int64_t session_id, ILLMBackend *backend,
                            AgentToolRegistry *tools, const LLMConfig &config,
                            const QString &system_prompt, int max_iterations,
-                           QObject *parent)
+                           ConfigManager *config_manager, QObject *parent)
     : QObject(parent),
       m_session_id(session_id),
       m_backend(backend),
       m_tools(tools),
+      m_config_manager(config_manager),
       m_config(config),
       m_system_prompt(system_prompt),
       m_max_iterations(max_iterations) {}
@@ -34,6 +36,10 @@ int64_t AgentSession::sessionId(void) const {
   return m_session_id;
 }
 
+int64_t AgentSession::rootNodeId(void) const {
+  return m_root_node_id;
+}
+
 QVector<AgentMessage> AgentSession::messages(void) const {
   QMutexLocker lock(&m_mutex);
   return m_messages;
@@ -41,6 +47,14 @@ QVector<AgentMessage> AgentSession::messages(void) const {
 
 bool AgentSession::isRunning(void) const {
   return m_running.loadRelaxed() != 0;
+}
+
+void AgentSession::loadMessages(const QVector<AgentMessage> &messages) {
+  QMutexLocker lock(&m_mutex);
+  m_messages = messages;
+  if (!m_messages.isEmpty()) {
+    m_next_message_id = m_messages.last().message_id + 1;
+  }
 }
 
 void AgentSession::pause(void) {
@@ -57,10 +71,19 @@ void AgentSession::cancel(void) {
   m_cancelled.storeRelaxed(1);
 }
 
+int AgentSession::modelContextLimit(const QString &model) {
+  if (model.contains(QStringLiteral("claude"))) return 200000;
+  if (model.contains(QStringLiteral("gpt-4o-mini"))) return 128000;
+  if (model.contains(QStringLiteral("gpt-4o"))) return 128000;
+  if (model.contains(QStringLiteral("o3"))) return 200000;
+  return 100000;
+}
+
 AgentMessage AgentSession::addMessage(
     const QString &role, const QString &content, const QString &tool_name,
     const QString &tool_call_id, const QJsonObject &tool_args,
-    const QJsonObject &tool_result, int token_count) {
+    const QJsonObject &tool_result, int token_count, int duration_ms,
+    int64_t parent_message_id) {
   AgentMessage msg;
   msg.session_id = m_session_id;
   msg.role = role;
@@ -71,6 +94,8 @@ AgentMessage AgentSession::addMessage(
   msg.tool_result = tool_result;
   msg.timestamp = QDateTime::currentDateTime();
   msg.token_count = token_count;
+  msg.duration_ms = duration_ms;
+  msg.parent_message_id = parent_message_id;
 
   {
     QMutexLocker lock(&m_mutex);
@@ -159,7 +184,15 @@ void AgentSession::sendUserMessage(const QString &text) {
     return;
   }
 
-  addMessage(QStringLiteral("user"), text);
+  auto user_msg = addMessage(QStringLiteral("user"), text);
+  m_user_msg_id = user_msg.message_id;
+  m_assistant_msg_id = -1;
+
+  // Create a root cost node for this user message.
+  if (m_config_manager) {
+    m_root_node_id = m_config_manager->CreateCostNode(
+        m_session_id, -1, QStringLiteral("user_message"));
+  }
 
   auto *thread = QThread::create([this] { runLoop(); });
   QObject::connect(thread, &QThread::finished, thread, &QThread::deleteLater);
@@ -196,22 +229,97 @@ void AgentSession::runLoop(void) {
     auto llm_messages = buildMessages();
     auto tool_defs = m_tools->allDefinitions();
 
+    // Inject the 'follows' parameter into every tool's schema so the LLM
+    // can declare provenance dependencies between tool calls.
+    for (auto &def : tool_defs) {
+      auto props = def.parameters_schema.value(
+          QStringLiteral("properties")).toObject();
+      QJsonObject follows_prop;
+      follows_prop[QStringLiteral("description")] =
+          QStringLiteral("Result ID(s) from previous tool results that "
+                         "motivated this call (e.g. \"r-3\" or [\"r-1\", "
+                         "\"r-5\"]).");
+      QJsonArray one_of;
+      QJsonObject str_type;
+      str_type[QStringLiteral("type")] = QStringLiteral("string");
+      QJsonObject arr_type;
+      arr_type[QStringLiteral("type")] = QStringLiteral("array");
+      QJsonObject items;
+      items[QStringLiteral("type")] = QStringLiteral("string");
+      arr_type[QStringLiteral("items")] = items;
+      one_of.append(str_type);
+      one_of.append(arr_type);
+      follows_prop[QStringLiteral("oneOf")] = one_of;
+      props[QStringLiteral("follows")] = follows_prop;
+      def.parameters_schema[QStringLiteral("properties")] = props;
+    }
+
+    // Create a cost node for this LLM call (marshal to main thread).
+    if (m_config_manager) {
+      QMetaObject::invokeMethod(m_config_manager, [&] {
+        m_current_llm_node_id = m_config_manager->CreateCostNode(
+            m_session_id, m_root_node_id, QStringLiteral("llm_call"),
+            {}, m_config.model);
+
+        // Record a causal edge from root to this LLM call.
+        if (m_root_node_id >= 0 && m_current_llm_node_id >= 0) {
+          m_config_manager->CreateCostEdge(
+              m_root_node_id, m_current_llm_node_id,
+              QStringLiteral("causal"));
+        }
+
+        // Record context edges from pending tool nodes to this LLM call.
+        for (auto from_id : m_pending_context_nodes) {
+          m_config_manager->CreateCostEdge(
+              from_id, m_current_llm_node_id, QStringLiteral("context"));
+        }
+        m_pending_context_nodes.clear();
+      }, Qt::BlockingQueuedConnection);
+    }
+
+    QElapsedTimer llm_timer;
+    llm_timer.start();
+
     auto response = m_backend->sendMessage(llm_messages, tool_defs, m_config);
 
+    auto llm_duration_ms = static_cast<int>(llm_timer.elapsed());
+
     if (!response.error.isEmpty()) {
+      // Complete the cost node even on error.
+      if (m_config_manager && m_current_llm_node_id >= 0) {
+        QMetaObject::invokeMethod(m_config_manager, [&] {
+          m_config_manager->CompleteCostNode(
+              m_current_llm_node_id, response.prompt_tokens,
+              response.completion_tokens, llm_duration_ms);
+        }, Qt::BlockingQueuedConnection);
+      }
       m_running.storeRelaxed(0);
       emit sessionError(response.error);
       return;
+    }
+
+    // Complete the LLM cost node with tokens.
+    if (m_config_manager && m_current_llm_node_id >= 0) {
+      m_config_manager->CompleteCostNode(
+          m_current_llm_node_id, response.prompt_tokens,
+          response.completion_tokens, llm_duration_ms);
     }
 
     m_total_prompt_tokens += response.prompt_tokens;
     m_total_completion_tokens += response.completion_tokens;
     emit tokenUsageUpdated(m_total_prompt_tokens, m_total_completion_tokens);
 
+    // Track context window usage.
+    m_last_prompt_tokens = response.prompt_tokens;
+    int max_tokens = modelContextLimit(m_config.model);
+    emit contextUsageUpdated(m_session_id, m_last_prompt_tokens, max_tokens);
+
     // If there is text content, add an assistant message.
     if (!response.content.isEmpty()) {
-      addMessage(QStringLiteral("assistant"), response.content,
-                 {}, {}, {}, {}, response.completion_tokens);
+      auto assistant_msg = addMessage(
+          QStringLiteral("assistant"), response.content,
+          {}, {}, {}, {}, response.completion_tokens, 0, m_user_msg_id);
+      m_assistant_msg_id = assistant_msg.message_id;
     }
 
     // If there are no tool calls, we are done.
@@ -230,10 +338,33 @@ void AgentSession::runLoop(void) {
         return;
       }
 
-      // Record the tool call.
-      addMessage(QStringLiteral("tool_call"), {},
-                 call.name, call.id, call.arguments);
+      // Record the tool call with provenance to the assistant message.
+      auto call_msg = addMessage(QStringLiteral("tool_call"), {},
+                                 call.name, call.id, call.arguments,
+                                 {}, 0, 0, m_assistant_msg_id);
       emit toolCallStarted(call.name, call.arguments);
+
+      // Create a cost node for this tool call.
+      int64_t tool_node_id = -1;
+      if (m_config_manager) {
+        QMetaObject::invokeMethod(m_config_manager, [&] {
+          tool_node_id = m_config_manager->CreateCostNode(
+              m_session_id, m_current_llm_node_id,
+              QStringLiteral("tool_call"), call.name);
+
+          // Record a causal edge from the LLM call to this tool call.
+          if (m_current_llm_node_id >= 0 && tool_node_id >= 0) {
+            m_config_manager->CreateCostEdge(
+                m_current_llm_node_id, tool_node_id,
+                QStringLiteral("causal"));
+          }
+        }, Qt::BlockingQueuedConnection);
+
+        // Map the tool_call_id to its cost node for context edge tracking.
+        if (tool_node_id >= 0 && !call.id.isEmpty()) {
+          m_tool_call_id_to_node[call.id] = tool_node_id;
+        }
+      }
 
       QElapsedTimer timer;
       timer.start();
@@ -257,26 +388,100 @@ void AgentSession::runLoop(void) {
       }
 
       auto duration_ms = static_cast<int>(timer.elapsed());
+
+      // Assign a result_id so the LLM can reference this result later.
+      auto result_id = QStringLiteral("r-%1").arg(m_next_result_id++);
+      result.insert(QStringLiteral("result_id"), result_id);
+
+      // Inject row_id into array elements so the LLM can reference
+      // specific rows (e.g. "r-3.1" for the second entity in a search).
+      for (auto it = result.begin(); it != result.end(); ++it) {
+        if (it.value().isArray()) {
+          auto arr = it.value().toArray();
+          bool modified = false;
+          for (int ri = 0; ri < arr.size(); ++ri) {
+            if (arr[ri].isObject()) {
+              auto obj = arr[ri].toObject();
+              obj.insert(QStringLiteral("row_id"),
+                         QStringLiteral("%1.%2").arg(result_id).arg(ri));
+              arr[ri] = obj;
+              modified = true;
+            }
+          }
+          if (modified) {
+            result[it.key()] = arr;
+          }
+        }
+      }
+
+      // Complete the tool cost node.
+      if (m_config_manager && tool_node_id >= 0) {
+        QMetaObject::invokeMethod(m_config_manager, [&] {
+          m_config_manager->CompleteCostNode(tool_node_id, 0, 0, duration_ms);
+        }, Qt::BlockingQueuedConnection);
+
+        // Track this tool node for context edges in the next LLM call.
+        m_pending_context_nodes.append(tool_node_id);
+
+        // Map the result_id to the cost node for provenance edges.
+        m_result_id_to_cost_node[result_id] = tool_node_id;
+      }
+
+      // Create "follows" edges from referenced result nodes to this tool node.
+      if (m_config_manager && tool_node_id >= 0) {
+        auto follows = call.arguments.value(QStringLiteral("follows"));
+        auto create_follows_edge = [&](const QString &ref_id) {
+          auto from_node = m_result_id_to_cost_node.value(ref_id, -1);
+          if (from_node >= 0) {
+            QMetaObject::invokeMethod(m_config_manager, [&] {
+              m_config_manager->CreateCostEdge(
+                  from_node, tool_node_id, QStringLiteral("follows"));
+            }, Qt::BlockingQueuedConnection);
+          }
+        };
+        if (follows.isString()) {
+          create_follows_edge(follows.toString());
+        } else if (follows.isArray()) {
+          for (const auto &v : follows.toArray()) {
+            create_follows_edge(v.toString());
+          }
+        }
+      }
+
       emit toolCallCompleted(call.name, result, duration_ms);
 
-      // Record the tool result.
+      // Record the tool result with provenance to its tool_call message.
       auto result_str = QString::fromUtf8(
           QJsonDocument(result).toJson(QJsonDocument::Compact));
       addMessage(QStringLiteral("tool_result"), result_str,
-                 call.name, call.id, {}, result);
+                 call.name, call.id, {}, result, 0, duration_ms,
+                 call_msg.message_id);
 
-      // Check if the finish tool was called.
+      // Check if the finish tool was called and capture its args.
       if (call.name == QStringLiteral("finish")) {
         finish_called = true;
+        m_pending_finish_result.summary =
+            call.arguments.value(QStringLiteral("summary")).toString();
+        m_pending_finish_result.status =
+            call.arguments.value(QStringLiteral("status")).toString(
+                QStringLiteral("completed"));
+        auto actions = call.arguments.value(
+            QStringLiteral("next_actions")).toArray();
+        for (const auto &a : actions) {
+          auto s = a.toString();
+          if (!s.isEmpty()) {
+            m_pending_finish_result.next_actions.append(s);
+          }
+        }
       }
     }
 
-    // If the finish tool was called, stop the loop and emit the result.
-    if (finish_called && FinishTool::wasCalledAndReset()) {
-      auto session_result = FinishTool::lastResult();
+    // If the finish tool was called, extract the result from the tool call
+    // args (which we already have) and stop the loop.
+    if (finish_called) {
       m_running.storeRelaxed(0);
-      emit sessionFinished(session_result);
-      emit sessionCompleted(session_result.summary);
+      emit sessionFinished(m_pending_finish_result);
+      emit sessionCompleted(m_pending_finish_result.summary);
       return;
     }
 

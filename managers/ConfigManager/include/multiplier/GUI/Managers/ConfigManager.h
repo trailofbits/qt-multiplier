@@ -61,6 +61,9 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   //! to this group so that the global undo/redo toolbar buttons work.
   QUndoGroup &UndoGroup(void) const noexcept;
 
+  //! Get the file path to the currently loaded database.
+  QString DatabasePath(void) const;
+
   //! Get access to the current index.
   const class Index &Index(void) const noexcept;
 
@@ -110,6 +113,23 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   QString PythonInterpreterPath(void) const;
   void SetPythonInterpreterPath(const QString &path);
 
+  //! Workspace directory for agent artifacts (scripts, reports, etc.).
+  //! Empty means use the system temp directory.
+  QString WorkspacePath(void) const;
+  void SetWorkspacePath(const QString &path);
+
+  //! C/C++ compiler paths for building fuzzer harnesses and test programs.
+  QString CCompilerPath(void) const;
+  void SetCCompilerPath(const QString &path);
+  QString CXXCompilerPath(void) const;
+  void SetCXXCompilerPath(const QString &path);
+  QString SDKRoot(void) const;
+  void SetSDKRoot(const QString &path);
+
+  //! Dashboard cumulative vs per-minute cost toggle.
+  bool DashboardCumulative(void) const;
+  void SetDashboardCumulative(bool cumulative);
+
   //! Save all persistent settings to disk.
   void SaveSettings(void) const;
 
@@ -157,6 +177,7 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     QString description;
     QString role;       // "general", "task_list", "findings", etc.
     QString closed_at;  // ISO 8601 timestamp; empty = open.
+    int key_column_index{-1};  // Column used as unique key; -1 = none.
     QVector<SheetColumnInfo> columns;
     QVector<QVector<QString>> cells;          // cells[row][col] = JSON value
     QHash<int, QColor> row_colors;
@@ -177,9 +198,11 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   //! Document storage (per-project). Documents are stored by ID so
   //! multiple sheet cells can reference the same document.
   int CreateDocument(const QString &content = {},
-                     const QString &title = {}) const;
+                     const QString &title = {},
+                     const QString &format = QStringLiteral("html")) const;
   QString LoadDocumentContent(int doc_id) const;
   QString LoadDocumentTitle(int doc_id) const;
+  QString LoadDocumentFormat(int doc_id) const;
   void SaveDocumentContent(int doc_id, const QString &content) const;
   void SaveDocumentTitle(int doc_id, const QString &title) const;
 
@@ -192,6 +215,8 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     int doc_id{-1};
     QString title;
     QString description;
+    QString format;
+    QString category;
     QString created_at;
     QString updated_at;
   };
@@ -235,7 +260,8 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   int64_t CreateAgentSession(const QString &name,
                              const QString &system_prompt,
                              const QString &backend,
-                             const QString &model) const;
+                             const QString &model,
+                             int64_t primary_session_id = -1) const;
   void UpdateAgentSessionStatus(int64_t session_id,
                                 const QString &status) const;
   void UpdateAgentSessionTokens(int64_t session_id, int prompt_tokens,
@@ -256,6 +282,8 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     QString tool_result;
     QString timestamp;
     int token_count{0};
+    int duration_ms{0};
+    int64_t parent_message_id{-1};
   };
 
   int64_t SaveAgentMessage(int64_t session_id, const QString &role,
@@ -264,7 +292,9 @@ class ConfigManager Q_DECL_FINAL : public QObject {
                            const QString &tool_call_id = {},
                            const QString &tool_args = {},
                            const QString &tool_result = {},
-                           int token_count = 0) const;
+                           int token_count = 0,
+                           int duration_ms = 0,
+                           int64_t parent_message_id = -1) const;
   QVector<AgentMessageInfo> LoadAgentMessages(int64_t session_id) const;
 
   //! Agent checkpoint persistence (per-project).
@@ -289,10 +319,100 @@ class ConfigManager Q_DECL_FINAL : public QObject {
       const QString &category) const;
   void SetDocumentCategory(int doc_id, const QString &category) const;
 
+  //! Cost tracking (per-project).
+  int64_t CreateCostNode(int64_t session_id, int64_t parent_node_id,
+                         const QString &node_type,
+                         const QString &tool_name = {},
+                         const QString &model = {}) const;
+  void CompleteCostNode(int64_t node_id, int input_tokens, int output_tokens,
+                        int duration_ms,
+                        const QString &metadata = {}) const;
+  double LookupCostRate(const QString &model, bool is_input) const;
+
+  struct CostNodeInfo {
+    int64_t node_id{-1};
+    int64_t session_id{-1};
+    int64_t parent_node_id{-1};
+    QString node_type;
+    QString tool_name;
+    QString model;
+    int input_tokens{0};
+    int output_tokens{0};
+    int duration_ms{0};
+    double cost_usd{0.0};
+    QString started_at;
+    QString completed_at;
+  };
+  QVector<CostNodeInfo> LoadCostNodes(int64_t session_id) const;
+
+  //! Dependency edge tracking between cost nodes.
+  void CreateCostEdge(int64_t from_node_id, int64_t to_node_id,
+                      const QString &edge_type) const;
+
+  struct CostEdgeInfo {
+    int64_t edge_id{-1};
+    int64_t from_node_id{-1};
+    int64_t to_node_id{-1};
+    QString edge_type;
+  };
+  QVector<CostEdgeInfo> LoadCostEdges(int64_t session_id) const;
+
+  //! Load all upstream nodes that contributed to a given node (recursive).
+  QVector<CostNodeInfo> LoadUpstreamNodes(int64_t node_id) const;
+
+  //! Compute the true cost of a node including amortized sibling costs.
+  double ComputeTrueCost(int64_t node_id) const;
+
+  struct CostSummary {
+    double total_cost_usd{0.0};
+    int total_input_tokens{0};
+    int total_output_tokens{0};
+    int total_duration_ms{0};
+    int llm_call_count{0};
+    int tool_call_count{0};
+  };
+  CostSummary LoadCostSummary(int64_t session_id) const;
+
+  struct ToolCostBreakdown {
+    QString tool_name;
+    int call_count{0};
+    double total_cost_usd{0.0};
+    int total_duration_ms{0};
+    int avg_duration_ms{0};
+  };
+  QVector<ToolCostBreakdown> LoadToolCostBreakdown(int64_t session_id) const;
+
+  struct ToolStatistics {
+    QString tool_name;
+    int call_count{0};
+    int total_duration_ms{0};
+    int min_duration_ms{0};
+    int max_duration_ms{0};
+    int avg_duration_ms{0};
+    double total_cost_usd{0.0};
+  };
+  QVector<ToolStatistics> LoadToolStatistics(int64_t session_id) const;
+
+  struct RoleCostBreakdown {
+    QString node_type;
+    QString model;
+    int call_count{0};
+    int total_input_tokens{0};
+    int total_output_tokens{0};
+    double total_cost_usd{0.0};
+  };
+  QVector<RoleCostBreakdown> LoadRoleCostBreakdown(int64_t session_id) const;
+
+  //! Notify that sheets/documents were modified externally (e.g. by the agent).
+  void NotifyExternalSheetsChanged(void);
+  void NotifyExternalDocumentsChanged(void);
+
  signals:
   void IndexChanged(const ConfigManager &config_manager);
   void TabWidthChanged(unsigned tab_width);
   void UseTabStopsChanged(bool use_tab_stops);
+  void ExternalSheetsChanged(void);
+  void ExternalDocumentsChanged(void);
 
  private:
   static quint64 doc_title_version_;

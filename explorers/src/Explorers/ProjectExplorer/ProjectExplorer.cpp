@@ -57,6 +57,7 @@ void ProjectExplorer::CreateDockWidget(IWindowManager *manager) {
 
   IWindowManager::DockConfig config;
   config.id = "com.trailofbits.dock.ProjectExplorer";
+  config.location = IWindowManager::DockLocation::Left;
   config.tabify = true;
   config.app_menu_location = {tr("View"), tr("Explorers")};
   manager->AddDockWidget(d->view, config);

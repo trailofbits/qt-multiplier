@@ -195,4 +195,76 @@ class GetSheetAsMarkdownTool Q_DECL_FINAL : public AgentTool {
   QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
 };
 
+class WriteLocationCellTool Q_DECL_FINAL : public AgentTool {
+  SpreadsheetToolContext *m_ctx;
+ public:
+  explicit WriteLocationCellTool(SpreadsheetToolContext *ctx) : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
+class CreateFindingsSheetTool Q_DECL_FINAL : public AgentTool {
+  SpreadsheetToolContext *m_ctx;
+ public:
+  explicit CreateFindingsSheetTool(SpreadsheetToolContext *ctx) : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
+class CreateAttackSurfaceSheetTool Q_DECL_FINAL : public AgentTool {
+  SpreadsheetToolContext *m_ctx;
+ public:
+  explicit CreateAttackSurfaceSheetTool(SpreadsheetToolContext *ctx)
+      : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
+class GetCellFormatReferenceTool Q_DECL_FINAL : public AgentTool {
+  SpreadsheetToolContext *m_ctx;
+ public:
+  explicit GetCellFormatReferenceTool(SpreadsheetToolContext *ctx)
+      : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
+class GetSheetSchemaTool Q_DECL_FINAL : public AgentTool {
+  SpreadsheetToolContext *m_ctx;
+ public:
+  explicit GetSheetSchemaTool(SpreadsheetToolContext *ctx) : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
+class ReadRowByKeyTool Q_DECL_FINAL : public AgentTool {
+  SpreadsheetToolContext *m_ctx;
+ public:
+  explicit ReadRowByKeyTool(SpreadsheetToolContext *ctx) : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
+class UpdateRowByKeyTool Q_DECL_FINAL : public AgentTool {
+  SpreadsheetToolContext *m_ctx;
+ public:
+  explicit UpdateRowByKeyTool(SpreadsheetToolContext *ctx) : m_ctx(ctx) {}
+  QString name(void) const Q_DECL_FINAL;
+  QString description(void) const Q_DECL_FINAL;
+  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
+  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
+};
+
 }  // namespace mx::gui

@@ -118,6 +118,7 @@ struct SpreadsheetExplorer::PrivateData {
     SpreadsheetModel *cell_model{nullptr};  // If opened from a cell.
     int cell_row{-1};
     int cell_col{-1};
+    QString format{QStringLiteral("html")};
   };
   std::unordered_map<QWidget *, DocTab> doc_tab_map;
 
@@ -146,6 +147,9 @@ static ConfigManager::SheetData SheetTabToData(const SheetTab &tab,
   for (int c = 0; c < num_cols; ++c) {
     ConfigManager::SheetColumnInfo ci;
     ci.name = model->headerData(c, Qt::Horizontal).toString();
+    // Strip display-only affordance markers before persisting.
+    ci.name.remove(QStringLiteral(" [K]"));
+    ci.name.remove(QStringLiteral(" [\xe2\x86\x97]"));  // ↗
     ci.color = model->ColumnColor(c);
     ci.clickable = tab.view ? tab.view->IsColumnClickable(c) : false;
     ci.width = tab.view ? tab.view->columnWidth(c) : -1;
@@ -329,6 +333,10 @@ SpreadsheetExplorer::SpreadsheetExplorer(ConfigManager &config_manager,
             this, &SpreadsheetExplorer::ShowReopenClosedSheetsMenu);
     file_menu->addAction(reopen_action);
   }
+
+  // Refresh when the agent modifies sheets externally.
+  connect(&config_manager, &ConfigManager::ExternalSheetsChanged,
+          this, &SpreadsheetExplorer::OnExternalSheetsChanged);
 }
 
 void SpreadsheetExplorer::LoadPersistedSheets(void) {
@@ -568,6 +576,25 @@ void SpreadsheetExplorer::OpenSheetFromData(
     }
     if (sheet.columns[c].width > 0) {
       view->setColumnWidth(c, sheet.columns[c].width);
+    }
+  }
+
+  // Add visual affordance markers to column headers (display-only).
+  // Key column gets a key indicator; clickable columns get an arrow.
+  for (int c = 0; c < sheet.columns.size(); ++c) {
+    auto current = model->headerData(c, Qt::Horizontal).toString();
+    bool is_key = (sheet.key_column_index >= 0 &&
+                   c == sheet.key_column_index);
+    bool is_clickable = sheet.columns[c].clickable;
+    if (is_key || is_clickable) {
+      QString suffix;
+      if (is_key) {
+        suffix += QStringLiteral(" [K]");
+      }
+      if (is_clickable) {
+        suffix += QStringLiteral(" [\xe2\x86\x97]");  // ↗
+      }
+      model->setHeaderData(c, Qt::Horizontal, current + suffix);
     }
   }
 
@@ -822,8 +849,16 @@ void SpreadsheetExplorer::SaveCurrentDocument(void) {
     if (it == d->doc_tab_map.end()) continue;
     auto &tab = it->second;
     if (tab.doc_id < 0 || !tab.editor) continue;
-    d->config_manager.SaveDocumentContent(tab.doc_id,
-                                          tab.editor->toHtml());
+    if (tab.format == QLatin1String("markdown")) {
+      d->config_manager.SaveDocumentContent(tab.doc_id,
+                                            tab.editor->toMarkdown());
+    } else if (tab.format == QLatin1String("plaintext")) {
+      d->config_manager.SaveDocumentContent(tab.doc_id,
+                                            tab.editor->toPlainText());
+    } else {
+      d->config_manager.SaveDocumentContent(tab.doc_id,
+                                            tab.editor->toHtml());
+    }
     QString title = w->windowTitle();
     d->config_manager.SaveDocumentTitle(tab.doc_id, title);
     open_ids.push_back(tab.doc_id);
@@ -888,8 +923,15 @@ void SpreadsheetExplorer::CreateDocumentDock(IWindowManager *manager) {
     if (it != d->doc_tab_map.end()) {
       auto &tab = it->second;
       if (tab.doc_id >= 0 && tab.editor) {
-        d->config_manager.SaveDocumentContent(
-            tab.doc_id, tab.editor->toHtml());
+        QString serialized;
+        if (tab.format == QLatin1String("markdown")) {
+          serialized = tab.editor->toMarkdown();
+        } else if (tab.format == QLatin1String("plaintext")) {
+          serialized = tab.editor->toPlainText();
+        } else {
+          serialized = tab.editor->toHtml();
+        }
+        d->config_manager.SaveDocumentContent(tab.doc_id, serialized);
       }
       d->doc_tab_map.erase(it);
     }
@@ -1139,7 +1181,14 @@ void SpreadsheetExplorer::OpenDocumentViewer(
   container->setLayout(tab_layout);
 
   QString content = d->config_manager.LoadDocumentContent(doc_id);
-  editor->setHtml(content);
+  QString doc_format = d->config_manager.LoadDocumentFormat(doc_id);
+  if (doc_format == QLatin1String("markdown")) {
+    editor->setMarkdown(content);
+  } else if (doc_format == QLatin1String("plaintext")) {
+    editor->setPlainText(content);
+  } else {
+    editor->setHtml(content);
+  }
 
   QString title = d->config_manager.LoadDocumentTitle(doc_id);
   if (title.isEmpty()) {
@@ -1154,6 +1203,7 @@ void SpreadsheetExplorer::OpenDocumentViewer(
   dt.cell_model = model;
   dt.cell_row = row;
   dt.cell_col = col;
+  dt.format = doc_format;
   d->doc_tab_map.emplace(container, dt);
 
   d->doc_tabs->AddTab(container);
@@ -1294,6 +1344,66 @@ void SpreadsheetExplorer::ShowReopenClosedSheetsMenu(void) {
   }
 
   menu.exec(QCursor::pos());
+}
+
+void SpreadsheetExplorer::OnExternalSheetsChanged(void) {
+  // Collect IDs of sheets already open as tabs.
+  QSet<int> open_ids;
+  for (const auto &[widget, tab] : d->tabs) {
+    open_ids.insert(tab.sheet_id);
+  }
+
+  // Reload open sheet data from DB — open any new ones, refresh existing.
+  auto sheets = d->config_manager.LoadOpenSheets();
+  for (const auto &sheet : sheets) {
+    if (open_ids.contains(sheet.sheet_id)) {
+      // Already open — update the in-memory model so the user sees changes.
+      for (auto &[widget, tab] : d->tabs) {
+        if (tab.sheet_id != sheet.sheet_id) continue;
+        auto *model = tab.model;
+
+        // Re-apply cell data.
+        int num_rows = static_cast<int>(sheet.cells.size());
+        int num_cols = static_cast<int>(sheet.columns.size());
+
+        // Grow model if agent added rows/columns.
+        if (num_rows > model->rowCount()) {
+          model->insertRows(model->rowCount(),
+                            num_rows - model->rowCount());
+        }
+        if (num_cols > model->columnCount()) {
+          model->insertColumns(model->columnCount(),
+                               num_cols - model->columnCount());
+        }
+
+        const auto &index = d->config_manager.Index();
+        for (int r = 0; r < num_rows; ++r) {
+          for (int c = 0; c < num_cols; ++c) {
+            if (c < sheet.cells[r].size() && !sheet.cells[r][c].isEmpty()) {
+              QVariant v = SpreadsheetModel::value_from_json(
+                  sheet.cells[r][c], &index);
+              model->set_cell_value_internal(r, c, v);
+            }
+          }
+        }
+
+        // Apply row colors from the sheet data.
+        for (auto it = sheet.row_colors.begin();
+             it != sheet.row_colors.end(); ++it) {
+          model->SetRowColor(it.key(), it.value());
+        }
+        break;
+      }
+    } else {
+      // New sheet — open it.
+      if (!d->dock) {
+        CreateDockWidget(d->manager);
+      }
+      OpenSheetFromData(sheet);
+      d->dock->show();
+      d->dock->EmitRequestAttention();
+    }
+  }
 }
 
 void SpreadsheetExplorer::OnIndexChanged(const ConfigManager &cm) {

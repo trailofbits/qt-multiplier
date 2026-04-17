@@ -33,9 +33,9 @@ AgentToolLogWidget::AgentToolLogWidget(QWidget *parent)
   auto *layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
-  d->model = new QStandardItemModel(0, 4, this);
+  d->model = new QStandardItemModel(0, 5, this);
   d->model->setHorizontalHeaderLabels(
-      {tr("Time"), tr("Tool"), tr("Duration"), tr("Status")});
+      {tr("Time"), tr("Tool"), tr("Duration"), tr("Cost"), tr("Status")});
 
   d->tree_view = new QTreeView(this);
   d->tree_view->setModel(d->model);
@@ -47,6 +47,7 @@ AgentToolLogWidget::AgentToolLogWidget(QWidget *parent)
   d->tree_view->header()->setSectionResizeMode(1, QHeaderView::Stretch);
   d->tree_view->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
   d->tree_view->header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+  d->tree_view->header()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
 
   layout->addWidget(d->tree_view);
 }
@@ -60,20 +61,26 @@ void AgentToolLogWidget::onToolCallStarted(int64_t /*session_id*/,
   auto *time_item = new QStandardItem(time_str);
   auto *name_item = new QStandardItem(name);
   auto *dur_item = new QStandardItem(QStringLiteral("..."));
+  auto *cost_item = new QStandardItem(QStringLiteral("\xe2\x80\x94"));
   auto *status_item = new QStandardItem(QStringLiteral("running"));
   status_item->setForeground(QColor(0xF5, 0x9E, 0x0B));  // Amber.
 
-  auto row = d->model->rowCount();
-  d->model->appendRow({time_item, name_item, dur_item, status_item});
+  d->model->insertRow(0, {time_item, name_item, dur_item, cost_item,
+                          status_item});
+  auto row = time_item->row();
 
-  // Add args as child row.
+  // Add args as child row (truncated).
   if (!args.isEmpty()) {
     auto args_str = QString::fromUtf8(
         QJsonDocument(args).toJson(QJsonDocument::Compact));
+    if (args_str.size() > 300) {
+      args_str = args_str.left(300) + QStringLiteral("...(truncated)");
+    }
     auto *args_item = new QStandardItem(
         QStringLiteral("Args: ") + args_str);
     time_item->appendRow({args_item, new QStandardItem,
-                          new QStandardItem, new QStandardItem});
+                          new QStandardItem, new QStandardItem,
+                          new QStandardItem});
   }
 
   d->pending_calls[name] = time_item;
@@ -93,25 +100,34 @@ void AgentToolLogWidget::onToolCallCompleted(int64_t /*session_id*/,
   }
 
   if (!time_item) {
-    // No matching start -- create a standalone row.
+    // No matching start -- create a standalone row at the top.
     auto time_str = QDateTime::currentDateTime().toString(
         QStringLiteral("HH:mm:ss"));
     time_item = new QStandardItem(time_str);
-    d->model->appendRow(
+    d->model->insertRow(0,
         {time_item, new QStandardItem(name),
-         new QStandardItem, new QStandardItem});
+         new QStandardItem, new QStandardItem, new QStandardItem});
   }
 
-  // Update duration.
+  // Update duration with human-friendly formatting.
   auto row = time_item->row();
   auto *dur_item = d->model->item(row, 2);
   if (dur_item) {
-    dur_item->setText(QStringLiteral("%1ms").arg(duration_ms));
+    if (duration_ms < 1000) {
+      dur_item->setText(QStringLiteral("%1ms").arg(duration_ms));
+    } else if (duration_ms < 60000) {
+      dur_item->setText(QStringLiteral("%1s")
+          .arg(duration_ms / 1000.0, 0, 'f', 1));
+    } else {
+      auto mins = duration_ms / 60000;
+      auto secs = (duration_ms % 60000) / 1000;
+      dur_item->setText(QStringLiteral("%1m%2s").arg(mins).arg(secs));
+    }
   }
 
   // Update status.
   bool has_error = result.contains(QStringLiteral("error"));
-  auto *status_item = d->model->item(row, 3);
+  auto *status_item = d->model->item(row, 4);
   if (status_item) {
     if (has_error) {
       status_item->setText(QStringLiteral("error"));
@@ -122,15 +138,19 @@ void AgentToolLogWidget::onToolCallCompleted(int64_t /*session_id*/,
     }
   }
 
-  // Add result as child row.
+  // Add result as child row (truncated).
   if (!result.isEmpty()) {
     auto result_str = QString::fromUtf8(
         QJsonDocument(result).toJson(QJsonDocument::Compact));
+    if (result_str.size() > 500) {
+      result_str = result_str.left(500) + QStringLiteral("...(truncated)");
+    }
     auto label = has_error ? QStringLiteral("Error: ") + result_str
                            : QStringLiteral("Result: ") + result_str;
     auto *result_item = new QStandardItem(label);
     time_item->appendRow({result_item, new QStandardItem,
-                          new QStandardItem, new QStandardItem});
+                          new QStandardItem, new QStandardItem,
+                          new QStandardItem});
   }
 }
 

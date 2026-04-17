@@ -88,10 +88,14 @@ add_library("mx_explorers"
   src/Explorers/AgentExplorer/AgentConversationWidget.cpp
   src/Explorers/AgentExplorer/AgentConfigPanel.h
   src/Explorers/AgentExplorer/AgentConfigPanel.cpp
+  src/Explorers/AgentExplorer/AgentDashboardWidget.h
+  src/Explorers/AgentExplorer/AgentDashboardWidget.cpp
   src/Explorers/AgentExplorer/AgentToolLogWidget.h
   src/Explorers/AgentExplorer/AgentToolLogWidget.cpp
   src/Explorers/AgentExplorer/AgentSessionListWidget.h
   src/Explorers/AgentExplorer/AgentSessionListWidget.cpp
+
+  src/Explorers/AgentExplorer/resources/AgentResources.qrc
 )
 
 if(MX_ENABLE_PYTHON_BINDINGS)

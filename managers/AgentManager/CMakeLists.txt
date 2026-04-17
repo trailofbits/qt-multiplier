@@ -35,6 +35,9 @@ add_library("mx_agent_manager"
 
   src/tools/ObserverTools.h
   src/tools/ObserverTools.cpp
+
+  src/tools/PythonTools.h
+  src/tools/PythonTools.cpp
 )
 
 target_link_libraries("mx_agent_manager"
@@ -48,6 +51,7 @@ target_link_libraries("mx_agent_manager"
     "mx_config_manager"
     "mx_spreadsheet_widget"
     "mx_multiplier_library"
+    "mx_util_component"
 )
 
 target_include_directories("mx_agent_manager" PRIVATE

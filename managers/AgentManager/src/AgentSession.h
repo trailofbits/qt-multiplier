@@ -10,6 +10,8 @@
 #include <multiplier/GUI/Managers/AgentMessage.h>
 
 #include <QAtomicInt>
+#include <QHash>
+#include <QMap>
 #include <QMutex>
 #include <QObject>
 #include <QVector>
@@ -17,6 +19,7 @@
 namespace mx::gui {
 
 class AgentToolRegistry;
+class ConfigManager;
 
 class AgentSession Q_DECL_FINAL : public QObject {
   Q_OBJECT
@@ -25,12 +28,17 @@ class AgentSession Q_DECL_FINAL : public QObject {
   AgentSession(int64_t session_id, ILLMBackend *backend,
                AgentToolRegistry *tools, const LLMConfig &config,
                const QString &system_prompt, int max_iterations,
+               ConfigManager *config_manager = nullptr,
                QObject *parent = nullptr);
   ~AgentSession(void) override;
 
   int64_t sessionId(void) const;
+  int64_t rootNodeId(void) const;
   QVector<AgentMessage> messages(void) const;
   bool isRunning(void) const;
+
+  // Load messages from an external source (e.g. DB) to restore history.
+  void loadMessages(const QVector<AgentMessage> &messages);
 
   // Start processing a user message. Runs the agentic loop in a thread.
   void sendUserMessage(const QString &text);
@@ -51,6 +59,7 @@ class AgentSession Q_DECL_FINAL : public QObject {
   void sessionFinished(const mx::gui::SessionResult &result);
   void sessionError(const QString &error);
   void tokenUsageUpdated(int prompt_tokens, int completion_tokens);
+  void contextUsageUpdated(int64_t session_id, int used_tokens, int max_tokens);
 
  private:
   // The agentic loop, run on a worker thread.
@@ -65,11 +74,17 @@ class AgentSession Q_DECL_FINAL : public QObject {
                           const QString &tool_call_id = {},
                           const QJsonObject &tool_args = {},
                           const QJsonObject &tool_result = {},
-                          int token_count = 0);
+                          int token_count = 0,
+                          int duration_ms = 0,
+                          int64_t parent_message_id = -1);
+
+  static int modelContextLimit(const QString &model);
 
   int64_t m_session_id;
   ILLMBackend *m_backend;
   AgentToolRegistry *m_tools;
+  ConfigManager *m_config_manager{nullptr};
+  SessionResult m_pending_finish_result;
   LLMConfig m_config;
   QString m_system_prompt;
   int m_max_iterations;
@@ -84,6 +99,25 @@ class AgentSession Q_DECL_FINAL : public QObject {
 
   int m_total_prompt_tokens{0};
   int m_total_completion_tokens{0};
+  int m_last_prompt_tokens{0};
+
+  // Provenance tracking: parent message IDs for the current agentic loop.
+  int64_t m_user_msg_id{-1};
+  int64_t m_assistant_msg_id{-1};
+
+  // Cost tracking node IDs.
+  int64_t m_root_node_id{-1};
+  int64_t m_current_llm_node_id{-1};
+
+  // Dependency edge tracking: tool_call_id string -> cost node_id.
+  QMap<QString, int64_t> m_tool_call_id_to_node;
+
+  // Tool nodes completed since the last LLM call, used for context edges.
+  QVector<int64_t> m_pending_context_nodes;
+
+  // Result ID tracking for tool call provenance graph.
+  int m_next_result_id{1};
+  QHash<QString, int64_t> m_result_id_to_cost_node;
 };
 
 }  // namespace mx::gui

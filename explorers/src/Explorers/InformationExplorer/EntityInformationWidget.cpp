@@ -9,10 +9,14 @@
 #include "EntityInformationWidget.h"
 
 #include <multiplier/GUI/QtCompat.h>
+#include <QAction>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMenu>
 #include <QPushButton>
+#include <QSettings>
 #include <QThreadPool>
 #include <QToolBar>
 #include <QTreeView>
@@ -185,6 +189,35 @@ EntityInformationWidget::EntityInformationWidget(
 
   d->tree->setContextMenuPolicy(Qt::CustomContextMenu);
   d->tree->viewport()->installEventFilter(this);
+
+  // Load persisted file path display mode.
+  {
+    QSettings settings(
+        QDir::homePath() + QStringLiteral("/.settings.qmx"),
+        QSettings::IniFormat);
+    bool show_full = settings.value(
+        QStringLiteral("InformationExplorer/show_full_paths"), false).toBool();
+    d->model->SetShowFullPaths(show_full);
+  }
+
+  // Add a context menu to the header for toggling file path display.
+  d->tree->header()->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(d->tree->header(), &QHeaderView::customContextMenuRequested,
+          this, [this](const QPoint &pos) {
+    QMenu menu;
+    auto *action = menu.addAction(tr("Show Full File Paths"));
+    action->setCheckable(true);
+    action->setChecked(d->model->GetShowFullPaths());
+    connect(action, &QAction::toggled, this, [this](bool checked) {
+      d->model->SetShowFullPaths(checked);
+      QSettings settings(
+          QDir::homePath() + QStringLiteral("/.settings.qmx"),
+          QSettings::IniFormat);
+      settings.setValue(
+          QStringLiteral("InformationExplorer/show_full_paths"), checked);
+    });
+    menu.exec(d->tree->header()->mapToGlobal(pos));
+  });
 
   // Create the status widget
   d->status->setVisible(false);

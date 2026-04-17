@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QJsonObject>
+#include <QStringList>
 #include <QWidget>
 
 #include <memory>
@@ -14,6 +15,7 @@
 namespace mx::gui {
 
 struct AgentMessage;
+class ConfigManager;
 class ThemeManager;
 
 class AgentConversationWidget Q_DECL_FINAL : public QWidget {
@@ -26,25 +28,47 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   virtual ~AgentConversationWidget(void);
 
   explicit AgentConversationWidget(ThemeManager &theme_manager,
+                                   ConfigManager &config_manager,
                                    QWidget *parent = nullptr);
+
+  void setEnterToSend(bool enabled);
 
  signals:
   void sendMessageRequested(const QString &text);
+  void suggestionAccepted(const QString &text);
+  void navigateToEntity(uint64_t entity_id);
+  void openDocument(int doc_id);
+  void promptBenched(const QString &prompt);
+  void scheduleTaskRequested(const QString &description);
+  void observerRecommendationFollowed(const QString &recommendation);
 
  public slots:
   void addMessage(const AgentMessage &msg);
-  void updateTokens(int prompt_tokens, int completion_tokens);
+  void updateTokens(int prompt_tokens, int completion_tokens,
+                    double cost_usd = -1.0);
+  void updateContextUsage(int used_tokens, int max_tokens);
   void clear(void);
+  void showSuggestion(const QString &suggestion,
+                      const QStringList &alternatives = {});
+  void clearSuggestion(void);
+  void showObserverRecommendation(const QString &text,
+                                  const QStringList &suggested_prompts);
+  void setStatus(const QString &text);
+  void clearStatus(void);
 
  private slots:
   void onSendClicked(void);
   void onThemeChanged(const ThemeManager &tm);
 
+ protected:
+  bool eventFilter(QObject *obj, QEvent *event) override;
+
  private:
   void addMessageBubble(const QString &role, const QString &content,
                         const QString &tool_name = {},
                         const QJsonObject &tool_args = {},
-                        const QJsonObject &tool_result = {});
+                        const QJsonObject &tool_result = {},
+                        int64_t parent_message_id = -1);
   void scrollToBottom(void);
   void applyThemeColors(void);
 };

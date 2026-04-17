@@ -9,8 +9,21 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+#include <multiplier/AST/CXXMethodDecl.h>
+#include <multiplier/AST/CXXRecordDecl.h>
+#include <multiplier/AST/FieldDecl.h>
+#include <multiplier/AST/FunctionDecl.h>
+#include <multiplier/AST/ParmVarDecl.h>
+#include <multiplier/AST/RecordDecl.h>
+#include <multiplier/AST/VarDecl.h>
+#include <multiplier/Frontend/File.h>
+#include <multiplier/Frontend/Query.h>
 #include <multiplier/Index.h>
+#include <multiplier/Re2.h>
 #include <multiplier/Reference.h>
+#include <multiplier/GUI/Util.h>
+
+#include <unordered_set>
 
 namespace mx::gui {
 namespace {
@@ -31,6 +44,13 @@ static QJsonObject string_prop(const QString &desc) {
 static QJsonObject int_prop(const QString &desc) {
   QJsonObject p;
   p[QStringLiteral("type")] = QStringLiteral("integer");
+  p[QStringLiteral("description")] = desc;
+  return p;
+}
+
+static QJsonObject bool_prop(const QString &desc) {
+  QJsonObject p;
+  p[QStringLiteral("type")] = QStringLiteral("boolean");
   p[QStringLiteral("description")] = desc;
   return p;
 }
@@ -119,6 +139,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
   QJsonArray arr;
   int count = 0;
   static constexpr int kMaxResults = 100;
+  std::unordered_set<mx::RawEntityId> seen_ids;
 
   for (mx::NamedEntity result : index.query_entities(query)) {
     if (count >= kMaxResults) {
@@ -127,6 +148,18 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
 
     if (std::holds_alternative<mx::NamedDecl>(result)) {
       mx::NamedDecl decl = std::get<mx::NamedDecl>(result);
+
+      // Canonicalize to deduplicate across redeclarations.
+      auto base = mx::Decl::from(decl);
+      mx::RawEntityId canonical_id = decl.id().Pack();
+      if (base) {
+        canonical_id = base->canonical_declaration().id().Pack();
+      }
+      if (seen_ids.count(canonical_id)) {
+        continue;
+      }
+      seen_ids.insert(canonical_id);
+
       QString kind = decl_kind_string(decl);
 
       if (!kind_filter.isEmpty() && kind != kind_filter) {
@@ -138,7 +171,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
           QString::fromStdString(std::string(decl.name()));
       obj[QStringLiteral("kind")] = kind;
       obj[QStringLiteral("entity_id")] =
-          static_cast<qint64>(decl.id().Pack());
+          QString::number(static_cast<quint64>(canonical_id));
       arr.append(obj);
       ++count;
 
@@ -154,7 +187,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
           QString::fromStdString(std::string(macro.name().data()));
       obj[QStringLiteral("kind")] = QStringLiteral("macro");
       obj[QStringLiteral("entity_id")] =
-          static_cast<qint64>(macro.id().Pack());
+          QString::number(static_cast<quint64>(macro.id().Pack()));
       arr.append(obj);
       ++count;
 
@@ -170,7 +203,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
         obj[QStringLiteral("name")] = path;
         obj[QStringLiteral("kind")] = QStringLiteral("file");
         obj[QStringLiteral("entity_id")] =
-            static_cast<qint64>(file.id().Pack());
+            QString::number(static_cast<quint64>(file.id().Pack()));
         arr.append(obj);
         ++count;
       }
@@ -198,14 +231,19 @@ QString GetDefinitionTool::description(void) const {
 
 QJsonObject GetDefinitionTool::parametersSchema(void) const {
   QJsonObject props;
-  props[QStringLiteral("entity_id")] = int_prop(
-      QStringLiteral("Entity ID (from search_entities)"));
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string (from search_entities)"));
   return make_schema(props, {QStringLiteral("entity_id")});
 }
 
 QJsonObject GetDefinitionTool::execute(const QJsonObject &args) {
-  auto raw_id = static_cast<mx::RawEntityId>(
-      args[QStringLiteral("entity_id")].toDouble(0));
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
   if (raw_id == 0) {
     return error_result(QStringLiteral("entity_id is required"));
   }
@@ -289,19 +327,33 @@ QString GetReferencesTool::name(void) const {
 
 QString GetReferencesTool::description(void) const {
   return QStringLiteral(
-      "Find references to an entity by its ID.");
+      "Find references to an entity by its ID. Optionally filter by "
+      "reference kind.");
 }
 
 QJsonObject GetReferencesTool::parametersSchema(void) const {
   QJsonObject props;
-  props[QStringLiteral("entity_id")] = int_prop(
-      QStringLiteral("Entity ID (from search_entities)"));
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string (from search_entities)"));
+  props[QStringLiteral("kind")] = string_prop(
+      QStringLiteral("Filter by reference kind: calls, uses_value, uses_type, "
+                     "writes, reads, takes_address, all (default: all)"));
+  props[QStringLiteral("max_results")] = int_prop(
+      QStringLiteral("Maximum number of results to return (default: 100)"));
+  props[QStringLiteral("offset")] = int_prop(
+      QStringLiteral("Skip this many matching results before returning (default: 0). "
+                     "Use with max_results for pagination."));
   return make_schema(props, {QStringLiteral("entity_id")});
 }
 
 QJsonObject GetReferencesTool::execute(const QJsonObject &args) {
-  auto raw_id = static_cast<mx::RawEntityId>(
-      args[QStringLiteral("entity_id")].toDouble(0));
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
   if (raw_id == 0) {
     return error_result(QStringLiteral("entity_id is required"));
   }
@@ -313,16 +365,84 @@ QJsonObject GetReferencesTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("entity not found"));
   }
 
+  QString kind_filter = args[QStringLiteral("kind")].toString();
+  if (kind_filter.isEmpty()) {
+    kind_filter = QStringLiteral("all");
+  }
+
+  int max_results = static_cast<int>(
+      args[QStringLiteral("max_results")].toDouble(100));
+  if (max_results <= 0) {
+    max_results = 100;
+  }
+
+  int offset = static_cast<int>(
+      args[QStringLiteral("offset")].toDouble(0));
+  if (offset < 0) {
+    offset = 0;
+  }
+
+  // Build set of acceptable builtin reference kinds.
+  auto matches_kind = [&](const mx::Reference &ref) -> bool {
+    if (kind_filter == QLatin1String("all")) {
+      return true;
+    }
+    auto brk = ref.builtin_reference_kind();
+    if (!brk) {
+      return kind_filter == QLatin1String("all");
+    }
+    auto k = *brk;
+    if (kind_filter == QLatin1String("calls")) {
+      return k == mx::BuiltinReferenceKind::CALLS;
+    } else if (kind_filter == QLatin1String("uses_value")) {
+      return k == mx::BuiltinReferenceKind::USES_VALUE;
+    } else if (kind_filter == QLatin1String("uses_type")) {
+      return k == mx::BuiltinReferenceKind::USES_TYPE;
+    } else if (kind_filter == QLatin1String("writes")) {
+      return k == mx::BuiltinReferenceKind::WRITES_VALUE ||
+             k == mx::BuiltinReferenceKind::UPDATES_VALUE;
+    } else if (kind_filter == QLatin1String("reads")) {
+      return k == mx::BuiltinReferenceKind::USES_VALUE ||
+             k == mx::BuiltinReferenceKind::ACCESSES_VALUE;
+    } else if (kind_filter == QLatin1String("takes_address")) {
+      return k == mx::BuiltinReferenceKind::TAKES_ADDRESS;
+    }
+    return true;
+  };
+
   QJsonArray arr;
-  int count = 0;
-  static constexpr int kMaxResults = 50;
+  int count = 0;      // Results returned.
+  int matched = 0;    // Total matching (including skipped).
+  bool has_more = false;
 
   for (mx::Reference ref : mx::Reference::to(vent)) {
-    if (count >= kMaxResults) {
-      break;
+    if (!matches_kind(ref)) {
+      continue;
+    }
+
+    ++matched;
+
+    // Skip until we've passed the offset.
+    if (matched <= offset) {
+      continue;
+    }
+
+    if (count >= max_results) {
+      has_more = true;
+      // Keep counting total matches for the summary.
+      continue;
     }
 
     QJsonObject obj;
+
+    // Include reference kind name.
+    if (auto brk = ref.builtin_reference_kind()) {
+      obj[QStringLiteral("ref_kind")] =
+          QString::fromUtf8(mx::EnumeratorName(*brk));
+    } else {
+      obj[QStringLiteral("ref_kind")] =
+          QString::fromStdString(std::string(ref.kind().data()));
+    }
 
     // Try to get location of the reference context.
     mx::VariantEntity context_entity = ref.context();
@@ -362,6 +482,308 @@ QJsonObject GetReferencesTool::execute(const QJsonObject &args) {
   QJsonObject result;
   result[QStringLiteral("references")] = arr;
   result[QStringLiteral("count")] = count;
+  result[QStringLiteral("total_matched")] = matched;
+  result[QStringLiteral("offset")] = offset;
+  result[QStringLiteral("has_more")] = has_more;
+  return result;
+}
+
+// ===========================================================================
+// GetCallersTool
+// ===========================================================================
+
+QString GetCallersTool::name(void) const {
+  return QStringLiteral("get_callers");
+}
+
+QString GetCallersTool::description(void) const {
+  return QStringLiteral(
+      "Find all functions that call a given function. Returns the call "
+      "hierarchy upward.");
+}
+
+QJsonObject GetCallersTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string of the function to find callers of"));
+  props[QStringLiteral("depth")] = int_prop(
+      QStringLiteral("How many levels up to traverse (default 1)"));
+  return make_schema(props, {QStringLiteral("entity_id")});
+}
+
+namespace {
+
+struct CallerInfo {
+  mx::RawEntityId entity_id;
+  QString name;
+  QString kind;
+  QString file;
+  int line;
+};
+
+static QJsonArray collect_callers(
+    ConfigManager *config, const mx::Decl &target_decl,
+    int depth, int max_depth,
+    std::unordered_set<mx::RawEntityId> &visited) {
+
+  QJsonArray callers_arr;
+
+  // Normalize to canonical declaration.
+  mx::Decl canonical = target_decl.canonical_declaration();
+
+  std::unordered_set<mx::RawEntityId> seen_callers;
+
+  for (mx::Reference ref : mx::Reference::to(canonical)) {
+    auto brk = ref.builtin_reference_kind();
+    if (!brk || *brk != mx::BuiltinReferenceKind::CALLS) {
+      continue;
+    }
+
+    // Find the named entity containing the reference site.
+    mx::VariantEntity use = ref.as_variant();
+    mx::VariantEntity user = NamedEntityContaining(use);
+
+    if (std::holds_alternative<mx::NotAnEntity>(user)) {
+      continue;
+    }
+
+    // Normalize caller to canonical declaration.
+    if (std::holds_alternative<mx::Decl>(user)) {
+      user = std::get<mx::Decl>(user).canonical_declaration();
+    }
+
+    mx::RawEntityId caller_id = mx::EntityId(user).Pack();
+
+    // Deduplicate.
+    if (!seen_callers.insert(caller_id).second) {
+      continue;
+    }
+
+    QJsonObject caller_obj;
+    caller_obj[QStringLiteral("entity_id")] = QString::number(static_cast<quint64>(caller_id));
+
+    if (auto name_str = NameOfEntityAsString(user)) {
+      caller_obj[QStringLiteral("name")] = *name_str;
+    }
+
+    if (std::holds_alternative<mx::Decl>(user)) {
+      caller_obj[QStringLiteral("kind")] =
+          decl_kind_string(std::get<mx::Decl>(user));
+    }
+
+    if (auto loc = LocationOfEntityEx(config->FileLocationCache(), user)) {
+      caller_obj[QStringLiteral("file")] =
+          QString::fromStdString(loc->path.generic_string());
+      caller_obj[QStringLiteral("line")] = static_cast<int>(loc->line);
+    }
+
+    // Recurse if needed and not already visited in this traversal.
+    if (depth < max_depth && std::holds_alternative<mx::Decl>(user) &&
+        visited.insert(caller_id).second) {
+      QJsonArray sub_callers = collect_callers(
+          config, std::get<mx::Decl>(user), depth + 1, max_depth, visited);
+      if (!sub_callers.isEmpty()) {
+        caller_obj[QStringLiteral("callers")] = sub_callers;
+      }
+    }
+
+    callers_arr.append(caller_obj);
+  }
+
+  return callers_arr;
+}
+
+}  // namespace
+
+QJsonObject GetCallersTool::execute(const QJsonObject &args) {
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
+  if (raw_id == 0) {
+    return error_result(QStringLiteral("entity_id is required"));
+  }
+
+  int depth = static_cast<int>(args[QStringLiteral("depth")].toDouble(1));
+  if (depth < 1) depth = 1;
+
+  const auto &index = m_ctx->config->Index();
+  mx::VariantEntity vent = index.entity(mx::EntityId(raw_id));
+
+  if (std::holds_alternative<mx::NotAnEntity>(vent)) {
+    return error_result(QStringLiteral("entity not found"));
+  }
+
+  // Resolve to a declaration.
+  mx::VariantEntity containing = vent;
+  if (!std::holds_alternative<mx::Decl>(containing)) {
+    containing = NamedEntityContaining(vent);
+  }
+
+  if (!std::holds_alternative<mx::Decl>(containing)) {
+    return error_result(QStringLiteral("entity is not a declaration"));
+  }
+
+  std::unordered_set<mx::RawEntityId> visited;
+  QJsonArray callers = collect_callers(
+      m_ctx->config, std::get<mx::Decl>(containing), 1, depth, visited);
+
+  QJsonObject result;
+  result[QStringLiteral("callers")] = callers;
+  result[QStringLiteral("count")] = callers.size();
+  return result;
+}
+
+// ===========================================================================
+// GetCalleesTool
+// ===========================================================================
+
+QString GetCalleesTool::name(void) const {
+  return QStringLiteral("get_callees");
+}
+
+QString GetCalleesTool::description(void) const {
+  return QStringLiteral(
+      "Find all functions called by a given function.");
+}
+
+QJsonObject GetCalleesTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string of the function to find callees of"));
+  props[QStringLiteral("depth")] = int_prop(
+      QStringLiteral("How many levels down to traverse (default 1)"));
+  return make_schema(props, {QStringLiteral("entity_id")});
+}
+
+namespace {
+
+static QJsonArray collect_callees(
+    ConfigManager *config, const mx::Decl &func_decl,
+    int depth, int max_depth,
+    std::unordered_set<mx::RawEntityId> &visited) {
+
+  QJsonArray callees_arr;
+
+  // Normalize to canonical declaration, then prefer the definition for
+  // finding outgoing references (the definition has the function body).
+  mx::Decl canonical = func_decl.canonical_declaration();
+  std::optional<mx::Decl> def = canonical.definition();
+  const mx::Decl &source = def ? *def : canonical;
+
+  std::unordered_set<mx::RawEntityId> seen_callees;
+
+  for (mx::Reference ref : mx::Reference::from(source)) {
+    auto brk = ref.builtin_reference_kind();
+    if (!brk || *brk != mx::BuiltinReferenceKind::CALLS) {
+      continue;
+    }
+
+    // The referenced entity is the callee.
+    mx::VariantEntity callee_vent = ref.as_variant();
+
+    // Normalize to canonical declaration if it's a decl.
+    if (std::holds_alternative<mx::Decl>(callee_vent)) {
+      callee_vent = std::get<mx::Decl>(callee_vent).canonical_declaration();
+    } else {
+      // Try to find the named entity.
+      callee_vent = NamedEntityContaining(callee_vent);
+      if (std::holds_alternative<mx::Decl>(callee_vent)) {
+        callee_vent = std::get<mx::Decl>(callee_vent).canonical_declaration();
+      }
+    }
+
+    if (std::holds_alternative<mx::NotAnEntity>(callee_vent)) {
+      continue;
+    }
+
+    mx::RawEntityId callee_id = mx::EntityId(callee_vent).Pack();
+
+    // Deduplicate.
+    if (!seen_callees.insert(callee_id).second) {
+      continue;
+    }
+
+    QJsonObject callee_obj;
+    callee_obj[QStringLiteral("entity_id")] = QString::number(static_cast<quint64>(callee_id));
+
+    if (auto name_str = NameOfEntityAsString(callee_vent)) {
+      callee_obj[QStringLiteral("name")] = *name_str;
+    }
+
+    if (std::holds_alternative<mx::Decl>(callee_vent)) {
+      callee_obj[QStringLiteral("kind")] =
+          decl_kind_string(std::get<mx::Decl>(callee_vent));
+    }
+
+    if (auto loc = LocationOfEntityEx(config->FileLocationCache(),
+                                      callee_vent)) {
+      callee_obj[QStringLiteral("file")] =
+          QString::fromStdString(loc->path.generic_string());
+      callee_obj[QStringLiteral("line")] = static_cast<int>(loc->line);
+    }
+
+    // Recurse if needed.
+    if (depth < max_depth && std::holds_alternative<mx::Decl>(callee_vent) &&
+        visited.insert(callee_id).second) {
+      QJsonArray sub_callees = collect_callees(
+          config, std::get<mx::Decl>(callee_vent),
+          depth + 1, max_depth, visited);
+      if (!sub_callees.isEmpty()) {
+        callee_obj[QStringLiteral("callees")] = sub_callees;
+      }
+    }
+
+    callees_arr.append(callee_obj);
+  }
+
+  return callees_arr;
+}
+
+}  // namespace
+
+QJsonObject GetCalleesTool::execute(const QJsonObject &args) {
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
+  if (raw_id == 0) {
+    return error_result(QStringLiteral("entity_id is required"));
+  }
+
+  int depth = static_cast<int>(args[QStringLiteral("depth")].toDouble(1));
+  if (depth < 1) depth = 1;
+
+  const auto &index = m_ctx->config->Index();
+  mx::VariantEntity vent = index.entity(mx::EntityId(raw_id));
+
+  if (std::holds_alternative<mx::NotAnEntity>(vent)) {
+    return error_result(QStringLiteral("entity not found"));
+  }
+
+  // Resolve to a declaration.
+  mx::VariantEntity containing = vent;
+  if (!std::holds_alternative<mx::Decl>(containing)) {
+    containing = NamedEntityContaining(vent);
+  }
+
+  if (!std::holds_alternative<mx::Decl>(containing)) {
+    return error_result(QStringLiteral("entity is not a declaration"));
+  }
+
+  std::unordered_set<mx::RawEntityId> visited;
+  QJsonArray callees = collect_callees(
+      m_ctx->config, std::get<mx::Decl>(containing), 1, depth, visited);
+
+  QJsonObject result;
+  result[QStringLiteral("callees")] = callees;
+  result[QStringLiteral("count")] = callees.size();
   return result;
 }
 
@@ -391,13 +813,384 @@ QJsonObject ListFilesTool::execute(const QJsonObject &) {
     obj[QStringLiteral("path")] =
         QString::fromStdString(path.generic_string());
     obj[QStringLiteral("file_id")] =
-        static_cast<qint64>(file_id.Pack());
+        QString::number(static_cast<quint64>(file_id.Pack()));
     arr.append(obj);
   }
 
   QJsonObject result;
   result[QStringLiteral("files")] = arr;
   result[QStringLiteral("count")] = static_cast<int>(file_paths.size());
+  return result;
+}
+
+// ===========================================================================
+// GetDatabasePathTool
+// ===========================================================================
+
+QString GetDatabasePathTool::name(void) const {
+  return QStringLiteral("get_database_path");
+}
+
+QString GetDatabasePathTool::description(void) const {
+  return QStringLiteral(
+      "Get the file path to the currently loaded multiplier database. "
+      "Use this in Python scripts with Index.from_database().");
+}
+
+QJsonObject GetDatabasePathTool::parametersSchema(void) const {
+  return make_schema({}, {});
+}
+
+QJsonObject GetDatabasePathTool::execute(const QJsonObject &) {
+  QString path = m_ctx->config->DatabasePath();
+  if (path.isEmpty()) {
+    return error_result(QStringLiteral("no database loaded"));
+  }
+
+  QJsonObject result;
+  result[QStringLiteral("path")] = path;
+  return result;
+}
+
+// ===========================================================================
+// SearchCodeTool
+// ===========================================================================
+
+QString SearchCodeTool::name(void) const {
+  return QStringLiteral("search_code");
+}
+
+QString SearchCodeTool::description(void) const {
+  return QStringLiteral(
+      "Search all indexed source code for a regex pattern. Returns matching "
+      "lines with file, line number, and context.");
+}
+
+QJsonObject SearchCodeTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("pattern")] = string_prop(
+      QStringLiteral("Regex pattern to search for (RE2 syntax)"));
+  props[QStringLiteral("case_sensitive")] = bool_prop(
+      QStringLiteral("Whether the search is case sensitive (default: false)"));
+  props[QStringLiteral("max_results")] = int_prop(
+      QStringLiteral("Maximum number of results to return (default: 100)"));
+  props[QStringLiteral("offset")] = int_prop(
+      QStringLiteral("Skip this many matches before returning (default: 0). "
+                     "Use with max_results for pagination."));
+  return make_schema(props, {QStringLiteral("pattern")});
+}
+
+QJsonObject SearchCodeTool::execute(const QJsonObject &args) {
+  QString pattern_str = args[QStringLiteral("pattern")].toString();
+  if (pattern_str.isEmpty()) {
+    return error_result(QStringLiteral("pattern is required"));
+  }
+
+  bool case_sensitive = args[QStringLiteral("case_sensitive")].toBool(false);
+
+  int max_results = static_cast<int>(
+      args[QStringLiteral("max_results")].toDouble(100));
+  if (max_results <= 0) {
+    max_results = 100;
+  }
+
+  int offset = static_cast<int>(
+      args[QStringLiteral("offset")].toDouble(0));
+  if (offset < 0) {
+    offset = 0;
+  }
+
+  // Build the RE2 pattern. Prepend (?i) for case-insensitive matching.
+  std::string re2_pattern;
+  if (!case_sensitive) {
+    re2_pattern = "(?i)";
+  }
+  re2_pattern += pattern_str.toStdString();
+
+  mx::RegexQuery query(std::move(re2_pattern));
+  if (!query.is_valid()) {
+    return error_result(QStringLiteral("invalid regex pattern"));
+  }
+
+  const auto &index = m_ctx->config->Index();
+
+  QJsonArray arr;
+  int count = 0;
+  int total_matched = 0;
+  bool has_more = false;
+
+  for (mx::File file : index.files()) {
+    // Get a display path for the file.
+    QString file_path;
+    mx::RawEntityId file_entity_id = file.id().Pack();
+    for (auto path : file.paths()) {
+      file_path = QString::fromStdString(path.generic_string());
+      break;
+    }
+
+    for (mx::RegexQueryMatch match : query.match_fragments(file)) {
+      ++total_matched;
+
+      // Skip until we've passed the offset.
+      if (total_matched <= offset) {
+        continue;
+      }
+
+      if (count >= max_results) {
+        has_more = true;
+        continue;
+      }
+
+      std::string_view match_data = match.data();
+      QString match_text = QString::fromUtf8(
+          match_data.data(), static_cast<qsizetype>(match_data.size()));
+
+      // Get the line number from the first token of the match.
+      int line = -1;
+      for (mx::Token tok : match) {
+        mx::Token ft = tok.file_token();
+        if (!ft) {
+          ft = tok;
+        }
+        auto loc = ft.nearest_location(m_ctx->config->FileLocationCache());
+        if (loc) {
+          line = static_cast<int>(loc->first);
+        }
+        break;
+      }
+
+      // Build a context snippet: the full line(s) containing the match.
+      // The match data points into the file's token data, so we extract
+      // surrounding context by finding line boundaries.
+      QString context = match_text;
+      if (!match_data.empty()) {
+        // Walk backwards to find the line start.
+        const char *data_ptr = match_data.data();
+        const char *line_start = data_ptr;
+
+        // Walk forward to find the line end.
+        const char *line_end = data_ptr + match_data.size();
+
+        // Trim to just the first line of a multi-line match for context.
+        const char *first_newline = data_ptr;
+        while (first_newline < line_end && *first_newline != '\n') {
+          ++first_newline;
+        }
+
+        // Use the match text up to the first newline as context.
+        if (first_newline < line_end) {
+          context = QString::fromUtf8(
+              line_start,
+              static_cast<qsizetype>(first_newline - line_start));
+        }
+      }
+
+      QJsonObject obj;
+      obj[QStringLiteral("file")] = file_path;
+      if (line >= 0) {
+        obj[QStringLiteral("line")] = line;
+      }
+      obj[QStringLiteral("match")] = match_text;
+      obj[QStringLiteral("context")] = context;
+      obj[QStringLiteral("entity_id")] = QString::number(static_cast<quint64>(file_entity_id));
+      arr.append(obj);
+      ++count;
+    }
+  }
+
+  QJsonObject result;
+  result[QStringLiteral("matches")] = arr;
+  result[QStringLiteral("count")] = count;
+  result[QStringLiteral("total_matched")] = total_matched;
+  result[QStringLiteral("offset")] = offset;
+  result[QStringLiteral("has_more")] = has_more;
+  return result;
+}
+
+// ===========================================================================
+// SummarizeEntityTool
+// ===========================================================================
+
+QString SummarizeEntityTool::name(void) const {
+  return QStringLiteral("summarize_entity");
+}
+
+QString SummarizeEntityTool::description(void) const {
+  return QStringLiteral(
+      "Get a structural summary of an entity: its signature, parameters, "
+      "return type, callers count, callees count, file location, and size "
+      "in tokens.");
+}
+
+QJsonObject SummarizeEntityTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string (from search_entities)"));
+  return make_schema(props, {QStringLiteral("entity_id")});
+}
+
+namespace {
+
+static QString type_to_string(const mx::Type &type) {
+  std::string text;
+  for (mx::Token tok : type.tokens()) {
+    text += tok.data();
+  }
+  return QString::fromStdString(text);
+}
+
+}  // namespace
+
+QJsonObject SummarizeEntityTool::execute(const QJsonObject &args) {
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
+  if (raw_id == 0) {
+    return error_result(QStringLiteral("entity_id is required"));
+  }
+
+  const auto &index = m_ctx->config->Index();
+  mx::VariantEntity vent = index.entity(mx::EntityId(raw_id));
+
+  if (std::holds_alternative<mx::NotAnEntity>(vent)) {
+    return error_result(QStringLiteral("entity not found"));
+  }
+
+  // Resolve to a Decl if possible.
+  if (!std::holds_alternative<mx::Decl>(vent)) {
+    vent = NamedEntityContaining(vent);
+  }
+  if (!std::holds_alternative<mx::Decl>(vent)) {
+    return error_result(QStringLiteral("entity is not a declaration"));
+  }
+
+  const mx::Decl &decl = std::get<mx::Decl>(vent);
+  QJsonObject result;
+  result[QStringLiteral("entity_id")] =
+      QString::number(static_cast<quint64>(raw_id));
+  result[QStringLiteral("kind")] = decl_kind_string(decl);
+
+  // Common: file path, line, token count.
+  auto add_location = [&](const mx::Decl &d) {
+    mx::Token tok = d.token();
+    auto ft = tok.nearest_file_token();
+    if (auto maybe_file = mx::File::containing(ft)) {
+      result[QStringLiteral("file")] = first_file_path(*maybe_file);
+    }
+    auto loc = ft.nearest_location(m_ctx->config->FileLocationCache());
+    if (loc) {
+      result[QStringLiteral("line")] = static_cast<int>(loc->first);
+    }
+    int token_count = 0;
+    for ([[maybe_unused]] mx::Token t : d.tokens()) {
+      ++token_count;
+    }
+    result[QStringLiteral("token_count")] = token_count;
+  };
+
+  // Try FunctionDecl.
+  if (auto func = mx::FunctionDecl::from(decl)) {
+    std::optional<mx::FunctionDecl> def = func->definition();
+    const mx::FunctionDecl &target = def ? *def : *func;
+
+    result[QStringLiteral("name")] =
+        QString::fromStdString(std::string(func->name()));
+    result[QStringLiteral("return_type")] =
+        type_to_string(target.return_type());
+    result[QStringLiteral("is_definition")] =
+        target.is_this_declaration_a_definition();
+
+    QJsonArray params_arr;
+    for (mx::ParmVarDecl param : target.parameters()) {
+      QJsonObject pobj;
+      pobj[QStringLiteral("name")] =
+          QString::fromStdString(std::string(param.name()));
+      pobj[QStringLiteral("type")] = type_to_string(param.type());
+      params_arr.append(pobj);
+    }
+    result[QStringLiteral("parameters")] = params_arr;
+    result[QStringLiteral("parameter_count")] =
+        static_cast<int>(target.num_parameters());
+
+    // Count callers (references TO this entity with CALLS kind).
+    int callers_count = 0;
+    mx::Decl canonical = func->canonical_declaration();
+    for (mx::Reference ref : mx::Reference::to(canonical)) {
+      auto brk = ref.builtin_reference_kind();
+      if (brk && *brk == mx::BuiltinReferenceKind::CALLS) {
+        ++callers_count;
+      }
+    }
+    result[QStringLiteral("callers_count")] = callers_count;
+
+    // Count callees (references FROM this entity with CALLS kind).
+    int callees_count = 0;
+    const mx::Decl &source = def ? static_cast<const mx::Decl &>(*def)
+                                 : static_cast<const mx::Decl &>(*func);
+    for (mx::Reference ref : mx::Reference::from(source)) {
+      auto brk = ref.builtin_reference_kind();
+      if (brk && *brk == mx::BuiltinReferenceKind::CALLS) {
+        ++callees_count;
+      }
+    }
+    result[QStringLiteral("callees_count")] = callees_count;
+
+    add_location(target);
+    return result;
+  }
+
+  // Try RecordDecl (struct/class/union).
+  if (auto record = mx::RecordDecl::from(decl)) {
+    std::optional<mx::RecordDecl> def = record->definition();
+    const mx::RecordDecl &target = def ? *def : *record;
+
+    result[QStringLiteral("name")] =
+        QString::fromStdString(std::string(record->name()));
+
+    QJsonArray fields_arr;
+    for (mx::FieldDecl field : target.fields()) {
+      QJsonObject fobj;
+      fobj[QStringLiteral("name")] =
+          QString::fromStdString(std::string(field.name()));
+      fobj[QStringLiteral("type")] = type_to_string(field.type());
+      fields_arr.append(fobj);
+    }
+    result[QStringLiteral("fields")] = fields_arr;
+    result[QStringLiteral("field_count")] =
+        static_cast<int>(target.num_fields());
+
+    // Count methods if it's a CXXRecordDecl.
+    int method_count = 0;
+    if (auto cxx_record = mx::CXXRecordDecl::from(
+            static_cast<const mx::Decl &>(target))) {
+      for ([[maybe_unused]] mx::CXXMethodDecl m : cxx_record->methods()) {
+        ++method_count;
+      }
+    }
+    result[QStringLiteral("method_count")] = method_count;
+
+    add_location(target);
+    return result;
+  }
+
+  // Try VarDecl.
+  if (auto var = mx::VarDecl::from(decl)) {
+    result[QStringLiteral("name")] =
+        QString::fromStdString(std::string(var->name()));
+    result[QStringLiteral("type")] = type_to_string(var->type());
+    add_location(*var);
+    return result;
+  }
+
+  // Generic fallback for other declaration types.
+  if (auto name_str = NameOfEntityAsString(vent)) {
+    result[QStringLiteral("name")] = *name_str;
+  }
+  add_location(decl);
   return result;
 }
 
@@ -410,7 +1203,12 @@ void registerNavigationTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<SearchEntitiesTool>(ctx));
   registry.registerTool(std::make_unique<GetDefinitionTool>(ctx));
   registry.registerTool(std::make_unique<GetReferencesTool>(ctx));
+  registry.registerTool(std::make_unique<GetCallersTool>(ctx));
+  registry.registerTool(std::make_unique<GetCalleesTool>(ctx));
   registry.registerTool(std::make_unique<ListFilesTool>(ctx));
+  registry.registerTool(std::make_unique<GetDatabasePathTool>(ctx));
+  registry.registerTool(std::make_unique<SearchCodeTool>(ctx));
+  registry.registerTool(std::make_unique<SummarizeEntityTool>(ctx));
 }
 
 }  // namespace mx::gui

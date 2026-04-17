@@ -35,6 +35,8 @@ struct EntityInformationModel::PrivateData {
   QMap<QString, std::list<std::pair<uint64_t, IInfoGenerator::Item>>>
       insertion_queue;
 
+  bool show_full_paths{false};
+
   inline PrivateData(const FileLocationCache &file_location_cache_,
                      AtomicU64Ptr version_number_)
       : file_location_cache(file_location_cache_),
@@ -128,6 +130,9 @@ QVariant EntityInformationModel::data(
       if (!node->render_name && node->item.tokens) {
         return TokensToString(node->item.tokens);
       }
+      if (node->render_name && !d->show_full_paths) {
+        return ShortenLocation(node->name);
+      }
       return node->name;
 
     } else if (role == IModel::TokenRangeDisplayRole) {
@@ -194,7 +199,11 @@ QVariant EntityInformationModel::data(
     const auto &file_name_location = node->item.file_name_location.value();
 
     if (role == Qt::DisplayRole) {
-      return TokensToString(file_name_location);
+      auto loc_str = TokensToString(file_name_location);
+      if (!d->show_full_paths) {
+        return ShortenLocation(loc_str);
+      }
+      return loc_str;
 
     } else if (role == TokenRangeDisplayRole) {
       return QVariant::fromValue(file_name_location);
@@ -453,6 +462,18 @@ void EntityInformationModel::OnIndexChanged(
     const ConfigManager &config_manager) {
   d->file_location_cache = config_manager.FileLocationCache();
   Clear();
+}
+
+void EntityInformationModel::SetShowFullPaths(bool show) {
+  if (d->show_full_paths != show) {
+    d->show_full_paths = show;
+    emit beginResetModel();
+    emit endResetModel();
+  }
+}
+
+bool EntityInformationModel::GetShowFullPaths(void) const {
+  return d->show_full_paths;
 }
 
 void EntityInformationModel::Clear(void) {

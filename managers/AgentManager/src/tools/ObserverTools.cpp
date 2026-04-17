@@ -12,6 +12,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMetaObject>
 
 namespace mx::gui {
 namespace {
@@ -113,7 +114,10 @@ QJsonObject GetPrimarySessionContextTool::execute(const QJsonObject &args) {
   QJsonArray sheets_arr;
   QJsonArray docs_arr;
   if (m_ctx->config) {
-    auto sheets = m_ctx->config->LoadOpenSheets();
+    QVector<ConfigManager::SheetData> sheets;
+    QMetaObject::invokeMethod(m_ctx->config, [&] {
+      sheets = m_ctx->config->LoadOpenSheets();
+    }, Qt::BlockingQueuedConnection);
     for (const auto &sheet : sheets) {
       QJsonObject obj;
       obj[QStringLiteral("sheet_id")] = sheet.sheet_id;
@@ -122,7 +126,10 @@ QJsonObject GetPrimarySessionContextTool::execute(const QJsonObject &args) {
       sheets_arr.append(obj);
     }
 
-    auto docs = m_ctx->config->LoadAllDocuments();
+    QVector<ConfigManager::DocumentInfo> docs;
+    QMetaObject::invokeMethod(m_ctx->config, [&] {
+      docs = m_ctx->config->LoadAllDocuments();
+    }, Qt::BlockingQueuedConnection);
     for (const auto &doc : docs) {
       QJsonObject obj;
       obj[QStringLiteral("doc_id")] = doc.doc_id;
@@ -169,6 +176,16 @@ QJsonObject ObserverRecommendationTool::parametersSchema(void) const {
   priority_prop[QStringLiteral("enum")] = enum_vals;
   props[QStringLiteral("priority")] = priority_prop;
 
+  QJsonObject prompts_prop;
+  prompts_prop[QStringLiteral("type")] = QStringLiteral("array");
+  prompts_prop[QStringLiteral("description")] = QStringLiteral(
+      "Optional list of suggested prompts the user can click to send to the "
+      "primary agent. Keep each prompt concise and actionable.");
+  QJsonObject items;
+  items[QStringLiteral("type")] = QStringLiteral("string");
+  prompts_prop[QStringLiteral("items")] = items;
+  props[QStringLiteral("suggested_prompts")] = prompts_prop;
+
   return make_schema(props, {QStringLiteral("recommendation")});
 }
 
@@ -196,25 +213,34 @@ QJsonObject ObserverRecommendationTool::execute(const QJsonObject &args) {
 
   int doc_id = -1;
   if (m_ctx && m_ctx->config) {
-    // Find or create the observer_notes document.
-    auto docs = m_ctx->config->LoadDocumentsByCategory(
-        QStringLiteral("observer_notes"));
-    if (!docs.isEmpty()) {
-      doc_id = docs.first().doc_id;
-      // Append to existing content.
-      auto existing = m_ctx->config->LoadDocumentContent(doc_id);
-      if (!existing.isEmpty()) {
-        existing += QStringLiteral("\n");
+    QMetaObject::invokeMethod(m_ctx->config, [&] {
+      // Find or create the observer_notes document.
+      auto docs = m_ctx->config->LoadDocumentsByCategory(
+          QStringLiteral("observer_notes"));
+      if (!docs.isEmpty()) {
+        doc_id = docs.first().doc_id;
+        // Append to existing content.
+        auto existing = m_ctx->config->LoadDocumentContent(doc_id);
+        if (!existing.isEmpty()) {
+          existing += QStringLiteral("\n");
+        }
+        existing += formatted;
+        m_ctx->config->SaveDocumentContent(doc_id, existing);
+      } else {
+        // Create a new observer notes document.
+        doc_id = m_ctx->config->CreateDocument(
+            formatted, QStringLiteral("Observer Notes"));
+        m_ctx->config->SetDocumentCategory(doc_id,
+                                           QStringLiteral("observer_notes"));
       }
-      existing += formatted;
-      m_ctx->config->SaveDocumentContent(doc_id, existing);
-    } else {
-      // Create a new observer notes document.
-      doc_id = m_ctx->config->CreateDocument(
-          formatted, QStringLiteral("Observer Notes"));
-      m_ctx->config->SetDocumentCategory(doc_id,
-                                         QStringLiteral("observer_notes"));
-    }
+    }, Qt::BlockingQueuedConnection);
+  }
+
+  // Extract optional suggested prompts.
+  QJsonArray suggested_prompts;
+  auto prompts_val = args[QStringLiteral("suggested_prompts")];
+  if (prompts_val.isArray()) {
+    suggested_prompts = prompts_val.toArray();
   }
 
   int recommendation_id = s_next_recommendation_id++;
@@ -224,6 +250,10 @@ QJsonObject ObserverRecommendationTool::execute(const QJsonObject &args) {
   result[QStringLiteral("recommendation_id")] = recommendation_id;
   result[QStringLiteral("timestamp")] = timestamp;
   result[QStringLiteral("priority")] = priority;
+  result[QStringLiteral("recommendation")] = recommendation;
+  if (!suggested_prompts.isEmpty()) {
+    result[QStringLiteral("suggested_prompts")] = suggested_prompts;
+  }
   return result;
 }
 

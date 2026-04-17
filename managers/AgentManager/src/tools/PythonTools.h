@@ -13,62 +13,51 @@
 
 namespace mx::gui {
 
-struct TaskToolContext {
+struct PythonToolContext {
   ConfigManager *config{nullptr};
-  int cached_task_sheet_id{-1};
 };
 
-// Register all task management tools with the given registry.
-void registerTaskTools(AgentToolRegistry &registry, TaskToolContext *ctx);
+// Register all Python tools with the given registry.
+void registerPythonTools(AgentToolRegistry &registry, PythonToolContext *ctx);
 
 // ---------------------------------------------------------------------------
 // Individual tool classes
 // ---------------------------------------------------------------------------
 
-class CreateTaskTool Q_DECL_FINAL : public AgentTool {
-  TaskToolContext *m_ctx;
+class RunPythonTool Q_DECL_FINAL : public AgentTool {
+  PythonToolContext *m_ctx;
  public:
-  explicit CreateTaskTool(TaskToolContext *ctx) : m_ctx(ctx) {}
+  explicit RunPythonTool(PythonToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;
   QString description(void) const Q_DECL_FINAL;
   QJsonObject parametersSchema(void) const Q_DECL_FINAL;
   QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
 };
 
-class UpdateTaskTool Q_DECL_FINAL : public AgentTool {
-  TaskToolContext *m_ctx;
+class CreateScriptFileTool Q_DECL_FINAL : public AgentTool {
+  PythonToolContext *m_ctx;
  public:
-  explicit UpdateTaskTool(TaskToolContext *ctx) : m_ctx(ctx) {}
+  explicit CreateScriptFileTool(PythonToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;
   QString description(void) const Q_DECL_FINAL;
   QJsonObject parametersSchema(void) const Q_DECL_FINAL;
   QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
 };
 
-class ListTasksTool Q_DECL_FINAL : public AgentTool {
-  TaskToolContext *m_ctx;
+class GetWorkspacePathTool Q_DECL_FINAL : public AgentTool {
+  PythonToolContext *m_ctx;
  public:
-  explicit ListTasksTool(TaskToolContext *ctx) : m_ctx(ctx) {}
+  explicit GetWorkspacePathTool(PythonToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;
   QString description(void) const Q_DECL_FINAL;
   QJsonObject parametersSchema(void) const Q_DECL_FINAL;
   QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
 };
 
-class CompleteTaskTool Q_DECL_FINAL : public AgentTool {
-  TaskToolContext *m_ctx;
+class GetPythonApiReferenceTool Q_DECL_FINAL : public AgentTool {
+  [[maybe_unused]] PythonToolContext *m_ctx;
  public:
-  explicit CompleteTaskTool(TaskToolContext *ctx) : m_ctx(ctx) {}
-  QString name(void) const Q_DECL_FINAL;
-  QString description(void) const Q_DECL_FINAL;
-  QJsonObject parametersSchema(void) const Q_DECL_FINAL;
-  QJsonObject execute(const QJsonObject &args) Q_DECL_FINAL;
-};
-
-class GetTaskBoardSummaryTool Q_DECL_FINAL : public AgentTool {
-  TaskToolContext *m_ctx;
- public:
-  explicit GetTaskBoardSummaryTool(TaskToolContext *ctx) : m_ctx(ctx) {}
+  explicit GetPythonApiReferenceTool(PythonToolContext *ctx) : m_ctx(ctx) {}
   QString name(void) const Q_DECL_FINAL;
   QString description(void) const Q_DECL_FINAL;
   QJsonObject parametersSchema(void) const Q_DECL_FINAL;

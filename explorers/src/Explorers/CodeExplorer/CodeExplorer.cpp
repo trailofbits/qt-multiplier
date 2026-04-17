@@ -18,6 +18,9 @@
 #include <multiplier/GUI/Widgets/HistoryWidget.h>
 #include <multiplier/GUI/Util.h>
 
+#include <multiplier/AST/Decl.h>
+#include <multiplier/AST/DeclKind.h>
+#include <multiplier/Frontend/File.h>
 #include <multiplier/Frontend/MacroConcatenate.h>
 #include <multiplier/Frontend/MacroExpansion.h>
 #include <multiplier/Frontend/TokenTree.h>
@@ -828,4 +831,95 @@ void CodeExplorer::OnRenameEntities(
   emit RenameEntities(new_entity_names);
 }
 
+QVector<ViewedCode> CodeExplorer::recentlyViewedCode(int max) const {
+  // Collect history items (oldest to newest).
+  struct HistItem {
+    VariantEntity entity;
+    QString label;
+  };
+  QVector<HistItem> items;
+
+  d->history->ForEachHistoryItem(
+      [&items](const QVariant &item, const QString &label) {
+        if (!item.canConvert<Location>()) return;
+        auto loc = item.value<Location>();
+        items.append(HistItem{loc.first, label});
+      });
+
+  // Take the last `max` items (most recent), reversed.
+  QVector<ViewedCode> result;
+  QSet<RawEntityId> seen;
+
+  for (qsizetype i = items.size() - 1;
+       i >= 0 && result.size() < static_cast<qsizetype>(max); --i) {
+    const auto &hist = items[i];
+    auto eid = EntityId(hist.entity).Pack();
+    if (seen.contains(eid)) continue;
+    seen.insert(eid);
+
+    ViewedCode vc;
+    vc.label = hist.label;
+
+    if (std::holds_alternative<Decl>(hist.entity)) {
+      auto decl = std::get<Decl>(hist.entity);
+      vc.kind = QString::fromLatin1(EnumeratorName(decl.kind()));
+
+      // Get code snippet from tokens.
+      QString snippet;
+      for (Token tok : decl.tokens()) {
+        auto td = tok.data();
+        snippet += QString::fromUtf8(td.data(),
+                                     static_cast<qsizetype>(td.size()));
+        if (snippet.size() >= 500) break;
+      }
+      vc.code_snippet = snippet.left(500);
+
+      // Get file path.
+      if (auto file = File::containing(decl)) {
+        for (auto path : file->paths()) {
+          vc.file_path = QString::fromStdString(path.generic_string());
+          break;
+        }
+      }
+    } else if (std::holds_alternative<File>(hist.entity)) {
+      auto file = std::get<File>(hist.entity);
+      vc.kind = QStringLiteral("file");
+      for (auto path : file.paths()) {
+        vc.file_path = QString::fromStdString(path.generic_string());
+        if (vc.label.isEmpty()) {
+          vc.label = QString::fromStdString(path.filename().generic_string());
+        }
+        break;
+      }
+      // Skip code for files (too large).
+    } else if (std::holds_alternative<Fragment>(hist.entity)) {
+      vc.kind = QStringLiteral("fragment");
+      auto frag = std::get<Fragment>(hist.entity);
+      // Get snippet from top-level decl tokens if available.
+      for (auto tld : frag.top_level_declarations()) {
+        QString snippet;
+        for (Token tok : tld.tokens()) {
+          auto td = tok.data();
+          snippet += QString::fromUtf8(td.data(),
+                                       static_cast<qsizetype>(td.size()));
+          if (snippet.size() >= 500) break;
+        }
+        vc.code_snippet = snippet.left(500);
+        break;
+      }
+      if (auto file = File::containing(frag)) {
+        for (auto path : file->paths()) {
+          vc.file_path = QString::fromStdString(path.generic_string());
+          break;
+        }
+      }
+    } else {
+      continue;
+    }
+
+    result.append(std::move(vc));
+  }
+
+  return result;
+}
 }  // namespace mx::gui

@@ -16,6 +16,13 @@
 
 namespace mx::gui {
 
+struct ViewedCode {
+  QString label;        // Entity name / file name
+  QString kind;         // "function", "file", "type", etc.
+  QString file_path;
+  QString code_snippet; // First ~50 lines of the definition
+};
+
 class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   Q_OBJECT
 
@@ -38,6 +45,9 @@ class CodeExplorer Q_DECL_FINAL : public IMainWindowPlugin {
   std::optional<NamedAction> ActOnKeyPress(
     IWindowManager *, const QKeySequence &keys,
     const QModelIndex &index) Q_DECL_FINAL;
+
+  // Return recently viewed entities with code snippets for context tracking.
+  QVector<ViewedCode> recentlyViewedCode(int max = 10) const;
 
  private:
   void OpenEntity(const VariantEntity &entity, bool add_to_history);

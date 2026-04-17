@@ -31,6 +31,11 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   QString systemPrompt(void) const;
   int maxIterations(void) const;
   double temperature(void) const;
+  int suggestionMode(void) const;
+  bool enterToSend(void) const;
+  QString recommenderModel(void) const;
+  QString summarizerModel(void) const;
+  QString observerModel(void) const;
 
  signals:
   void configChanged(void);
@@ -40,12 +45,15 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   void onApiKeyChanged(void);
   void onBaseUrlChanged(void);
   void onModelChanged(void);
-  void onLoadPromptClicked(void);
+  void onBrowseWorkspaceClicked(void);
   void onBrowsePythonClicked(void);
 
  private:
   void populateModels(const QString &backend_type);
   void ensureBackendExists(const QString &type);
+  void showSaved(void);
+  void maybeVerifyPython(void);
+  void setPythonStatus(int state);
 };
 
 }  // namespace mx::gui

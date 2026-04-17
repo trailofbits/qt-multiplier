@@ -9,13 +9,10 @@
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QMetaObject>
 
 namespace mx::gui {
 namespace {
-
-// In-memory checkpoint/observation storage. Persistence comes in Step 10.
-static int s_next_checkpoint_id = 1;
-static int s_next_observation_id = 1;
 
 static QJsonObject error_result(const QString &msg) {
   QJsonObject r;
@@ -64,7 +61,10 @@ QJsonObject GetAuditContextTool::parametersSchema(void) const {
 QJsonObject GetAuditContextTool::execute(const QJsonObject &) {
   // Sheets summary.
   QJsonArray sheets_arr;
-  auto sheets = m_ctx->config->LoadOpenSheets();
+  QVector<ConfigManager::SheetData> sheets;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheets = m_ctx->config->LoadOpenSheets();
+  }, Qt::BlockingQueuedConnection);
   for (const auto &sheet : sheets) {
     QJsonObject obj;
     obj[QStringLiteral("sheet_id")] = sheet.sheet_id;
@@ -76,7 +76,10 @@ QJsonObject GetAuditContextTool::execute(const QJsonObject &) {
 
   // Documents summary.
   QJsonArray docs_arr;
-  auto docs = m_ctx->config->LoadAllDocuments();
+  QVector<ConfigManager::DocumentInfo> docs;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    docs = m_ctx->config->LoadAllDocuments();
+  }, Qt::BlockingQueuedConnection);
   for (const auto &doc : docs) {
     QJsonObject obj;
     obj[QStringLiteral("doc_id")] = doc.doc_id;
@@ -119,12 +122,21 @@ QJsonObject SaveCheckpointTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("summary is required"));
   }
 
-  // Placeholder: in-memory ID assignment. Full persistence comes in Step 10.
-  int checkpoint_id = s_next_checkpoint_id++;
+  auto session_id = m_ctx->current_session_id;
+  if (session_id < 0) {
+    return error_result(QStringLiteral("No active session"));
+  }
+
+  int64_t checkpoint_id = -1;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    checkpoint_id =
+        m_ctx->config->SaveAgentCheckpoint(session_id, summary);
+  }, Qt::BlockingQueuedConnection);
   QString created_at = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
 
   QJsonObject result;
-  result[QStringLiteral("checkpoint_id")] = checkpoint_id;
+  result[QStringLiteral("checkpoint_id")] =
+      static_cast<qint64>(checkpoint_id);
   result[QStringLiteral("created_at")] = created_at;
   result[QStringLiteral("summary")] = summary;
   return result;
@@ -157,13 +169,136 @@ QJsonObject LogObservationTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("content is required"));
   }
 
-  // Placeholder: in-memory ID assignment. Full persistence comes in Step 10.
-  int observation_id = s_next_observation_id++;
+  auto session_id = m_ctx->current_session_id;
+  if (session_id < 0) {
+    return error_result(QStringLiteral("No active session"));
+  }
+
+  int64_t observation_id = -1;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    observation_id =
+        m_ctx->config->SaveAgentObservation(session_id, content);
+  }, Qt::BlockingQueuedConnection);
   QString timestamp = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
 
   QJsonObject result;
-  result[QStringLiteral("observation_id")] = observation_id;
+  result[QStringLiteral("observation_id")] =
+      static_cast<qint64>(observation_id);
   result[QStringLiteral("timestamp")] = timestamp;
+  return result;
+}
+
+// ===========================================================================
+// GetSessionCostTool
+// ===========================================================================
+
+QString GetSessionCostTool::name(void) const {
+  return QStringLiteral("get_session_cost");
+}
+
+QString GetSessionCostTool::description(void) const {
+  return QStringLiteral(
+      "Get a cost breakdown for the current session including total cost, "
+      "per-tool costs, and per-role costs.");
+}
+
+QJsonObject GetSessionCostTool::parametersSchema(void) const {
+  return make_schema({}, {});
+}
+
+QJsonObject GetSessionCostTool::execute(const QJsonObject &) {
+  auto session_id = m_ctx->current_session_id;
+  if (session_id < 0) {
+    return error_result(QStringLiteral("No active session"));
+  }
+
+  ConfigManager::CostSummary summary;
+  QVector<ConfigManager::ToolCostBreakdown> tool_breakdown;
+  QVector<ConfigManager::RoleCostBreakdown> role_breakdown;
+  QVector<ConfigManager::CostEdgeInfo> edges;
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    summary = m_ctx->config->LoadCostSummary(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    tool_breakdown = m_ctx->config->LoadToolCostBreakdown(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    role_breakdown = m_ctx->config->LoadRoleCostBreakdown(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    edges = m_ctx->config->LoadCostEdges(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QJsonObject result;
+  result[QStringLiteral("total_cost_usd")] = summary.total_cost_usd;
+  result[QStringLiteral("total_input_tokens")] = summary.total_input_tokens;
+  result[QStringLiteral("total_output_tokens")] = summary.total_output_tokens;
+  result[QStringLiteral("llm_calls")] = summary.llm_call_count;
+  result[QStringLiteral("tool_calls")] = summary.tool_call_count;
+
+  QJsonArray by_tool;
+  for (const auto &t : tool_breakdown) {
+    QJsonObject obj;
+    obj[QStringLiteral("tool")] = t.tool_name;
+    obj[QStringLiteral("calls")] = t.call_count;
+    obj[QStringLiteral("cost_usd")] = t.total_cost_usd;
+    obj[QStringLiteral("avg_duration_ms")] = t.avg_duration_ms;
+    by_tool.append(obj);
+  }
+  result[QStringLiteral("by_tool")] = by_tool;
+
+  QJsonArray by_role;
+  for (const auto &r : role_breakdown) {
+    QJsonObject obj;
+    obj[QStringLiteral("role")] = r.node_type;
+    obj[QStringLiteral("model")] = r.model;
+    obj[QStringLiteral("calls")] = r.call_count;
+    obj[QStringLiteral("cost_usd")] = r.total_cost_usd;
+    by_role.append(obj);
+  }
+  result[QStringLiteral("by_role")] = by_role;
+
+  // Tool statistics (latency details).
+  QVector<ConfigManager::ToolStatistics> tool_stats;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    tool_stats = m_ctx->config->LoadToolStatistics(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QJsonArray stats_arr;
+  for (const auto &ts : tool_stats) {
+    QJsonObject obj;
+    obj[QStringLiteral("tool")] = ts.tool_name;
+    obj[QStringLiteral("calls")] = ts.call_count;
+    obj[QStringLiteral("total_ms")] = ts.total_duration_ms;
+    obj[QStringLiteral("min_ms")] = ts.min_duration_ms;
+    obj[QStringLiteral("max_ms")] = ts.max_duration_ms;
+    obj[QStringLiteral("avg_ms")] = ts.avg_duration_ms;
+    obj[QStringLiteral("cost_usd")] = ts.total_cost_usd;
+    stats_arr.append(obj);
+  }
+  result[QStringLiteral("tool_statistics")] = stats_arr;
+
+  // Dependency edge summary.
+  int causal_count = 0;
+  int context_count = 0;
+  int trigger_count = 0;
+  for (const auto &e : edges) {
+    if (e.edge_type == QStringLiteral("causal")) ++causal_count;
+    else if (e.edge_type == QStringLiteral("context")) ++context_count;
+    else if (e.edge_type == QStringLiteral("trigger")) ++trigger_count;
+  }
+
+  QJsonObject edge_summary;
+  edge_summary[QStringLiteral("total_edges")] = edges.size();
+  edge_summary[QStringLiteral("causal_edges")] = causal_count;
+  edge_summary[QStringLiteral("context_edges")] = context_count;
+  edge_summary[QStringLiteral("trigger_edges")] = trigger_count;
+  result[QStringLiteral("dependency_edges")] = edge_summary;
+
   return result;
 }
 
@@ -171,8 +306,6 @@ QJsonObject LogObservationTool::execute(const QJsonObject &args) {
 // FinishTool
 // ===========================================================================
 
-SessionResult FinishTool::s_last_result;
-bool FinishTool::s_was_called = false;
 
 QString FinishTool::name(void) const {
   return QStringLiteral("finish");
@@ -229,24 +362,12 @@ QJsonObject FinishTool::execute(const QJsonObject &args) {
     }
   }
 
-  s_last_result = result;
-  s_was_called = true;
+  m_ctx->finish_result = result;
+  m_ctx->finish_called = true;
 
   QJsonObject r;
   r[QStringLiteral("acknowledged")] = true;
   return r;
-}
-
-SessionResult FinishTool::lastResult(void) {
-  return s_last_result;
-}
-
-bool FinishTool::wasCalledAndReset(void) {
-  if (s_was_called) {
-    s_was_called = false;
-    return true;
-  }
-  return false;
 }
 
 // ===========================================================================
@@ -258,6 +379,7 @@ void registerSessionTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<GetAuditContextTool>(ctx));
   registry.registerTool(std::make_unique<SaveCheckpointTool>(ctx));
   registry.registerTool(std::make_unique<LogObservationTool>(ctx));
+  registry.registerTool(std::make_unique<GetSessionCostTool>(ctx));
   registry.registerTool(std::make_unique<FinishTool>(ctx));
 }
 

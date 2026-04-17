@@ -52,6 +52,14 @@ class LLMManager Q_DECL_FINAL : public QObject {
   QString activeBackendName(void) const;
   ILLMBackend *activeBackend(void) const;
 
+  // API key shared across all backends of the same type.
+  // E.g. setting a Claude key applies to all Claude model variants.
+  void setApiKeyForType(const QString &type, const QString &key);
+  QString apiKeyForType(const QString &type) const;
+
+  // Remove all stored API keys.
+  void clearAllApiKeys(void);
+
   // Persistence via QSettings.
   void saveConfig(void) const;
   void loadConfig(void);
