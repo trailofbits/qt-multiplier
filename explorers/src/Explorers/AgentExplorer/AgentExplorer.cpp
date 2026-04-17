@@ -36,6 +36,7 @@
 
 #include "AgentConversationWidget.h"
 #include "AgentConfigPanel.h"
+#include "AgentDashboardWidget.h"
 #include "AgentToolLogWidget.h"
 #include "AgentSessionListWidget.h"
 
@@ -53,12 +54,14 @@ struct AgentExplorer::PrivateData {
   IWindowWidget *config_dock{nullptr};
   IWindowWidget *tool_log_dock{nullptr};
   IWindowWidget *session_list_dock{nullptr};
+  IWindowWidget *dashboard_dock{nullptr};
 
   // Child widgets.
   AgentConversationWidget *conversation{nullptr};
   AgentConfigPanel *config_panel{nullptr};
   AgentToolLogWidget *tool_log{nullptr};
   AgentSessionListWidget *session_list{nullptr};
+  AgentDashboardWidget *dashboard{nullptr};
 
   // Toolbar buttons.
   QPushButton *new_session_btn{nullptr};
@@ -273,6 +276,27 @@ void AgentExplorer::CreateDockWidgets(IWindowManager *manager) {
     config.start_hidden = true;
     config.app_menu_location = {tr("Agent")};
     manager->AddDockWidget(d->session_list_dock, config);
+  }
+
+  // Bottom dock: dashboard.
+  d->dashboard_dock = new IWindowWidget;
+  d->dashboard_dock->setWindowTitle(tr("Agent Dashboard"));
+  d->dashboard_dock->setContentsMargins(0, 0, 0, 0);
+
+  auto *dashboard_layout = new QVBoxLayout(d->dashboard_dock);
+  dashboard_layout->setContentsMargins(0, 0, 0, 0);
+
+  d->dashboard = new AgentDashboardWidget(d->dashboard_dock);
+  dashboard_layout->addWidget(d->dashboard);
+
+  {
+    IWindowManager::DockConfig config;
+    config.id = "com.trailofbits.dock.AgentDashboard";
+    config.location = IWindowManager::DockLocation::Bottom;
+    config.tabify = true;
+    config.start_hidden = true;
+    config.app_menu_location = {tr("Agent")};
+    manager->AddDockWidget(d->dashboard_dock, config);
   }
 }
 
@@ -538,6 +562,7 @@ void AgentExplorer::OnSessionCompleted(int64_t session_id,
   d->config_manager.UpdateAgentSessionStatus(
       session_id, QStringLiteral("completed"));
   d->session_list->refresh();
+  d->dashboard->refresh(session_id, d->config_manager);
 }
 
 void AgentExplorer::OnSessionFinished(int64_t session_id,
@@ -575,6 +600,7 @@ void AgentExplorer::OnSessionFinished(int64_t session_id,
       session_id, result.status.isEmpty() ? QStringLiteral("completed")
                                           : result.status);
   d->session_list->refresh();
+  d->dashboard->refresh(session_id, d->config_manager);
 }
 
 void AgentExplorer::OnSessionError(int64_t session_id,
@@ -709,6 +735,9 @@ void AgentExplorer::LoadSession(int64_t session_id) {
     }
     d->conversation->addMessage(msg);
   }
+
+  // Refresh the dashboard for the loaded session.
+  d->dashboard->refresh(session_id, d->config_manager);
 }
 
 void AgentExplorer::OnToggleObserver(bool checked) {
