@@ -124,16 +124,39 @@ The harness needs to compile against the target code. Key considerations:
 - Use `-g` for debug symbols (crash triage needs them)
 - Use `-O1` or `-O2` (not `-O0` — too slow for fuzzing, not `-O3` — can optimize away bugs)
 
+### Environment variables
+
+The following are automatically set in Python scripts from the agent configuration:
+- `CC` — C compiler path (e.g. `/usr/bin/cc`)
+- `CXX` — C++ compiler path (e.g. `/usr/bin/c++`)
+- `SDKROOT` — macOS SDK root path
+- `MULTIPLIER_WORKSPACE` — workspace directory for saving harness files
+
+Use them in compilation scripts:
+```python
+import os, subprocess
+cc = os.environ.get('CC', 'cc')
+workspace = os.environ['MULTIPLIER_WORKSPACE']
+harness_dir = os.path.join(workspace, 'harnesses')
+os.makedirs(harness_dir, exist_ok=True)
+
+subprocess.run([cc, '-fsanitize=fuzzer,address', '-O1', '-g',
+                '-o', f'{harness_dir}/fuzz_parser', 'harness.c', 'target.c'])
+```
+
 ### macOS specifics
-On macOS, you may need:
-- Set `SDKROOT` to the macOS SDK path: `xcrun --show-sdk-path`
-- Use the system clang or a specific clang version
-- Link against system frameworks if the target uses them
+On macOS, `SDKROOT` is set from the agent configuration. If not configured, detect it:
+```python
+import subprocess
+sdk = os.environ.get('SDKROOT') or subprocess.check_output(
+    ['xcrun', '--show-sdk-path']).decode().strip()
+```
 
 ### Linking
 - If the target is a library: link against it
 - If copying source: compile the copied functions alongside the harness
 - Avoid pulling in the entire build system — compile just what you need
+- Save compiled harnesses to `$MULTIPLIER_WORKSPACE/harnesses/`
 
 ## Seed Corpus
 
