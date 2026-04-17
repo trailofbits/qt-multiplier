@@ -94,6 +94,8 @@ add_library("mx_explorers"
   src/Explorers/AgentExplorer/AgentToolLogWidget.cpp
   src/Explorers/AgentExplorer/AgentSessionListWidget.h
   src/Explorers/AgentExplorer/AgentSessionListWidget.cpp
+
+  src/Explorers/AgentExplorer/resources/AgentResources.qrc
 )
 
 if(MX_ENABLE_PYTHON_BINDINGS)

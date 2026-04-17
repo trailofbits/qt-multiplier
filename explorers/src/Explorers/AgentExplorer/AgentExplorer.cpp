@@ -37,6 +37,7 @@
 #include "AgentConversationWidget.h"
 #include "AgentConfigPanel.h"
 #include "AgentDashboardWidget.h"
+#include "AgentResourceLoader.h"
 #include "AgentToolLogWidget.h"
 #include "AgentSessionListWidget.h"
 
@@ -91,6 +92,11 @@ struct AgentExplorer::PrivateData {
   CodeExplorer *code_explorer{nullptr};
   QTimer *context_refresh_timer{nullptr};
 
+  // Cached prompt content loaded from resource documents.
+  QString observer_prompt;
+  QString code_summary_prompt;
+  QString recommender_prompt;
+
   QString recommender_model;
   QString summarizer_model;
   QString observer_model;
@@ -119,6 +125,36 @@ AgentExplorer::AgentExplorer(ConfigManager &config_manager,
                              IWindowManager *parent)
     : IMainWindowPlugin(config_manager, parent),
       d(new PrivateData(config_manager, parent)) {
+
+  // Ensure all resource-backed documents exist in the database.
+  ensureAllResourceDocuments(config_manager, {
+    {QStringLiteral("Default Agent System Prompt"),
+     QStringLiteral("prompt"),
+     QStringLiteral(":/agent/prompts/system_prompt.md"), 10},
+    {QStringLiteral("Observer System Prompt"),
+     QStringLiteral("prompt"),
+     QStringLiteral(":/agent/prompts/observer_prompt.md"), 0},
+    {QStringLiteral("Code Summarizer Prompt"),
+     QStringLiteral("prompt"),
+     QStringLiteral(":/agent/prompts/code_summarizer_prompt.md"), 0},
+    {QStringLiteral("Next Question Recommender Prompt"),
+     QStringLiteral("prompt"),
+     QStringLiteral(":/agent/prompts/recommender_prompt.md"), 0},
+    {QStringLiteral("Multiplier Python API Reference"),
+     QStringLiteral("reference"),
+     QStringLiteral(":/agent/references/python_api.md"), 0},
+    {QStringLiteral("Cell Content Format Reference"),
+     QStringLiteral("reference"),
+     QStringLiteral(":/agent/references/cell_format.md"), 0},
+  });
+
+  // Cache the prompts that are used at runtime.
+  d->observer_prompt = loadResource(
+      QStringLiteral(":/agent/prompts/observer_prompt.md"));
+  d->code_summary_prompt = loadResource(
+      QStringLiteral(":/agent/prompts/code_summarizer_prompt.md"));
+  d->recommender_prompt = loadResource(
+      QStringLiteral(":/agent/prompts/recommender_prompt.md"));
 
   // Create the LLM and Agent managers.
   d->llm_manager = new LLMManager(this);
@@ -802,37 +838,9 @@ void AgentExplorer::StartObserver(void) {
     return;  // Already running.
   }
 
-  static const QString kObserverSystemPrompt = QStringLiteral(
-      "You are a senior security researcher acting as an independent reviewer "
-      "of an AI agent's code analysis work. You are not a passive monitor — "
-      "you are an opinionated expert collaborator, like a seasoned auditor "
-      "from Trail of Bits or Project Zero looking over a junior analyst's "
-      "shoulder.\n\n"
-      "The analyst and their AI agent are examining a C/C++ codebase for "
-      "security-relevant patterns: attack surface, data flow from untrusted "
-      "inputs, memory safety, type confusion, missing validation, and "
-      "exploitable logic.\n\n"
-      "Your role:\n"
-      "- Make critical, high-leverage observations the primary agent missed\n"
-      "- Challenge assumptions: is the agent looking at the right code? Is it "
-      "following the most productive line of inquiry?\n"
-      "- Redirect if the agent is wasting time on low-value work\n"
-      "- Suggest specific, targeted investigations that a vulnerability "
-      "researcher like halvarflake, lcamtuf, or taviso would pursue\n"
-      "- Point out patterns: 'this looks like a classic TOCTOU', 'this "
-      "unchecked return is the same pattern as CVE-XXXX'\n"
-      "- Be direct and specific. Name functions, entity IDs, reference kinds.\n\n"
-      "Use get_primary_session_context to see what the primary agent has done.\n"
-      "Use observer_recommendation to record your findings.\n\n"
-      "When you have specific next steps, include them in suggested_prompts "
-      "so the analyst can click a button to send them directly to the primary "
-      "agent. Each prompt should be a complete, actionable instruction.\n\n"
-      "Do not be polite. Do not hedge. Be the reviewer you'd want on your "
-      "own audit.");
-
   auto backend_name = d->llm_manager->activeBackendName();
   d->observer_session_id = d->agent_manager->createObserverSession(
-      kObserverSystemPrompt, backend_name, d->current_session_id,
+      d->observer_prompt, backend_name, d->current_session_id,
       d->observer_model);
 
   if (d->observer_session_id < 0) {
@@ -849,7 +857,7 @@ void AgentExplorer::StartObserver(void) {
     auto *obs_backend = d->llm_manager->activeBackend();
     QString obs_model = obs_backend ? obs_backend->name() : QString();
     d->config_manager.CreateAgentSession(
-        tr("Observer"), kObserverSystemPrompt, backend_name, obs_model,
+        tr("Observer"), d->observer_prompt, backend_name, obs_model,
         d->current_session_id);
   }
 
@@ -929,23 +937,7 @@ void AgentExplorer::summarizeViewedCode(void) {
   }
   d->code_context.last_summarize_hash = snippets_hash;
 
-  static const QString kCodeSummaryPrompt = QString::fromUtf8(
-      R"MX(You are a code analyst producing factual observations about recently viewed code.
-Describe what you see using neutral language. Do NOT judge whether code is
-"dangerous", "safe", "vulnerable", or "secure". Report contracts and behavior,
-not quality assessments.
-
-For each piece of code, note what it does, what it assumes about inputs,
-and any factual observations (e.g. "error path does not free buffer",
-"loop bound depends on unchecked caller value"). Use symbolic constants.
-
-Recently viewed code:
-%1
-
-Respond with ONLY a JSON object:
-{"code_summary":"2-4 sentence factual summary of what the analyst has been examining","observations":["factual observation 1","factual observation 2"]})MX");
-
-  auto prompt_text = kCodeSummaryPrompt.arg(code_snippets);
+  auto prompt_text = d->code_summary_prompt.arg(code_snippets);
 
   QVector<LLMMessage> messages;
   LLMMessage user_msg;
@@ -1096,30 +1088,7 @@ void AgentExplorer::requestRecommendation(void) {
     }
   }
 
-  static const QString kRecommenderPrompt = QString::fromUtf8(
-      R"MX(You are a research assistant helping guide a security analyst's conversation with an AI agent in a binary analysis IDE.
-
-Prefer depth over breadth. The analyst's time is best spent on:
-- Following data flow from untrusted inputs to dangerous operations
-- Examining specific functions in detail rather than listing all files
-- Cross-referencing callers/callees to trace attack paths
-- Using search_code to find patterns (TODO/FIXME/HACK, dangerous functions, unchecked inputs)
-
-Do NOT suggest listing all files or creating generic overviews. Suggest specific, targeted investigations.
-
-Recent conversation (last messages):
-%1
-
-Analysis context:
-%2
-
-Open questions:
-%3
-%4
-Respond with ONLY a JSON object (no markdown, no explanation):
-{"suggestion":"the single best next investigation to pursue","alternatives":["other targeted investigation 1","other targeted investigation 2"],"context_summary":"2-3 sentence summary of where analysis stands","open_questions":["unresolved question 1","unresolved question 2"]})MX");
-
-  auto prompt_text = kRecommenderPrompt
+  auto prompt_text = d->recommender_prompt
       .arg(recent_lines.join(QStringLiteral("\n")))
       .arg(context_summary)
       .arg(open_questions_str)

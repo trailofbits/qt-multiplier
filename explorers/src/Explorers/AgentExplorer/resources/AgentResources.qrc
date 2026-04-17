@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/agent">
+        <file>prompts/system_prompt.md</file>
+        <file>prompts/observer_prompt.md</file>
+        <file>prompts/code_summarizer_prompt.md</file>
+        <file>prompts/recommender_prompt.md</file>
+        <file>references/python_api.md</file>
+        <file>references/cell_format.md</file>
+    </qresource>
+</RCC>
