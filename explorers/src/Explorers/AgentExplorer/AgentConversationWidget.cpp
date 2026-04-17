@@ -487,7 +487,7 @@ static constexpr int kEntityIdRole = Qt::UserRole + 10;
 
 // Forward declaration for use in createDefinitionView.
 static QTextBrowser *createAnnotatedCodeView(
-    const QString &type, quint64 entity_id, int start_line, int end_line,
+    const QString &type, uint64_t entity_id, int start_line, int end_line,
     const mx::gui::ConfigManager &config, QWidget *parent);
 
 // Helper: apply compact styling to a list/table/tree widget.
