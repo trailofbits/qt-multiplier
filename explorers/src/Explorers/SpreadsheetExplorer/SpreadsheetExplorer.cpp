@@ -147,6 +147,9 @@ static ConfigManager::SheetData SheetTabToData(const SheetTab &tab,
   for (int c = 0; c < num_cols; ++c) {
     ConfigManager::SheetColumnInfo ci;
     ci.name = model->headerData(c, Qt::Horizontal).toString();
+    // Strip display-only affordance markers before persisting.
+    ci.name.remove(QStringLiteral(" [K]"));
+    ci.name.remove(QStringLiteral(" [\xe2\x86\x97]"));  // ↗
     ci.color = model->ColumnColor(c);
     ci.clickable = tab.view ? tab.view->IsColumnClickable(c) : false;
     ci.width = tab.view ? tab.view->columnWidth(c) : -1;
@@ -573,6 +576,25 @@ void SpreadsheetExplorer::OpenSheetFromData(
     }
     if (sheet.columns[c].width > 0) {
       view->setColumnWidth(c, sheet.columns[c].width);
+    }
+  }
+
+  // Add visual affordance markers to column headers (display-only).
+  // Key column gets a key indicator; clickable columns get an arrow.
+  for (int c = 0; c < sheet.columns.size(); ++c) {
+    auto current = model->headerData(c, Qt::Horizontal).toString();
+    bool is_key = (sheet.key_column_index >= 0 &&
+                   c == sheet.key_column_index);
+    bool is_clickable = sheet.columns[c].clickable;
+    if (is_key || is_clickable) {
+      QString suffix;
+      if (is_key) {
+        suffix += QStringLiteral(" [K]");
+      }
+      if (is_clickable) {
+        suffix += QStringLiteral(" [\xe2\x86\x97]");  // ↗
+      }
+      model->setHeaderData(c, Qt::Horizontal, current + suffix);
     }
   }
 

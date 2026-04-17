@@ -1114,6 +1114,31 @@ void AgentExplorer::requestRecommendation(void) {
     }
   }
 
+  // Append recent observer recommendations if observer session exists.
+  QString observer_recs_str;
+  if (d->observer_session_id >= 0) {
+    auto obs_msgs = d->agent_manager->sessionMessages(d->observer_session_id);
+    QStringList obs_recs;
+    for (auto it = obs_msgs.rbegin();
+         it != obs_msgs.rend() && obs_recs.size() < 5; ++it) {
+      if (it->role == QStringLiteral("tool_call") &&
+          it->tool_name == QStringLiteral("observer_recommendation")) {
+        auto rec = it->tool_args.value(
+            QStringLiteral("recommendation")).toString();
+        if (!rec.isEmpty()) {
+          obs_recs.prepend(rec);
+        }
+      }
+    }
+    if (!obs_recs.isEmpty()) {
+      observer_recs_str = QStringLiteral(
+          "\nRecent observer recommendations:\n");
+      for (const auto &r : obs_recs) {
+        observer_recs_str += QStringLiteral("- %1\n").arg(r);
+      }
+    }
+  }
+
   // Append benched prompts if any.
   QString benched_str;
   if (!d->recommender.benched_prompts.isEmpty()) {
@@ -1128,7 +1153,7 @@ void AgentExplorer::requestRecommendation(void) {
       .arg(recent_lines.join(QStringLiteral("\n")))
       .arg(context_summary)
       .arg(open_questions_str)
-      .arg(code_context_str + benched_str);
+      .arg(code_context_str + observer_recs_str + benched_str);
 
   QVector<LLMMessage> messages;
   LLMMessage user_msg;

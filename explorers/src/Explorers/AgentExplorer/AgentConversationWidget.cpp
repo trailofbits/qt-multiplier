@@ -1583,6 +1583,11 @@ struct AgentConversationWidget::PrivateData {
   bool auto_scroll{true};
   QPushButton *tail_btn{nullptr};
 
+  // Observer-only message filter.
+  bool observer_filter{false};
+  QPushButton *observer_filter_btn{nullptr};
+  QVector<QWidget *> message_frames;  // track all frames for filtering
+
   int total_prompt_tokens{0};
   int total_completion_tokens{0};
   bool enter_to_send{true};
@@ -1705,13 +1710,33 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
 
   main_layout->addLayout(input_layout);
 
-  // Token counter.
+  // Token counter and observer filter toggle.
+  auto *bottom_bar = new QHBoxLayout;
+  bottom_bar->setContentsMargins(0, 0, 0, 0);
+  bottom_bar->setSpacing(4);
+
   d->token_label = new QLabel(tr("Tokens: 0 in / 0 out ($0.00)"), this);
   d->token_label->setContentsMargins(8, 0, 8, 4);
   auto font = d->token_label->font();
   font.setPointSize(font.pointSize() - 1);
   d->token_label->setFont(font);
-  main_layout->addWidget(d->token_label);
+  bottom_bar->addWidget(d->token_label, 1);
+
+  d->observer_filter_btn = new QPushButton(tr("Observer Only"), this);
+  d->observer_filter_btn->setCheckable(true);
+  d->observer_filter_btn->setChecked(false);
+  d->observer_filter_btn->setFixedHeight(22);
+  auto ofont = d->observer_filter_btn->font();
+  ofont.setPointSize(ofont.pointSize() - 1);
+  d->observer_filter_btn->setFont(ofont);
+  d->observer_filter_btn->setStyleSheet(
+      QStringLiteral("QPushButton { padding: 2px 8px; border-radius: 3px; "
+                     "border: 1px solid palette(mid); } "
+                     "QPushButton:checked { background-color: rgba(139, 92, 246, 60); "
+                     "border-color: rgba(139, 92, 246, 120); }"));
+  bottom_bar->addWidget(d->observer_filter_btn);
+
+  main_layout->addLayout(bottom_bar);
 
   // Connections.
   connect(d->send_button, &QPushButton::clicked,
@@ -1734,6 +1759,20 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
     }
     menu->popup(d->suggestion_more_btn->mapToGlobal(
         d->suggestion_more_btn->rect().bottomLeft()));
+  });
+
+  // Observer-only filter toggle.
+  connect(d->observer_filter_btn, &QPushButton::toggled, this, [this](bool on) {
+    d->observer_filter = on;
+    for (auto *w : d->message_frames) {
+      auto role = w->property("msg_role").toString();
+      if (on) {
+        w->setVisible(role == QStringLiteral("observer") ||
+                      role == QStringLiteral("system"));
+      } else {
+        w->setVisible(true);
+      }
+    }
   });
 
   // Event filter on input for Tab-to-accept and scroll area for resize.
@@ -1820,6 +1859,7 @@ void AgentConversationWidget::clear(void) {
   d->token_label->setText(tr("Tokens: 0 in / 0 out ($0.00)"));
   d->pending_tool_args.clear();
   d->pending_tool_names.clear();
+  d->message_frames.clear();
   d->auto_scroll = true;
   d->tail_btn->setVisible(false);
   clearStatus();
@@ -1883,9 +1923,16 @@ void AgentConversationWidget::addMessageBubble(
   auto *frame = new QFrame(d->messages_container);
   frame->setFrameShape(QFrame::StyledPanel);
   frame->setFrameShadow(QFrame::Plain);
+  frame->setProperty("msg_role", role);
   auto *frame_layout = new QVBoxLayout(frame);
   frame_layout->setContentsMargins(8, 6, 8, 6);
   frame_layout->setSpacing(4);
+
+  // Track the frame for observer filter, and apply filter if active.
+  d->message_frames.append(frame);
+  if (d->observer_filter && role != QStringLiteral("system")) {
+    frame->setVisible(false);
+  }
 
   if (role == QStringLiteral("user")) {
     frame->setStyleSheet(
@@ -2025,6 +2072,7 @@ void AgentConversationWidget::addMessageBubble(
       // Reuse the existing batch frame; discard the freshly created frame.
       batch_frame = d->current_tool_batch;
       batch_layout = d->tool_batch_layout;
+      d->message_frames.removeOne(frame);
       frame->deleteLater();
       reusing_batch = true;
     } else {
@@ -2165,10 +2213,14 @@ void AgentConversationWidget::showObserverRecommendation(
   auto *frame = new QFrame(d->messages_container);
   frame->setFrameShape(QFrame::StyledPanel);
   frame->setFrameShadow(QFrame::Plain);
+  frame->setProperty("msg_role", QStringLiteral("observer"));
   frame->setStyleSheet(
       QStringLiteral("QFrame { background-color: rgba(139, 92, 246, 30); "
                      "border-radius: 8px; "
                      "border: 1px solid rgba(139, 92, 246, 60); }"));
+
+  // Track the frame for observer filter.
+  d->message_frames.append(frame);
 
   auto *layout = new QVBoxLayout(frame);
   layout->setContentsMargins(10, 8, 10, 8);
