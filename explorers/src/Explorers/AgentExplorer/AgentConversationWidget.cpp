@@ -477,6 +477,11 @@ static QString formatToolArgs(const QString &tool_name,
 // Custom data role for storing entity IDs on list/table items.
 static constexpr int kEntityIdRole = Qt::UserRole + 10;
 
+// Forward declaration for use in createDefinitionView.
+static QTextBrowser *createAnnotatedCodeView(
+    const QString &type, quint64 entity_id, int start_line, int end_line,
+    const mx::gui::ConfigManager &config, QWidget *parent);
+
 // Helper: apply compact styling to a list/table/tree widget.
 static void applyCompactStyle(QAbstractItemView *view, int max_height) {
   auto f = view->font();
@@ -746,14 +751,31 @@ static QWidget *createCallTreeView(const QJsonObject &result,
   return tree;
 }
 
-// 6. get_definition -> mini code view
+// 6. get_definition -> syntax-highlighted code view with clickable tokens
 static QWidget *createDefinitionView(const QJsonObject &result,
+                                     const QJsonObject &args,
+                                     const mx::gui::ConfigManager &config,
                                      QWidget *parent) {
   auto code = result[QStringLiteral("code")].toString();
   if (code.isEmpty()) {
     return nullptr;
   }
 
+  // Try to render with syntax highlighting using the entity ID from the args.
+  auto eid_val = args[QStringLiteral("entity_id")];
+  quint64 eid = eid_val.isString()
+      ? eid_val.toString().toULongLong()
+      : static_cast<quint64>(eid_val.toDouble(0));
+
+  if (eid != 0) {
+    auto *view = createAnnotatedCodeView(
+        QStringLiteral("entity"), eid, 0, 0, config, parent);
+    if (view) {
+      return view;
+    }
+  }
+
+  // Fallback: plain monospace.
   auto file = result[QStringLiteral("file")].toString();
   int line = result[QStringLiteral("line")].toInt(-1);
 
@@ -1335,7 +1357,7 @@ static QWidget *createToolResultWidget(const QString &tool_name,
     return createCallTreeView(result, tool_name, parent);
   }
   if (tool_name == QStringLiteral("get_definition")) {
-    return createDefinitionView(result, parent);
+    return createDefinitionView(result, args, config, parent);
   }
   if (tool_name == QStringLiteral("get_task_board_summary")) {
     return createTaskBoardView(result, parent);
