@@ -507,7 +507,8 @@ static QString ensureApiRefDocument(ConfigManager *config) {
   // Create it.
   int doc_id = -1;
   QMetaObject::invokeMethod(config, [&] {
-    doc_id = config->CreateDocument(kApiRefContent, kApiRefTitle);
+    doc_id = config->CreateDocument(kApiRefContent, kApiRefTitle,
+                                    QStringLiteral("markdown"));
     if (doc_id >= 0) {
       config->SetDocumentCategory(doc_id, QStringLiteral("reference"));
     }

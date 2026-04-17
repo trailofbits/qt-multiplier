@@ -1583,7 +1583,8 @@ QJsonObject GetCellFormatReferenceTool::execute(const QJsonObject &) {
 
   // Create it.
   QMetaObject::invokeMethod(m_ctx->config, [&] {
-    auto doc_id = m_ctx->config->CreateDocument(kCellRefContent, kCellRefTitle);
+    auto doc_id = m_ctx->config->CreateDocument(kCellRefContent, kCellRefTitle,
+                                                QStringLiteral("markdown"));
     if (doc_id >= 0) {
       m_ctx->config->SetDocumentCategory(doc_id, QStringLiteral("reference"));
     }

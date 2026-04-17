@@ -193,7 +193,8 @@ static QString ensureDefaultPromptDocument(ConfigManager &config) {
     }
   }
 
-  auto doc_id = config.CreateDocument(kDefaultPromptContent, kDefaultPromptTitle);
+  auto doc_id = config.CreateDocument(kDefaultPromptContent, kDefaultPromptTitle,
+                                      QStringLiteral("markdown"));
   if (doc_id >= 0) {
     config.SetDocumentCategory(doc_id, QStringLiteral("prompt"));
   }
