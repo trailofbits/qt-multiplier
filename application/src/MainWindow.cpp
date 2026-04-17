@@ -228,6 +228,7 @@ void MainWindow::InitializePlugins(void) {
     }
   }
 
+
   for (const auto &plugin : d->plugins) {
     connect(plugin.get(), &IMainWindowPlugin::RequestPrimaryClick,
             this, &MainWindow::OnRequestPrimaryClick);

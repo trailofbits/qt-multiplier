@@ -922,5 +922,4 @@ QVector<ViewedCode> CodeExplorer::recentlyViewedCode(int max) const {
 
   return result;
 }
-
 }  // namespace mx::gui
