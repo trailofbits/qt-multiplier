@@ -366,6 +366,17 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   };
   QVector<ToolCostBreakdown> LoadToolCostBreakdown(int64_t session_id) const;
 
+  struct ToolStatistics {
+    QString tool_name;
+    int call_count{0};
+    int total_duration_ms{0};
+    int min_duration_ms{0};
+    int max_duration_ms{0};
+    int avg_duration_ms{0};
+    double total_cost_usd{0.0};
+  };
+  QVector<ToolStatistics> LoadToolStatistics(int64_t session_id) const;
+
   struct RoleCostBreakdown {
     QString node_type;
     QString model;

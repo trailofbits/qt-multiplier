@@ -926,6 +926,66 @@ static QWidget *createSessionCostView(const QJsonObject &result,
       ++row;
     }
   }
+
+  // Tool statistics table with latency details.
+  auto tool_stats = result[QStringLiteral("tool_statistics")].toArray();
+  if (!tool_stats.isEmpty()) {
+    int row = grid->rowCount();
+
+    auto *stats_header = new QLabel(QStringLiteral("Tool statistics:"), widget);
+    auto shf = stats_header->font();
+    shf.setPointSize(shf.pointSize() - 1);
+    shf.setBold(true);
+    stats_header->setFont(shf);
+    grid->addWidget(stats_header, row, 0, 1, 2);
+    ++row;
+
+    // Find max total_ms for proportional bar.
+    int max_total_ms = 0;
+    for (const auto &v : tool_stats) {
+      int total_ms = v.toObject()[QStringLiteral("total_ms")].toInt();
+      if (total_ms > max_total_ms) {
+        max_total_ms = total_ms;
+      }
+    }
+
+    for (const auto &v : tool_stats) {
+      auto obj = v.toObject();
+      auto tool = obj[QStringLiteral("tool")].toString();
+      int calls = obj[QStringLiteral("calls")].toInt();
+      int avg_ms = obj[QStringLiteral("avg_ms")].toInt();
+      int total_ms = obj[QStringLiteral("total_ms")].toInt();
+
+      auto *name_lbl = new QLabel(tool, widget);
+      name_lbl->setFont(small_font);
+
+      // Proportional background bar via stylesheet.
+      if (max_total_ms > 0) {
+        int pct = qBound(1, total_ms * 100 / max_total_ms, 100);
+        name_lbl->setStyleSheet(
+            QStringLiteral("background: qlineargradient("
+                           "x1:0, y1:0, x2:1, y2:0, "
+                           "stop:0 rgba(80,140,220,60), "
+                           "stop:%1 rgba(80,140,220,60), "
+                           "stop:%2 transparent, "
+                           "stop:1 transparent); "
+                           "padding: 1px 2px;")
+                .arg(pct / 100.0, 0, 'f', 2)
+                .arg(pct / 100.0 + 0.001, 0, 'f', 3));
+      }
+
+      grid->addWidget(name_lbl, row, 0);
+
+      auto *detail_lbl = new QLabel(
+          QStringLiteral("%1x, avg %2ms, total %3ms")
+              .arg(calls).arg(avg_ms).arg(total_ms), widget);
+      detail_lbl->setFont(small_font);
+      detail_lbl->setAlignment(Qt::AlignRight);
+      grid->addWidget(detail_lbl, row, 1);
+      ++row;
+    }
+  }
+
   return widget;
 }
 

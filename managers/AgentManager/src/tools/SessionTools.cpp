@@ -262,6 +262,26 @@ QJsonObject GetSessionCostTool::execute(const QJsonObject &) {
   }
   result[QStringLiteral("by_role")] = by_role;
 
+  // Tool statistics (latency details).
+  QVector<ConfigManager::ToolStatistics> tool_stats;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    tool_stats = m_ctx->config->LoadToolStatistics(session_id);
+  }, Qt::BlockingQueuedConnection);
+
+  QJsonArray stats_arr;
+  for (const auto &ts : tool_stats) {
+    QJsonObject obj;
+    obj[QStringLiteral("tool")] = ts.tool_name;
+    obj[QStringLiteral("calls")] = ts.call_count;
+    obj[QStringLiteral("total_ms")] = ts.total_duration_ms;
+    obj[QStringLiteral("min_ms")] = ts.min_duration_ms;
+    obj[QStringLiteral("max_ms")] = ts.max_duration_ms;
+    obj[QStringLiteral("avg_ms")] = ts.avg_duration_ms;
+    obj[QStringLiteral("cost_usd")] = ts.total_cost_usd;
+    stats_arr.append(obj);
+  }
+  result[QStringLiteral("tool_statistics")] = stats_arr;
+
   // Dependency edge summary.
   int causal_count = 0;
   int context_count = 0;

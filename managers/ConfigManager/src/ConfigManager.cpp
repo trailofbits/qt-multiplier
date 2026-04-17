@@ -1687,6 +1687,38 @@ ConfigManager::LoadToolCostBreakdown(int64_t session_id) const {
   return result;
 }
 
+QVector<ConfigManager::ToolStatistics>
+ConfigManager::LoadToolStatistics(int64_t session_id) const {
+  if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};
+  QSqlQuery q(d->project_db);
+  q.prepare(QStringLiteral(
+      "SELECT tool_name, COUNT(*) as calls, "
+      "COALESCE(SUM(duration_ms), 0), "
+      "COALESCE(MIN(duration_ms), 0), "
+      "COALESCE(MAX(duration_ms), 0), "
+      "COALESCE(AVG(duration_ms), 0), "
+      "COALESCE(SUM(cost_usd), 0) "
+      "FROM gui_cost_nodes "
+      "WHERE session_id = ? AND node_type = 'tool_call' "
+      "AND tool_name IS NOT NULL "
+      "GROUP BY tool_name ORDER BY calls DESC"));
+  q.addBindValue(static_cast<qlonglong>(session_id));
+  q.exec();
+  QVector<ToolStatistics> result;
+  while (q.next()) {
+    ToolStatistics info;
+    info.tool_name = q.value(0).toString();
+    info.call_count = q.value(1).toInt();
+    info.total_duration_ms = q.value(2).toInt();
+    info.min_duration_ms = q.value(3).toInt();
+    info.max_duration_ms = q.value(4).toInt();
+    info.avg_duration_ms = q.value(5).toInt();
+    info.total_cost_usd = q.value(6).toDouble();
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
 QVector<ConfigManager::RoleCostBreakdown>
 ConfigManager::LoadRoleCostBreakdown(int64_t session_id) const {
   if (!d->project_db.isValid() || !d->project_db.isOpen()) return {};

@@ -9,6 +9,13 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+#include <multiplier/AST/CXXMethodDecl.h>
+#include <multiplier/AST/CXXRecordDecl.h>
+#include <multiplier/AST/FieldDecl.h>
+#include <multiplier/AST/FunctionDecl.h>
+#include <multiplier/AST/ParmVarDecl.h>
+#include <multiplier/AST/RecordDecl.h>
+#include <multiplier/AST/VarDecl.h>
 #include <multiplier/Frontend/File.h>
 #include <multiplier/Frontend/Query.h>
 #include <multiplier/Index.h>
@@ -1001,6 +1008,193 @@ QJsonObject SearchCodeTool::execute(const QJsonObject &args) {
 }
 
 // ===========================================================================
+// SummarizeEntityTool
+// ===========================================================================
+
+QString SummarizeEntityTool::name(void) const {
+  return QStringLiteral("summarize_entity");
+}
+
+QString SummarizeEntityTool::description(void) const {
+  return QStringLiteral(
+      "Get a structural summary of an entity: its signature, parameters, "
+      "return type, callers count, callees count, file location, and size "
+      "in tokens.");
+}
+
+QJsonObject SummarizeEntityTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("entity_id")] = string_prop(
+      QStringLiteral("Entity ID as a string (from search_entities)"));
+  return make_schema(props, {QStringLiteral("entity_id")});
+}
+
+namespace {
+
+static QString type_to_string(const mx::Type &type) {
+  std::string text;
+  for (mx::Token tok : type.tokens()) {
+    text += tok.data();
+  }
+  return QString::fromStdString(text);
+}
+
+}  // namespace
+
+QJsonObject SummarizeEntityTool::execute(const QJsonObject &args) {
+  auto id_val = args[QStringLiteral("entity_id")];
+  mx::RawEntityId raw_id;
+  if (id_val.isString()) {
+    raw_id = id_val.toString().toULongLong();
+  } else {
+    raw_id = static_cast<mx::RawEntityId>(id_val.toDouble(0));
+  }
+  if (raw_id == 0) {
+    return error_result(QStringLiteral("entity_id is required"));
+  }
+
+  const auto &index = m_ctx->config->Index();
+  mx::VariantEntity vent = index.entity(mx::EntityId(raw_id));
+
+  if (std::holds_alternative<mx::NotAnEntity>(vent)) {
+    return error_result(QStringLiteral("entity not found"));
+  }
+
+  // Resolve to a Decl if possible.
+  if (!std::holds_alternative<mx::Decl>(vent)) {
+    vent = NamedEntityContaining(vent);
+  }
+  if (!std::holds_alternative<mx::Decl>(vent)) {
+    return error_result(QStringLiteral("entity is not a declaration"));
+  }
+
+  const mx::Decl &decl = std::get<mx::Decl>(vent);
+  QJsonObject result;
+  result[QStringLiteral("entity_id")] =
+      QString::number(static_cast<quint64>(raw_id));
+  result[QStringLiteral("kind")] = decl_kind_string(decl);
+
+  // Common: file path, line, token count.
+  auto add_location = [&](const mx::Decl &d) {
+    mx::Token tok = d.token();
+    auto ft = tok.nearest_file_token();
+    if (auto maybe_file = mx::File::containing(ft)) {
+      result[QStringLiteral("file")] = first_file_path(*maybe_file);
+    }
+    auto loc = ft.nearest_location(m_ctx->config->FileLocationCache());
+    if (loc) {
+      result[QStringLiteral("line")] = static_cast<int>(loc->first);
+    }
+    int token_count = 0;
+    for ([[maybe_unused]] mx::Token t : d.tokens()) {
+      ++token_count;
+    }
+    result[QStringLiteral("token_count")] = token_count;
+  };
+
+  // Try FunctionDecl.
+  if (auto func = mx::FunctionDecl::from(decl)) {
+    std::optional<mx::FunctionDecl> def = func->definition();
+    const mx::FunctionDecl &target = def ? *def : *func;
+
+    result[QStringLiteral("name")] =
+        QString::fromStdString(std::string(func->name()));
+    result[QStringLiteral("return_type")] =
+        type_to_string(target.return_type());
+    result[QStringLiteral("is_definition")] =
+        target.is_this_declaration_a_definition();
+
+    QJsonArray params_arr;
+    for (mx::ParmVarDecl param : target.parameters()) {
+      QJsonObject pobj;
+      pobj[QStringLiteral("name")] =
+          QString::fromStdString(std::string(param.name()));
+      pobj[QStringLiteral("type")] = type_to_string(param.type());
+      params_arr.append(pobj);
+    }
+    result[QStringLiteral("parameters")] = params_arr;
+    result[QStringLiteral("parameter_count")] =
+        static_cast<int>(target.num_parameters());
+
+    // Count callers (references TO this entity with CALLS kind).
+    int callers_count = 0;
+    mx::Decl canonical = func->canonical_declaration();
+    for (mx::Reference ref : mx::Reference::to(canonical)) {
+      auto brk = ref.builtin_reference_kind();
+      if (brk && *brk == mx::BuiltinReferenceKind::CALLS) {
+        ++callers_count;
+      }
+    }
+    result[QStringLiteral("callers_count")] = callers_count;
+
+    // Count callees (references FROM this entity with CALLS kind).
+    int callees_count = 0;
+    const mx::Decl &source = def ? static_cast<const mx::Decl &>(*def)
+                                 : static_cast<const mx::Decl &>(*func);
+    for (mx::Reference ref : mx::Reference::from(source)) {
+      auto brk = ref.builtin_reference_kind();
+      if (brk && *brk == mx::BuiltinReferenceKind::CALLS) {
+        ++callees_count;
+      }
+    }
+    result[QStringLiteral("callees_count")] = callees_count;
+
+    add_location(target);
+    return result;
+  }
+
+  // Try RecordDecl (struct/class/union).
+  if (auto record = mx::RecordDecl::from(decl)) {
+    std::optional<mx::RecordDecl> def = record->definition();
+    const mx::RecordDecl &target = def ? *def : *record;
+
+    result[QStringLiteral("name")] =
+        QString::fromStdString(std::string(record->name()));
+
+    QJsonArray fields_arr;
+    for (mx::FieldDecl field : target.fields()) {
+      QJsonObject fobj;
+      fobj[QStringLiteral("name")] =
+          QString::fromStdString(std::string(field.name()));
+      fobj[QStringLiteral("type")] = type_to_string(field.type());
+      fields_arr.append(fobj);
+    }
+    result[QStringLiteral("fields")] = fields_arr;
+    result[QStringLiteral("field_count")] =
+        static_cast<int>(target.num_fields());
+
+    // Count methods if it's a CXXRecordDecl.
+    int method_count = 0;
+    if (auto cxx_record = mx::CXXRecordDecl::from(
+            static_cast<const mx::Decl &>(target))) {
+      for ([[maybe_unused]] mx::CXXMethodDecl m : cxx_record->methods()) {
+        ++method_count;
+      }
+    }
+    result[QStringLiteral("method_count")] = method_count;
+
+    add_location(target);
+    return result;
+  }
+
+  // Try VarDecl.
+  if (auto var = mx::VarDecl::from(decl)) {
+    result[QStringLiteral("name")] =
+        QString::fromStdString(std::string(var->name()));
+    result[QStringLiteral("type")] = type_to_string(var->type());
+    add_location(*var);
+    return result;
+  }
+
+  // Generic fallback for other declaration types.
+  if (auto name_str = NameOfEntityAsString(vent)) {
+    result[QStringLiteral("name")] = *name_str;
+  }
+  add_location(decl);
+  return result;
+}
+
+// ===========================================================================
 // Registration
 // ===========================================================================
 
@@ -1014,6 +1208,7 @@ void registerNavigationTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<ListFilesTool>(ctx));
   registry.registerTool(std::make_unique<GetDatabasePathTool>(ctx));
   registry.registerTool(std::make_unique<SearchCodeTool>(ctx));
+  registry.registerTool(std::make_unique<SummarizeEntityTool>(ctx));
 }
 
 }  // namespace mx::gui
