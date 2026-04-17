@@ -493,6 +493,30 @@ void ConfigManager::SetWorkspacePath(const QString &path) {
   SetSetting(d->global_db, QStringLiteral("workspace_path"), path);
 }
 
+QString ConfigManager::CCompilerPath(void) const {
+  return GetSetting(d->global_db, QStringLiteral("c_compiler_path"));
+}
+
+void ConfigManager::SetCCompilerPath(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("c_compiler_path"), path);
+}
+
+QString ConfigManager::CXXCompilerPath(void) const {
+  return GetSetting(d->global_db, QStringLiteral("cxx_compiler_path"));
+}
+
+void ConfigManager::SetCXXCompilerPath(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("cxx_compiler_path"), path);
+}
+
+QString ConfigManager::SDKRoot(void) const {
+  return GetSetting(d->global_db, QStringLiteral("sdk_root"));
+}
+
+void ConfigManager::SetSDKRoot(const QString &path) {
+  SetSetting(d->global_db, QStringLiteral("sdk_root"), path);
+}
+
 // --- Global settings ---
 
 void ConfigManager::SaveSettings(void) const {

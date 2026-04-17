@@ -83,6 +83,12 @@ struct AgentConfigPanel::PrivateData {
   QLineEdit *python_path_edit{nullptr};
   QPushButton *python_browse_btn{nullptr};
   QLabel *python_status_label{nullptr};
+  QLineEdit *cc_path_edit{nullptr};
+  QPushButton *cc_browse_btn{nullptr};
+  QLineEdit *cxx_path_edit{nullptr};
+  QPushButton *cxx_browse_btn{nullptr};
+  QLineEdit *sdk_root_edit{nullptr};
+  QPushButton *sdk_browse_btn{nullptr};
   QLabel *save_indicator{nullptr};
   QProcess *python_verify_proc{nullptr};
   int prompt_doc_id{-1};
@@ -355,6 +361,62 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
       tr("Path to a Python interpreter with multiplier bindings. "
          "Verified automatically."), content));
 
+  // Separator.
+  auto *sep5 = new QFrame(content);
+  sep5->setFrameShape(QFrame::HLine);
+  sep5->setFrameShadow(QFrame::Sunken);
+  form->addRow(sep5);
+
+  // ---- C/C++ Compilers ----
+  auto *cc_row = new QWidget(content);
+  auto *cc_layout = new QHBoxLayout(cc_row);
+  cc_layout->setContentsMargins(0, 0, 0, 0);
+  cc_layout->setSpacing(4);
+
+  d->cc_path_edit = new QLineEdit(cc_row);
+  d->cc_path_edit->setPlaceholderText(tr("/usr/bin/cc"));
+  d->cc_path_edit->setText(d->config_manager.CCompilerPath());
+  cc_layout->addWidget(d->cc_path_edit, 1);
+
+  d->cc_browse_btn = new QPushButton(tr("Browse..."), cc_row);
+  cc_layout->addWidget(d->cc_browse_btn);
+
+  form->addRow(tr("C Compiler:"), cc_row);
+
+  auto *cxx_row = new QWidget(content);
+  auto *cxx_layout = new QHBoxLayout(cxx_row);
+  cxx_layout->setContentsMargins(0, 0, 0, 0);
+  cxx_layout->setSpacing(4);
+
+  d->cxx_path_edit = new QLineEdit(cxx_row);
+  d->cxx_path_edit->setPlaceholderText(tr("/usr/bin/c++"));
+  d->cxx_path_edit->setText(d->config_manager.CXXCompilerPath());
+  cxx_layout->addWidget(d->cxx_path_edit, 1);
+
+  d->cxx_browse_btn = new QPushButton(tr("Browse..."), cxx_row);
+  cxx_layout->addWidget(d->cxx_browse_btn);
+
+  form->addRow(tr("C++ Compiler:"), cxx_row);
+
+  auto *sdk_row = new QWidget(content);
+  auto *sdk_layout = new QHBoxLayout(sdk_row);
+  sdk_layout->setContentsMargins(0, 0, 0, 0);
+  sdk_layout->setSpacing(4);
+
+  d->sdk_root_edit = new QLineEdit(sdk_row);
+  d->sdk_root_edit->setPlaceholderText(tr("(auto-detect)"));
+  d->sdk_root_edit->setText(d->config_manager.SDKRoot());
+  sdk_layout->addWidget(d->sdk_root_edit, 1);
+
+  d->sdk_browse_btn = new QPushButton(tr("Browse..."), sdk_row);
+  sdk_layout->addWidget(d->sdk_browse_btn);
+
+  form->addRow(tr("SDK Root:"), sdk_row);
+
+  form->addRow(makeHint(
+      tr("Used when compiling fuzzer harnesses and test programs."),
+      content));
+
   // ---- Save indicator ----
   d->save_indicator = new QLabel(content);
   d->save_indicator->setAlignment(Qt::AlignCenter);
@@ -430,6 +492,61 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
     d->config_manager.SetPythonInterpreterPath(d->python_path_edit->text());
     showSaved();
     maybeVerifyPython();
+  });
+
+  // Compiler connections.
+  connect(d->cc_browse_btn, &QPushButton::clicked, this, [this] {
+    QFileDialog dialog(this, tr("Select C Compiler"), QStringLiteral("/usr"));
+    dialog.setNameFilter(tr("All files (*)"));
+    dialog.setFileMode(QFileDialog::ExistingFile);
+    dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog.setWindowModality(Qt::ApplicationModal);
+    if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+      auto path = dialog.selectedFiles().first();
+      d->cc_path_edit->setText(path);
+      d->config_manager.SetCCompilerPath(path);
+      showSaved();
+    }
+  });
+  connect(d->cc_path_edit, &QLineEdit::editingFinished, this, [this] {
+    d->config_manager.SetCCompilerPath(d->cc_path_edit->text());
+    showSaved();
+  });
+
+  connect(d->cxx_browse_btn, &QPushButton::clicked, this, [this] {
+    QFileDialog dialog(this, tr("Select C++ Compiler"), QStringLiteral("/usr"));
+    dialog.setNameFilter(tr("All files (*)"));
+    dialog.setFileMode(QFileDialog::ExistingFile);
+    dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog.setWindowModality(Qt::ApplicationModal);
+    if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+      auto path = dialog.selectedFiles().first();
+      d->cxx_path_edit->setText(path);
+      d->config_manager.SetCXXCompilerPath(path);
+      showSaved();
+    }
+  });
+  connect(d->cxx_path_edit, &QLineEdit::editingFinished, this, [this] {
+    d->config_manager.SetCXXCompilerPath(d->cxx_path_edit->text());
+    showSaved();
+  });
+
+  connect(d->sdk_browse_btn, &QPushButton::clicked, this, [this] {
+    QFileDialog dialog(this, tr("Select SDK Root"), QDir::homePath());
+    dialog.setFileMode(QFileDialog::Directory);
+    dialog.setOption(QFileDialog::ShowDirsOnly, true);
+    dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog.setWindowModality(Qt::ApplicationModal);
+    if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+      auto path = dialog.selectedFiles().first();
+      d->sdk_root_edit->setText(path);
+      d->config_manager.SetSDKRoot(path);
+      showSaved();
+    }
+  });
+  connect(d->sdk_root_edit, &QLineEdit::editingFinished, this, [this] {
+    d->config_manager.SetSDKRoot(d->sdk_root_edit->text());
+    showSaved();
   });
 
   connect(d->system_prompt_edit, &QPlainTextEdit::textChanged, this, [this] {

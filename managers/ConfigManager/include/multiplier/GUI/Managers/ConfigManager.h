@@ -118,6 +118,14 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   QString WorkspacePath(void) const;
   void SetWorkspacePath(const QString &path);
 
+  //! C/C++ compiler paths for building fuzzer harnesses and test programs.
+  QString CCompilerPath(void) const;
+  void SetCCompilerPath(const QString &path);
+  QString CXXCompilerPath(void) const;
+  void SetCXXCompilerPath(const QString &path);
+  QString SDKRoot(void) const;
+  void SetSDKRoot(const QString &path);
+
   //! Save all persistent settings to disk.
   void SaveSettings(void) const;
 

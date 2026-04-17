@@ -13,6 +13,8 @@
 #include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QFile>
+#include <QFileDialog>
 #include <QLabel>
 #include <QListView>
 #include <QPlainTextEdit>
@@ -232,6 +234,36 @@ void DocumentExplorer::CreateDockWidget(IWindowManager *manager) {
         mime->setData(kDocMimeType, data);
         mime->setText(QStringLiteral("[doc:%1]").arg(doc_id));
         QApplication::clipboard()->setMimeData(mime);
+      });
+
+      menu.addAction(tr("Save as..."), this,
+                     [this, doc_id] () {
+        auto title = d->config_manager.LoadDocumentTitle(doc_id);
+        auto format = d->config_manager.LoadDocumentFormat(doc_id);
+
+        // Choose a default extension based on the document format.
+        QString extension;
+        if (format == QStringLiteral("markdown") ||
+            format == QStringLiteral("md")) {
+          extension = QStringLiteral(".md");
+        } else if (format == QStringLiteral("html")) {
+          extension = QStringLiteral(".html");
+        } else {
+          extension = QStringLiteral(".txt");
+        }
+
+        QString suggested = title.isEmpty()
+            ? QStringLiteral("document_%1").arg(doc_id) + extension
+            : title + extension;
+
+        auto path = QFileDialog::getSaveFileName(
+            d->list, tr("Save Document"), suggested);
+        if (path.isEmpty()) return;
+
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return;
+        auto content = d->config_manager.LoadDocumentContent(doc_id);
+        file.write(content.toUtf8());
       });
 
       menu.addSeparator();

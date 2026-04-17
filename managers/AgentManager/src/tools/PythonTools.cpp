@@ -155,6 +155,20 @@ QJsonObject RunPythonTool::execute(const QJsonObject &args) {
     }
     env.insert(QStringLiteral("MULTIPLIER_WORKSPACE"),
                workspace_base(m_ctx->config));
+
+    auto cc = m_ctx->config->CCompilerPath();
+    if (!cc.isEmpty()) {
+      env.insert(QStringLiteral("CC"), cc);
+    }
+    auto cxx = m_ctx->config->CXXCompilerPath();
+    if (!cxx.isEmpty()) {
+      env.insert(QStringLiteral("CXX"), cxx);
+    }
+    auto sdk_root = m_ctx->config->SDKRoot();
+    if (!sdk_root.isEmpty()) {
+      env.insert(QStringLiteral("SDKROOT"), sdk_root);
+    }
+
     proc.setProcessEnvironment(env);
   }
 

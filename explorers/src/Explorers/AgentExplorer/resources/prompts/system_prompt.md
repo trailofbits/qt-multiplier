@@ -73,6 +73,7 @@ A workspace directory stores scripts, reports, fuzzer harnesses, and other artif
 Environment variables available in Python scripts:
 - MULTIPLIER_DATABASE: path to the current database
 - MULTIPLIER_WORKSPACE: path to the workspace directory for saving artifacts
+- CC, CXX, SDKROOT: set from the agent configuration when compiling fuzzer harnesses and test programs
 
 Use them in scripts:
 
