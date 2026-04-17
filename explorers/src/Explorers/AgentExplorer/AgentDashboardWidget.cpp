@@ -295,7 +295,7 @@ void AgentDashboardWidget::refresh(int64_t session_id,
       if (!dt.isValid()) {
         continue;
       }
-      double sec = session_start.msecsTo(dt) / 1000.0;
+      double sec = static_cast<double>(session_start.msecsTo(dt)) / 1000.0;
       entries.push_back({sec, node.cost_usd});
     }
 
@@ -346,7 +346,7 @@ void AgentDashboardWidget::refresh(int64_t session_id,
       if (!node.completed_at.isEmpty()) {
         auto dt = QDateTime::fromString(node.completed_at, Qt::ISODate);
         if (dt.isValid()) {
-          double sec = session_start.msecsTo(dt) / 1000.0;
+          double sec = static_cast<double>(session_start.msecsTo(dt)) / 1000.0;
           if (sec > max_seconds) {
             max_seconds = sec;
           }
@@ -384,7 +384,7 @@ void AgentDashboardWidget::refresh(int64_t session_id,
       if (!dt.isValid()) {
         continue;
       }
-      double sec = session_start.msecsTo(dt) / 1000.0;
+      double sec = static_cast<double>(session_start.msecsTo(dt)) / 1000.0;
       int bucket = static_cast<int>(sec / bucket_width);
       if (bucket >= kSparkBuckets) {
         bucket = kSparkBuckets - 1;
