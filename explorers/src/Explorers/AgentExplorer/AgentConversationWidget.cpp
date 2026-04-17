@@ -2455,6 +2455,7 @@ void AgentConversationWidget::showObserverRecommendation(
               [this, prompt] {
         d->input_edit->setPlainText(prompt);
         onSendClicked();
+        emit observerRecommendationFollowed(prompt);
       });
       row->addWidget(exec_btn);
 

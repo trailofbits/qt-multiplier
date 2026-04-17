@@ -92,6 +92,15 @@ Always wrap Index.from_database() with Index.in_memory_cache() for better perfor
 
 For the full API reference, call get_python_api_reference.
 
+### Script Output Format
+
+When writing Python scripts, format output for LLM consumption:
+- Use structured JSON when returning multiple results: `json.dumps(results, indent=2)`
+- One result per line for simple lists
+- Include entity IDs in output so they can be referenced in subsequent tool calls
+- Prefix errors with "ERROR:" so they're easily distinguishable
+- Keep output concise — the full output goes back into the LLM context window
+
 ## Tools Available
 
 - **Task management**: create_task, update_task, complete_task, list_tasks, get_task_board_summary

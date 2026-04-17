@@ -248,6 +248,7 @@ void DocumentExplorer::CreateDockWidget(IWindowManager *manager) {
   d->tree->setSelectionMode(QAbstractItemView::SingleSelection);
   d->tree->setAlternatingRowColors(true);
   d->tree->setWordWrap(true);
+  d->tree->setUniformRowHeights(false);
   d->tree->setHeaderHidden(true);
   d->tree->setRootIsDecorated(true);
   d->tree->setItemDelegate(new HtmlDelegate(d->tree));
@@ -552,6 +553,7 @@ void DocumentExplorer::Refresh(void) {
   d->filter_proxy->setFilterRole(kFilterRole);
 
   d->tree->expandAll();
+  d->tree->doItemsLayout();
 }
 
 void DocumentExplorer::OnIndexChanged(const ConfigManager &) {

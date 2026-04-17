@@ -40,6 +40,7 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   void openDocument(int doc_id);
   void promptBenched(const QString &prompt);
   void scheduleTaskRequested(const QString &description);
+  void observerRecommendationFollowed(const QString &recommendation);
 
  public slots:
   void addMessage(const AgentMessage &msg);

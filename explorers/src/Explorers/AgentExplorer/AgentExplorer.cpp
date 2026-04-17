@@ -486,6 +486,23 @@ void AgentExplorer::ConnectSignals(void) {
     config.NotifyExternalSheetsChanged();
   });
 
+  // Meta-observation: when the user follows an observer recommendation,
+  // trigger the observer to evaluate the result.
+  connect(d->conversation, &AgentConversationWidget::observerRecommendationFollowed,
+          this, [this](const QString &rec) {
+    if (d->observer_session_id < 0) return;
+
+    auto meta_prompt = QStringLiteral(
+        "The user just followed your recommendation: \"%1\"\n\n"
+        "Review the primary agent's response and reflect:\n"
+        "1. Did the agent address the recommendation effectively?\n"
+        "2. Should any system prompts or analysis approaches be adjusted?\n"
+        "3. What should the next step be?")
+        .arg(rec);
+
+    d->agent_manager->sendMessage(d->observer_session_id, meta_prompt);
+  });
+
   // Navigate to entities when user double-clicks in tool result views.
   // Use the implicit preview action to open in the code preview widget.
   auto navigate_trigger = d->config_manager.ActionManager().Find(
