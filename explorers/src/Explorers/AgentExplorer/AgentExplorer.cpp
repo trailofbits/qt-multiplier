@@ -80,6 +80,7 @@ struct AgentExplorer::PrivateData {
   struct RecommenderState {
     QString context_summary;
     QStringList open_questions;
+    QStringList benched_prompts;
     QString current_suggestion;
     QStringList alternatives;
     int suggestion_tokens{0};
@@ -387,6 +388,14 @@ void AgentExplorer::ConnectSignals(void) {
   // Conversation send.
   connect(d->conversation, &AgentConversationWidget::sendMessageRequested,
           this, &AgentExplorer::OnSendMessage);
+
+  // Store benched prompts from observer recommendations.
+  connect(d->conversation, &AgentConversationWidget::promptBenched,
+          this, [this](const QString &prompt) {
+    if (!d->recommender.benched_prompts.contains(prompt)) {
+      d->recommender.benched_prompts.append(prompt);
+    }
+  });
 
   // Navigate to entities when user double-clicks in tool result views.
   // Use the implicit preview action to open in the code preview widget.
@@ -1105,11 +1114,21 @@ void AgentExplorer::requestRecommendation(void) {
     }
   }
 
+  // Append benched prompts if any.
+  QString benched_str;
+  if (!d->recommender.benched_prompts.isEmpty()) {
+    benched_str = QStringLiteral(
+        "\nBenched prompts (from observer, not yet executed):\n");
+    for (const auto &bp : d->recommender.benched_prompts) {
+      benched_str += QStringLiteral("- %1\n").arg(bp);
+    }
+  }
+
   auto prompt_text = d->recommender_prompt
       .arg(recent_lines.join(QStringLiteral("\n")))
       .arg(context_summary)
       .arg(open_questions_str)
-      .arg(code_context_str);
+      .arg(code_context_str + benched_str);
 
   QVector<LLMMessage> messages;
   LLMMessage user_msg;

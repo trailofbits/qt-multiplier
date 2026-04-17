@@ -38,6 +38,7 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   void suggestionAccepted(const QString &text);
   void navigateToEntity(uint64_t entity_id);
   void openDocument(int doc_id);
+  void promptBenched(const QString &prompt);
 
  public slots:
   void addMessage(const AgentMessage &msg);

@@ -1033,6 +1033,74 @@ static QWidget *createSheetLabel(const QJsonObject &result,
   return label;
 }
 
+// Replace file:line patterns (e.g. parser.c:42) with markdown entity links.
+static QString linkifyFileLinePatterns(const QString &text,
+                                       const mx::gui::ConfigManager &config) {
+  static const QRegularExpression fileline_re(
+      QStringLiteral("(?<![\\w/])([a-zA-Z_][a-zA-Z0-9_]*\\.(?:c|h|cpp|hpp|cc|hh|cxx|hxx|C|H)):([0-9]+)(?::([0-9]+))?"));
+
+  auto it = fileline_re.globalMatch(text);
+  if (!it.hasNext()) {
+    return text;
+  }
+
+  // Build a filename-to-entity-ID cache from the index.
+  const auto &index = config.Index();
+  QHash<QString, uint64_t> file_cache;
+  bool cache_built = false;
+
+  struct FileLineMatch {
+    int start;
+    int length;
+    QString display;
+    uint64_t entity_id;
+  };
+  QVector<FileLineMatch> matches;
+
+  while (it.hasNext()) {
+    auto m = it.next();
+    auto filename = m.captured(1);
+
+    if (!cache_built) {
+      auto file_map = index.file_paths();
+      for (const auto &[path, file_id] : file_map) {
+        auto fname = QString::fromStdString(path.filename().string());
+        if (!fname.isEmpty()) {
+          file_cache.insert(fname, static_cast<uint64_t>(file_id.Pack()));
+        }
+      }
+      cache_built = true;
+    }
+
+    auto fit = file_cache.find(filename);
+    if (fit == file_cache.end()) {
+      continue;
+    }
+
+    matches.append({static_cast<int>(m.capturedStart(0)),
+                    static_cast<int>(m.capturedLength(0)),
+                    m.captured(0),
+                    fit.value()});
+  }
+
+  if (matches.isEmpty()) {
+    return text;
+  }
+
+  // Replace from end to start so positions remain valid.
+  std::sort(matches.begin(), matches.end(),
+            [](const FileLineMatch &a, const FileLineMatch &b) {
+    return a.start > b.start;
+  });
+
+  QString result = text;
+  for (const auto &m : matches) {
+    auto link = QStringLiteral("[%1](entity:%2)").arg(m.display).arg(m.entity_id);
+    result.replace(m.start, m.length, link);
+  }
+  return result;
+}
+
 // Scan text for C/C++ identifiers, resolve against the Index, and return
 // text with markdown links for recognized entities.
 static QString symbolizeIdentifiers(const QString &text,
@@ -1040,6 +1108,9 @@ static QString symbolizeIdentifiers(const QString &text,
   if (text.isEmpty()) {
     return text;
   }
+
+  // First pass: replace file:line patterns (more specific, takes priority).
+  auto processed = linkifyFileLinePatterns(text, config);
 
   // Match function-call-like identifiers: word(
   static const QRegularExpression func_re(
@@ -1105,7 +1176,7 @@ static QString symbolizeIdentifiers(const QString &text,
 
   // Gather candidates from both regexes.
   auto gather = [&](const QRegularExpression &re) {
-    auto it = re.globalMatch(text);
+    auto it = re.globalMatch(processed);
     while (it.hasNext()) {
       auto match = it.next();
       auto name = match.captured(1);
@@ -1120,7 +1191,7 @@ static QString symbolizeIdentifiers(const QString &text,
   gather(backtick_re);
 
   if (candidates.isEmpty()) {
-    return text;
+    return processed;
   }
 
   // Sort by position descending so we can replace from end to start.
@@ -1131,7 +1202,7 @@ static QString symbolizeIdentifiers(const QString &text,
 
   // Deduplicate overlapping ranges (keep the first occurrence at each pos).
   QSet<int> seen_positions;
-  QString result = text;
+  QString result = processed;
   for (const auto &c : candidates) {
     if (seen_positions.contains(c.start)) {
       continue;
@@ -2130,38 +2201,68 @@ void AgentConversationWidget::showObserverRecommendation(
   });
   layout->addWidget(body);
 
-  // Suggested prompt buttons (stacked vertically for readability).
+  // Suggested prompts with Execute and Bench actions.
   if (!suggested_prompts.isEmpty()) {
-    auto *btn_layout = new QVBoxLayout;
-    btn_layout->setSpacing(4);
-    btn_layout->setContentsMargins(0, 4, 0, 0);
+    auto *prompts_layout = new QVBoxLayout;
+    prompts_layout->setSpacing(4);
+    prompts_layout->setContentsMargins(0, 4, 0, 0);
 
     for (const auto &prompt : suggested_prompts) {
+      auto *row = new QHBoxLayout;
+      row->setSpacing(4);
+
       auto display = prompt.length() > 140
                          ? prompt.left(137) + QStringLiteral("...")
                          : prompt;
-      auto *btn = new QPushButton(display, frame);
-      btn->setStyleSheet(
-          QStringLiteral("QPushButton { background-color: rgba(139, 92, 246, 50); "
+      auto *prompt_label = new QLabel(display, frame);
+      prompt_label->setWordWrap(true);
+      prompt_label->setToolTip(prompt);
+      prompt_label->setStyleSheet(
+          QStringLiteral("background-color: rgba(139, 92, 246, 50); "
                          "border: 1px solid rgba(139, 92, 246, 80); "
                          "border-radius: 4px; padding: 6px 10px; "
-                         "text-align: left; } "
-                         "QPushButton:hover { background-color: rgba(139, 92, 246, 80); }"));
-      btn->setCursor(Qt::PointingHandCursor);
-      btn->setToolTip(prompt);
-      btn->setMinimumHeight(32);
-      btn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
-      connect(btn, &QPushButton::clicked, this,
+                         "border: none;"));
+      prompt_label->setMinimumHeight(32);
+      prompt_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+      row->addWidget(prompt_label, 1);
+
+      auto *exec_btn = new QPushButton(tr("Execute"), frame);
+      exec_btn->setToolTip(tr("Send this to the agent now"));
+      exec_btn->setFixedWidth(60);
+      exec_btn->setCursor(Qt::PointingHandCursor);
+      exec_btn->setStyleSheet(
+          QStringLiteral("QPushButton { background-color: rgba(34, 197, 94, 60); "
+                         "border: 1px solid rgba(34, 197, 94, 100); "
+                         "border-radius: 4px; padding: 4px; } "
+                         "QPushButton:hover { background-color: rgba(34, 197, 94, 100); }"));
+      connect(exec_btn, &QPushButton::clicked, this,
               [this, prompt] {
         d->input_edit->setPlainText(prompt);
-        auto cursor = d->input_edit->textCursor();
-        cursor.movePosition(QTextCursor::End);
-        d->input_edit->setTextCursor(cursor);
-        d->input_edit->setFocus();
+        onSendClicked();
       });
-      btn_layout->addWidget(btn);
+      row->addWidget(exec_btn);
+
+      auto *bench_btn = new QPushButton(tr("Bench"), frame);
+      bench_btn->setToolTip(
+          tr("Save for later \xe2\x80\x94 will be suggested by the recommender"));
+      bench_btn->setFixedWidth(50);
+      bench_btn->setCursor(Qt::PointingHandCursor);
+      bench_btn->setStyleSheet(
+          QStringLiteral("QPushButton { background-color: rgba(139, 92, 246, 50); "
+                         "border: 1px solid rgba(139, 92, 246, 80); "
+                         "border-radius: 4px; padding: 4px; } "
+                         "QPushButton:hover { background-color: rgba(139, 92, 246, 80); }"));
+      connect(bench_btn, &QPushButton::clicked, this,
+              [this, prompt, bench_btn] {
+        emit promptBenched(prompt);
+        bench_btn->setEnabled(false);
+        bench_btn->setText(tr("Saved"));
+      });
+      row->addWidget(bench_btn);
+
+      prompts_layout->addLayout(row);
     }
-    layout->addLayout(btn_layout);
+    layout->addLayout(prompts_layout);
   }
 
   d->messages_layout->addWidget(frame);
