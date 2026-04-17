@@ -728,6 +728,18 @@ void AgentExplorer::OnToolCallCompleted(int64_t session_id,
       d->observer_label->setText(
           tr("Observer: %1 recommendations")
               .arg(d->observer_recommendation_count));
+
+      // Show the recommendation inline in the conversation.
+      auto rec_text = result[QStringLiteral("recommendation")].toString();
+      QStringList prompts;
+      auto prompts_arr =
+          result[QStringLiteral("suggested_prompts")].toArray();
+      for (const auto &v : prompts_arr) {
+        prompts.append(v.toString());
+      }
+      if (!rec_text.isEmpty()) {
+        d->conversation->showObserverRecommendation(rec_text, prompts);
+      }
     }
   }
 
@@ -791,15 +803,32 @@ void AgentExplorer::StartObserver(void) {
   }
 
   static const QString kObserverSystemPrompt = QStringLiteral(
-      "You are an observer agent reviewing another AI agent's work. "
-      "Your job is to:\n"
-      "1. Analyze the primary agent's approach and progress\n"
-      "2. Identify gaps, missed opportunities, or potential issues\n"
-      "3. Suggest improvements or alternative approaches\n"
-      "4. Track whether the primary agent is staying focused on its goals\n\n"
+      "You are a senior security researcher acting as an independent reviewer "
+      "of an AI agent's code analysis work. You are not a passive monitor — "
+      "you are an opinionated expert collaborator, like a seasoned auditor "
+      "from Trail of Bits or Project Zero looking over a junior analyst's "
+      "shoulder.\n\n"
+      "The analyst and their AI agent are examining a C/C++ codebase for "
+      "security-relevant patterns: attack surface, data flow from untrusted "
+      "inputs, memory safety, type confusion, missing validation, and "
+      "exploitable logic.\n\n"
+      "Your role:\n"
+      "- Make critical, high-leverage observations the primary agent missed\n"
+      "- Challenge assumptions: is the agent looking at the right code? Is it "
+      "following the most productive line of inquiry?\n"
+      "- Redirect if the agent is wasting time on low-value work\n"
+      "- Suggest specific, targeted investigations that a vulnerability "
+      "researcher like halvarflake, lcamtuf, or taviso would pursue\n"
+      "- Point out patterns: 'this looks like a classic TOCTOU', 'this "
+      "unchecked return is the same pattern as CVE-XXXX'\n"
+      "- Be direct and specific. Name functions, entity IDs, reference kinds.\n\n"
       "Use get_primary_session_context to see what the primary agent has done.\n"
       "Use observer_recommendation to record your findings.\n\n"
-      "Be concise and actionable. Focus on what matters most.");
+      "When you have specific next steps, include them in suggested_prompts "
+      "so the analyst can click a button to send them directly to the primary "
+      "agent. Each prompt should be a complete, actionable instruction.\n\n"
+      "Do not be polite. Do not hedge. Be the reviewer you'd want on your "
+      "own audit.");
 
   auto backend_name = d->llm_manager->activeBackendName();
   d->observer_session_id = d->agent_manager->createObserverSession(

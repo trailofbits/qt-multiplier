@@ -176,6 +176,16 @@ QJsonObject ObserverRecommendationTool::parametersSchema(void) const {
   priority_prop[QStringLiteral("enum")] = enum_vals;
   props[QStringLiteral("priority")] = priority_prop;
 
+  QJsonObject prompts_prop;
+  prompts_prop[QStringLiteral("type")] = QStringLiteral("array");
+  prompts_prop[QStringLiteral("description")] = QStringLiteral(
+      "Optional list of suggested prompts the user can click to send to the "
+      "primary agent. Keep each prompt concise and actionable.");
+  QJsonObject items;
+  items[QStringLiteral("type")] = QStringLiteral("string");
+  prompts_prop[QStringLiteral("items")] = items;
+  props[QStringLiteral("suggested_prompts")] = prompts_prop;
+
   return make_schema(props, {QStringLiteral("recommendation")});
 }
 
@@ -226,6 +236,13 @@ QJsonObject ObserverRecommendationTool::execute(const QJsonObject &args) {
     }, Qt::BlockingQueuedConnection);
   }
 
+  // Extract optional suggested prompts.
+  QJsonArray suggested_prompts;
+  auto prompts_val = args[QStringLiteral("suggested_prompts")];
+  if (prompts_val.isArray()) {
+    suggested_prompts = prompts_val.toArray();
+  }
+
   int recommendation_id = s_next_recommendation_id++;
 
   QJsonObject result;
@@ -233,6 +250,10 @@ QJsonObject ObserverRecommendationTool::execute(const QJsonObject &args) {
   result[QStringLiteral("recommendation_id")] = recommendation_id;
   result[QStringLiteral("timestamp")] = timestamp;
   result[QStringLiteral("priority")] = priority;
+  result[QStringLiteral("recommendation")] = recommendation;
+  if (!suggested_prompts.isEmpty()) {
+    result[QStringLiteral("suggested_prompts")] = suggested_prompts;
+  }
   return result;
 }
 

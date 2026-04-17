@@ -2028,6 +2028,84 @@ void AgentConversationWidget::clearSuggestion(void) {
   d->suggestion_frame->setVisible(false);
 }
 
+void AgentConversationWidget::showObserverRecommendation(
+    const QString &text, const QStringList &suggested_prompts) {
+
+  auto *frame = new QFrame(d->messages_container);
+  frame->setFrameShape(QFrame::StyledPanel);
+  frame->setFrameShadow(QFrame::Plain);
+  frame->setStyleSheet(
+      QStringLiteral("QFrame { background-color: rgba(139, 92, 246, 30); "
+                     "border-radius: 8px; "
+                     "border: 1px solid rgba(139, 92, 246, 60); }"));
+
+  auto *layout = new QVBoxLayout(frame);
+  layout->setContentsMargins(10, 8, 10, 8);
+  layout->setSpacing(6);
+
+  // "Observer" header label.
+  auto *header = new QLabel(tr("Observer"), frame);
+  auto hf = header->font();
+  hf.setBold(true);
+  header->setFont(hf);
+  header->setStyleSheet(
+      QStringLiteral("color: rgb(139, 92, 246); background: transparent; "
+                     "border: none;"));
+  layout->addWidget(header);
+
+  // Recommendation text with symbolized identifiers.
+  auto symbolized = symbolizeIdentifiers(text, d->config_manager);
+  auto *body = new QLabel(frame);
+  body->setTextFormat(Qt::MarkdownText);
+  body->setWordWrap(true);
+  body->setText(symbolized);
+  body->setTextInteractionFlags(Qt::TextBrowserInteraction);
+  body->setOpenExternalLinks(false);
+  body->setStyleSheet(
+      QStringLiteral("background: transparent; border: none;"));
+  connect(body, &QLabel::linkActivated, this, [this](const QString &link) {
+    if (link.startsWith(QStringLiteral("entity:"))) {
+      emit navigateToEntity(link.mid(7).toULongLong());
+    }
+  });
+  layout->addWidget(body);
+
+  // Suggested prompt buttons.
+  if (!suggested_prompts.isEmpty()) {
+    auto *btn_layout = new QHBoxLayout;
+    btn_layout->setSpacing(6);
+    btn_layout->setContentsMargins(0, 4, 0, 0);
+
+    for (const auto &prompt : suggested_prompts) {
+      auto display = prompt.length() > 80
+                         ? prompt.left(77) + QStringLiteral("...")
+                         : prompt;
+      auto *btn = new QPushButton(display, frame);
+      btn->setStyleSheet(
+          QStringLiteral("QPushButton { background-color: rgba(139, 92, 246, 50); "
+                         "border: 1px solid rgba(139, 92, 246, 80); "
+                         "border-radius: 4px; padding: 4px 8px; } "
+                         "QPushButton:hover { background-color: rgba(139, 92, 246, 80); }"));
+      btn->setCursor(Qt::PointingHandCursor);
+      btn->setToolTip(prompt);
+      connect(btn, &QPushButton::clicked, this,
+              [this, prompt] {
+        d->input_edit->setPlainText(prompt);
+        auto cursor = d->input_edit->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        d->input_edit->setTextCursor(cursor);
+        d->input_edit->setFocus();
+      });
+      btn_layout->addWidget(btn);
+    }
+    btn_layout->addStretch();
+    layout->addLayout(btn_layout);
+  }
+
+  d->messages_layout->addWidget(frame);
+  scrollToBottom();
+}
+
 bool AgentConversationWidget::eventFilter(QObject *obj, QEvent *event) {
   if (obj == d->scroll_area && event->type() == QEvent::Resize) {
     // Reposition floating tail button at bottom-right of scroll area.

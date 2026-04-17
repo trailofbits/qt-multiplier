@@ -47,6 +47,8 @@ class AgentConversationWidget Q_DECL_FINAL : public QWidget {
   void showSuggestion(const QString &suggestion,
                       const QStringList &alternatives = {});
   void clearSuggestion(void);
+  void showObserverRecommendation(const QString &text,
+                                  const QStringList &suggested_prompts);
   void setStatus(const QString &text);
   void clearStatus(void);
 
