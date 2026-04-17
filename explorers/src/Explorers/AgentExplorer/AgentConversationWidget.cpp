@@ -965,6 +965,9 @@ static QString symbolizeIdentifiers(const QString &text,
   // Match snake_case identifiers (likely code symbols).
   static const QRegularExpression snake_re(
       QStringLiteral("\\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\\b"));
+  // Match backtick-wrapped identifiers: `identifier`
+  static const QRegularExpression backtick_re(
+      QStringLiteral("`([a-zA-Z_][a-zA-Z0-9_]{1,})`"));
 
   // Collect candidate identifiers with their positions.
   struct Candidate {
@@ -1009,6 +1012,7 @@ static QString symbolizeIdentifiers(const QString &text,
 
   gather(func_re);
   gather(snake_re);
+  gather(backtick_re);
 
   if (candidates.isEmpty()) {
     return text;
@@ -1440,7 +1444,7 @@ AgentConversationWidget::AgentConversationWidget(ThemeManager &theme_manager,
 
   // Floating "new messages" button overlaid on scroll area.
   d->tail_btn = new QPushButton(
-      QStringLiteral("\xe2\x86\x93 New messages"), d->scroll_area);
+      tr("New messages below"), d->scroll_area);
   d->tail_btn->setStyleSheet(
       QStringLiteral("QPushButton { background: palette(highlight); "
                      "color: palette(highlighted-text); border-radius: 4px; "
@@ -1717,8 +1721,20 @@ void AgentConversationWidget::addMessageBubble(
                        "border-radius: 8px; }")
             .arg(d->user_bg.red()).arg(d->user_bg.green())
             .arg(d->user_bg.blue()).arg(d->user_bg.alpha()));
-    auto *label = make_label(content);
-    label->setAlignment(Qt::AlignRight);
+
+    auto symbolized = symbolizeIdentifiers(content, d->config_manager);
+    auto *label = new QLabel(frame);
+    label->setTextFormat(Qt::MarkdownText);
+    label->setWordWrap(true);
+    label->setAlignment(Qt::AlignRight | Qt::AlignTop);
+    label->setText(symbolized);
+    label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    label->setOpenExternalLinks(false);
+    connect(label, &QLabel::linkActivated, this, [this](const QString &link) {
+      if (link.startsWith(QStringLiteral("entity:"))) {
+        emit navigateToEntity(link.mid(7).toULongLong());
+      }
+    });
     frame_layout->addWidget(label);
 
     // Right-align user messages (slight indent from left).
@@ -1768,6 +1784,56 @@ void AgentConversationWidget::addMessageBubble(
                        "border-radius: 4px; border: 1px solid palette(mid); }")
             .arg(d->tool_bg.red()).arg(d->tool_bg.green())
             .arg(d->tool_bg.blue()).arg(d->tool_bg.alpha()));
+
+    // Simple creation results: show inline with clickable link, no collapsible.
+    bool is_doc_create = (tool_name == QStringLiteral("create_document"));
+    bool is_sheet_create = (tool_name == QStringLiteral("create_sheet") ||
+                            tool_name == QStringLiteral("create_findings_sheet") ||
+                            tool_name == QStringLiteral("create_attack_surface_sheet"));
+
+    if (is_doc_create && !tool_result.isEmpty()) {
+      auto title = tool_result.value(QStringLiteral("title")).toString();
+      auto doc_id = tool_result.value(QStringLiteral("doc_id")).toInt(-1);
+      if (title.isEmpty()) title = QStringLiteral("Untitled");
+
+      auto *label = new QLabel(frame);
+      label->setTextFormat(Qt::RichText);
+      label->setWordWrap(true);
+      label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+      label->setOpenExternalLinks(false);
+      if (doc_id >= 0) {
+        label->setText(QStringLiteral("Document <a href='doc:%1'>%2</a> created")
+                           .arg(doc_id).arg(title.toHtmlEscaped()));
+        connect(label, &QLabel::linkActivated, this, [this](const QString &link) {
+          if (link.startsWith(QStringLiteral("doc:"))) {
+            emit openDocument(link.mid(4).toInt());
+          }
+        });
+      } else {
+        label->setText(QStringLiteral("Document '%1' created").arg(title.toHtmlEscaped()));
+      }
+      frame_layout->addWidget(label);
+      d->messages_layout->addWidget(frame);
+      scrollToBottom();
+      return;
+    }
+
+    if (is_sheet_create && !tool_result.isEmpty()) {
+      auto name = tool_result.value(QStringLiteral("name")).toString();
+      if (name.isEmpty()) name = tool_result.value(QStringLiteral("sheet_name")).toString();
+      if (name.isEmpty()) name = QStringLiteral("Sheet");
+      auto *label = new QLabel(
+          QStringLiteral("Sheet '%1' created — visible in the Sheets panel")
+              .arg(name.toHtmlEscaped()),
+          frame);
+      auto lf = label->font();
+      lf.setItalic(true);
+      label->setFont(lf);
+      frame_layout->addWidget(label);
+      d->messages_layout->addWidget(frame);
+      scrollToBottom();
+      return;
+    }
 
     auto summary = toolResultSummary(tool_name, tool_result);
     auto *toggle_btn = new QPushButton(summary, frame);
@@ -1836,16 +1902,28 @@ void AgentConversationWidget::addMessageBubble(
     d->messages_layout->addWidget(frame);
 
   } else {
-    // System or unknown role -- centered, italic.
+    // System or unknown role -- left-aligned, italic, symbolized.
     frame->setStyleSheet(
         QStringLiteral("QFrame { border: none; }"));
-    auto *label = make_label(content);
-    label->setAlignment(Qt::AlignCenter);
+
+    auto symbolized = symbolizeIdentifiers(content, d->config_manager);
+    auto *label = new QLabel(frame);
+    label->setTextFormat(Qt::MarkdownText);
+    label->setWordWrap(true);
+    label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    label->setText(symbolized);
+    label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    label->setOpenExternalLinks(false);
     auto f = label->font();
     f.setItalic(true);
     label->setFont(f);
     label->setStyleSheet(
         QStringLiteral("color: %1;").arg(d->system_fg.name()));
+    connect(label, &QLabel::linkActivated, this, [this](const QString &link) {
+      if (link.startsWith(QStringLiteral("entity:"))) {
+        emit navigateToEntity(link.mid(7).toULongLong());
+      }
+    });
     frame_layout->addWidget(label);
     d->messages_layout->addWidget(frame);
   }
