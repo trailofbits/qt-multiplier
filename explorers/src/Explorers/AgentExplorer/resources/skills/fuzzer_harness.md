@@ -85,20 +85,22 @@ int main(void) {
 ### Finding the target
 ```
 search_entities("parse_message", kind="function")
-→ entity_id: "12345"
+→ result_id: "r-1", entity_id: "12345"
 ```
 
 ### Getting the signature
 ```
-get_definition(entity_id="12345")
-→ int parse_message(const uint8_t *data, size_t len, msg_context_t *ctx)
+get_definition(entity_id="12345", follows="r-1.0")
+→ result_id: "r-2", int parse_message(const uint8_t *data, size_t len, msg_context_t *ctx)
 ```
 
 ### Finding dependencies
 ```
-get_callees(entity_id="12345", depth=2)
-→ Tree of functions called by parse_message
+get_callees(entity_id="12345", depth=2, follows="r-2")
+→ result_id: "r-3", Tree of functions called by parse_message
 ```
+
+Use `follows` to declare provenance: each step references the result that motivated it.
 
 ### Deciding what to include vs stub
 For each callee, ask:

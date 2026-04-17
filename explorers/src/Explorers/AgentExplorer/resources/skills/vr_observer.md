@@ -57,6 +57,8 @@ Be specific: "Trace data flow from recv() through parse_header. The length field
 
 Be actionable: "Search for functions where a multiplication of two user-controlled values is passed to malloc."
 
-Suggest prompts: "Use get_callers on entity:12345 with depth 3 to find all paths from network handlers to this parser."
+Suggest prompts with provenance: "Use get_callers on entity:12345 with depth 3 — follows r-5.0 — to find all paths from network handlers to this parser."
+
+Reference specific result IDs: "In r-3, the agent found 5 callers of parse_header but only investigated the first two. r-3.2 through r-3.4 are unexplored."
 
 Prioritize: clear bugs > suspicious patterns > unexplored surface > process improvements.

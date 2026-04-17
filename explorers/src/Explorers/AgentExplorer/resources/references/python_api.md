@@ -1,6 +1,15 @@
 # Multiplier Python Bindings
 
-Write Python scripts using the Multiplier binary analysis framework's Python bindings. Multiplier indexes C/C++ codebases into a database, and the Python API lets you query entities (functions, types, variables, macros), navigate the AST, extract source code, find references, and trace call graphs.
+Write Python scripts using the Multiplier code analysis framework's Python bindings. Multiplier indexes C/C++ codebases into a database, and the Python API lets you query entities (functions, types, variables, macros), navigate the AST, extract source code, find references, and trace call graphs.
+
+## Environment Variables
+
+These are automatically set when running via `run_python`:
+- `MULTIPLIER_DATABASE` — path to the current database
+- `MULTIPLIER_WORKSPACE` — workspace directory for saving artifacts
+- `CC` — C compiler path (if configured)
+- `CXX` — C++ compiler path (if configured)
+- `SDKROOT` — macOS SDK root (if configured)
 
 ## Opening the Database
 
@@ -12,6 +21,7 @@ import multiplier as mx
 
 db_path = os.environ['MULTIPLIER_DATABASE']
 index = mx.Index.in_memory_cache(mx.Index.from_database(db_path))
+workspace = os.environ.get('MULTIPLIER_WORKSPACE', '/tmp')
 ```
 
 Never call `Index.from_database()` without wrapping it in `Index.in_memory_cache()`.
@@ -183,3 +193,30 @@ for func in mx.ast.FunctionDecl.IN(index):
 - Use `Fragment.containing()` + `TokenTree` for macro-aware source.
 - Wrap entity operations in try/except for safety.
 - `.IN()`, `.containing()`, `.callers` return generators — consume or list().
+
+## Script Output Format
+
+Format output for LLM consumption:
+- Use `json.dumps(results, indent=2)` for structured data
+- Include entity IDs in output so they can be referenced in subsequent tool calls
+- Prefix errors with `ERROR:` for easy detection
+- Keep output concise — it goes back into the LLM context window
+- Save large outputs to files in `$MULTIPLIER_WORKSPACE` instead of printing
+
+```python
+import json, os
+
+results = []
+for func in mx.ast.FunctionDecl.IN(index):
+    func = func.canonical_declaration
+    if func.is_implicit or func.id in seen:
+        continue
+    seen.add(func.id)
+    results.append({
+        "name": func.name,
+        "entity_id": str(func.id),  # Always string for entity IDs
+        "is_definition": func.is_definition,
+    })
+
+print(json.dumps({"functions": results[:50]}, indent=2))
+```
