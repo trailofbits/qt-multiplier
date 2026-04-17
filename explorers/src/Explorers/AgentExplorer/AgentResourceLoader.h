@@ -43,7 +43,7 @@ static inline QString ensureResourceDocument(
   for (const auto &doc : docs) {
     if (doc.title == title) {
       auto existing = config.LoadDocumentContent(doc.doc_id);
-      if (parsePromptVersion(existing) >= version) {
+      if (!existing.isEmpty() && parsePromptVersion(existing) >= version) {
         return existing;
       }
       // Upgrade: replace with resource content.

@@ -49,7 +49,6 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   void onBrowsePythonClicked(void);
 
  private:
-  void refreshPromptCombo(void);
   void populateModels(const QString &backend_type);
   void ensureBackendExists(const QString &type);
   void showSaved(void);

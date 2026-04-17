@@ -54,7 +54,6 @@ struct AgentConfigPanel::PrivateData {
   QLineEdit *base_url_edit{nullptr};
   QLabel *base_url_label{nullptr};
   QComboBox *model_combo{nullptr};
-  QComboBox *system_prompt_combo{nullptr};
   QSpinBox *max_iterations_spin{nullptr};
   QDoubleSpinBox *temperature_spin{nullptr};
   QComboBox *suggestion_combo{nullptr};
@@ -234,12 +233,26 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
   sep1->setFrameShadow(QFrame::Sunken);
   form->addRow(sep1);
 
-  // ---- System Prompt (select from prompt documents) ----
-  d->system_prompt_combo = new QComboBox(content);
-  refreshPromptCombo();
-  form->addRow(tr("System Prompt:"), d->system_prompt_combo);
+  // ---- System Prompt ----
+  // Find the default system prompt document ID.
+  {
+    auto prompts = d->config_manager.LoadDocumentsByCategory(
+        QStringLiteral("prompt"));
+    for (const auto &doc : prompts) {
+      if (doc.title == QStringLiteral("Default Agent System Prompt")) {
+        d->prompt_doc_id = doc.doc_id;
+        break;
+      }
+    }
+    // Fallback: use the first prompt document.
+    if (d->prompt_doc_id < 0 && !prompts.isEmpty()) {
+      d->prompt_doc_id = prompts.first().doc_id;
+    }
+  }
+
   form->addRow(makeHint(
-      tr("Edit prompts in the Document Explorer (Prompts folder)."), content));
+      tr("The system prompt is a document in the Prompts folder. "
+         "Edit it in the Document Explorer."), content));
 
   // Separator.
   auto *sep2 = new QFrame(content);
@@ -446,11 +459,6 @@ AgentConfigPanel::AgentConfigPanel(LLMManager &llm_manager,
 
   connect(d->model_combo, &QComboBox::currentTextChanged,
           this, &AgentConfigPanel::onModelChanged);
-  connect(d->system_prompt_combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          this, [this] {
-            d->prompt_doc_id = d->system_prompt_combo->currentData().toInt();
-            emit configChanged();
-          });
   connect(d->workspace_browse_btn, &QPushButton::clicked,
           this, &AgentConfigPanel::onBrowseWorkspaceClicked);
   connect(d->workspace_path_edit, &QLineEdit::editingFinished, this, [this] {
@@ -971,28 +979,6 @@ void AgentConfigPanel::maybeVerifyPython(void) {
   });
 
   proc->start();
-}
-
-void AgentConfigPanel::refreshPromptCombo(void) {
-  auto saved_id = d->prompt_doc_id;
-  d->system_prompt_combo->clear();
-
-  auto prompts = d->config_manager.LoadDocumentsByCategory(
-      QStringLiteral("prompt"));
-  int select_idx = 0;
-  for (const auto &doc : prompts) {
-    auto title = doc.title.isEmpty()
-        ? tr("Document %1").arg(doc.doc_id) : doc.title;
-    d->system_prompt_combo->addItem(title, doc.doc_id);
-    if (doc.doc_id == saved_id) {
-      select_idx = d->system_prompt_combo->count() - 1;
-    }
-  }
-
-  if (d->system_prompt_combo->count() > 0) {
-    d->system_prompt_combo->setCurrentIndex(select_idx);
-    d->prompt_doc_id = d->system_prompt_combo->currentData().toInt();
-  }
 }
 
 void AgentConfigPanel::populateModels(const QString &backend_type) {
