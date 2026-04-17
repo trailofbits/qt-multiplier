@@ -1109,6 +1109,70 @@ static QString linkifyFileLinePatterns(const QString &text,
   return result;
 }
 
+// Replace entity:NUMBER, func:NUMBER, type:NUMBER etc. with clickable links.
+static QString linkifyEntityReferences(const QString &text,
+                                       const mx::gui::ConfigManager &config) {
+  // Match patterns like entity:12345, func:4295032833, type:123, etc.
+  static const QRegularExpression entity_ref_re(
+      QStringLiteral("\\b(entity|func|function|type|var|variable|macro|file|decl)"
+                     ":(\\d{1,20})\\b"));
+
+  auto it = entity_ref_re.globalMatch(text);
+  if (!it.hasNext()) {
+    return text;
+  }
+
+  const auto &index = config.Index();
+
+  struct RefMatch {
+    int start;
+    int length;
+    QString display;
+    uint64_t entity_id;
+  };
+  QVector<RefMatch> matches;
+
+  while (it.hasNext()) {
+    auto m = it.next();
+    auto eid = m.captured(2).toULongLong();
+    if (eid == 0) continue;
+
+    auto entity = index.entity(mx::EntityId(static_cast<mx::RawEntityId>(eid)));
+    if (std::holds_alternative<mx::NotAnEntity>(entity)) continue;
+
+    // Get a nice display name.
+    QString display;
+    if (auto name = mx::gui::NameOfEntityAsString(entity)) {
+      display = name.value();
+    } else {
+      display = m.captured(0);  // Keep the original text as fallback.
+    }
+
+    matches.append({static_cast<int>(m.capturedStart(0)),
+                    static_cast<int>(m.capturedLength(0)),
+                    display, eid});
+  }
+
+  if (matches.isEmpty()) {
+    return text;
+  }
+
+  // Replace from end to start.
+  std::sort(matches.begin(), matches.end(),
+            [](const RefMatch &a, const RefMatch &b) {
+    return a.start > b.start;
+  });
+
+  QString result = text;
+  for (const auto &m : matches) {
+    auto link = QStringLiteral("[`%1`](entity:%2)")
+        .arg(m.display.toHtmlEscaped())
+        .arg(m.entity_id);
+    result.replace(m.start, m.length, link);
+  }
+  return result;
+}
+
 // Scan text for C/C++ identifiers, resolve against the Index, and return
 // text with markdown links for recognized entities.
 static QString symbolizeIdentifiers(const QString &text,
@@ -1119,6 +1183,9 @@ static QString symbolizeIdentifiers(const QString &text,
 
   // First pass: replace file:line patterns (more specific, takes priority).
   auto processed = linkifyFileLinePatterns(text, config);
+
+  // Second pass: replace entity:NUMBER patterns with clickable entity links.
+  processed = linkifyEntityReferences(processed, config);
 
   // Match function-call-like identifiers: word(
   static const QRegularExpression func_re(
