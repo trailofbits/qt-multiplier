@@ -214,6 +214,59 @@ static QString try_as_location_cell(ConfigManager *config,
   return make_location_cell_json(config, eid);
 }
 
+// Resolve a column index from args, supporting both numeric "column" and
+// string "column_name" (case-insensitive). column_name takes precedence.
+// Returns -1 if column_name was given but not found, or neither was given.
+static int resolveColumnIndex(const ConfigManager::SheetData &sheet,
+                              const QJsonObject &args) {
+  auto col_name = args[QStringLiteral("column_name")].toString();
+  if (!col_name.isEmpty()) {
+    for (int i = 0; i < sheet.columns.size(); ++i) {
+      if (sheet.columns[i].name.compare(col_name, Qt::CaseInsensitive) == 0) {
+        return i;
+      }
+    }
+    return -1;  // Name given but not found.
+  }
+  // Fall back to numeric index.
+  return static_cast<int>(args[QStringLiteral("column")].toDouble(-1));
+}
+
+// Resolve a column index by name only (case-insensitive). Returns -1 if not
+// found.
+static int resolveColumnByName(const ConfigManager::SheetData &sheet,
+                               const QString &col_name) {
+  for (int i = 0; i < sheet.columns.size(); ++i) {
+    if (sheet.columns[i].name.compare(col_name, Qt::CaseInsensitive) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// Instantiate a key template by replacing '%' with the next available number.
+// For example, if existing keys are "T-1", "T-5" and template_val is "T-%",
+// returns "T-6".
+static QString instantiateKey(const ConfigManager::SheetData &sheet,
+                              int key_col, const QString &template_val) {
+  if (!template_val.contains(QLatin1Char('%'))) return template_val;
+
+  int max_num = 0;
+  QString prefix = template_val.left(template_val.indexOf(QLatin1Char('%')));
+  for (const auto &row : sheet.cells) {
+    if (key_col >= row.size()) continue;
+    auto text = cell_display_text(row[key_col]);
+    if (text.startsWith(prefix, Qt::CaseInsensitive)) {
+      bool ok;
+      int num = text.mid(prefix.length()).toInt(&ok);
+      if (ok && num > max_num) max_num = num;
+    }
+  }
+
+  QString result = template_val;
+  return result.replace(QLatin1Char('%'), QString::number(max_num + 1));
+}
+
 }  // namespace
 
 // ===========================================================================
@@ -241,6 +294,10 @@ QJsonObject CreateSheetTool::parametersSchema(void) const {
   props[QStringLiteral("role")] = string_prop(
       QStringLiteral("Optional role tag for the sheet (e.g. \"task_list\", "
                      "\"findings\"). Helps tools find sheets by purpose."));
+  props[QStringLiteral("key_column")] = string_prop(
+      QStringLiteral("Optional column name to designate as the key column. "
+                     "Enables auto-incrementing keys (e.g. \"T-%\") and "
+                     "key-based row lookup."));
   return make_schema(props, {QStringLiteral("name"),
                              QStringLiteral("columns")});
 }
@@ -265,6 +322,18 @@ QJsonObject CreateSheetTool::execute(const QJsonObject &args) {
 
   sheet.description = args[QStringLiteral("description")].toString();
   sheet.role = args[QStringLiteral("role")].toString();
+
+  // Resolve optional key column.
+  QString key_col_name = args[QStringLiteral("key_column")].toString();
+  if (!key_col_name.isEmpty()) {
+    int kci = resolveColumnByName(sheet, key_col_name);
+    if (kci < 0) {
+      return error_result(
+          QStringLiteral("key_column \"%1\" does not match any column")
+              .arg(key_col_name));
+    }
+    sheet.key_column_index = kci;
+  }
 
   int id = -1;
   QMetaObject::invokeMethod(m_ctx->config, [&] {
@@ -380,15 +449,15 @@ QJsonObject ReadCellTool::parametersSchema(void) const {
       QStringLiteral("Row index (0-based)"));
   props[QStringLiteral("column")] = int_prop(
       QStringLiteral("Column index (0-based)"));
+  props[QStringLiteral("column_name")] = string_prop(
+      QStringLiteral("Column name (alternative to column index; takes precedence)"));
   return make_schema(props, {QStringLiteral("sheet_id"),
-                             QStringLiteral("row"),
-                             QStringLiteral("column")});
+                             QStringLiteral("row")});
 }
 
 QJsonObject ReadCellTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
-  int col = args[QStringLiteral("column")].toInt(-1);
 
   ConfigManager::SheetData sheet;
   QMetaObject::invokeMethod(m_ctx->config, [&] {
@@ -396,6 +465,11 @@ QJsonObject ReadCellTool::execute(const QJsonObject &args) {
   }, Qt::BlockingQueuedConnection);
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
+  }
+
+  int col = resolveColumnIndex(sheet, args);
+  if (col < 0 || col >= sheet.columns.size()) {
+    return error_result(QStringLiteral("column not found or out of range"));
   }
 
   QString cell_json = get_cell(sheet, row, col);
@@ -426,6 +500,8 @@ QJsonObject WriteCellTool::parametersSchema(void) const {
       QStringLiteral("Row index (0-based)"));
   props[QStringLiteral("column")] = int_prop(
       QStringLiteral("Column index (0-based)"));
+  props[QStringLiteral("column_name")] = string_prop(
+      QStringLiteral("Column name (alternative to column index; takes precedence)"));
   props[QStringLiteral("value")] = string_prop(
       QStringLiteral("Value to write"));
   QJsonObject type_prop = string_prop(
@@ -438,14 +514,12 @@ QJsonObject WriteCellTool::parametersSchema(void) const {
   props[QStringLiteral("type")] = type_prop;
   return make_schema(props, {QStringLiteral("sheet_id"),
                              QStringLiteral("row"),
-                             QStringLiteral("column"),
                              QStringLiteral("value")});
 }
 
 QJsonObject WriteCellTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
-  int col = args[QStringLiteral("column")].toInt(-1);
   QString value = args[QStringLiteral("value")].toString();
   QString type = args[QStringLiteral("type")].toString(
       QStringLiteral("string"));
@@ -457,8 +531,15 @@ QJsonObject WriteCellTool::execute(const QJsonObject &args) {
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
+
+  int col = resolveColumnIndex(sheet, args);
   if (col < 0 || col >= sheet.columns.size()) {
-    return error_result(QStringLiteral("column out of range"));
+    return error_result(QStringLiteral("column not found or out of range"));
+  }
+
+  // Instantiate key template if writing to the key column.
+  if (sheet.key_column_index >= 0 && col == sheet.key_column_index) {
+    value = instantiateKey(sheet, col, value);
   }
 
   ensure_cell(sheet, row, col);
@@ -482,6 +563,7 @@ QJsonObject WriteCellTool::execute(const QJsonObject &args) {
 
   QJsonObject result;
   result[QStringLiteral("success")] = true;
+  result[QStringLiteral("value")] = value;
   return result;
 }
 
@@ -528,6 +610,7 @@ QJsonObject ReadRowTool::execute(const QJsonObject &args) {
     QString cj = get_cell(sheet, row, c);
     QJsonObject cell;
     cell[QStringLiteral("column")] = c;
+    cell[QStringLiteral("column_name")] = sheet.columns[c].name;
     cell[QStringLiteral("value")] = cell_display_text(cj);
     cell[QStringLiteral("type")] = cell_type_string(cj);
     cells.append(cell);
@@ -556,13 +639,13 @@ QJsonObject ReadColumnTool::parametersSchema(void) const {
       QStringLiteral("ID of the sheet"));
   props[QStringLiteral("column")] = int_prop(
       QStringLiteral("Column index (0-based)"));
-  return make_schema(props, {QStringLiteral("sheet_id"),
-                             QStringLiteral("column")});
+  props[QStringLiteral("column_name")] = string_prop(
+      QStringLiteral("Column name (alternative to column index; takes precedence)"));
+  return make_schema(props, {QStringLiteral("sheet_id")});
 }
 
 QJsonObject ReadColumnTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
-  int col = args[QStringLiteral("column")].toInt(-1);
 
   ConfigManager::SheetData sheet;
   QMetaObject::invokeMethod(m_ctx->config, [&] {
@@ -571,8 +654,10 @@ QJsonObject ReadColumnTool::execute(const QJsonObject &args) {
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
+
+  int col = resolveColumnIndex(sheet, args);
   if (col < 0 || col >= sheet.columns.size()) {
-    return error_result(QStringLiteral("column out of range"));
+    return error_result(QStringLiteral("column not found or out of range"));
   }
 
   QJsonArray cells;
@@ -608,8 +693,15 @@ QJsonObject AddRowTool::parametersSchema(void) const {
   QJsonObject props;
   props[QStringLiteral("sheet_id")] = int_prop(
       QStringLiteral("ID of the sheet"));
-  props[QStringLiteral("values")] = string_array_prop(
-      QStringLiteral("Values for each column (as strings)"));
+
+  // values can be either an array of strings (positional) or an object
+  // mapping column names to values.
+  QJsonObject values_prop;
+  values_prop[QStringLiteral("description")] = QStringLiteral(
+      "Values for each column. Can be an array of strings (positional) or "
+      "an object mapping column names to values.");
+  props[QStringLiteral("values")] = values_prop;
+
   return make_schema(props, {QStringLiteral("sheet_id"),
                              QStringLiteral("values")});
 }
@@ -624,12 +716,38 @@ QJsonObject AddRowTool::execute(const QJsonObject &args) {
     return error_result(QStringLiteral("sheet not found"));
   }
 
-  QJsonArray vals = args[QStringLiteral("values")].toArray();
-  QVector<QString> row;
   auto num_cols = sheet.columns.size();
-  row.resize(num_cols);
-  for (qsizetype i = 0; i < vals.size() && i < num_cols; ++i) {
-    row[i] = make_cell_json(vals[i].toString(), QStringLiteral("string"));
+  QVector<QString> row(num_cols);
+
+  auto values_val = args[QStringLiteral("values")];
+  if (values_val.isObject()) {
+    // Object: map column names to values.
+    QJsonObject values_obj = values_val.toObject();
+    for (auto it = values_obj.begin(); it != values_obj.end(); ++it) {
+      int ci = resolveColumnByName(sheet, it.key());
+      if (ci < 0) {
+        return error_result(
+            QStringLiteral("column name not found: ") + it.key());
+      }
+      QString val = it.value().toString();
+      // Instantiate key template if this is the key column.
+      if (sheet.key_column_index >= 0 && ci == sheet.key_column_index) {
+        val = instantiateKey(sheet, ci, val);
+      }
+      row[ci] = make_cell_json(val, QStringLiteral("string"));
+    }
+  } else {
+    // Array: positional values.
+    QJsonArray vals = values_val.toArray();
+    for (qsizetype i = 0; i < vals.size() && i < num_cols; ++i) {
+      QString val = vals[i].toString();
+      // Instantiate key template if this is the key column.
+      if (sheet.key_column_index >= 0 &&
+          static_cast<int>(i) == sheet.key_column_index) {
+        val = instantiateKey(sheet, static_cast<int>(i), val);
+      }
+      row[i] = make_cell_json(val, QStringLiteral("string"));
+    }
   }
 
   auto row_index = sheet.cells.size();
@@ -642,6 +760,14 @@ QJsonObject AddRowTool::execute(const QJsonObject &args) {
 
   QJsonObject result;
   result[QStringLiteral("row_index")] = static_cast<int>(row_index);
+
+  // Return the instantiated key if there's a key column.
+  if (sheet.key_column_index >= 0 && sheet.key_column_index < num_cols &&
+      !row[sheet.key_column_index].isEmpty()) {
+    result[QStringLiteral("key")] =
+        cell_display_text(row[sheet.key_column_index]);
+  }
+
   return result;
 }
 
@@ -959,18 +1085,18 @@ QJsonObject SetCheckboxTool::parametersSchema(void) const {
       QStringLiteral("Row index (0-based)"));
   props[QStringLiteral("column")] = int_prop(
       QStringLiteral("Column index (0-based)"));
+  props[QStringLiteral("column_name")] = string_prop(
+      QStringLiteral("Column name (alternative to column index; takes precedence)"));
   props[QStringLiteral("checked")] = bool_prop(
       QStringLiteral("Whether the checkbox is checked"));
   return make_schema(props, {QStringLiteral("sheet_id"),
                              QStringLiteral("row"),
-                             QStringLiteral("column"),
                              QStringLiteral("checked")});
 }
 
 QJsonObject SetCheckboxTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
-  int col = args[QStringLiteral("column")].toInt(-1);
   bool checked = args[QStringLiteral("checked")].toBool();
 
   ConfigManager::SheetData sheet;
@@ -980,8 +1106,10 @@ QJsonObject SetCheckboxTool::execute(const QJsonObject &args) {
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
+
+  int col = resolveColumnIndex(sheet, args);
   if (col < 0 || col >= sheet.columns.size()) {
-    return error_result(QStringLiteral("column out of range"));
+    return error_result(QStringLiteral("column not found or out of range"));
   }
 
   ensure_cell(sheet, row, col);
@@ -1015,6 +1143,8 @@ QJsonObject SortSheetTool::parametersSchema(void) const {
       QStringLiteral("ID of the sheet"));
   props[QStringLiteral("column")] = int_prop(
       QStringLiteral("Column index to sort by (0-based)"));
+  props[QStringLiteral("column_name")] = string_prop(
+      QStringLiteral("Column name to sort by (alternative to column index; takes precedence)"));
   QJsonObject order_prop = string_prop(
       QStringLiteral("Sort order: \"asc\" or \"desc\" (default: \"asc\")"));
   QJsonArray order_enum;
@@ -1022,13 +1152,11 @@ QJsonObject SortSheetTool::parametersSchema(void) const {
   order_enum.append(QStringLiteral("desc"));
   order_prop[QStringLiteral("enum")] = order_enum;
   props[QStringLiteral("order")] = order_prop;
-  return make_schema(props, {QStringLiteral("sheet_id"),
-                             QStringLiteral("column")});
+  return make_schema(props, {QStringLiteral("sheet_id")});
 }
 
 QJsonObject SortSheetTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
-  int col = args[QStringLiteral("column")].toInt(-1);
   QString order = args[QStringLiteral("order")].toString(
       QStringLiteral("asc"));
 
@@ -1039,8 +1167,10 @@ QJsonObject SortSheetTool::execute(const QJsonObject &args) {
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
+
+  int col = resolveColumnIndex(sheet, args);
   if (col < 0 || col >= sheet.columns.size()) {
-    return error_result(QStringLiteral("column out of range"));
+    return error_result(QStringLiteral("column not found or out of range"));
   }
 
   bool ascending = (order != QLatin1String("desc"));
@@ -1260,6 +1390,8 @@ QJsonObject WriteLocationCellTool::parametersSchema(void) const {
       QStringLiteral("Row index (0-based)"));
   props[QStringLiteral("column")] = int_prop(
       QStringLiteral("Column index (0-based)"));
+  props[QStringLiteral("column_name")] = string_prop(
+      QStringLiteral("Column name (alternative to column index; takes precedence)"));
 
   QJsonObject eid_prop;
   eid_prop[QStringLiteral("type")] = QStringLiteral("string");
@@ -1269,14 +1401,12 @@ QJsonObject WriteLocationCellTool::parametersSchema(void) const {
 
   return make_schema(props, {QStringLiteral("sheet_id"),
                              QStringLiteral("row"),
-                             QStringLiteral("column"),
                              QStringLiteral("entity_id")});
 }
 
 QJsonObject WriteLocationCellTool::execute(const QJsonObject &args) {
   int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
   int row = args[QStringLiteral("row")].toInt(-1);
-  int col = args[QStringLiteral("column")].toInt(-1);
   auto eid_val = args[QStringLiteral("entity_id")];
   mx::RawEntityId entity_id;
   if (eid_val.isString()) {
@@ -1296,8 +1426,10 @@ QJsonObject WriteLocationCellTool::execute(const QJsonObject &args) {
   if (sheet.sheet_id < 0) {
     return error_result(QStringLiteral("sheet not found"));
   }
+
+  int col = resolveColumnIndex(sheet, args);
   if (col < 0 || col >= sheet.columns.size()) {
-    return error_result(QStringLiteral("column out of range"));
+    return error_result(QStringLiteral("column not found or out of range"));
   }
 
   QString cell_json = make_location_cell_json(m_ctx->config, entity_id);
@@ -1559,6 +1691,253 @@ QJsonObject GetCellFormatReferenceTool::execute(const QJsonObject &) {
   return result;
 }
 
+// ===========================================================================
+// GetSheetSchemaTool
+// ===========================================================================
+
+QString GetSheetSchemaTool::name(void) const {
+  return QStringLiteral("get_sheet_schema");
+}
+
+QString GetSheetSchemaTool::description(void) const {
+  return QStringLiteral(
+      "Get the full schema of a sheet: column names, types, features "
+      "(clickable, key column), and sample data from the first few rows.");
+}
+
+QJsonObject GetSheetSchemaTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("sheet_id")] = int_prop(
+      QStringLiteral("ID of the sheet"));
+  props[QStringLiteral("sample_rows")] = int_prop(
+      QStringLiteral("Number of sample rows to include (default: 3)"));
+  return make_schema(props, {QStringLiteral("sheet_id")});
+}
+
+QJsonObject GetSheetSchemaTool::execute(const QJsonObject &args) {
+  int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
+  int sample_rows = args[QStringLiteral("sample_rows")].toInt(3);
+  if (sample_rows < 0) sample_rows = 3;
+
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
+  if (sheet.sheet_id < 0) {
+    return error_result(QStringLiteral("sheet not found"));
+  }
+
+  QJsonArray columns;
+  for (int i = 0; i < sheet.columns.size(); ++i) {
+    QJsonObject col;
+    col[QStringLiteral("index")] = i;
+    col[QStringLiteral("name")] = sheet.columns[i].name;
+    col[QStringLiteral("is_key")] = (sheet.key_column_index == i);
+    col[QStringLiteral("clickable")] = sheet.columns[i].clickable;
+
+    // Gather sample values.
+    QJsonArray samples;
+    int count = qMin(sample_rows, static_cast<int>(sheet.cells.size()));
+    for (int r = 0; r < count; ++r) {
+      QString cj = get_cell(sheet, r, i);
+      samples.append(cell_display_text(cj));
+    }
+    col[QStringLiteral("sample_values")] = samples;
+    columns.append(col);
+  }
+
+  QJsonObject result;
+  result[QStringLiteral("columns")] = columns;
+  result[QStringLiteral("row_count")] = static_cast<int>(sheet.cells.size());
+  result[QStringLiteral("role")] = sheet.role;
+
+  if (sheet.key_column_index >= 0 &&
+      sheet.key_column_index < sheet.columns.size()) {
+    result[QStringLiteral("key_column")] =
+        sheet.columns[sheet.key_column_index].name;
+  }
+
+  return result;
+}
+
+// ===========================================================================
+// ReadRowByKeyTool
+// ===========================================================================
+
+QString ReadRowByKeyTool::name(void) const {
+  return QStringLiteral("read_row_by_key");
+}
+
+QString ReadRowByKeyTool::description(void) const {
+  return QStringLiteral(
+      "Read a row by its key column value (e.g. 'T-5' in a task board).");
+}
+
+QJsonObject ReadRowByKeyTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("sheet_id")] = int_prop(
+      QStringLiteral("ID of the sheet"));
+  props[QStringLiteral("key")] = string_prop(
+      QStringLiteral("Key value to look up (e.g. \"T-5\")"));
+  return make_schema(props, {QStringLiteral("sheet_id"),
+                             QStringLiteral("key")});
+}
+
+QJsonObject ReadRowByKeyTool::execute(const QJsonObject &args) {
+  int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
+  QString key = args[QStringLiteral("key")].toString();
+  if (key.isEmpty()) {
+    return error_result(QStringLiteral("key is required"));
+  }
+
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
+  if (sheet.sheet_id < 0) {
+    return error_result(QStringLiteral("sheet not found"));
+  }
+  if (sheet.key_column_index < 0) {
+    return error_result(QStringLiteral("sheet has no key column"));
+  }
+
+  int key_col = sheet.key_column_index;
+  int found_row = -1;
+  for (int r = 0; r < sheet.cells.size(); ++r) {
+    if (key_col < sheet.cells[r].size()) {
+      if (cell_display_text(sheet.cells[r][key_col]) == key) {
+        found_row = r;
+        break;
+      }
+    }
+  }
+
+  if (found_row < 0) {
+    return error_result(QStringLiteral("row not found for key: ") + key);
+  }
+
+  QJsonArray cells;
+  for (int c = 0; c < sheet.columns.size(); ++c) {
+    QString cj = get_cell(sheet, found_row, c);
+    QJsonObject cell;
+    cell[QStringLiteral("column")] = c;
+    cell[QStringLiteral("column_name")] = sheet.columns[c].name;
+    cell[QStringLiteral("value")] = cell_display_text(cj);
+    cell[QStringLiteral("type")] = cell_type_string(cj);
+    cells.append(cell);
+  }
+
+  QJsonObject result;
+  result[QStringLiteral("row")] = found_row;
+  result[QStringLiteral("cells")] = cells;
+  return result;
+}
+
+// ===========================================================================
+// UpdateRowByKeyTool
+// ===========================================================================
+
+QString UpdateRowByKeyTool::name(void) const {
+  return QStringLiteral("update_row_by_key");
+}
+
+QString UpdateRowByKeyTool::description(void) const {
+  return QStringLiteral(
+      "Update cells in a row identified by key column value. "
+      "Specify values by column name.");
+}
+
+QJsonObject UpdateRowByKeyTool::parametersSchema(void) const {
+  QJsonObject props;
+  props[QStringLiteral("sheet_id")] = int_prop(
+      QStringLiteral("ID of the sheet"));
+  props[QStringLiteral("key")] = string_prop(
+      QStringLiteral("Key value to look up (e.g. \"T-5\")"));
+
+  QJsonObject values_prop;
+  values_prop[QStringLiteral("type")] = QStringLiteral("object");
+  values_prop[QStringLiteral("description")] = QStringLiteral(
+      "Object mapping column names to new values");
+  props[QStringLiteral("values")] = values_prop;
+
+  return make_schema(props, {QStringLiteral("sheet_id"),
+                             QStringLiteral("key"),
+                             QStringLiteral("values")});
+}
+
+QJsonObject UpdateRowByKeyTool::execute(const QJsonObject &args) {
+  int sheet_id = args[QStringLiteral("sheet_id")].toInt(-1);
+  QString key = args[QStringLiteral("key")].toString();
+  if (key.isEmpty()) {
+    return error_result(QStringLiteral("key is required"));
+  }
+
+  QJsonObject values_obj = args[QStringLiteral("values")].toObject();
+  if (values_obj.isEmpty()) {
+    return error_result(QStringLiteral("values is required"));
+  }
+
+  ConfigManager::SheetData sheet;
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    sheet = m_ctx->config->LoadSheetById(sheet_id);
+  }, Qt::BlockingQueuedConnection);
+  if (sheet.sheet_id < 0) {
+    return error_result(QStringLiteral("sheet not found"));
+  }
+  if (sheet.key_column_index < 0) {
+    return error_result(QStringLiteral("sheet has no key column"));
+  }
+
+  int key_col = sheet.key_column_index;
+  int found_row = -1;
+  for (int r = 0; r < sheet.cells.size(); ++r) {
+    if (key_col < sheet.cells[r].size()) {
+      if (cell_display_text(sheet.cells[r][key_col]) == key) {
+        found_row = r;
+        break;
+      }
+    }
+  }
+
+  if (found_row < 0) {
+    return error_result(QStringLiteral("row not found for key: ") + key);
+  }
+
+  // Apply updates by column name.
+  for (auto it = values_obj.begin(); it != values_obj.end(); ++it) {
+    int ci = resolveColumnByName(sheet, it.key());
+    if (ci < 0) {
+      return error_result(
+          QStringLiteral("column name not found: ") + it.key());
+    }
+    ensure_cell(sheet, found_row, ci);
+
+    QString val = it.value().toString();
+
+    // Auto-detect entity references for string values.
+    QString cell_json = try_as_location_cell(m_ctx->config, val);
+    if (cell_json.isEmpty()) {
+      cell_json = make_cell_json(val, QStringLiteral("string"));
+    }
+    sheet.cells[found_row][ci] = cell_json;
+  }
+
+  QMetaObject::invokeMethod(m_ctx->config, [&] {
+    m_ctx->config->SaveSheet(sheet);
+  }, Qt::BlockingQueuedConnection);
+  QMetaObject::invokeMethod(m_ctx->config,
+      &ConfigManager::NotifyExternalSheetsChanged, Qt::QueuedConnection);
+
+  QJsonObject result;
+  result[QStringLiteral("success")] = true;
+  result[QStringLiteral("row")] = found_row;
+  return result;
+}
+
+// ===========================================================================
+// Registration
+// ===========================================================================
+
 void registerSpreadsheetTools(AgentToolRegistry &registry,
                               SpreadsheetToolContext *ctx) {
   registry.registerTool(std::make_unique<CreateSheetTool>(ctx));
@@ -1582,6 +1961,9 @@ void registerSpreadsheetTools(AgentToolRegistry &registry,
   registry.registerTool(std::make_unique<CreateFindingsSheetTool>(ctx));
   registry.registerTool(std::make_unique<CreateAttackSurfaceSheetTool>(ctx));
   registry.registerTool(std::make_unique<GetCellFormatReferenceTool>(ctx));
+  registry.registerTool(std::make_unique<GetSheetSchemaTool>(ctx));
+  registry.registerTool(std::make_unique<ReadRowByKeyTool>(ctx));
+  registry.registerTool(std::make_unique<UpdateRowByKeyTool>(ctx));
 }
 
 }  // namespace mx::gui

@@ -133,6 +133,7 @@ static int ensureTaskSheet(TaskToolContext *ctx) {
   sheet.name = QStringLiteral("Task Board");
   sheet.description = QStringLiteral("Agent task management board");
   sheet.role = QStringLiteral("task_list");
+  sheet.key_column_index = kColId;
 
   for (const auto &col_name : kTaskColumnNames) {
     ConfigManager::SheetColumnInfo ci;

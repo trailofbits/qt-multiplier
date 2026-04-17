@@ -173,6 +173,7 @@ class ConfigManager Q_DECL_FINAL : public QObject {
     QString description;
     QString role;       // "general", "task_list", "findings", etc.
     QString closed_at;  // ISO 8601 timestamp; empty = open.
+    int key_column_index{-1};  // Column used as unique key; -1 = none.
     QVector<SheetColumnInfo> columns;
     QVector<QVector<QString>> cells;          // cells[row][col] = JSON value
     QHash<int, QColor> row_colors;

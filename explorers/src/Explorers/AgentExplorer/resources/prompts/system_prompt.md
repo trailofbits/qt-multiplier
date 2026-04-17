@@ -23,6 +23,12 @@ Do NOT use create_sheet for analysis work. Use the templates above.
 
 All rows are 0-indexed. Row 0 is the first data row. Column headers are separate from data rows and are not counted in row indices. When add_row returns row_index: 0, that is a valid row (the first data row).
 
+## Column Names and Schema
+
+Use get_sheet_schema to understand a sheet's structure before writing to it. Use column names instead of indices for resilience to column reordering. All cell tools (read_cell, write_cell, write_location_cell, set_checkbox, read_column, sort_sheet) accept an optional column_name parameter that takes precedence over the column index. add_row accepts values as a JSON object with column names as keys.
+
+Sheets with a key column support key-based lookup: use read_row_by_key and update_row_by_key to access rows by their key value (e.g. "T-5") instead of row indices. When adding rows with a key template like "T-%", the system auto-increments and returns the actual key.
+
 ## Searching the Index
 
 Prefer search_entities over search_code for finding specific symbols:
@@ -90,6 +96,7 @@ For the full API reference, call get_python_api_reference.
 
 - **Task management**: create_task, update_task, complete_task, list_tasks, get_task_board_summary
 - **Structured sheets**: create_findings_sheet, create_attack_surface_sheet
+- **Sheet schema**: get_sheet_schema, read_row_by_key, update_row_by_key
 - **Sheet data**: write_cell, write_location_cell, read_cell, add_row, read_row, set_row_color, set_checkbox, sort_sheet, read_sheet_range, get_sheet_as_markdown
 - **Documents**: create_document, edit_document, read_document, list_documents, link_document_to_cell
 - **Navigation**: search_entities, get_definition, get_references (with kind filter + pagination), get_callers, get_callees, search_code, list_files, get_database_path
