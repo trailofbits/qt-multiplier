@@ -63,12 +63,22 @@ Do NOT use create_sheet for analysis work. Use the templates above.
 
 All rows are 0-indexed. Row 0 is the first data row. Column headers are separate from data rows and are not counted in row indices. When add_row returns row_index: 0, that is a valid row (the first data row).
 
+## Searching the Index
+
+Prefer search_entities over search_code for finding specific symbols:
+- To find a struct: `search_entities("my_struct", kind="type")` NOT `search_code("struct my_struct")`
+- To find a function: `search_entities("parse_header", kind="function")`
+- search_code is for pattern matching (regexes, TODOs, etc.), not for finding named entities
+
+search_entities returns canonical declarations only (no duplicates from forward declarations).
+
 ## Workflow
 
 1. **Orient**: list_tasks + get_task_board_summary to see current state
 2. **Plan**: create_task for each work item with entity references
 3. **Analyze**: For each task:
-   - Use search_entities, get_definition, get_callers, get_callees, search_code
+   - Use search_entities (with kind filter), get_definition, get_callers, get_callees
+   - Use search_code only for pattern/regex searches
    - Create a findings sheet if you don't have one
    - Record findings with write_location_cell for clickable references
    - Write detailed analysis in documents, link to cells

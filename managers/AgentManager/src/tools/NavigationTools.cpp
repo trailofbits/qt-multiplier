@@ -132,6 +132,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
   QJsonArray arr;
   int count = 0;
   static constexpr int kMaxResults = 100;
+  std::unordered_set<mx::RawEntityId> seen_ids;
 
   for (mx::NamedEntity result : index.query_entities(query)) {
     if (count >= kMaxResults) {
@@ -140,6 +141,18 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
 
     if (std::holds_alternative<mx::NamedDecl>(result)) {
       mx::NamedDecl decl = std::get<mx::NamedDecl>(result);
+
+      // Canonicalize to deduplicate across redeclarations.
+      auto base = mx::Decl::from(decl);
+      mx::RawEntityId canonical_id = decl.id().Pack();
+      if (base) {
+        canonical_id = base->canonical_declaration().id().Pack();
+      }
+      if (seen_ids.count(canonical_id)) {
+        continue;
+      }
+      seen_ids.insert(canonical_id);
+
       QString kind = decl_kind_string(decl);
 
       if (!kind_filter.isEmpty() && kind != kind_filter) {
@@ -151,7 +164,7 @@ QJsonObject SearchEntitiesTool::execute(const QJsonObject &args) {
           QString::fromStdString(std::string(decl.name()));
       obj[QStringLiteral("kind")] = kind;
       obj[QStringLiteral("entity_id")] =
-          QString::number(static_cast<quint64>(decl.id().Pack()));
+          QString::number(static_cast<quint64>(canonical_id));
       arr.append(obj);
       ++count;
 
