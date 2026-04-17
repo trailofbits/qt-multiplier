@@ -45,11 +45,11 @@ class AgentConfigPanel Q_DECL_FINAL : public QWidget {
   void onApiKeyChanged(void);
   void onBaseUrlChanged(void);
   void onModelChanged(void);
-  void onLoadPromptClicked(void);
   void onBrowseWorkspaceClicked(void);
   void onBrowsePythonClicked(void);
 
  private:
+  void refreshPromptCombo(void);
   void populateModels(const QString &backend_type);
   void ensureBackendExists(const QString &type);
   void showSaved(void);

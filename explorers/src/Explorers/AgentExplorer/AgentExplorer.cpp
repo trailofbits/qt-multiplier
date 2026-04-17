@@ -154,6 +154,9 @@ AgentExplorer::AgentExplorer(ConfigManager &config_manager,
      QStringLiteral(":/agent/skills/fuzzer_harness.md"), 0},
   });
 
+  // Notify Document Explorer that new documents may have been created.
+  config_manager.NotifyExternalDocumentsChanged();
+
   // Cache the prompts that are used at runtime.
   d->observer_prompt = loadResource(
       QStringLiteral(":/agent/prompts/observer_prompt.md"));
