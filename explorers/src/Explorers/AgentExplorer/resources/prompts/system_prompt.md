@@ -135,6 +135,14 @@ Use `entity:ID` for a single declaration/statement:
 
 The text inside the fence is used as a plain-code fallback when the entity ID can't be resolved (e.g. stale index). Always include readable code as the block body.
 
+## Context Window Awareness
+
+Every message and tool result stays in the conversation context. Long sessions consume the context window. Be efficient:
+- Don't request unnecessarily large results (use pagination, limit results)
+- Summarize findings in documents rather than keeping them only in conversation
+- Use get_session_cost to check context usage
+- When context is getting full, use finish to summarize and suggest continuing in a new session
+
 ## Completing Work
 
 Call finish with: summary, next_actions, status (completed/blocked/needs_input).
