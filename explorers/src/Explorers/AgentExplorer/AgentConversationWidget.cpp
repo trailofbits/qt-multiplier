@@ -561,12 +561,12 @@ static QWidget *createSearchEntitiesView(const QJsonObject &result,
     auto row = static_cast<int>(i);
     auto *kind_item = new QTableWidgetItem(kind);
     kind_item->setData(kEntityIdRole, QVariant::fromValue(eid));
-    kind_item->setToolTip(QStringLiteral("Double-click to open"));
+    kind_item->setToolTip(QStringLiteral("Click to open"));
     table->setItem(row, 0, kind_item);
 
     auto *name_item = new QTableWidgetItem(name);
     name_item->setData(kEntityIdRole, QVariant::fromValue(eid));
-    name_item->setToolTip(QStringLiteral("Double-click to open"));
+    name_item->setToolTip(QStringLiteral("Click to open"));
     table->setItem(row, 1, name_item);
   }
   table->resizeColumnsToContents();
@@ -609,7 +609,7 @@ static QWidget *createSearchCodeView(const QJsonObject &result,
     f.setFamily(QStringLiteral("monospace"));
     item->setFont(f);
     item->setData(kEntityIdRole, QVariant::fromValue(eid));
-    item->setToolTip(QStringLiteral("Double-click to open"));
+    item->setToolTip(QStringLiteral("Click to open"));
   }
   return list;
 }
@@ -1860,9 +1860,9 @@ void AgentConversationWidget::addMessageBubble(
     if (interactive) {
       detail_layout->addWidget(interactive);
 
-      // Connect clickable views to navigate to entities on double-click.
+      // Connect clickable views to navigate to entities on click.
       if (auto *list = qobject_cast<QListWidget *>(interactive)) {
-        connect(list, &QListWidget::itemDoubleClicked, this,
+        connect(list, &QListWidget::itemClicked, this,
                 [this](QListWidgetItem *item) {
           auto eid = item->data(kEntityIdRole).toULongLong();
           if (eid != 0) {
@@ -1870,7 +1870,7 @@ void AgentConversationWidget::addMessageBubble(
           }
         });
       } else if (auto *table = qobject_cast<QTableWidget *>(interactive)) {
-        connect(table, &QTableWidget::itemDoubleClicked, this,
+        connect(table, &QTableWidget::itemClicked, this,
                 [this](QTableWidgetItem *item) {
           auto eid = item->data(kEntityIdRole).toULongLong();
           if (eid != 0) {
