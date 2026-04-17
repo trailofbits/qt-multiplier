@@ -10,6 +10,7 @@
 #include <multiplier/GUI/Managers/AgentMessage.h>
 
 #include <QAtomicInt>
+#include <QHash>
 #include <QMap>
 #include <QMutex>
 #include <QObject>
@@ -113,6 +114,10 @@ class AgentSession Q_DECL_FINAL : public QObject {
 
   // Tool nodes completed since the last LLM call, used for context edges.
   QVector<int64_t> m_pending_context_nodes;
+
+  // Result ID tracking for tool call provenance graph.
+  int m_next_result_id{1};
+  QHash<QString, int64_t> m_result_id_to_cost_node;
 };
 
 }  // namespace mx::gui

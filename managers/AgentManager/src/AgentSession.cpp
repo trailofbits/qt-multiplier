@@ -229,6 +229,31 @@ void AgentSession::runLoop(void) {
     auto llm_messages = buildMessages();
     auto tool_defs = m_tools->allDefinitions();
 
+    // Inject the 'follows' parameter into every tool's schema so the LLM
+    // can declare provenance dependencies between tool calls.
+    for (auto &def : tool_defs) {
+      auto props = def.parameters_schema.value(
+          QStringLiteral("properties")).toObject();
+      QJsonObject follows_prop;
+      follows_prop[QStringLiteral("description")] =
+          QStringLiteral("Result ID(s) from previous tool results that "
+                         "motivated this call (e.g. \"r-3\" or [\"r-1\", "
+                         "\"r-5\"]).");
+      QJsonArray one_of;
+      QJsonObject str_type;
+      str_type[QStringLiteral("type")] = QStringLiteral("string");
+      QJsonObject arr_type;
+      arr_type[QStringLiteral("type")] = QStringLiteral("array");
+      QJsonObject items;
+      items[QStringLiteral("type")] = QStringLiteral("string");
+      arr_type[QStringLiteral("items")] = items;
+      one_of.append(str_type);
+      one_of.append(arr_type);
+      follows_prop[QStringLiteral("oneOf")] = one_of;
+      props[QStringLiteral("follows")] = follows_prop;
+      def.parameters_schema[QStringLiteral("properties")] = props;
+    }
+
     // Create a cost node for this LLM call (marshal to main thread).
     if (m_config_manager) {
       QMetaObject::invokeMethod(m_config_manager, [&] {
@@ -364,6 +389,31 @@ void AgentSession::runLoop(void) {
 
       auto duration_ms = static_cast<int>(timer.elapsed());
 
+      // Assign a result_id so the LLM can reference this result later.
+      auto result_id = QStringLiteral("r-%1").arg(m_next_result_id++);
+      result.insert(QStringLiteral("result_id"), result_id);
+
+      // Inject row_id into array elements so the LLM can reference
+      // specific rows (e.g. "r-3.1" for the second entity in a search).
+      for (auto it = result.begin(); it != result.end(); ++it) {
+        if (it.value().isArray()) {
+          auto arr = it.value().toArray();
+          bool modified = false;
+          for (int ri = 0; ri < arr.size(); ++ri) {
+            if (arr[ri].isObject()) {
+              auto obj = arr[ri].toObject();
+              obj.insert(QStringLiteral("row_id"),
+                         QStringLiteral("%1.%2").arg(result_id).arg(ri));
+              arr[ri] = obj;
+              modified = true;
+            }
+          }
+          if (modified) {
+            result[it.key()] = arr;
+          }
+        }
+      }
+
       // Complete the tool cost node.
       if (m_config_manager && tool_node_id >= 0) {
         QMetaObject::invokeMethod(m_config_manager, [&] {
@@ -372,6 +422,30 @@ void AgentSession::runLoop(void) {
 
         // Track this tool node for context edges in the next LLM call.
         m_pending_context_nodes.append(tool_node_id);
+
+        // Map the result_id to the cost node for provenance edges.
+        m_result_id_to_cost_node[result_id] = tool_node_id;
+      }
+
+      // Create "follows" edges from referenced result nodes to this tool node.
+      if (m_config_manager && tool_node_id >= 0) {
+        auto follows = call.arguments.value(QStringLiteral("follows"));
+        auto create_follows_edge = [&](const QString &ref_id) {
+          auto from_node = m_result_id_to_cost_node.value(ref_id, -1);
+          if (from_node >= 0) {
+            QMetaObject::invokeMethod(m_config_manager, [&] {
+              m_config_manager->CreateCostEdge(
+                  from_node, tool_node_id, QStringLiteral("follows"));
+            }, Qt::BlockingQueuedConnection);
+          }
+        };
+        if (follows.isString()) {
+          create_follows_edge(follows.toString());
+        } else if (follows.isArray()) {
+          for (const auto &v : follows.toArray()) {
+            create_follows_edge(v.toString());
+          }
+        }
       }
 
       emit toolCallCompleted(call.name, result, duration_ms);

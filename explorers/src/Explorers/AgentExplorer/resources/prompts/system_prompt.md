@@ -143,6 +143,22 @@ Every message and tool result stays in the conversation context. Long sessions c
 - Use get_session_cost to check context usage
 - When context is getting full, use finish to summarize and suggest continuing in a new session
 
+## Tool Call Provenance
+
+Every tool result includes a `result_id` (e.g. "r-7"). Results with arrays also have per-row `row_id` values (e.g. "r-7.0", "r-7.1") identifying specific items.
+
+When making a subsequent tool call motivated by a previous result, include `follows` in the arguments to declare the dependency:
+- `follows: "r-7"` — motivated by the entire result
+- `follows: "r-7.2"` — motivated by a specific row (the third item)
+- `follows: ["r-3", "r-5.1"]` — motivated by multiple results/rows
+
+Example:
+1. search_entities("parse") -> result_id: "r-1", entities: [{row_id: "r-1.0", name: "parse_header"}, {row_id: "r-1.1", name: "parse_body"}]
+2. get_definition(entity_id="123", follows="r-1.0") -> result_id: "r-2"
+3. get_callers(entity_id="123", follows="r-2") -> result_id: "r-3"
+
+Always use `follows` when a tool call is directly motivated by an earlier result. Omit it only for independent/exploratory calls.
+
 ## Completing Work
 
 Call finish with: summary, next_actions, status (completed/blocked/needs_input).
