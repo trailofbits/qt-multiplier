@@ -146,6 +146,12 @@ AgentExplorer::AgentExplorer(ConfigManager &config_manager,
     {QStringLiteral("Cell Content Format Reference"),
      QStringLiteral("reference"),
      QStringLiteral(":/agent/references/cell_format.md"), 0},
+    {QStringLiteral("VR Observer Review Methodology"),
+     QStringLiteral("skill"),
+     QStringLiteral(":/agent/skills/vr_observer.md"), 0},
+    {QStringLiteral("Fuzzer Harness Writing Guide"),
+     QStringLiteral("skill"),
+     QStringLiteral(":/agent/skills/fuzzer_harness.md"), 0},
   });
 
   // Cache the prompts that are used at runtime.

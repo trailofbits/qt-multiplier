@@ -6,5 +6,7 @@
         <file>prompts/recommender_prompt.md</file>
         <file>references/python_api.md</file>
         <file>references/cell_format.md</file>
+        <file>skills/vr_observer.md</file>
+        <file>skills/fuzzer_harness.md</file>
     </qresource>
 </RCC>
