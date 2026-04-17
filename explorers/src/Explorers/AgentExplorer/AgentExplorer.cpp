@@ -41,6 +41,8 @@
 #include "AgentToolLogWidget.h"
 #include "AgentSessionListWidget.h"
 
+#include <multiplier/GUI/Widgets/SpreadsheetModel.h>
+
 // Must be at global scope — Q_INIT_RESOURCE can't be inside a namespace.
 static void initAgentResources(void) {
   Q_INIT_RESOURCE(AgentResources);
@@ -395,6 +397,93 @@ void AgentExplorer::ConnectSignals(void) {
     if (!d->recommender.benched_prompts.contains(prompt)) {
       d->recommender.benched_prompts.append(prompt);
     }
+  });
+
+  // Create tasks directly in the task board for observer suggestions.
+  connect(d->conversation, &AgentConversationWidget::scheduleTaskRequested,
+          this, [this](const QString &desc) {
+    auto &config = d->config_manager;
+
+    // Find or create the task sheet.
+    auto sheets = config.LoadOpenSheets();
+    int sheet_id = -1;
+    for (const auto &s : sheets) {
+      if (s.role == QLatin1String("task_list")) {
+        sheet_id = s.sheet_id;
+        break;
+      }
+    }
+    if (sheet_id < 0) {
+      for (const auto &s : sheets) {
+        if (s.name == QLatin1String("Task Board")) {
+          sheet_id = s.sheet_id;
+          break;
+        }
+      }
+    }
+
+    ConfigManager::SheetData sheet;
+    if (sheet_id >= 0) {
+      sheet = config.LoadSheetById(sheet_id);
+    } else {
+      // Create a new task sheet.
+      sheet.name = QStringLiteral("Task Board");
+      sheet.description = QStringLiteral("Agent task management board");
+      sheet.role = QStringLiteral("task_list");
+      sheet.key_column_index = 0;  // ID column.
+
+      static const QStringList kCols = {
+          QStringLiteral("ID"), QStringLiteral("Description"),
+          QStringLiteral("Status"), QStringLiteral("Priority"),
+          QStringLiteral("Entity"), QStringLiteral("Notes"),
+          QStringLiteral("Done")};
+      for (const auto &col_name : kCols) {
+        ConfigManager::SheetColumnInfo ci;
+        ci.name = col_name;
+        sheet.columns.append(ci);
+      }
+    }
+
+    // Determine next task ID.
+    int max_num = 0;
+    for (int r = 0; r < sheet.cells.size(); ++r) {
+      if (0 < sheet.cells[r].size()) {
+        auto v = SpreadsheetModel::value_from_json(sheet.cells[r][0]);
+        auto id_text = SpreadsheetModel::display_text_for(v);
+        if (id_text.startsWith(QLatin1String("T-"))) {
+          bool ok = false;
+          int num = id_text.mid(2).toInt(&ok);
+          if (ok && num > max_num) max_num = num;
+        }
+      }
+    }
+    auto task_id = QStringLiteral("T-%1").arg(max_num + 1, 3, 10, QLatin1Char('0'));
+
+    // Add row.
+    int row = static_cast<int>(sheet.cells.size());
+    int num_cols = static_cast<int>(sheet.columns.size());
+    while (sheet.cells.size() <= row) {
+      sheet.cells.append(QVector<QString>(num_cols));
+    }
+    auto &r = sheet.cells[row];
+    while (r.size() < num_cols) r.append(QString());
+
+    auto str_cell = [](const QString &s) {
+      return SpreadsheetModel::value_to_json(QVariant(s));
+    };
+    auto bool_cell = [](bool b) {
+      return SpreadsheetModel::value_to_json(QVariant(b));
+    };
+
+    r[0] = str_cell(task_id);          // ID
+    r[1] = str_cell(desc);             // Description
+    r[2] = str_cell(QStringLiteral("planned")); // Status
+    r[3] = str_cell(QStringLiteral("medium"));  // Priority
+    // Entity and Notes left empty.
+    if (r.size() > 6) r[6] = bool_cell(false);  // Done
+
+    config.SaveSheet(sheet);
+    config.NotifyExternalSheetsChanged();
   });
 
   // Navigate to entities when user double-clicks in tool result views.

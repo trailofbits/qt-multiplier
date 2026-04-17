@@ -40,6 +40,8 @@ class CostTimelineWidget Q_DECL_FINAL : public QWidget {
   explicit CostTimelineWidget(QWidget *parent = nullptr);
 
   void set_data(const QVector<QPointF> &points);
+  void setCumulative(bool cumulative);
+  bool isCumulative(void) const;
   QSize sizeHint(void) const override;
 
  protected:
@@ -50,6 +52,7 @@ class CostTimelineWidget Q_DECL_FINAL : public QWidget {
  private:
   QVector<QPointF> m_points;  // (seconds_since_start, cumulative_cost)
   int m_hover_index{-1};
+  bool m_cumulative{true};
 };
 
 // Custom widget: horizontal bar chart of tool call frequency.

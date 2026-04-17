@@ -13,6 +13,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QToolTip>
 #include <QVBoxLayout>
@@ -89,6 +90,7 @@ struct AgentDashboardWidget::PrivateData {
   CostTimelineWidget *cost_timeline{nullptr};
   ToolBarsWidget *tool_bars{nullptr};
   ToolSparklineWidget *tool_sparklines{nullptr};
+  QPushButton *cost_toggle{nullptr};
 
   // Summary card labels (updated on refresh).
   QLabel *total_cost_val{nullptr};
@@ -98,6 +100,7 @@ struct AgentDashboardWidget::PrivateData {
   QLabel *avg_cost_val{nullptr};
 
   QHash<QString, QString> tool_descriptions;
+  bool cumulative_loaded{false};
 };
 
 AgentDashboardWidget::~AgentDashboardWidget(void) {}
@@ -158,14 +161,35 @@ AgentDashboardWidget::AgentDashboardWidget(QWidget *parent)
   d->summary_layout->addStretch();
   root_layout->addWidget(summary_widget);
 
-  // Section: Cost timeline.
-  auto *cost_label = new QLabel(tr("Cumulative Cost Over Time"), container);
+  // Section: Cost timeline with cumulative/per-minute toggle.
+  auto *cost_header = new QHBoxLayout;
+  cost_header->setContentsMargins(0, 0, 0, 0);
+
+  auto *cost_label = new QLabel(tr("Cost Over Time"), container);
   auto section_font = cost_label->font();
   section_font.setBold(true);
   cost_label->setFont(section_font);
-  root_layout->addWidget(cost_label);
+  cost_header->addWidget(cost_label);
+
+  cost_header->addStretch();
+
+  d->cost_toggle = new QPushButton(tr("Cumulative"), container);
+  d->cost_toggle->setCheckable(true);
+  d->cost_toggle->setChecked(true);
+  d->cost_toggle->setFixedHeight(24);
+  cost_header->addWidget(d->cost_toggle);
+
+  root_layout->addLayout(cost_header);
 
   d->cost_timeline = new CostTimelineWidget(container);
+
+  connect(d->cost_toggle, &QPushButton::toggled,
+          [this](bool cumulative) {
+    d->cost_timeline->setCumulative(cumulative);
+    d->cost_toggle->setText(cumulative ? tr("Cumulative") : tr("Per minute"));
+    d->cost_timeline->update();
+  });
+
   root_layout->addWidget(d->cost_timeline);
 
   // Section: Tool usage bars.
@@ -197,6 +221,19 @@ void AgentDashboardWidget::refresh(int64_t session_id,
                                    ConfigManager &config) {
   if (session_id < 0) {
     return;
+  }
+
+  // Load cumulative toggle preference on first refresh.
+  if (!d->cumulative_loaded) {
+    d->cumulative_loaded = true;
+    bool cumulative = config.DashboardCumulative();
+    d->cost_toggle->setChecked(cumulative);
+    d->cost_timeline->setCumulative(cumulative);
+    d->cost_toggle->setText(cumulative ? tr("Cumulative") : tr("Per minute"));
+
+    // Save preference when toggled.
+    connect(d->cost_toggle, &QPushButton::toggled,
+            [&config](bool c) { config.SetDashboardCumulative(c); });
   }
 
   // Load aggregated data.
@@ -377,6 +414,16 @@ void CostTimelineWidget::set_data(const QVector<QPointF> &points) {
   update();
 }
 
+void CostTimelineWidget::setCumulative(bool cumulative) {
+  m_cumulative = cumulative;
+  m_hover_index = -1;
+  update();
+}
+
+bool CostTimelineWidget::isCumulative(void) const {
+  return m_cumulative;
+}
+
 QSize CostTimelineWidget::sizeHint(void) const {
   return QSize(400, kChartHeight + kMarginTop + kMarginBottom);
 }
@@ -401,10 +448,90 @@ void CostTimelineWidget::paintEvent(QPaintEvent *) {
   }
 
   double max_time = m_points.last().x();
-  double max_cost = m_points.last().y();
   if (max_time <= 0.0) {
     max_time = 1.0;
   }
+
+  if (!m_cumulative) {
+    // --- Timeboxed bar chart mode ---
+    // Divide session into ~20 time buckets, sum cost per bucket.
+    constexpr int kNumBuckets = 20;
+    double bucket_width = max_time / kNumBuckets;
+
+    QVector<double> buckets(kNumBuckets, 0.0);
+    // m_points contains cumulative data; compute per-point deltas.
+    for (int i = 1; i < m_points.size(); ++i) {
+      double cost_delta = m_points[i].y() - m_points[i - 1].y();
+      double t = m_points[i].x();
+      int bucket = static_cast<int>(t / bucket_width);
+      if (bucket >= kNumBuckets) bucket = kNumBuckets - 1;
+      if (bucket < 0) bucket = 0;
+      buckets[bucket] += cost_delta;
+    }
+
+    double max_bucket = 0.0;
+    for (double v : buckets) {
+      if (v > max_bucket) max_bucket = v;
+    }
+    if (max_bucket <= 0.0) max_bucket = 0.01;
+    max_bucket *= 1.1;
+
+    // Grid lines (4 horizontal).
+    p.setPen(QPen(grid_color, 1, Qt::DotLine));
+    for (int i = 1; i <= 4; ++i) {
+      double y_val = (max_bucket / 4.0) * i;
+      double y = kMarginTop + chart_h - (y_val / max_bucket) * chart_h;
+      p.drawLine(QPointF(kMarginLeft, y),
+                 QPointF(kMarginLeft + chart_w, y));
+      p.setPen(fg);
+      p.drawText(QRectF(0, y - 8, kMarginLeft - 4, 16),
+                 Qt::AlignRight | Qt::AlignVCenter,
+                 QStringLiteral("$%1").arg(y_val, 0, 'f', 3));
+      p.setPen(QPen(grid_color, 1, Qt::DotLine));
+    }
+
+    // Axes.
+    p.setPen(QPen(fg, 1));
+    p.drawLine(kMarginLeft, kMarginTop,
+               kMarginLeft, kMarginTop + chart_h);
+    p.drawLine(kMarginLeft, kMarginTop + chart_h,
+               kMarginLeft + chart_w, kMarginTop + chart_h);
+
+    // X-axis labels (5 ticks).
+    for (int i = 0; i <= 4; ++i) {
+      double t = (max_time / 4.0) * i;
+      double x = kMarginLeft + (t / max_time) * chart_w;
+      int total_secs = static_cast<int>(t);
+      int mins = total_secs / 60;
+      int secs = total_secs % 60;
+      auto label = QStringLiteral("%1:%2")
+                       .arg(mins)
+                       .arg(secs, 2, 10, QLatin1Char('0'));
+      p.drawText(QRectF(x - 25, kMarginTop + chart_h + 4, 50, 20),
+                 Qt::AlignCenter, label);
+    }
+
+    // Draw bars.
+    double bar_pixel_w = static_cast<double>(chart_w) / kNumBuckets;
+    auto bar_color = QColor(0x3B, 0x82, 0xF6);
+    for (int b = 0; b < kNumBuckets; ++b) {
+      if (buckets[b] <= 0.0) continue;
+      double bar_h = (buckets[b] / max_bucket) * chart_h;
+      double x = kMarginLeft + b * bar_pixel_w;
+      double y = kMarginTop + chart_h - bar_h;
+      auto c = bar_color;
+      if (b == m_hover_index) {
+        c = QColor(0xFB, 0xBF, 0x24);
+      }
+      p.setBrush(c);
+      p.setPen(Qt::NoPen);
+      p.drawRoundedRect(QRectF(x + 1, y, bar_pixel_w - 2, bar_h), 2, 2);
+    }
+    return;
+  }
+
+  // --- Cumulative line chart mode (original) ---
+  double max_cost = m_points.last().y();
   if (max_cost <= 0.0) {
     max_cost = 0.01;
   }
@@ -489,13 +616,53 @@ void CostTimelineWidget::mouseMoveEvent(QMouseEvent *event) {
   }
 
   double max_time = m_points.last().x();
-  double max_cost = m_points.last().y() * 1.1;
   if (max_time <= 0.0) max_time = 1.0;
-  if (max_cost <= 0.0) max_cost = 0.01;
 
   int chart_w = width() - kMarginLeft - kMarginRight;
-
   auto pos = event->pos();
+
+  if (!m_cumulative) {
+    // Timeboxed mode: detect which bar bucket the mouse is over.
+    constexpr int kNumBuckets = 20;
+    double bar_pixel_w = static_cast<double>(chart_w) / kNumBuckets;
+    int bucket = static_cast<int>((pos.x() - kMarginLeft) / bar_pixel_w);
+    if (bucket < 0 || bucket >= kNumBuckets ||
+        pos.y() < kMarginTop || pos.y() > kMarginTop + kChartHeight) {
+      bucket = -1;
+    }
+
+    if (bucket != m_hover_index) {
+      m_hover_index = bucket;
+      update();
+    }
+
+    if (bucket >= 0) {
+      // Compute bucket cost.
+      double bucket_width = max_time / kNumBuckets;
+      double bucket_cost = 0.0;
+      for (int i = 1; i < m_points.size(); ++i) {
+        double cost_delta = m_points[i].y() - m_points[i - 1].y();
+        int b = static_cast<int>(m_points[i].x() / bucket_width);
+        if (b >= kNumBuckets) b = kNumBuckets - 1;
+        if (b == bucket) bucket_cost += cost_delta;
+      }
+      int t0 = static_cast<int>(bucket * bucket_width);
+      int t1 = static_cast<int>((bucket + 1) * bucket_width);
+      auto tip = QStringLiteral("%1:%2 - %3:%4  Cost: $%5")
+                     .arg(t0 / 60).arg(t0 % 60, 2, 10, QLatin1Char('0'))
+                     .arg(t1 / 60).arg(t1 % 60, 2, 10, QLatin1Char('0'))
+                     .arg(bucket_cost, 0, 'f', 4);
+      QToolTip::showText(event->globalPosition().toPoint(), tip, this);
+    } else {
+      QToolTip::hideText();
+    }
+    return;
+  }
+
+  // Cumulative mode.
+  double max_cost = m_points.last().y() * 1.1;
+  if (max_cost <= 0.0) max_cost = 0.01;
+
   int best = -1;
   double best_dist = 20.0;  // Max pixel distance for hover.
 

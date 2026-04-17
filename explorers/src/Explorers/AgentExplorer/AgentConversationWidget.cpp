@@ -144,6 +144,14 @@ static QString toolResultSummary(const QString &tool_name,
         .arg(llm_calls)
         .arg(tool_calls);
   }
+  if (tool_name == QStringLiteral("run_python")) {
+    int exit_code = result[QStringLiteral("exit_code")].toInt(-1);
+    bool timed_out = result[QStringLiteral("timed_out")].toBool();
+    if (timed_out) {
+      return QStringLiteral("Python: timed out");
+    }
+    return QStringLiteral("Python: exit code %1").arg(exit_code);
+  }
   if (tool_name == QStringLiteral("finish")) {
     return QStringLiteral("Finished: acknowledged");
   }
@@ -1483,6 +1491,159 @@ static bool renderAnnotatedContent(
   return true;
 }
 
+// Basic Python syntax highlighting: returns HTML with colored spans.
+static QString highlightPython(const QString &code, const QPalette &pal) {
+  // Pick colors that work on both light and dark backgrounds.
+  bool is_dark = pal.color(QPalette::Base).lightness() < 128;
+  auto kw_color = is_dark ? QStringLiteral("#c678dd") : QStringLiteral("#a626a4");
+  auto str_color = is_dark ? QStringLiteral("#98c379") : QStringLiteral("#50a14f");
+  auto comment_color = is_dark ? QStringLiteral("#7f848e") : QStringLiteral("#a0a1a7");
+  auto num_color = is_dark ? QStringLiteral("#d19a66") : QStringLiteral("#986801");
+
+  static const QStringList keywords = {
+      QStringLiteral("def"), QStringLiteral("class"), QStringLiteral("import"),
+      QStringLiteral("from"), QStringLiteral("for"), QStringLiteral("while"),
+      QStringLiteral("if"), QStringLiteral("elif"), QStringLiteral("else"),
+      QStringLiteral("return"), QStringLiteral("yield"), QStringLiteral("with"),
+      QStringLiteral("as"), QStringLiteral("try"), QStringLiteral("except"),
+      QStringLiteral("finally"), QStringLiteral("raise"), QStringLiteral("pass"),
+      QStringLiteral("break"), QStringLiteral("continue"), QStringLiteral("and"),
+      QStringLiteral("or"), QStringLiteral("not"), QStringLiteral("in"),
+      QStringLiteral("is"), QStringLiteral("None"), QStringLiteral("True"),
+      QStringLiteral("False"), QStringLiteral("lambda"), QStringLiteral("assert"),
+      QStringLiteral("del"), QStringLiteral("global"), QStringLiteral("nonlocal"),
+      QStringLiteral("async"), QStringLiteral("await")};
+
+  // Build keyword regex.
+  QStringList escaped;
+  for (const auto &kw : keywords) escaped.append(QRegularExpression::escape(kw));
+  auto kw_pattern = QStringLiteral("\\b(?:%1)\\b").arg(escaped.join(QLatin1Char('|')));
+
+  struct Rule {
+    QRegularExpression re;
+    QString color;
+  };
+
+  QVector<Rule> rules;
+  // Comments (must be checked before other patterns in line-by-line processing).
+  rules.append({QRegularExpression(QStringLiteral("#[^\n]*")), comment_color});
+  // Triple-quoted strings.
+  rules.append({QRegularExpression(QStringLiteral("\"\"\"[\\s\\S]*?\"\"\"|'''[\\s\\S]*?'''")), str_color});
+  // Single/double-quoted strings.
+  rules.append({QRegularExpression(QStringLiteral("\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'")), str_color});
+  // Numbers.
+  rules.append({QRegularExpression(QStringLiteral("\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b")), num_color});
+  // Keywords.
+  rules.append({QRegularExpression(kw_pattern), kw_color});
+
+  // HTML-escape first.
+  QString escaped_code = code.toHtmlEscaped();
+
+  // Apply rules by finding all matches and sorting by position.
+  struct Match {
+    int start;
+    int length;
+    QString color;
+  };
+  QVector<Match> matches;
+
+  for (const auto &rule : rules) {
+    auto it = rule.re.globalMatch(code);
+    while (it.hasNext()) {
+      auto m = it.next();
+      matches.append({static_cast<int>(m.capturedStart()),
+                      static_cast<int>(m.capturedLength()), rule.color});
+    }
+  }
+
+  // Sort by start position, longer matches first for ties.
+  std::sort(matches.begin(), matches.end(), [](const Match &a, const Match &b) {
+    if (a.start != b.start) return a.start < b.start;
+    return a.length > b.length;
+  });
+
+  // Build HTML output, skipping overlapping matches.
+  QString html = QStringLiteral("<pre style=\"margin:0;\">");
+  int pos = 0;
+  for (const auto &m : matches) {
+    if (m.start < pos) continue;  // Skip overlapping.
+    // Emit un-highlighted text before this match.
+    if (m.start > pos) {
+      html += code.mid(pos, m.start - pos).toHtmlEscaped();
+    }
+    html += QStringLiteral("<span style=\"color:%1;\">%2</span>")
+                .arg(m.color, code.mid(m.start, m.length).toHtmlEscaped());
+    pos = m.start + m.length;
+  }
+  if (pos < code.size()) {
+    html += code.mid(pos).toHtmlEscaped();
+  }
+  html += QStringLiteral("</pre>");
+  return html;
+}
+
+// run_python: show the executed code with highlighting and stdout/stderr.
+static QWidget *createRunPythonView(const QJsonObject &result,
+                                    const QJsonObject &args,
+                                    QWidget *parent) {
+  auto code = args[QStringLiteral("code")].toString();
+  auto stdout_text = result[QStringLiteral("stdout")].toString();
+  auto stderr_text = result[QStringLiteral("stderr")].toString();
+
+  if (code.isEmpty() && stdout_text.isEmpty() && stderr_text.isEmpty()) {
+    return nullptr;
+  }
+
+  auto *container = new QWidget(parent);
+  auto *layout = new QVBoxLayout(container);
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(4);
+
+  // Code with basic syntax highlighting.
+  if (!code.isEmpty()) {
+    auto *code_browser = new QTextBrowser(container);
+    code_browser->setReadOnly(true);
+    code_browser->setMaximumHeight(200);
+    code_browser->setOpenLinks(false);
+    code_browser->setFrameShape(QFrame::NoFrame);
+    auto f = code_browser->font();
+    f.setFamily(QStringLiteral("monospace"));
+    f.setPointSize(f.pointSize() - 1);
+    code_browser->setFont(f);
+    code_browser->setHtml(highlightPython(code, parent->palette()));
+    layout->addWidget(code_browser);
+  }
+
+  // stdout.
+  if (!stdout_text.isEmpty()) {
+    auto *out = new QLabel(container);
+    out->setTextFormat(Qt::PlainText);
+    out->setWordWrap(true);
+    auto f = out->font();
+    f.setFamily(QStringLiteral("monospace"));
+    f.setPointSize(f.pointSize() - 1);
+    out->setFont(f);
+    out->setText(QStringLiteral("stdout:\n") + stdout_text.left(2000));
+    layout->addWidget(out);
+  }
+
+  // stderr.
+  if (!stderr_text.isEmpty()) {
+    auto *err = new QLabel(container);
+    err->setTextFormat(Qt::PlainText);
+    err->setWordWrap(true);
+    auto f = err->font();
+    f.setFamily(QStringLiteral("monospace"));
+    f.setPointSize(f.pointSize() - 1);
+    err->setFont(f);
+    err->setText(QStringLiteral("stderr:\n") + stderr_text.left(1000));
+    err->setStyleSheet(QStringLiteral("color: #ef4444;"));
+    layout->addWidget(err);
+  }
+
+  return container;
+}
+
 // Dispatcher: returns an interactive widget for the tool result, or nullptr.
 static QWidget *createToolResultWidget(const QString &tool_name,
                                        const QJsonObject &result,
@@ -1526,6 +1687,9 @@ static QWidget *createToolResultWidget(const QString &tool_name,
       tool_name == QStringLiteral("create_findings_sheet") ||
       tool_name == QStringLiteral("create_attack_surface_sheet")) {
     return createSheetLabel(result, args, parent);
+  }
+  if (tool_name == QStringLiteral("run_python")) {
+    return createRunPythonView(result, args, parent);
   }
   return nullptr;
 }
@@ -2314,6 +2478,29 @@ void AgentConversationWidget::showObserverRecommendation(
 
       prompts_layout->addLayout(row);
     }
+
+    // "Schedule All as Tasks" button when multiple prompts are available.
+    if (suggested_prompts.size() > 1) {
+      auto *exec_all_btn = new QPushButton(
+          tr("Schedule All as Tasks (%1)").arg(suggested_prompts.size()), frame);
+      exec_all_btn->setToolTip(tr("Create a task for each suggestion"));
+      exec_all_btn->setCursor(Qt::PointingHandCursor);
+      exec_all_btn->setStyleSheet(
+          QStringLiteral("QPushButton { background-color: rgba(59, 130, 246, 60); "
+                         "border: 1px solid rgba(59, 130, 246, 100); "
+                         "border-radius: 4px; padding: 6px 12px; } "
+                         "QPushButton:hover { background-color: rgba(59, 130, 246, 100); }"));
+      connect(exec_all_btn, &QPushButton::clicked, this,
+              [this, suggested_prompts, exec_all_btn] {
+        for (const auto &prompt : suggested_prompts) {
+          emit scheduleTaskRequested(prompt);
+        }
+        exec_all_btn->setEnabled(false);
+        exec_all_btn->setText(tr("Tasks Created"));
+      });
+      prompts_layout->addWidget(exec_all_btn);
+    }
+
     layout->addLayout(prompts_layout);
   }
 

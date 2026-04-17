@@ -521,6 +521,16 @@ void ConfigManager::SetSDKRoot(const QString &path) {
   SetSetting(d->global_db, QStringLiteral("sdk_root"), path);
 }
 
+bool ConfigManager::DashboardCumulative(void) const {
+  return GetSetting(d->global_db, QStringLiteral("dashboard_cumulative"),
+                    QStringLiteral("1")) == QStringLiteral("1");
+}
+
+void ConfigManager::SetDashboardCumulative(bool cumulative) {
+  SetSetting(d->global_db, QStringLiteral("dashboard_cumulative"),
+             cumulative ? QStringLiteral("1") : QStringLiteral("0"));
+}
+
 // --- Global settings ---
 
 void ConfigManager::SaveSettings(void) const {

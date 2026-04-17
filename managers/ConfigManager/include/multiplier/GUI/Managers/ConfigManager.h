@@ -126,6 +126,10 @@ class ConfigManager Q_DECL_FINAL : public QObject {
   QString SDKRoot(void) const;
   void SetSDKRoot(const QString &path);
 
+  //! Dashboard cumulative vs per-minute cost toggle.
+  bool DashboardCumulative(void) const;
+  void SetDashboardCumulative(bool cumulative);
+
   //! Save all persistent settings to disk.
   void SaveSettings(void) const;
 
