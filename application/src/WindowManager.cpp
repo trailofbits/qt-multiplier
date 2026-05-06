@@ -299,16 +299,24 @@ void WindowManager::AddDockWidget(IWindowWidget *widget,
   }
 
   auto area = ConvertLocation(config.location);
-  d->window->addDockWidget(area, dock_widget);
 
-  // Add this dock to a tab.
-  if (config.tabify) {
-    for (auto &[other_dock_widget, other_config] : d->dock_configs) {
-      if (other_dock_widget != dock_widget && other_config.tabify &&
-          d->window->dockWidgetArea(other_dock_widget) == area) {
-        d->window->tabifyDockWidget(other_dock_widget, dock_widget);
-        dock_widget->lower();
-        break;
+  // When split_after_id is set, use the three-argument addDockWidget overload
+  // with Qt::Horizontal so Qt splits the area rather than tabifying. The
+  // two-argument form auto-tabifies when the area is already occupied, and a
+  // subsequent splitDockWidget call cannot un-tabify a group it just created.
+  if (!config.split_after_id.isEmpty()) {
+    d->window->addDockWidget(area, dock_widget, Qt::Horizontal);
+  } else {
+    d->window->addDockWidget(area, dock_widget);
+    // Add this dock to a tab.
+    if (config.tabify) {
+      for (auto &[other_dock_widget, other_config] : d->dock_configs) {
+        if (other_dock_widget != dock_widget && other_config.tabify &&
+            d->window->dockWidgetArea(other_dock_widget) == area) {
+          d->window->tabifyDockWidget(other_dock_widget, dock_widget);
+          dock_widget->lower();
+          break;
+        }
       }
     }
   }

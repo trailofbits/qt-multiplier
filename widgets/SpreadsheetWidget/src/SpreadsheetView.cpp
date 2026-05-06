@@ -487,11 +487,16 @@ bool SpreadsheetView::viewportEvent(QEvent *event) {
 
 // Reserve a few row-heights of empty space below the last row so the user can
 // grab the bottom row's resize grip and drag it downward into slack space.
+// Mirror the same slack horizontally so the rightmost column can always be
+// dragged wider even when fully scrolled to the right.
 void SpreadsheetView::updateGeometries(void) {
   QTableView::updateGeometries();
   if (auto *vbar = verticalScrollBar()) {
     int extra = verticalHeader()->defaultSectionSize() * 3;
     vbar->setMaximum(vbar->maximum() + extra);
+  }
+  if (auto *hbar = horizontalScrollBar()) {
+    hbar->setMaximum(hbar->maximum() + 200);
   }
 }
 

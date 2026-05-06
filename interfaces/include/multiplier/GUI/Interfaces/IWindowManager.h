@@ -65,6 +65,12 @@ class IWindowManager : public QObject {
     //! If non-empty, this is the menu location where this dock widget should
     //! show up.
     QStringList app_menu_location;
+
+    //! If non-empty, place this dock by splitting the area horizontally rather
+    //! than tabifying. Uses the three-argument addDockWidget overload so Qt
+    //! creates a side-by-side split instead of a tab group. The value is used
+    //! as a human-readable label only; any non-empty string enables the split.
+    QString split_after_id;
   };
 
   struct CentralConfig {
