@@ -149,6 +149,15 @@ jobs:
           cp -a "${MULTIPLIER_INSTALL_DIRECTORY}"/bin/* "${INSTALL_DIR}/bin/"
           cp -a "${MULTIPLIER_INSTALL_DIRECTORY}"/lib/* "${INSTALL_DIR}/lib/"
 
+          # The Python extension module (multiplier.cpython-*.so) may be
+          # installed under lib/pythonX.Y/site-packages/ or a sub-package
+          # directory, but the binary's RPATH only covers the flat lib/.
+          # Flatten any cpython extension .so files into lib/ so the
+          # $ORIGIN/../lib RPATH resolves them without version-specific paths.
+          find "${MULTIPLIER_INSTALL_DIRECTORY}/lib" \
+            -name "multiplier.cpython-*.so" \
+            -exec cp {} "${INSTALL_DIR}/lib/" \;
+
           # Preserve include and cmake directories for development use
           if [ -d "${MULTIPLIER_INSTALL_DIRECTORY}/include" ]; then
             cp -a "${MULTIPLIER_INSTALL_DIRECTORY}/include" "${INSTALL_DIR}/"
