@@ -1870,8 +1870,13 @@ void CodeWidget::keyPressEvent(QKeyEvent *event) {
             static_cast<unsigned>(d->scene.num_file_lines));
 
       // Otherwise, request a generic keypress handler.
+      // Some keys (like Q for "Ask Agent") need the selection even when
+      // there's no entity under the cursor, so also emit when we have a
+      // selection and a cursor but no current_entity.
       } else if (d->current_entity && d->cursor) {
         emit RequestKeyPress(ks, d->CreateModelIndex(d->current_entity));
+      } else if (d->cursor && !d->token_model.selection.isEmpty()) {
+        emit RequestKeyPress(ks, d->CreateModelIndex(nullptr));
       }
       break;
   }

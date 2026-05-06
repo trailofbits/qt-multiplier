@@ -12,14 +12,25 @@
 #include <QClipboard>
 #include <QColorDialog>
 #include <QDataStream>
+#include <QHelpEvent>
 #include <QHeaderView>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QMimeData>
+#include <QLabel>
+#include <QPushButton>
+#include <QScreen>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QSortFilterProxyModel>
+#include <QTextBrowser>
+#include <QTimer>
+#include <QToolTip>
+#include <QVBoxLayout>
 
 #include <multiplier/Index.h>
 
@@ -35,6 +46,99 @@ Q_DECLARE_METATYPE(mx::TokenRange)
 Q_DECLARE_METATYPE(mx::Token)
 
 namespace mx::gui {
+
+// ---------------------------------------------------------------------------
+// ProvenancePopup — a mini-window that shows the evidence chain for a row.
+// Appears near the cursor on hover. Auto-dismisses after a delay unless the
+// mouse enters (which pins it). A close button dismisses it manually.
+// ---------------------------------------------------------------------------
+
+class ProvenancePopup Q_DECL_FINAL : public QFrame {
+  Q_OBJECT
+
+  QTimer *dismiss_timer_;
+  bool pinned_{false};
+
+ public:
+  explicit ProvenancePopup(const QString &html, QWidget *parent = nullptr)
+      : QFrame(parent, Qt::Tool | Qt::FramelessWindowHint) {
+    setAttribute(Qt::WA_DeleteOnClose);
+    setAttribute(Qt::WA_ShowWithoutActivating);
+    setFrameShape(QFrame::StyledPanel);
+    setFrameShadow(QFrame::Raised);
+    setStyleSheet(QStringLiteral(
+        "ProvenancePopup { background: palette(window); "
+        "border: 1px solid palette(mid); border-radius: 6px; }"));
+
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    // Title bar with close button.
+    auto *title_bar = new QWidget(this);
+    auto *title_layout = new QHBoxLayout(title_bar);
+    title_layout->setContentsMargins(8, 4, 4, 0);
+    auto *title = new QLabel(tr("Provenance"), title_bar);
+    auto tf = title->font();
+    tf.setBold(true);
+    tf.setPointSizeF(tf.pointSizeF() * 0.9);
+    title->setFont(tf);
+    title_layout->addWidget(title, 1);
+    auto *close_btn = new QPushButton(QStringLiteral("\u2715"), title_bar);
+    close_btn->setFixedSize(20, 20);
+    close_btn->setFlat(true);
+    close_btn->setStyleSheet(QStringLiteral(
+        "QPushButton { border: none; font-size: 12px; } "
+        "QPushButton:hover { background: rgba(255,0,0,40); border-radius: 3px; }"));
+    connect(close_btn, &QPushButton::clicked, this, &QWidget::close);
+    title_layout->addWidget(close_btn);
+    layout->addWidget(title_bar);
+
+    // Scrollable content.
+    auto *browser = new QTextBrowser(this);
+    browser->setReadOnly(true);
+    browser->setOpenLinks(false);
+    browser->setFrameShape(QFrame::NoFrame);
+    browser->setHtml(html);
+    browser->setFont([&] {
+      QFont f = font();
+      f.setPointSizeF(f.pointSizeF() * 0.85);
+      return f;
+    }());
+    layout->addWidget(browser, 1);
+
+    setFixedSize(480, qMin(400, qMax(200,
+        static_cast<int>(browser->document()->size().height()) + 60)));
+
+    // Auto-dismiss after 1.5s unless the mouse enters.
+    dismiss_timer_ = new QTimer(this);
+    dismiss_timer_->setSingleShot(true);
+    dismiss_timer_->setInterval(1500);
+    connect(dismiss_timer_, &QTimer::timeout, this, &QWidget::close);
+    dismiss_timer_->start();
+  }
+
+ protected:
+  void enterEvent(QEnterEvent *) override {
+    // Mouse entered — stop the dismiss timer and pin.
+    dismiss_timer_->stop();
+    pinned_ = true;
+  }
+
+  void leaveEvent(QEvent *) override {
+    // Mouse left — if not pinned by click, start dismiss.
+    if (!pinned_) {
+      dismiss_timer_->start();
+    }
+  }
+
+  void mousePressEvent(QMouseEvent *event) override {
+    // Any click inside pins the popup.
+    pinned_ = true;
+    dismiss_timer_->stop();
+    QFrame::mousePressEvent(event);
+  }
+};
 
 SpreadsheetView::SpreadsheetView(QWidget *parent)
     : QTableView(parent) {
@@ -153,7 +257,8 @@ SpreadsheetView::SpreadsheetView(QWidget *parent)
 
     QMenu menu(this);
     menu.addAction(tr("Rename Column..."), this, [this, col] () {
-      auto current = model()->headerData(col, Qt::Horizontal).toString();
+      auto current = model()->headerData(col, Qt::Horizontal,
+                                         Qt::EditRole).toString();
       SimpleTextInputDialog dialog(tr("Enter the new column name"),
                                    current, this);
       dialog.setWindowTitle(tr("Rename Column"));
@@ -222,6 +327,10 @@ void SpreadsheetView::SetColumnClickable(int col, bool clickable) {
   } else {
     clickable_columns_.remove(col);
   }
+  // Keep the model's clickable state in sync so the header marker updates.
+  if (auto *sm = qobject_cast<SpreadsheetModel *>(model())) {
+    sm->SetColumnClickable(col, clickable);
+  }
 }
 
 void SpreadsheetView::mousePressEvent(QMouseEvent *event) {
@@ -234,6 +343,16 @@ void SpreadsheetView::mousePressEvent(QMouseEvent *event) {
       emit DocumentCellClicked(idx);
     }
 
+    // Provenance cells: always clickable — show the evidence chain.
+    if (raw.canConvert<ProvenanceCell>()) {
+      auto pc = raw.value<ProvenanceCell>();
+      selectionModel()->select(idx, QItemSelectionModel::ClearAndSelect);
+      setCurrentIndex(idx);
+      emit ProvenanceCellClicked(pc.session_id, pc.result_id, pc.follows);
+      event->accept();
+      return;
+    }
+
     // Clickable-tokens columns: navigate on click, select only the cell.
     if (clickable_columns_.contains(idx.column())) {
       selectionModel()->select(idx, QItemSelectionModel::ClearAndSelect);
@@ -244,6 +363,136 @@ void SpreadsheetView::mousePressEvent(QMouseEvent *event) {
     }
   }
   QTableView::mousePressEvent(event);
+}
+
+bool SpreadsheetView::viewportEvent(QEvent *event) {
+  if (event->type() == QEvent::ToolTip && config_manager_) {
+    auto *help_event = static_cast<QHelpEvent *>(event);
+    auto idx = indexAt(help_event->pos());
+    if (idx.isValid()) {
+      QVariant raw = idx.data(SpreadsheetRoles::RawValueRole);
+      if (raw.canConvert<ProvenanceCell>()) {
+        auto pc = raw.value<ProvenanceCell>();
+
+        // Collect the chain: result_id first, then follows (oldest first).
+        QStringList chain_ids;
+        for (auto it = pc.follows.crbegin(); it != pc.follows.crend(); ++it) {
+          chain_ids.append(*it);
+        }
+        chain_ids.append(pc.result_id);
+
+        QStringList lines;
+        lines.append(QStringLiteral(
+            "<b>Provenance chain</b> &mdash; session %1")
+            .arg(pc.session_id));
+
+        // Load messages and build a result_id index by parsing JSON.
+        auto messages = config_manager_->LoadAgentMessages(pc.session_id);
+        QHash<QString, const ConfigManager::AgentMessageInfo *> rid_map;
+        QHash<int64_t, const ConfigManager::AgentMessageInfo *> id_map;
+        for (const auto &m : messages) {
+          id_map[m.message_id] = &m;
+          if (m.role != QStringLiteral("tool_result")) continue;
+          auto doc = QJsonDocument::fromJson(m.tool_result.toUtf8());
+          if (!doc.isObject()) continue;
+          auto rid = doc.object().value(QStringLiteral("result_id"))
+                         .toString();
+          if (!rid.isEmpty()) {
+            rid_map[rid] = &m;
+          }
+        }
+
+        // Show each chain member, capped at 10.
+        int shown = 0;
+        for (const auto &rid : chain_ids) {
+          if (shown >= 10) {
+            lines.append(QStringLiteral(
+                "<hr><i>... %1 more in chain</i>")
+                .arg(chain_ids.size() - shown));
+            break;
+          }
+          auto it = rid_map.find(rid);
+          if (it == rid_map.end()) continue;
+          const auto *m = it.value();
+
+          lines.append(QStringLiteral("<hr><b>%1</b> <code>%2</code>")
+              .arg(m->tool_name.toHtmlEscaped(), rid.toHtmlEscaped()));
+
+          // Show truncated tool result.
+          auto tr = m->tool_result;
+          if (tr.size() > 800) {
+            tr = tr.left(800) + QStringLiteral("...");
+          }
+          lines.append(QStringLiteral("<pre>%1</pre>")
+              .arg(tr.toHtmlEscaped()));
+
+          // Show the assistant reasoning that preceded this tool call.
+          auto parent_it = id_map.find(m->parent_message_id);
+          if (parent_it != id_map.end()) {
+            // tool_result -> tool_call -> assistant
+            auto call_it = id_map.find(parent_it.value()->parent_message_id);
+            if (call_it == id_map.end()) {
+              call_it = parent_it;  // fallback
+            }
+            const auto *reasoning = call_it.value();
+            if (reasoning->role == QStringLiteral("assistant") &&
+                !reasoning->content.isEmpty()) {
+              auto text = reasoning->content;
+              if (text.size() > 600) {
+                text = text.left(600) + QStringLiteral("...");
+              }
+              lines.append(QStringLiteral(
+                  "<blockquote><i>%1</i></blockquote>")
+                  .arg(text.toHtmlEscaped()));
+            }
+          }
+          ++shown;
+        }
+
+        // Close any existing popup.
+        if (provenance_popup_) {
+          provenance_popup_->close();
+        }
+
+        // Show a popup near the cursor.
+        auto *popup = new ProvenancePopup(
+            lines.join(QString()), nullptr);
+        provenance_popup_ = popup;
+
+        // Position: slightly below and to the right of the cursor,
+        // but keep on-screen.
+        auto cursor_pos = help_event->globalPos();
+        auto screen = QApplication::screenAt(cursor_pos);
+        if (screen) {
+          auto geom = screen->availableGeometry();
+          int x = cursor_pos.x() + 12;
+          int y = cursor_pos.y() + 12;
+          if (x + popup->width() > geom.right()) {
+            x = cursor_pos.x() - popup->width() - 12;
+          }
+          if (y + popup->height() > geom.bottom()) {
+            y = cursor_pos.y() - popup->height() - 12;
+          }
+          popup->move(x, y);
+        } else {
+          popup->move(cursor_pos + QPoint(12, 12));
+        }
+        popup->show();
+        return true;
+      }
+    }
+  }
+  return QTableView::viewportEvent(event);
+}
+
+// Reserve a few row-heights of empty space below the last row so the user can
+// grab the bottom row's resize grip and drag it downward into slack space.
+void SpreadsheetView::updateGeometries(void) {
+  QTableView::updateGeometries();
+  if (auto *vbar = verticalScrollBar()) {
+    int extra = verticalHeader()->defaultSectionSize() * 3;
+    vbar->setMaximum(vbar->maximum() + extra);
+  }
 }
 
 void SpreadsheetView::ApplyThemeColors(const QColor &gutter_bg,
@@ -1008,9 +1257,52 @@ void SpreadsheetView::OnContextMenu(const QPoint &pos) {
     menu.addAction(tr("Remove Column"), this, [this, col]() {
       model()->removeColumn(col);
     });
+
+    // "Investigate with Agent" — build a prompt from the row data.
+    menu.addSeparator();
+    menu.addAction(tr("Investigate with Agent"), this, [this, row]() {
+      auto *m = model();
+      if (!m) return;
+      int cols = m->columnCount();
+      QStringList parts;
+      for (int c = 0; c < cols; ++c) {
+        auto header = m->headerData(c, Qt::Horizontal).toString();
+        auto value = m->data(m->index(row, c), Qt::DisplayRole).toString();
+        if (!value.isEmpty()) {
+          parts.append(QStringLiteral("%1: %2").arg(header, value));
+        }
+      }
+      if (!parts.isEmpty()) {
+        auto prompt = QStringLiteral("Investigate this entry:\n%1")
+                          .arg(parts.join(QStringLiteral("\n")));
+        emit AgentTaskRequested(prompt);
+      }
+    });
+    menu.addAction(tr("Harness this"), this, [this, row]() {
+      auto *m = model();
+      if (!m) return;
+      int cols = m->columnCount();
+      QStringList parts;
+      for (int c = 0; c < cols; ++c) {
+        auto header = m->headerData(c, Qt::Horizontal).toString();
+        auto value = m->data(m->index(row, c), Qt::DisplayRole).toString();
+        if (!value.isEmpty()) {
+          parts.append(QStringLiteral("%1: %2").arg(header, value));
+        }
+      }
+      if (!parts.isEmpty()) {
+        auto desc = QStringLiteral(
+            "Validate this suspected vulnerability by building and "
+            "running a harness:\n%1")
+            .arg(parts.join(QStringLiteral("\n")));
+        emit HarnessRequested(desc, row);
+      }
+    });
   }
 
   menu.exec(viewport()->mapToGlobal(pos));
 }
 
 }  // namespace mx::gui
+
+#include "SpreadsheetView.moc"

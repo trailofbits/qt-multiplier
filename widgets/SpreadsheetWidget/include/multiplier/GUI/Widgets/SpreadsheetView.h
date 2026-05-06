@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <QPointer>
 #include <QSet>
 #include <QTableView>
 
@@ -15,11 +16,14 @@ QT_BEGIN_NAMESPACE
 class QKeyEvent;
 class QMenu;
 class QModelIndex;
+class QTextBrowser;
+class QTimer;
 QT_END_NAMESPACE
 
 namespace mx::gui {
 
 class ConfigManager;
+class ProvenancePopup;
 
 // A QTableView subclass providing spreadsheet-like interaction: keyboard
 // shortcuts for clipboard operations, context menus for row/column
@@ -29,6 +33,7 @@ class SpreadsheetView Q_DECL_FINAL : public QTableView {
 
   ConfigManager *config_manager_{nullptr};
   QSet<int> clickable_columns_;
+  QPointer<ProvenancePopup> provenance_popup_;
 
  public:
   explicit SpreadsheetView(QWidget *parent = nullptr);
@@ -59,10 +64,17 @@ class SpreadsheetView Q_DECL_FINAL : public QTableView {
  signals:
   void TokenClicked(const QModelIndex &index);
   void DocumentCellClicked(const QModelIndex &index);
+  void AgentTaskRequested(const QString &prompt);
+  void HarnessRequested(const QString &vulnerability_desc,
+                        int row_index);
+  void ProvenanceCellClicked(int64_t session_id, const QString &result_id,
+                             const QStringList &follows);
 
  protected:
   void keyPressEvent(QKeyEvent *event) Q_DECL_FINAL;
   void mousePressEvent(QMouseEvent *event) Q_DECL_FINAL;
+  bool viewportEvent(QEvent *event) Q_DECL_OVERRIDE;
+  void updateGeometries(void) Q_DECL_OVERRIDE;
 
  private slots:
   void OnContextMenu(const QPoint &pos);

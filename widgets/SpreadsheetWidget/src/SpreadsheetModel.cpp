@@ -41,6 +41,14 @@ QString LocationCell::displayText(void) const {
   return name;
 }
 
+QString ProvenanceCell::displayText(void) const {
+  if (follows.isEmpty()) {
+    return result_id;
+  }
+  return QStringLiteral("%1 \u2190 %2")
+      .arg(result_id, follows.join(QStringLiteral(", ")));
+}
+
 SpreadsheetModel::SpreadsheetModel(QObject *parent)
     : QAbstractTableModel(parent),
       m_undo_stack(new QUndoStack(this)) {}
@@ -309,15 +317,27 @@ Qt::ItemFlags SpreadsheetModel::flags(const QModelIndex &index) const {
 
 QVariant SpreadsheetModel::headerData(int section, Qt::Orientation orientation,
                                       int role) const {
-  if (role != Qt::DisplayRole) {
+  if (orientation == Qt::Horizontal &&
+      section >= 0 && section < m_columns.size()) {
+    if (role == Qt::EditRole) {
+      // EditRole returns the clean name (no markers).
+      return m_columns[section].name;
+    }
+    if (role == Qt::DisplayRole) {
+      // DisplayRole appends visual affordance markers.
+      QString display = m_columns[section].name;
+      if (section == m_key_column) {
+        display += QStringLiteral(" [K]");
+      }
+      if (m_clickable_columns.contains(section)) {
+        display += QStringLiteral(" [\u2197]");  // ↗
+      }
+      return display;
+    }
     return {};
   }
 
-  if (orientation == Qt::Horizontal) {
-    if (section >= 0 && section < m_columns.size()) {
-      return m_columns[section].name;
-    }
-  } else {
+  if (orientation == Qt::Vertical && role == Qt::DisplayRole) {
     // Row headers are 1-based indices.
     return section + 1;
   }
@@ -601,6 +621,10 @@ QString SpreadsheetModel::display_text_for(const QVariant &value) {
     return value.value<LocationCell>().displayText();
   }
 
+  if (value.canConvert<ProvenanceCell>()) {
+    return value.value<ProvenanceCell>().displayText();
+  }
+
   if (value.userType() == QMetaType::Bool) {
     return value.toBool() ? QStringLiteral("true")
                           : QStringLiteral("false");
@@ -655,6 +679,32 @@ QColor SpreadsheetModel::ColumnColor(int col) const {
   return (it != m_col_colors.end()) ? it.value() : QColor();
 }
 
+void SpreadsheetModel::SetKeyColumn(int col) {
+  int old_key = m_key_column;
+  m_key_column = col;
+  if (old_key >= 0 && old_key < m_columns.size()) {
+    emit headerDataChanged(Qt::Horizontal, old_key, old_key);
+  }
+  if (col >= 0 && col < m_columns.size()) {
+    emit headerDataChanged(Qt::Horizontal, col, col);
+  }
+}
+
+void SpreadsheetModel::SetColumnClickable(int col, bool clickable) {
+  if (clickable) {
+    m_clickable_columns.insert(col);
+  } else {
+    m_clickable_columns.remove(col);
+  }
+  if (col >= 0 && col < m_columns.size()) {
+    emit headerDataChanged(Qt::Horizontal, col, col);
+  }
+}
+
+bool SpreadsheetModel::IsColumnClickable(int col) const {
+  return m_clickable_columns.contains(col);
+}
+
 QString SpreadsheetModel::value_to_json(const QVariant &value) {
   if (!value.isValid()) {
     return {};
@@ -677,6 +727,25 @@ QString SpreadsheetModel::value_to_json(const QVariant &value) {
         .arg(lc.line)
         .arg(lc.column)
         .arg(opaque_b64);
+  }
+
+  if (value.canConvert<ProvenanceCell>()) {
+    auto pc = value.value<ProvenanceCell>();
+    QJsonObject obj;
+    obj[QStringLiteral("t")] = QStringLiteral("prov");
+    obj[QStringLiteral("sid")] = static_cast<qint64>(pc.session_id);
+    obj[QStringLiteral("rid")] = pc.result_id;
+    if (!pc.follows.isEmpty()) {
+      obj[QStringLiteral("f")] = QJsonArray::fromStringList(pc.follows);
+    }
+    if (!pc.row_key.isEmpty()) {
+      obj[QStringLiteral("rk")] = pc.row_key;
+    }
+    if (!pc.harness_status.isEmpty()) {
+      obj[QStringLiteral("hs")] = pc.harness_status;
+    }
+    return QString::fromUtf8(
+        QJsonDocument(obj).toJson(QJsonDocument::Compact));
   }
 
   if (value.canConvert<DocumentCell>()) {
@@ -773,6 +842,20 @@ QVariant SpreadsheetModel::value_from_json(const QString &json,
     dc.doc_id = obj[QStringLiteral("id")].toInt(-1);
     dc.title = obj[QStringLiteral("tl")].toString();
     return QVariant::fromValue(dc);
+  }
+
+  if (type == QLatin1String("prov")) {
+    ProvenanceCell pc;
+    pc.session_id = static_cast<int64_t>(
+        obj[QStringLiteral("sid")].toDouble());
+    pc.result_id = obj[QStringLiteral("rid")].toString();
+    pc.row_key = obj[QStringLiteral("rk")].toString();
+    pc.harness_status = obj[QStringLiteral("hs")].toString();
+    auto follows_arr = obj[QStringLiteral("f")].toArray();
+    for (const auto &v : follows_arr) {
+      pc.follows.append(v.toString());
+    }
+    return QVariant::fromValue(pc);
   }
 
   if (type == QLatin1String("tok")) {

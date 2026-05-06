@@ -12,6 +12,7 @@
 #include <QColor>
 #include <QHash>
 #include <QMetaType>
+#include <QSet>
 #include <QString>
 #include <QUndoStack>
 #include <QVariant>
@@ -42,6 +43,20 @@ struct FormulaCell {
 struct DocumentCell {
   int doc_id{-1};    // Primary key in gui_documents (-1 = not yet persisted).
   QString title;     // Cached document title, shown in the cell.
+};
+
+// A cell that references one or more conversation results (provenance).
+// Renders as a clickable chain of result_ids (e.g. "r-17 <- r-7, r-12").
+// Clicking opens the evidence chain for auditing or review.
+struct ProvenanceCell {
+  int64_t session_id{-1};     // Which session produced this evidence.
+  QString result_id;           // The result_id of the producing tool call.
+  QStringList follows;         // The result_ids this cell was motivated by.
+  QString row_key;             // Optional row key for lookup.
+  QString harness_status;      // Harness status: dispatched, running, completed, failed.
+
+  // Render as "r-17 <- r-7, r-12" or just "r-17".
+  QString displayText(void) const;
 };
 
 // A cell that references a code location. Renders as "path:line:col"
@@ -170,12 +185,20 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
   QColor RowColor(int row) const;
   QColor ColumnColor(int col) const;
 
+  // Column affordance markers (display-only, not stored in the name).
+  void SetKeyColumn(int col);
+  int KeyColumn(void) const { return m_key_column; }
+  void SetColumnClickable(int col, bool clickable);
+  bool IsColumnClickable(int col) const;
+
  private:
   QVector<ColumnDefinition> m_columns;
   QVector<QVector<QVariant>> m_rows;
   QUndoStack *m_undo_stack;
   QHash<int, QColor> m_row_colors;
   QHash<int, QColor> m_col_colors;
+  int m_key_column{-1};
+  QSet<int> m_clickable_columns;
 };
 
 }  // namespace mx::gui
@@ -183,3 +206,4 @@ class SpreadsheetModel Q_DECL_FINAL : public QAbstractTableModel {
 Q_DECLARE_METATYPE(mx::gui::FormulaCell)
 Q_DECLARE_METATYPE(mx::gui::DocumentCell)
 Q_DECLARE_METATYPE(mx::gui::LocationCell)
+Q_DECLARE_METATYPE(mx::gui::ProvenanceCell)

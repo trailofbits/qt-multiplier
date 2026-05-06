@@ -740,6 +740,7 @@ void CodeExplorer::OnPreviewEntity(const QVariant &data, bool is_explicit) {
     IWindowManager::DockConfig config;
     config.id = "com.trailofbits.dock.CodePreview";
     config.location = IWindowManager::DockLocation::Bottom;
+    config.tabify = true;
     config.app_menu_location = {tr("View"), tr("Drawers")};
     d->manager->AddDockWidget(d->preview, config);
   }

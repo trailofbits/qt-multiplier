@@ -389,6 +389,7 @@ void CodeSearchExplorer::OnSearchTriggered(void) {
     return;
   }
 
+  // Prepend (?m) so ^ and $ match line boundaries within fragments.
   RegexQuery query(pattern.toStdString());
   if (!query.is_valid()) {
     // TODO(pag): Show a proper error dialog or status bar message.

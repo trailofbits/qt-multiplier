@@ -259,6 +259,76 @@ void SpreadsheetDelegate::paint(QPainter *painter,
     return;
   }
 
+  // ProvenanceCell: render as link-colored text with a chain icon.
+  if (raw.canConvert<ProvenanceCell>()) {
+    QStyleOptionViewItem opt = option;
+    initStyleOption(&opt, index);
+
+    auto *style = opt.widget ? opt.widget->style() : QApplication::style();
+    style->drawPrimitive(QStyle::PE_PanelItemViewItem, &opt, painter,
+                         opt.widget);
+
+    auto pc = raw.value<ProvenanceCell>();
+
+    // Draw a link icon.
+    QIcon link_icon = style->standardIcon(QStyle::SP_CommandLink);
+    int icon_size = opt.rect.height() - 4;
+    QRect icon_rect(opt.rect.left() + 4, opt.rect.top() + 2,
+                    icon_size, icon_size);
+    link_icon.paint(painter, icon_rect);
+
+    // Draw the provenance text in link color.
+    QRect text_rect = opt.rect;
+    text_rect.setLeft(icon_rect.right() + 6);
+
+    // Draw harness status badge if present.
+    if (!pc.harness_status.isEmpty()) {
+      QColor badge_color;
+      QString badge_text;
+      if (pc.harness_status == QLatin1String("dispatched")) {
+        badge_color = QColor(0xF5, 0x9E, 0x0B);  // amber
+        badge_text = QStringLiteral("\u25CF");     // filled circle
+      } else if (pc.harness_status == QLatin1String("running")) {
+        badge_color = QColor(0x3B, 0x82, 0xF6);  // blue
+        badge_text = QStringLiteral("\u25CF");
+      } else if (pc.harness_status == QLatin1String("completed")) {
+        badge_color = QColor(0x22, 0xC5, 0x5E);  // green
+        badge_text = QStringLiteral("\u2713");     // check mark
+      } else if (pc.harness_status == QLatin1String("failed")) {
+        badge_color = QColor(0xEF, 0x44, 0x44);  // red
+        badge_text = QStringLiteral("\u2717");     // cross mark
+      }
+      if (!badge_text.isEmpty()) {
+        painter->save();
+        painter->setPen(badge_color);
+        QFont bf = painter->font();
+        bf.setBold(true);
+        painter->setFont(bf);
+        auto badge_width = painter->fontMetrics()
+                               .horizontalAdvance(badge_text) + 4;
+        QRect badge_rect(text_rect.left(), text_rect.top(),
+                         badge_width, text_rect.height());
+        painter->drawText(badge_rect, Qt::AlignCenter, badge_text);
+        text_rect.setLeft(badge_rect.right() + 2);
+        painter->restore();
+      }
+    }
+
+    painter->save();
+    if (opt.state & QStyle::State_Selected) {
+      painter->setPen(opt.palette.color(QPalette::HighlightedText));
+    } else {
+      painter->setPen(opt.palette.color(QPalette::Link));
+    }
+    QFont font = painter->font();
+    font.setUnderline(true);
+    painter->setFont(font);
+    painter->drawText(text_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                      pc.displayText());
+    painter->restore();
+    return;
+  }
+
   // FormulaCell: render the cached result (or error) text.
   if (raw.canConvert<FormulaCell>()) {
     QStyleOptionViewItem opt = option;

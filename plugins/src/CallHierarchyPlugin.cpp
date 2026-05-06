@@ -6,7 +6,13 @@
 
 #include <multiplier/GUI/Plugins/CallHierarchyPlugin.h>
 
+#include <multiplier/AST/DesignatedInitExpr.h>
+#include <multiplier/AST/Designator.h>
+#include <multiplier/AST/FieldDecl.h>
+#include <multiplier/AST/InitListExpr.h>
 #include <multiplier/AST/NamedDecl.h>
+#include <multiplier/AST/RecordDecl.h>
+#include <multiplier/AST/RecordType.h>
 #include <multiplier/GUI/Interfaces/IModel.h>
 #include <multiplier/GUI/Interfaces/ITreeGenerator.h>
 #include <multiplier/GUI/Managers/ActionManager.h>
@@ -79,6 +85,81 @@ static IGeneratedItemPtr CreateGeneratedItem(
   return std::make_shared<CallHierarchyItem>(
       user, used, NameOfEntity(used),
       LocationOfEntity(file_location_cache, user), EntityBreadCrumbs(user));
+}
+
+// Given a reference use site, check if it's inside an initializer list and
+// return the FieldDecl being initialized, if any. This handles both designated
+// initializers (e.g., .field = func) and positional initializers.
+static std::optional<FieldDecl> FieldForInitializerUse(
+    const VariantEntity &use) {
+
+  auto use_stmt = Stmt::from(use);
+  if (!use_stmt) {
+    return std::nullopt;
+  }
+
+  // Case 1: Designated initializer (e.g., .field = func).
+  for (auto die : DesignatedInitExpr::containing(*use_stmt)) {
+    for (auto d : die.designators()) {
+      if (d.is_field_designator()) {
+        return d.field();
+      }
+    }
+    return std::nullopt;
+  }
+
+  // Case 2: Positional initializer (e.g., { func1, func2 }). Walk up the
+  // parent chain to find the enclosing InitListExpr, tracking the direct
+  // child stmt so we can match it against the initializer list by ID.
+  Stmt child = *use_stmt;
+  for (auto cur = use_stmt->parent_statement(); cur; ) {
+    auto ile = InitListExpr::from(*cur);
+    if (!ile) {
+      child = *cur;
+      cur = cur->parent_statement();
+      continue;
+    }
+
+    // For unions, there's a direct field accessor.
+    if (auto field = ile->initialized_field_in_union()) {
+      return field;
+    }
+
+    // For structs, map the initializer index to the corresponding field.
+    auto type = ile->type();
+    if (!type) {
+      return std::nullopt;
+    }
+
+    auto record_type = RecordType::from(type->unqualified_desugared_type());
+    if (!record_type) {
+      return std::nullopt;
+    }
+
+    auto record = RecordDecl::from(record_type->declaration());
+    if (!record) {
+      return std::nullopt;
+    }
+
+    auto def = record->definition();
+    if (!def) {
+      return std::nullopt;
+    }
+
+    // `child` is the direct child of `ile` that we came from. Match it
+    // against the initializers by entity ID to find the field index.
+    unsigned num = ile->num_initializers();
+    for (unsigned i = 0u; i < num; ++i) {
+      auto init = ile->nth_initializer(i);
+      if (init && init->id() == child.id()) {
+        return def->nth_field(i);
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  return std::nullopt;
 }
 
 class CallHierarchyGenerator final : public ITreeGenerator {
@@ -207,6 +288,14 @@ gap::generator<IGeneratedItemPtr> CallHierarchyGenerator::Children(
     // NOTE(pag): `use` is a *user* of `containing_entity`, and `user` is a
     //            use of (really, container of) `use`.
     co_yield CreateGeneratedItem(file_location_cache, use, user);
+
+    // If the use is inside an initializer list, also yield an item for the
+    // field being initialized so that expanding it shows references to that
+    // field (e.g., var->field or var.field uses).
+    if (auto field = FieldForInitializerUse(use)) {
+      Decl canon = field->canonical_declaration();
+      co_yield CreateGeneratedItem(file_location_cache, canon, canon);
+    }
   }
 }
 

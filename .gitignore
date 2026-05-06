@@ -6,3 +6,6 @@ build
 compile_commands.json
 .mcp.json
 .claude/
+
+# Private planning notes — kept locally, not shipped.
+plans/

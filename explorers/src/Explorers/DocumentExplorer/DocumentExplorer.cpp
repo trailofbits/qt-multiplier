@@ -305,7 +305,8 @@ void DocumentExplorer::CreateDockWidget(IWindowManager *manager) {
                        [this, category] () {
           auto dir = QFileDialog::getExistingDirectory(
               d->tree, tr("Save All Documents in %1")
-                           .arg(category_display_name(category)));
+                           .arg(category_display_name(category)),
+              QString(), QFileDialog::DontUseNativeDialog);
           if (dir.isEmpty()) return;
 
           auto docs = d->config_manager.LoadDocumentsByCategory(category);
@@ -378,8 +379,14 @@ void DocumentExplorer::CreateDockWidget(IWindowManager *manager) {
               ? QStringLiteral("document_%1").arg(doc_id) + ext
               : title + ext;
 
-          auto path = QFileDialog::getSaveFileName(
-              d->tree, tr("Save Document"), suggested);
+          QFileDialog save_dlg(d->tree, tr("Save Document"), suggested);
+          save_dlg.setAcceptMode(QFileDialog::AcceptSave);
+          save_dlg.setOption(QFileDialog::DontUseNativeDialog, true);
+          QString path;
+          if (save_dlg.exec() == QDialog::Accepted &&
+              !save_dlg.selectedFiles().isEmpty()) {
+            path = save_dlg.selectedFiles().first();
+          }
           if (path.isEmpty()) return;
 
           QFile file(path);
